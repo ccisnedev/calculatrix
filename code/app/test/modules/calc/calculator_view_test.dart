@@ -3,15 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:calculatrix/main.dart';
 
 void main() {
-  group('CalculatrixApp - widget tests', () {
+  group('CalculatorView - widget tests', () {
     testWidgets('app renders without crash', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
       expect(find.byType(MaterialApp), findsOneWidget);
-    });
-
-    testWidgets('displays app title in AppBar', (tester) async {
-      await tester.pumpWidget(const CalculatrixApp());
-      expect(find.text('Calculatrix'), findsOneWidget);
     });
 
     testWidgets('displays initial value "0"', (tester) async {
@@ -24,40 +19,33 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('display has semantic label', (tester) async {
-      final handle = tester.ensureSemantics();
+    testWidgets('keypad has all 20 buttons', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
-      expect(
-        find.bySemanticsLabel(RegExp(r'Display: 0')),
-        findsOneWidget,
-      );
-      handle.dispose();
-    });
-
-    testWidgets('app title has semantic label', (tester) async {
-      final handle = tester.ensureSemantics();
-      await tester.pumpWidget(const CalculatrixApp());
-      expect(
-        find.bySemanticsLabel(RegExp(r'Calculatrix')),
-        findsWidgets,
-      );
-      handle.dispose();
-    });
-
-    testWidgets('keypad buttons are rendered', (tester) async {
-      await tester.pumpWidget(const CalculatrixApp());
-      expect(find.text('C'), findsOneWidget);
-      expect(find.text('='), findsOneWidget);
-      expect(find.text('7'), findsOneWidget);
-      // '0' appears in both keypad button and display
+      final expected = [
+        'C', '(', ')', '÷',
+        '7', '8', '9', '×',
+        '4', '5', '6', '-',
+        '1', '2', '3', '+',
+        '⌫', '.', '=',
+      ];
+      for (final label in expected) {
+        expect(find.text(label), findsOneWidget,
+            reason: 'Button "$label" not found');
+      }
+      // '0' appears in both display and button
       expect(find.text('0'), findsWidgets);
     });
 
-    testWidgets('tap digit updates display', (tester) async {
+    testWidgets('tap digit updates expression', (tester) async {
+      final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
       await tester.tap(find.text('5'));
       await tester.pump();
-      expect(find.text('5'), findsWidgets); // button + display
+      expect(
+        find.bySemanticsLabel(RegExp(r'Expression: 5')),
+        findsOneWidget,
+      );
+      handle.dispose();
     });
 
     testWidgets('tap equals evaluates expression', (tester) async {
@@ -87,6 +75,77 @@ void main() {
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 0')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('backspace removes last character', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+      await tester.tap(find.text('3'));
+      await tester.pump();
+      await tester.tap(find.text('5'));
+      await tester.pump();
+      await tester.tap(find.text('⌫'));
+      await tester.pump();
+      expect(
+        find.bySemanticsLabel(RegExp(r'Expression: 3')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('operator buttons work', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+      await tester.tap(find.text('8'));
+      await tester.pump();
+      await tester.tap(find.text('×'));
+      await tester.pump();
+      await tester.tap(find.text('2'));
+      await tester.pump();
+      await tester.tap(find.text('='));
+      await tester.pump();
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: 16')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('parentheses work in expression', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+      // (2+3)×4 = 20
+      await tester.tap(find.text('('));
+      await tester.pump();
+      await tester.tap(find.text('2'));
+      await tester.pump();
+      await tester.tap(find.text('+'));
+      await tester.pump();
+      await tester.tap(find.text('3'));
+      await tester.pump();
+      await tester.tap(find.text(')'));
+      await tester.pump();
+      await tester.tap(find.text('×'));
+      await tester.pump();
+      await tester.tap(find.text('4'));
+      await tester.pump();
+      await tester.tap(find.text('='));
+      await tester.pump();
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: 20')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('display has expression semantic label', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+      expect(
+        find.bySemanticsLabel(RegExp(r'Expression: ')),
         findsOneWidget,
       );
       handle.dispose();

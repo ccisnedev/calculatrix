@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
 import 'controller.dart';
 
-/// The main calculator screen.
+/// Button category for visual differentiation.
+enum _ButtonCategory { number, operator, function, equals }
+
+/// Definition of a calculator button.
+class _ButtonDef {
+  final String label;
+  final _ButtonCategory category;
+  final int colSpan;
+
+  const _ButtonDef(this.label, this.category, [this.colSpan = 1]);
+}
+
+/// The Casio HL-820LV inspired calculator layout.
 ///
-/// Displays the expression and result, with a minimal keypad for v0.2.0 testing.
-/// Full Casio layout will be implemented in v0.3.0.
+/// 5 rows × 4 columns grid with expression + result display.
 class CalculatorView extends StatefulWidget {
   const CalculatorView({super.key});
 
@@ -15,6 +26,34 @@ class CalculatorView extends StatefulWidget {
 class _CalculatorViewState extends State<CalculatorView> {
   final _controller = CalculatorController();
 
+  static const _buttons = [
+    // Row 1: function keys
+    _ButtonDef('C', _ButtonCategory.function),
+    _ButtonDef('(', _ButtonCategory.function),
+    _ButtonDef(')', _ButtonCategory.function),
+    _ButtonDef('÷', _ButtonCategory.operator),
+    // Row 2
+    _ButtonDef('7', _ButtonCategory.number),
+    _ButtonDef('8', _ButtonCategory.number),
+    _ButtonDef('9', _ButtonCategory.number),
+    _ButtonDef('×', _ButtonCategory.operator),
+    // Row 3
+    _ButtonDef('4', _ButtonCategory.number),
+    _ButtonDef('5', _ButtonCategory.number),
+    _ButtonDef('6', _ButtonCategory.number),
+    _ButtonDef('-', _ButtonCategory.operator),
+    // Row 4
+    _ButtonDef('1', _ButtonCategory.number),
+    _ButtonDef('2', _ButtonCategory.number),
+    _ButtonDef('3', _ButtonCategory.number),
+    _ButtonDef('+', _ButtonCategory.operator),
+    // Row 5
+    _ButtonDef('⌫', _ButtonCategory.function),
+    _ButtonDef('0', _ButtonCategory.number),
+    _ButtonDef('.', _ButtonCategory.number),
+    _ButtonDef('=', _ButtonCategory.equals),
+  ];
+
   @override
   void dispose() {
     _controller.dispose();
@@ -24,96 +63,150 @@ class _CalculatorViewState extends State<CalculatorView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Semantics(
-          label: 'Calculatrix',
-          child: const Text('Calculatrix'),
+      backgroundColor: const Color(0xFF1A1A2E),
+      body: SafeArea(
+        child: ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            return Column(
+              children: [
+                // Display area
+                _buildDisplay(context),
+                // Keypad
+                Expanded(
+                  child: _buildKeypad(),
+                ),
+              ],
+            );
+          },
         ),
-      ),
-      body: ListenableBuilder(
-        listenable: _controller,
-        builder: (context, _) {
-          return Column(
-            children: [
-              // Display area
-              Expanded(
-                child: Container(
-                  alignment: Alignment.bottomRight,
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      // Expression line
-                      Semantics(
-                        label: 'Expression: ${_controller.expression}',
-                        child: Text(
-                          _controller.expression.isEmpty
-                              ? ' '
-                              : _controller.expression,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(color: Colors.grey),
-                          textAlign: TextAlign.right,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Result / display line
-                      Semantics(
-                        label: 'Display: ${_controller.display}',
-                        child: Text(
-                          _controller.display,
-                          style: Theme.of(context).textTheme.displayMedium,
-                          textAlign: TextAlign.right,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Minimal keypad for v0.2.0 functional testing
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Semantics(
-                  label: 'Calculator keypad',
-                  container: true,
-                  child: Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: [
-                      for (final label in [
-                        'C', '(', ')', '÷',
-                        '7', '8', '9', '×',
-                        '4', '5', '6', '-',
-                        '1', '2', '3', '+',
-                        '⌫', '0', '.', '=',
-                      ])
-                        _buildButton(label),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
       ),
     );
   }
 
-  Widget _buildButton(String label) {
-    return Semantics(
-      button: true,
-      label: _semanticLabel(label),
-      child: SizedBox(
-        width: 72,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: () => _onButtonPressed(label),
-          child: Text(label, style: const TextStyle(fontSize: 20)),
+  Widget _buildDisplay(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF16213E),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Expression line
+          Semantics(
+            label: 'Expression: ${_controller.expression}',
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Text(
+                _controller.expression.isEmpty
+                    ? ' '
+                    : _controller.expression,
+                style: const TextStyle(
+                  fontSize: 20,
+                  color: Color(0xFF8A8FA3),
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Result line
+          Semantics(
+            label: 'Display: ${_controller.display}',
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Text(
+                _controller.display,
+                style: const TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.w300,
+                  color: Colors.white,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKeypad() {
+    // 5 rows of 4 buttons each
+    final rows = <List<_ButtonDef>>[];
+    for (var i = 0; i < _buttons.length; i += 4) {
+      rows.add(_buttons.sublist(i, i + 4));
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        children: [
+          for (final row in rows)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    for (final btn in row)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: _buildButton(btn),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildButton(_ButtonDef btn) {
+    final colors = _getButtonColors(btn.category);
+    final semanticName = _semanticLabel(btn.label);
+    return Tooltip(
+      message: semanticName,
+      child: Material(
+        color: colors.$1,
+        borderRadius: BorderRadius.circular(16),
+        elevation: 2,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _onButtonPressed(btn.label),
+          child: Center(
+            child: Text(
+              btn.label,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w500,
+                color: colors.$2,
+              ),
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  (Color background, Color foreground) _getButtonColors(
+      _ButtonCategory category) {
+    return switch (category) {
+      _ButtonCategory.number => (const Color(0xFF1F2940), Colors.white),
+      _ButtonCategory.operator => (const Color(0xFF0F3460), const Color(0xFF4FC3F7)),
+      _ButtonCategory.function => (const Color(0xFF2D2D44), const Color(0xFFADB5BD)),
+      _ButtonCategory.equals => (const Color(0xFF533483), Colors.white),
+    };
   }
 
   void _onButtonPressed(String label) {
