@@ -19,14 +19,15 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('keypad has all 20 buttons', (tester) async {
+    testWidgets('keypad has all buttons', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
       final expected = [
-        'C', '(', ')', '÷',
+        'MC', 'MR', 'M-', 'M+',
+        'C', '√', '%', '÷',
         '7', '8', '9', '×',
         '4', '5', '6', '-',
         '1', '2', '3', '+',
-        '⌫', '.', '=',
+        '±', '.', '=',
       ];
       for (final label in expected) {
         expect(find.text(label), findsOneWidget,
@@ -80,17 +81,17 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('backspace removes last character', (tester) async {
+    testWidgets('sqrt button works', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('3'));
+      await tester.tap(find.text('√'));
       await tester.pump();
-      await tester.tap(find.text('5'));
+      await tester.tap(find.text('9'));
       await tester.pump();
-      await tester.tap(find.text('⌫'));
+      await tester.tap(find.text('='));
       await tester.pump();
       expect(
-        find.bySemanticsLabel(RegExp(r'Expression: 3')),
+        find.bySemanticsLabel(RegExp(r'Display: 3')),
         findsOneWidget,
       );
       handle.dispose();
@@ -114,28 +115,20 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('parentheses work in expression', (tester) async {
+    testWidgets('percent button works', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      // (2+3)×4 = 20
-      await tester.tap(find.text('('));
+      // 50% = 0.5
+      await tester.tap(find.text('5'));
       await tester.pump();
-      await tester.tap(find.text('2'));
+      await tester.tap(find.text('0'));
       await tester.pump();
-      await tester.tap(find.text('+'));
-      await tester.pump();
-      await tester.tap(find.text('3'));
-      await tester.pump();
-      await tester.tap(find.text(')'));
-      await tester.pump();
-      await tester.tap(find.text('×'));
-      await tester.pump();
-      await tester.tap(find.text('4'));
+      await tester.tap(find.text('%'));
       await tester.pump();
       await tester.tap(find.text('='));
       await tester.pump();
       expect(
-        find.bySemanticsLabel(RegExp(r'Display: 20')),
+        find.bySemanticsLabel(RegExp(r'Display: 0\.5')),
         findsOneWidget,
       );
       handle.dispose();

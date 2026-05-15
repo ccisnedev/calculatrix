@@ -46,6 +46,12 @@ class Tokenizer {
       } else if (char == ')') {
         tokens.add(const Token(TokenType.rightParen, ')'));
         i++;
+      } else if (char == '√') {
+        tokens.add(const Token(TokenType.sqrt, '√'));
+        i++;
+      } else if (char == '%') {
+        tokens.add(const Token(TokenType.percent, '%'));
+        i++;
       } else {
         throw FormatException('Unexpected character: "$char"');
       }

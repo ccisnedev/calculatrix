@@ -156,4 +156,97 @@ void main() {
       expect(controller.display, '0');
     });
   });
+
+  group('CalculatorController - memory', () {
+    test('memory is initially empty', () {
+      expect(controller.hasMemory, isFalse);
+    });
+
+    test('M+ adds current display to memory', () {
+      controller.input('4');
+      controller.input('2');
+      controller.evaluate();
+      controller.memoryAdd();
+      expect(controller.hasMemory, isTrue);
+    });
+
+    test('MR recalls memory into expression', () {
+      controller.input('4');
+      controller.input('2');
+      controller.evaluate();
+      controller.memoryAdd();
+      controller.clear();
+      controller.memoryRecall();
+      expect(controller.expression, '42');
+    });
+
+    test('M- subtracts from memory', () {
+      controller.input('1');
+      controller.input('0');
+      controller.evaluate();
+      controller.memoryAdd(); // memory = 10
+      controller.clear();
+      controller.input('3');
+      controller.evaluate();
+      controller.memorySubtract(); // memory = 7
+      controller.clear();
+      controller.memoryRecall();
+      expect(controller.expression, '7');
+    });
+
+    test('MC clears memory', () {
+      controller.input('5');
+      controller.evaluate();
+      controller.memoryAdd();
+      controller.memoryClear();
+      expect(controller.hasMemory, isFalse);
+    });
+
+    test('MR does nothing when memory is 0', () {
+      controller.memoryRecall();
+      expect(controller.expression, '');
+    });
+  });
+
+  group('CalculatorController - sign toggle', () {
+    test('toggle sign on expression', () {
+      controller.input('5');
+      controller.toggleSign();
+      expect(controller.expression, '-5');
+    });
+
+    test('toggle sign back to positive', () {
+      controller.input('5');
+      controller.toggleSign();
+      controller.toggleSign();
+      expect(controller.expression, '5');
+    });
+
+    test('toggle sign on result', () {
+      controller.input('3');
+      controller.input('+');
+      controller.input('4');
+      controller.evaluate();
+      expect(controller.result, '7');
+      controller.toggleSign();
+      expect(controller.result, '-7');
+    });
+  });
+
+  group('CalculatorController - sqrt and percent', () {
+    test('sqrt evaluation', () {
+      controller.input('√');
+      controller.input('9');
+      controller.evaluate();
+      expect(controller.result, '3');
+    });
+
+    test('percent evaluation', () {
+      controller.input('5');
+      controller.input('0');
+      controller.input('%');
+      controller.evaluate();
+      expect(controller.result, '0.5');
+    });
+  });
 }

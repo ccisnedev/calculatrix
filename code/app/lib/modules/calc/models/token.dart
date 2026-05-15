@@ -20,6 +20,12 @@ enum TokenType {
 
   /// Closing parenthesis.
   rightParen,
+
+  /// Square root function (√).
+  sqrt,
+
+  /// Percent operator (%).
+  percent,
 }
 
 /// A single token extracted from an input expression string.

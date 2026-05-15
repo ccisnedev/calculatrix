@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'parser.dart';
 
 /// Evaluates an AST tree and returns the numeric result.
@@ -17,6 +18,8 @@ class Evaluator {
     final value = evaluate(operand);
     return switch (operator) {
       '-' => -value,
+      '√' => math.sqrt(value),
+      '%' => value / 100,
       _ => throw FormatException('Unknown unary operator: "$operator"'),
     };
   }

@@ -29,8 +29,8 @@ class UnaryOpNode extends AstNode {
 /// Grammar:
 ///   expression = term (('+' | '-') term)*
 ///   term       = unary (('×' | '÷') unary)*
-///   unary      = '-' unary | primary
-///   primary    = NUMBER | '(' expression ')'
+///   unary      = '-' unary | '√' unary | primary
+///   primary    = NUMBER '%'? | '(' expression ')' '%'?
 class Parser {
   List<Token> _tokens = [];
   int _pos = 0;
@@ -88,17 +88,22 @@ class Parser {
     return left;
   }
 
-  /// unary = '-' unary | primary
+  /// unary = '-' unary | '√' unary | primary
   AstNode _unary() {
     if (_current?.type == TokenType.minus) {
       _advance();
       final operand = _unary();
       return UnaryOpNode('-', operand);
     }
+    if (_current?.type == TokenType.sqrt) {
+      _advance();
+      final operand = _unary();
+      return UnaryOpNode('√', operand);
+    }
     return _primary();
   }
 
-  /// primary = NUMBER | '(' expression ')'
+  /// primary = NUMBER '%'? | '(' expression ')' '%'?
   AstNode _primary() {
     if (_current == null) {
       throw const FormatException('Unexpected end of expression');
@@ -106,7 +111,12 @@ class Parser {
 
     if (_current!.type == TokenType.number) {
       final token = _advance();
-      return NumberNode(double.parse(token.value));
+      AstNode node = NumberNode(double.parse(token.value));
+      if (_current?.type == TokenType.percent) {
+        _advance();
+        node = UnaryOpNode('%', node);
+      }
+      return node;
     }
 
     if (_match(TokenType.leftParen)) {
@@ -114,7 +124,12 @@ class Parser {
       if (!_match(TokenType.rightParen)) {
         throw const FormatException('Missing closing parenthesis');
       }
-      return expr;
+      AstNode node = expr;
+      if (_current?.type == TokenType.percent) {
+        _advance();
+        node = UnaryOpNode('%', node);
+      }
+      return node;
     }
 
     throw FormatException('Unexpected token: "${_current!.value}"');

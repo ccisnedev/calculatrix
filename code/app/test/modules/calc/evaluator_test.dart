@@ -74,4 +74,20 @@ void main() {
     test('100-50×2 = 0', () => expect(eval('100-50×2'), 0.0));
     test('1+2+3+4+5 = 15', () => expect(eval('1+2+3+4+5'), 15.0));
   });
+
+  group('Evaluator - square root', () {
+    test('√9 = 3', () => expect(eval('√9'), 3.0));
+    test('√16 = 4', () => expect(eval('√16'), 4.0));
+    test('√2 ≈ 1.414', () => expect(eval('√2'), closeTo(1.4142, 0.001)));
+    test('√0 = 0', () => expect(eval('√0'), 0.0));
+    test('√(4+5) = 3', () => expect(eval('√(4+5)'), 3.0));
+    test('2×√4 = 4', () => expect(eval('2×√4'), 4.0));
+  });
+
+  group('Evaluator - percent', () {
+    test('50% = 0.5', () => expect(eval('50%'), 0.5));
+    test('100% = 1', () => expect(eval('100%'), 1.0));
+    test('25% = 0.25', () => expect(eval('25%'), 0.25));
+    test('200+10% = 200.1', () => expect(eval('200+10%'), 200.1));
+  });
 }

@@ -27,28 +27,33 @@ class _CalculatorViewState extends State<CalculatorView> {
   final _controller = CalculatorController();
 
   static const _buttons = [
-    // Row 1: function keys
+    // Row 1: memory keys
+    _ButtonDef('MC', _ButtonCategory.function),
+    _ButtonDef('MR', _ButtonCategory.function),
+    _ButtonDef('M-', _ButtonCategory.function),
+    _ButtonDef('M+', _ButtonCategory.function),
+    // Row 2: function keys
     _ButtonDef('C', _ButtonCategory.function),
-    _ButtonDef('(', _ButtonCategory.function),
-    _ButtonDef(')', _ButtonCategory.function),
+    _ButtonDef('√', _ButtonCategory.function),
+    _ButtonDef('%', _ButtonCategory.function),
     _ButtonDef('÷', _ButtonCategory.operator),
-    // Row 2
+    // Row 3
     _ButtonDef('7', _ButtonCategory.number),
     _ButtonDef('8', _ButtonCategory.number),
     _ButtonDef('9', _ButtonCategory.number),
     _ButtonDef('×', _ButtonCategory.operator),
-    // Row 3
+    // Row 4
     _ButtonDef('4', _ButtonCategory.number),
     _ButtonDef('5', _ButtonCategory.number),
     _ButtonDef('6', _ButtonCategory.number),
     _ButtonDef('-', _ButtonCategory.operator),
-    // Row 4
+    // Row 5
     _ButtonDef('1', _ButtonCategory.number),
     _ButtonDef('2', _ButtonCategory.number),
     _ButtonDef('3', _ButtonCategory.number),
     _ButtonDef('+', _ButtonCategory.operator),
-    // Row 5
-    _ButtonDef('⌫', _ButtonCategory.function),
+    // Row 6
+    _ButtonDef('±', _ButtonCategory.function),
     _ButtonDef('0', _ButtonCategory.number),
     _ButtonDef('.', _ButtonCategory.number),
     _ButtonDef('=', _ButtonCategory.equals),
@@ -99,6 +104,25 @@ class _CalculatorViewState extends State<CalculatorView> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // Indicators row
+          Row(
+            children: [
+              if (_controller.hasMemory)
+                Semantics(
+                  label: 'Memory indicator',
+                  child: const Text(
+                    'M',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF4FC3F7),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 4),
           // Expression line
           Semantics(
             label: 'Expression: ${_controller.expression}',
@@ -217,6 +241,16 @@ class _CalculatorViewState extends State<CalculatorView> {
         _controller.backspace();
       case '=':
         _controller.evaluate();
+      case '±':
+        _controller.toggleSign();
+      case 'MC':
+        _controller.memoryClear();
+      case 'MR':
+        _controller.memoryRecall();
+      case 'M+':
+        _controller.memoryAdd();
+      case 'M-':
+        _controller.memorySubtract();
       default:
         _controller.input(label);
     }
@@ -234,6 +268,13 @@ class _CalculatorViewState extends State<CalculatorView> {
       '(' => 'Left parenthesis',
       ')' => 'Right parenthesis',
       '.' => 'Decimal point',
+      '√' => 'Square root',
+      '%' => 'Percent',
+      '±' => 'Toggle sign',
+      'MC' => 'Memory clear',
+      'MR' => 'Memory recall',
+      'M+' => 'Memory add',
+      'M-' => 'Memory subtract',
       _ => label,
     };
   }

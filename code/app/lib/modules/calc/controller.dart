@@ -15,6 +15,7 @@ class CalculatorController extends ChangeNotifier {
   String _expression = '';
   String _result = '';
   String _error = '';
+  double _memory = 0;
 
   /// The current expression being composed.
   String get expression => _expression;
@@ -24,6 +25,9 @@ class CalculatorController extends ChangeNotifier {
 
   /// Error message if evaluation failed (empty otherwise).
   String get error => _error;
+
+  /// Whether memory contains a non-zero value.
+  bool get hasMemory => _memory != 0;
 
   /// The display text shown to the user.
   String get display {
@@ -87,6 +91,70 @@ class CalculatorController extends ChangeNotifier {
       _error = '';
       notifyListeners();
     }
+  }
+
+  /// Toggles the sign of the current value.
+  void toggleSign() {
+    if (_result.isNotEmpty) {
+      final value = double.tryParse(_result);
+      if (value != null) {
+        _result = _formatResult(-value);
+        notifyListeners();
+      }
+      return;
+    }
+    if (_expression.isNotEmpty) {
+      if (_expression.startsWith('-')) {
+        _expression = _expression.substring(1);
+      } else {
+        _expression = '-$_expression';
+      }
+      notifyListeners();
+    }
+  }
+
+  /// Clears memory.
+  void memoryClear() {
+    _memory = 0;
+    notifyListeners();
+  }
+
+  /// Recalls memory value into expression.
+  void memoryRecall() {
+    if (_memory == 0) return;
+    final memStr = _formatResult(_memory);
+    if (_result.isNotEmpty) {
+      _expression = memStr;
+      _result = '';
+      _error = '';
+    } else {
+      _expression += memStr;
+    }
+    notifyListeners();
+  }
+
+  /// Adds current display value to memory.
+  void memoryAdd() {
+    final value = _currentNumericValue();
+    if (value != null) {
+      _memory += value;
+      notifyListeners();
+    }
+  }
+
+  /// Subtracts current display value from memory.
+  void memorySubtract() {
+    final value = _currentNumericValue();
+    if (value != null) {
+      _memory -= value;
+      notifyListeners();
+    }
+  }
+
+  double? _currentNumericValue() {
+    if (_result.isNotEmpty) return double.tryParse(_result);
+    if (_expression.isNotEmpty) return double.tryParse(_expression);
+    return null;
   }
 
   String _formatResult(double value) {
