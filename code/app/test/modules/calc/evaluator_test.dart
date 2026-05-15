@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:calculatrix/modules/calc/models/evaluator.dart';
 import 'package:calculatrix/modules/calc/models/parser.dart';
-import 'package:calculatrix/modules/calc/models/token.dart';
 import 'package:calculatrix/modules/calc/models/tokenizer.dart';
 
 void main() {

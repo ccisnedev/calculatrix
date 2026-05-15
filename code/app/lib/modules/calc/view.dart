@@ -8,9 +8,8 @@ enum _ButtonCategory { number, operator, function, equals }
 class _ButtonDef {
   final String label;
   final _ButtonCategory category;
-  final int colSpan;
 
-  const _ButtonDef(this.label, this.category, [this.colSpan = 1]);
+  const _ButtonDef(this.label, this.category);
 }
 
 /// The Casio HL-820LV inspired calculator layout.

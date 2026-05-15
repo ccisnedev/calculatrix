@@ -15,58 +15,58 @@
 Calculadora básica con layout inspirado en la Casio HL-820LV y motor de evaluación
 con precedencia de operadores al estilo Google Calculator.
 
-### v0.1.0 — Foundation
+### v0.1.0 — Foundation ✅
 
-- [ ] Proyecto Flutter scaffolded (`dev.ccisne.calculatrix`)
-- [ ] Estructura MVVM: `lib/{models,controllers,views,widgets}`
-- [ ] Modelo de dominio: `Token` (number, operator, paren), `TokenType` enum
-- [ ] `Tokenizer`: string → List\<Token\>
-- [ ] Unit tests del Tokenizer (TDD)
-- [ ] Widget test básico: app arranca sin crash
+- [x] Proyecto Flutter scaffolded (`dev.ccisne.calculatrix`)
+- [x] Estructura MVVM: `lib/{models,controllers,views,widgets}`
+- [x] Modelo de dominio: `Token` (number, operator, paren), `TokenType` enum
+- [x] `Tokenizer`: string → List\<Token\>
+- [x] Unit tests del Tokenizer (TDD)
+- [x] Widget test básico: app arranca sin crash
 
-### v0.2.0 — Parser & Evaluator
+### v0.2.0 — Parser & Evaluator ✅
 
-- [ ] `Parser`: List\<Token\> → árbol de expresión (AST)
-- [ ] Recursive descent con precedencia PEMDAS
-- [ ] `Evaluator`: AST → double
-- [ ] Operaciones: `+`, `-`, `×`, `÷`
-- [ ] Paréntesis y negación unaria
-- [ ] Unit tests exhaustivos (TDD): casos normales + edge cases
-- [ ] `CalculatorController` (ChangeNotifier) conecta input → evaluación
+- [x] `Parser`: List\<Token\> → árbol de expresión (AST)
+- [x] Recursive descent con precedencia PEMDAS
+- [x] `Evaluator`: AST → double
+- [x] Operaciones: `+`, `-`, `×`, `÷`
+- [x] Paréntesis y negación unaria
+- [x] Unit tests exhaustivos (TDD): casos normales + edge cases
+- [x] `CalculatorController` (ChangeNotifier) conecta input → evaluación
 
-### v0.3.0 — UI Casio Layout
+### v0.3.0 — UI Casio Layout ✅
 
-- [ ] Grid de botones 4 columnas (layout HL-820LV)
-- [ ] Todos los widgets con `Semantics` labels
-- [ ] Display: expresión arriba + resultado abajo (live preview)
-- [ ] Diferenciación visual de teclas por grupo funcional
-- [ ] Widget tests: cada botón tiene semántica, display actualiza
-- [ ] Integration test: secuencia completa `3 + 4 = 7`
+- [x] Grid de botones 4 columnas (layout HL-820LV)
+- [x] Todos los widgets con `Semantics` labels
+- [x] Display: expresión arriba + resultado abajo (live preview)
+- [x] Diferenciación visual de teclas por grupo funcional
+- [x] Widget tests: cada botón tiene semántica, display actualiza
+- [x] Integration test: secuencia completa `3 + 4 = 7`
 
-### v0.4.0 — Funcionalidades Casio
+### v0.4.0 — Funcionalidades Casio ✅
 
-- [ ] Raíz cuadrada (`√`)
-- [ ] Porcentaje (`%`)
-- [ ] Memoria (MC, MR, M-, M+)
-- [ ] Cambio de signo (`+/-`)
-- [ ] Indicadores de estado: M, Error
-- [ ] Tests unitarios de cada función
-- [ ] Integration test: flujo con memoria
+- [x] Raíz cuadrada (`√`)
+- [x] Porcentaje (`%`)
+- [x] Memoria (MC, MR, M-, M+)
+- [x] Cambio de signo (`+/-`)
+- [x] Indicadores de estado: M, Error
+- [x] Tests unitarios de cada función
+- [x] Integration test: flujo con memoria
 
-### v0.5.0 — Polish & Hardening
+### v0.5.0 — Polish & Hardening ✅
 
-- [ ] Manejo de errores (÷0, overflow, √ negativo)
-- [ ] Precisión numérica con redondeo inteligente (12 dígitos significativos)
-- [ ] Constante de repetición (`=` repetido)
-- [ ] Haptic/visual feedback en botones
-- [ ] Integration test: todos los flujos de error
+- [x] Manejo de errores (÷0, overflow, √ negativo)
+- [x] Precisión numérica con redondeo inteligente (12 dígitos significativos)
+- [x] Constante de repetición (`=` repetido)
+- [x] Haptic/visual feedback en botones
+- [x] Integration test: todos los flujos de error
 
-### v1.0.0 — Release Estable
+### v1.0.0 — Release Estable ✅
 
-- [ ] Feature-complete para calculadora básica con precedencia
-- [ ] Documentación de usuario
-- [ ] CI/CD pipeline (GitHub Actions: test + build web)
-- [ ] Full regression test suite passing
+- [x] Feature-complete para calculadora básica con precedencia
+- [x] Documentación de usuario
+- [x] CI/CD pipeline (GitHub Actions: test + build web)
+- [x] Full regression test suite passing
 
 ### v1.x.x — Mejoras y correcciones sobre v1
 
