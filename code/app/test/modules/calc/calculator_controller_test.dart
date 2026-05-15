@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:calculatrix/controllers/calculator_controller.dart';
+import 'package:calculatrix/modules/calc/controller.dart';
 
 void main() {
   late CalculatorController controller;

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../controllers/calculator_controller.dart';
+import 'controller.dart';
 
 /// The main calculator screen.
 ///
