@@ -3,7 +3,7 @@ import 'controller.dart';
 
 /// The main calculator screen.
 ///
-/// Displays the current expression and provides a minimal placeholder UI.
+/// Displays the expression and result, with a minimal keypad for v0.2.0 testing.
 /// Full Casio layout will be implemented in v0.3.0.
 class CalculatorView extends StatefulWidget {
   const CalculatorView({super.key});
@@ -40,24 +40,57 @@ class _CalculatorViewState extends State<CalculatorView> {
                 child: Container(
                   alignment: Alignment.bottomRight,
                   padding: const EdgeInsets.all(24),
-                  child: Semantics(
-                    label: 'Display: ${_controller.display}',
-                    child: Text(
-                      _controller.display,
-                      style: Theme.of(context).textTheme.displayMedium,
-                      textAlign: TextAlign.right,
-                    ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Expression line
+                      Semantics(
+                        label: 'Expression: ${_controller.expression}',
+                        child: Text(
+                          _controller.expression.isEmpty
+                              ? ' '
+                              : _controller.expression,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(color: Colors.grey),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Result / display line
+                      Semantics(
+                        label: 'Display: ${_controller.display}',
+                        child: Text(
+                          _controller.display,
+                          style: Theme.of(context).textTheme.displayMedium,
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              // Minimal keypad placeholder for v0.1.0
+              // Minimal keypad for v0.2.0 functional testing
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(8),
                 child: Semantics(
                   label: 'Calculator keypad',
-                  child: const Text(
-                    'Keypad coming in v0.3.0',
-                    style: TextStyle(color: Colors.grey),
+                  container: true,
+                  child: Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [
+                      for (final label in [
+                        'C', '(', ')', '÷',
+                        '7', '8', '9', '×',
+                        '4', '5', '6', '-',
+                        '1', '2', '3', '+',
+                        '⌫', '0', '.', '=',
+                      ])
+                        _buildButton(label),
+                    ],
                   ),
                 ),
               ),
@@ -66,5 +99,49 @@ class _CalculatorViewState extends State<CalculatorView> {
         },
       ),
     );
+  }
+
+  Widget _buildButton(String label) {
+    return Semantics(
+      button: true,
+      label: _semanticLabel(label),
+      child: SizedBox(
+        width: 72,
+        height: 56,
+        child: ElevatedButton(
+          onPressed: () => _onButtonPressed(label),
+          child: Text(label, style: const TextStyle(fontSize: 20)),
+        ),
+      ),
+    );
+  }
+
+  void _onButtonPressed(String label) {
+    switch (label) {
+      case 'C':
+        _controller.clear();
+      case '⌫':
+        _controller.backspace();
+      case '=':
+        _controller.evaluate();
+      default:
+        _controller.input(label);
+    }
+  }
+
+  String _semanticLabel(String label) {
+    return switch (label) {
+      'C' => 'Clear',
+      '⌫' => 'Backspace',
+      '=' => 'Equals',
+      '+' => 'Plus',
+      '-' => 'Minus',
+      '×' => 'Multiply',
+      '÷' => 'Divide',
+      '(' => 'Left parenthesis',
+      ')' => 'Right parenthesis',
+      '.' => 'Decimal point',
+      _ => label,
+    };
   }
 }

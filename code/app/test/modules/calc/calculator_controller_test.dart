@@ -75,4 +75,85 @@ void main() {
       expect(notified, isTrue);
     });
   });
+
+  group('CalculatorController - evaluation', () {
+    test('evaluate simple addition', () {
+      controller.input('3');
+      controller.input('+');
+      controller.input('4');
+      controller.evaluate();
+      expect(controller.result, '7');
+      expect(controller.display, '7');
+    });
+
+    test('evaluate with precedence', () {
+      controller.input('3');
+      controller.input('+');
+      controller.input('4');
+      controller.input('×');
+      controller.input('5');
+      controller.evaluate();
+      expect(controller.result, '23');
+    });
+
+    test('evaluate with parentheses', () {
+      // (3+4)×5 = 35
+      for (final c in '(3+4)×5'.split('')) {
+        controller.input(c);
+      }
+      controller.evaluate();
+      expect(controller.result, '35');
+    });
+
+    test('evaluate decimal result', () {
+      controller.input('1');
+      controller.input('÷');
+      controller.input('4');
+      controller.evaluate();
+      expect(controller.result, '0.25');
+    });
+
+    test('evaluate shows Error on invalid expression', () {
+      controller.input('+');
+      controller.input('+');
+      controller.evaluate();
+      expect(controller.error, 'Error');
+      expect(controller.display, 'Error');
+    });
+
+    test('evaluate division by zero shows Error', () {
+      controller.input('1');
+      controller.input('÷');
+      controller.input('0');
+      controller.evaluate();
+      expect(controller.display, 'Error');
+    });
+
+    test('after result, operator continues expression', () {
+      controller.input('3');
+      controller.input('+');
+      controller.input('4');
+      controller.evaluate();
+      expect(controller.result, '7');
+      controller.input('+');
+      expect(controller.expression, '7+');
+      expect(controller.result, '');
+    });
+
+    test('after result, digit starts new expression', () {
+      controller.input('3');
+      controller.input('+');
+      controller.input('4');
+      controller.evaluate();
+      controller.input('9');
+      expect(controller.expression, '9');
+    });
+
+    test('backspace after result clears all', () {
+      controller.input('5');
+      controller.evaluate();
+      controller.backspace();
+      expect(controller.display, '0');
+    });
+  });
 }
