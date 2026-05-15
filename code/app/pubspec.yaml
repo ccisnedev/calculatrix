@@ -1,7 +1,7 @@
 name: calculatrix
 description: "Casio Skin, Google Brain — High-quality calculator app"
 publish_to: 'none'
-version: 0.3.0+1
+version: 0.5.0+1
 
 environment:
   sdk: ^3.11.5

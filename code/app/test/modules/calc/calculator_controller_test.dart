@@ -248,5 +248,76 @@ void main() {
       controller.evaluate();
       expect(controller.result, '0.5');
     });
+
+    test('sqrt of negative shows Error', () {
+      controller.input('√');
+      controller.input('(');
+      controller.input('-');
+      controller.input('4');
+      controller.input(')');
+      controller.evaluate();
+      expect(controller.display, 'Error');
+    });
+  });
+
+  group('CalculatorController - repeat equals', () {
+    test('pressing = again repeats last operation', () {
+      controller.input('5');
+      controller.input('+');
+      controller.input('3');
+      controller.evaluate();
+      expect(controller.result, '8');
+      // Press = again: 8 + 3 = 11
+      controller.evaluate();
+      expect(controller.result, '11');
+      // Press = again: 11 + 3 = 14
+      controller.evaluate();
+      expect(controller.result, '14');
+    });
+
+    test('repeat with multiplication', () {
+      controller.input('2');
+      controller.input('×');
+      controller.input('3');
+      controller.evaluate();
+      expect(controller.result, '6');
+      controller.evaluate();
+      expect(controller.result, '18');
+    });
+
+    test('clear stops repeat', () {
+      controller.input('5');
+      controller.input('+');
+      controller.input('3');
+      controller.evaluate();
+      controller.clear();
+      controller.input('1');
+      controller.evaluate();
+      expect(controller.result, '1');
+    });
+  });
+
+  group('CalculatorController - precision', () {
+    test('1÷3 has reasonable precision', () {
+      controller.input('1');
+      controller.input('÷');
+      controller.input('3');
+      controller.evaluate();
+      expect(controller.result, startsWith('0.3333333'));
+    });
+
+    test('large numbers display correctly', () {
+      controller.input('9');
+      controller.input('9');
+      controller.input('9');
+      controller.input('9');
+      controller.input('9');
+      controller.input('9');
+      controller.input('9');
+      controller.input('9');
+      controller.input('9');
+      controller.evaluate();
+      expect(controller.result, '999999999');
+    });
   });
 }

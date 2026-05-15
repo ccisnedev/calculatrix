@@ -82,6 +82,7 @@ void main() {
     test('√0 = 0', () => expect(eval('√0'), 0.0));
     test('√(4+5) = 3', () => expect(eval('√(4+5)'), 3.0));
     test('2×√4 = 4', () => expect(eval('2×√4'), 4.0));
+    test('√(-1) = NaN', () => expect(eval('√(-1)'), isNaN));
   });
 
   group('Evaluator - percent', () {

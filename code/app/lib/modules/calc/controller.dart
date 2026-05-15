@@ -16,6 +16,8 @@ class CalculatorController extends ChangeNotifier {
   String _result = '';
   String _error = '';
   double _memory = 0;
+  String _lastOperator = '';
+  String _lastOperand = '';
 
   /// The current expression being composed.
   String get expression => _expression;
@@ -56,19 +58,52 @@ class CalculatorController extends ChangeNotifier {
 
   /// Evaluates the current expression.
   void evaluate() {
+    if (_expression.isEmpty && _result.isNotEmpty && _lastOperator.isNotEmpty) {
+      // Repeat last operation: result op lastOperand
+      _expression = '$_result$_lastOperator$_lastOperand';
+    }
     if (_expression.isEmpty) return;
     try {
+      // Save the last operator and operand for repeat
+      _saveLastOperation(_expression);
       final tokens = _tokenizer.tokenize(_expression);
       final ast = _parser.parse(tokens);
       final value = _evaluator.evaluate(ast);
       _result = _formatResult(value);
+      _expression = '';
       _error = '';
     } on FormatException catch (e) {
       _error = 'Error';
       _result = '';
+      _expression = '';
       debugPrint('Eval error: $e');
     }
     notifyListeners();
+  }
+
+  void _saveLastOperation(String expr) {
+    // Extract last binary operator and operand from expression
+    // Look for the last +, -, ×, ÷ that is not inside parentheses
+    var depth = 0;
+    var lastOpIndex = -1;
+    for (var i = expr.length - 1; i >= 0; i--) {
+      final c = expr[i];
+      if (c == ')') depth++;
+      if (c == '(') depth--;
+      if (depth == 0 && (c == '+' || c == '-' || c == '×' || c == '÷')) {
+        // Don't count leading minus
+        if (c == '-' && i == 0) break;
+        lastOpIndex = i;
+        break;
+      }
+    }
+    if (lastOpIndex > 0) {
+      _lastOperator = expr[lastOpIndex];
+      _lastOperand = expr.substring(lastOpIndex + 1);
+    } else {
+      _lastOperator = '';
+      _lastOperand = '';
+    }
   }
 
   /// Clears the entire expression and result.
@@ -76,6 +111,8 @@ class CalculatorController extends ChangeNotifier {
     _expression = '';
     _result = '';
     _error = '';
+    _lastOperator = '';
+    _lastOperand = '';
     notifyListeners();
   }
 
@@ -160,13 +197,16 @@ class CalculatorController extends ChangeNotifier {
   String _formatResult(double value) {
     if (value.isInfinite) return 'Error';
     if (value.isNaN) return 'Error';
-    if (value == value.toInt().toDouble()) {
+    if (value == 0) return '0';
+    if (value == value.toInt().toDouble() && value.abs() < 1e12) {
       return value.toInt().toString();
     }
-    // Limit to 10 decimal places, remove trailing zeros
-    var str = value.toStringAsFixed(10);
-    str = str.replaceAll(RegExp(r'0+$'), '');
-    str = str.replaceAll(RegExp(r'\.$'), '');
+    // Use 12 significant digits, remove trailing zeros
+    var str = value.toStringAsPrecision(12);
+    if (str.contains('.')) {
+      str = str.replaceAll(RegExp(r'0+$'), '');
+      str = str.replaceAll(RegExp(r'\.$'), '');
+    }
     return str;
   }
 

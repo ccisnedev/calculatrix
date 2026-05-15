@@ -207,12 +207,14 @@ class _CalculatorViewState extends State<CalculatorView> {
         elevation: 2,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
+          splashColor: colors.$2.withAlpha(50),
+          highlightColor: colors.$2.withAlpha(30),
           onTap: () => _onButtonPressed(btn.label),
           child: Center(
             child: Text(
               btn.label,
               style: TextStyle(
-                fontSize: 28,
+                fontSize: btn.label.length > 1 ? 18 : 28,
                 fontWeight: FontWeight.w500,
                 color: colors.$2,
               ),
