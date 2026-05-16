@@ -92,25 +92,25 @@ void main() {
 
     test('throws shape error for invalid matrix operation in rpn', () {
       expect(
-        () => Calculatrix.evaluateRpn(<String>[
-          '[[1,2]]',
-          '[[1,2],[3,4]]',
-          '+',
-        ]),
+        () =>
+            Calculatrix.evaluateRpn(<String>['[[1,2]]', '[[1,2],[3,4]]', '+']),
         throwsA(isA<MatrixShapeError>()),
       );
     });
 
-    test('throws unsupported operation error for matrix division by non-scalar', () {
-      expect(
-        () => Calculatrix.evaluateRpn(<String>[
-          '[[1,2],[3,4]]',
-          '[[1,0],[0,1]]',
-          '/',
-        ]),
-        throwsA(isA<UnsupportedCalculatrixOperationError>()),
-      );
-    });
+    test(
+      'throws unsupported operation error for matrix division by non-scalar',
+      () {
+        expect(
+          () => Calculatrix.evaluateRpn(<String>[
+            '[[1,2],[3,4]]',
+            '[[1,0],[0,1]]',
+            '/',
+          ]),
+          throwsA(isA<UnsupportedCalculatrixOperationError>()),
+        );
+      },
+    );
 
     test('throws matrix domain error for division by zero scalar', () {
       expect(

@@ -140,7 +140,9 @@ class Matrix {
     final int width = rows.first.length;
     for (final List<double> row in rows) {
       if (row.length != width) {
-        throw MatrixShapeError('All rows must have the same number of columns.');
+        throw MatrixShapeError(
+          'All rows must have the same number of columns.',
+        );
       }
     }
   }

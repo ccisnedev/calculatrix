@@ -53,10 +53,7 @@ void main() {
         <double>[3, 4],
       ]);
 
-      expect(
-        () => matrix * Matrix.scalar(3),
-        throwsA(isA<MatrixShapeError>()),
-      );
+      expect(() => matrix * Matrix.scalar(3), throwsA(isA<MatrixShapeError>()));
 
       expect(
         matrix.scale(3),
@@ -76,10 +73,7 @@ void main() {
         <double>[3, 4],
       ]);
 
-      expect(
-        () => a + b,
-        throwsA(isA<MatrixShapeError>()),
-      );
+      expect(() => a + b, throwsA(isA<MatrixShapeError>()));
     });
 
     test('multiplies two compatible matrices', () {

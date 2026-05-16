@@ -96,7 +96,9 @@ class Calculatrix {
     }
 
     if (decoded is! List) {
-      throw ExpressionSyntaxError('Matrix literal must decode to a list: $token');
+      throw ExpressionSyntaxError(
+        'Matrix literal must decode to a list: $token',
+      );
     }
 
     if (decoded.isEmpty) {
@@ -118,7 +120,9 @@ class Calculatrix {
       final List<double> parsedRow = <double>[];
       for (final dynamic item in row) {
         if (item is! num) {
-          throw ExpressionSyntaxError('Matrix literal must contain only numbers.');
+          throw ExpressionSyntaxError(
+            'Matrix literal must contain only numbers.',
+          );
         }
         parsedRow.add(item.toDouble());
       }
@@ -147,7 +151,11 @@ class Calculatrix {
         continue;
       }
 
-      if (_isOperator(char) || _isFunction(char) || _isPostfixOperator(char) || char == '(' || char == ')') {
+      if (_isOperator(char) ||
+          _isFunction(char) ||
+          _isPostfixOperator(char) ||
+          char == '(' ||
+          char == ')') {
         tokens.add(char);
         index++;
         continue;
@@ -246,7 +254,9 @@ class Calculatrix {
         continue;
       }
 
-      throw ExpressionSyntaxError('Unsupported token in infix expression: $token');
+      throw ExpressionSyntaxError(
+        'Unsupported token in infix expression: $token',
+      );
     }
 
     while (operators.isNotEmpty) {
@@ -306,7 +316,8 @@ class Calculatrix {
       return false;
     }
 
-    final bool unaryPosition = tokens.isEmpty ||
+    final bool unaryPosition =
+        tokens.isEmpty ||
         _isOperator(tokens.last) ||
         _isFunction(tokens.last) ||
         tokens.last == '(';
@@ -327,7 +338,8 @@ class Calculatrix {
     bool seenDot = false;
     bool seenExponent = false;
 
-    if (index < source.length && (source[index] == '-' || source[index] == '+')) {
+    if (index < source.length &&
+        (source[index] == '-' || source[index] == '+')) {
       index++;
     }
 
