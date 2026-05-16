@@ -90,23 +90,23 @@ core package as the single source of truth for all calculator semantics.
 
 ### v1.x.x → v2.0.0
 
-- [ ] Create and stabilize `package:calculatrix` (pure Dart, no Flutter dependency)
-- [ ] Define matrix-first domain model for all arithmetic (`1x1`, vectors, square, non-square)
-- [ ] Implement matrix API (`Matrix`) with uniform semantics for all valid shapes
-- [ ] Implement RPN core (`RpnEngine`) with stack operations over the same matrix domain
-- [ ] Implement algebraic parser/evaluator (`evaluateInfix`) mapped to the same core rules
-- [ ] Implement RPN evaluator facade (`evaluateRpn`) equivalent in semantics to algebraic mode
-- [ ] Define an error taxonomy (invalid dimensions, insufficient stack depth, unsupported operations)
-- [ ] Publish complete unit/property test suite for matrix, RPN, and cross-notation equivalence
-- [ ] Migrate Flutter app to consume core math APIs (no duplicated math engine in app)
-- [ ] Scaffold CLI commands consuming the same core APIs (no duplicated algorithms in CLI)
-- [ ] Document package integration contracts for Flutter app and CLI
+- [x] Create and stabilize `package:calculatrix` (pure Dart, no Flutter dependency)
+- [x] Define matrix-first domain model for all arithmetic (`1x1`, vectors, square, non-square)
+- [x] Implement matrix API (`Matrix`) with uniform semantics for all valid shapes
+- [x] Implement RPN core (`RpnEngine`) with stack operations over the same matrix domain
+- [x] Implement algebraic parser/evaluator (`evaluateInfix`) mapped to the same core rules
+- [x] Implement RPN evaluator facade (`evaluateRpn`) equivalent in semantics to algebraic mode
+- [x] Define an error taxonomy (invalid dimensions, insufficient stack depth, unsupported operations)
+- [x] Publish complete unit/property test suite for matrix, RPN, and cross-notation equivalence
+- [x] Migrate Flutter app to consume core math APIs (no duplicated math engine in app)
+- [x] Scaffold CLI commands consuming the same core APIs (no duplicated algorithms in CLI)
+- [x] Document package integration contracts for Flutter app and CLI
 
 ### v2.0.0 — Stable Release
 
 - [ ] `package:calculatrix` published as the official computation engine
-- [ ] Flutter app and CLI both running against shared core semantics
-- [ ] Updated architecture documentation (shared core: app + CLI + backend)
+- [x] Flutter app and CLI both running against shared core semantics
+- [x] Updated architecture documentation (shared core: app + CLI + backend)
 
 ### v2.x.x — Improvements and fixes on top of v2
 

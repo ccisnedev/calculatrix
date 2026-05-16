@@ -63,6 +63,26 @@ void main() {
       expect(engine.depth, 1);
     });
 
+    test('applies square root unary operation', () {
+      final RpnEngine engine = RpnEngine();
+
+      engine.pushScalar(9);
+      final Matrix result = engine.applyUnary(RpnUnaryOperator.sqrt);
+
+      expect(result, Matrix.scalar(3));
+      expect(engine.depth, 1);
+    });
+
+    test('applies percent unary operation', () {
+      final RpnEngine engine = RpnEngine();
+
+      engine.pushScalar(50);
+      final Matrix result = engine.applyUnary(RpnUnaryOperator.percent);
+
+      expect(result, Matrix.scalar(0.5));
+      expect(engine.depth, 1);
+    });
+
     test('throws when binary operation has fewer than two values', () {
       final RpnEngine engine = RpnEngine();
       engine.pushScalar(1);

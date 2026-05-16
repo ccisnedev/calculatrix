@@ -1,18 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:calculatrix/calculatrix.dart';
-import 'models/tokenizer.dart';
-import 'models/parser.dart';
-import 'models/evaluator.dart';
 
 /// Controller for the calculator.
 ///
 /// Manages the current expression input and delegates to the
 /// tokenizer/evaluator pipeline. Notifies listeners on state changes.
 class CalculatorController extends ChangeNotifier {
-  final _tokenizer = Tokenizer();
-  final _parser = Parser();
-  final _evaluator = Evaluator();
-
   String _expression = '';
   String _result = '';
   String _error = '';
@@ -86,24 +79,12 @@ class CalculatorController extends ChangeNotifier {
   }
 
   double _evaluateExpression(String expression) {
-    if (_canUseCore(expression)) {
-      final String normalized = expression
-          .replaceAll('×', '*')
-          .replaceAll('÷', '/');
+    final String normalized = expression
+        .replaceAll('×', '*')
+        .replaceAll('÷', '/');
 
-      final Matrix value = Calculatrix.evaluateInfix(normalized);
-      return value.scalarValue;
-    }
-
-    final tokens = _tokenizer.tokenize(expression);
-    final ast = _parser.parse(tokens);
-    return _evaluator.evaluate(ast);
-  }
-
-  bool _canUseCore(String expression) {
-    // Transitional rule for Stage 2 migration:
-    // keep legacy pipeline for operations not yet represented in core parser.
-    return !expression.contains('√') && !expression.contains('%');
+    final Matrix value = Calculatrix.evaluateInfix(normalized);
+    return value.scalarValue;
   }
 
   void _saveLastOperation(String expr) {

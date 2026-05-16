@@ -1,7 +1,11 @@
+import 'dart:math' as math;
+
 import '../errors/errors.dart';
 import '../matrix/matrix.dart';
 
 enum RpnBinaryOperator { add, subtract, multiply, divide }
+
+enum RpnUnaryOperator { sqrt, percent }
 
 class RpnEngine {
   final List<Matrix> _stack = <Matrix>[];
@@ -109,6 +113,27 @@ class RpnEngine {
     return result;
   }
 
+  Matrix applyUnary(RpnUnaryOperator operatorType) {
+    if (_stack.isEmpty) {
+      throw RpnStackUnderflowError(
+        'A unary operation requires at least one value.',
+      );
+    }
+
+    final Matrix value = _stack.removeLast();
+
+    late final Matrix result;
+    switch (operatorType) {
+      case RpnUnaryOperator.sqrt:
+        result = _sqrt(value);
+      case RpnUnaryOperator.percent:
+        result = _percent(value);
+    }
+
+    _stack.add(result);
+    return result;
+  }
+
   Matrix _divide(Matrix left, Matrix right) {
     if (!right.isScalar) {
       throw UnsupportedCalculatrixOperationError(
@@ -122,5 +147,24 @@ class RpnEngine {
     }
 
     return left.scale(1 / divisor);
+  }
+
+  Matrix _sqrt(Matrix value) {
+    if (!value.isScalar) {
+      throw UnsupportedCalculatrixOperationError(
+        'Square root is only supported for scalar (1x1) values.',
+      );
+    }
+
+    final double source = value.scalarValue;
+    if (source < 0) {
+      throw MatrixDomainError('Square root of negative scalar is undefined.');
+    }
+
+    return Matrix.scalar(math.sqrt(source));
+  }
+
+  Matrix _percent(Matrix value) {
+    return value.scale(0.01);
   }
 }

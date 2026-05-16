@@ -13,6 +13,16 @@ void main() {
       expect(result, Matrix.scalar(2.5));
     });
 
+    test('evaluates scalar square root in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('√9');
+      expect(result, Matrix.scalar(3));
+    });
+
+    test('evaluates scalar percent in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('50%');
+      expect(result, Matrix.scalar(0.5));
+    });
+
     test('evaluates scalar rpn expression', () {
       final Matrix result = Calculatrix.evaluateRpn(<String>['3', '4', '+']);
       expect(result, Matrix.scalar(7));
@@ -21,6 +31,14 @@ void main() {
     test('evaluates scalar division in rpn mode', () {
       final Matrix result = Calculatrix.evaluateRpn(<String>['10', '4', '/']);
       expect(result, Matrix.scalar(2.5));
+    });
+
+    test('evaluates scalar unary operators in rpn mode', () {
+      final Matrix sqrt = Calculatrix.evaluateRpn(<String>['9', '√']);
+      final Matrix percent = Calculatrix.evaluateRpn(<String>['50', '%']);
+
+      expect(sqrt, Matrix.scalar(3));
+      expect(percent, Matrix.scalar(0.5));
     });
 
     test('evaluates matrix product in infix mode', () {
@@ -97,6 +115,13 @@ void main() {
     test('throws matrix domain error for division by zero scalar', () {
       expect(
         () => Calculatrix.evaluateRpn(<String>['5', '0', '/']),
+        throwsA(isA<MatrixDomainError>()),
+      );
+    });
+
+    test('throws matrix domain error for sqrt of negative scalar', () {
+      expect(
+        () => Calculatrix.evaluateInfix('√(-4)'),
         throwsA(isA<MatrixDomainError>()),
       );
     });

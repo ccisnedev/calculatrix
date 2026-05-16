@@ -46,6 +46,12 @@ class Calculatrix {
         case '/':
           engine.applyBinary(RpnBinaryOperator.divide);
           continue;
+        case '√':
+          engine.applyUnary(RpnUnaryOperator.sqrt);
+          continue;
+        case '%':
+          engine.applyUnary(RpnUnaryOperator.percent);
+          continue;
         default:
           engine.push(_parseOperandToken(token));
       }
@@ -134,7 +140,14 @@ class Calculatrix {
         continue;
       }
 
-      if (_isOperator(char) || char == '(' || char == ')') {
+      if (_isSignedNumberStart(expression, index, tokens)) {
+        final _NumberScanResult scan = _scanNumber(expression, index);
+        tokens.add(scan.token);
+        index = scan.nextIndex;
+        continue;
+      }
+
+      if (_isOperator(char) || _isFunction(char) || _isPostfixOperator(char) || char == '(' || char == ')') {
         tokens.add(char);
         index++;
         continue;
@@ -198,6 +211,16 @@ class Calculatrix {
         continue;
       }
 
+      if (_isFunction(token)) {
+        operators.add(token);
+        continue;
+      }
+
+      if (_isPostfixOperator(token)) {
+        output.add(token);
+        continue;
+      }
+
       if (token == '(') {
         operators.add(token);
         continue;
@@ -215,6 +238,10 @@ class Calculatrix {
         }
         if (!foundOpen) {
           throw ExpressionSyntaxError('Mismatched parentheses in expression.');
+        }
+
+        if (operators.isNotEmpty && _isFunction(operators.last)) {
+          output.add(operators.removeLast());
         }
         continue;
       }
@@ -234,11 +261,23 @@ class Calculatrix {
   }
 
   static bool _isOperand(String token) {
-    return !_isOperator(token) && token != '(' && token != ')';
+    return !_isOperator(token) &&
+        !_isFunction(token) &&
+        !_isPostfixOperator(token) &&
+        token != '(' &&
+        token != ')';
   }
 
   static bool _isOperator(String token) {
     return token == '+' || token == '-' || token == '*' || token == '/';
+  }
+
+  static bool _isFunction(String token) {
+    return token == '√';
+  }
+
+  static bool _isPostfixOperator(String token) {
+    return token == '%';
   }
 
   static int _precedence(String token) {
@@ -258,10 +297,39 @@ class Calculatrix {
     return RegExp(r'[0-9.]').hasMatch(char);
   }
 
+  static bool _isSignedNumberStart(
+    String source,
+    int index,
+    List<String> tokens,
+  ) {
+    if (source[index] != '-') {
+      return false;
+    }
+
+    final bool unaryPosition = tokens.isEmpty ||
+        _isOperator(tokens.last) ||
+        _isFunction(tokens.last) ||
+        tokens.last == '(';
+
+    if (!unaryPosition) {
+      return false;
+    }
+
+    if (index + 1 >= source.length) {
+      return false;
+    }
+
+    return _isNumberStart(source[index + 1]);
+  }
+
   static _NumberScanResult _scanNumber(String source, int start) {
     int index = start;
     bool seenDot = false;
     bool seenExponent = false;
+
+    if (index < source.length && (source[index] == '-' || source[index] == '+')) {
+      index++;
+    }
 
     while (index < source.length) {
       final String current = source[index];
