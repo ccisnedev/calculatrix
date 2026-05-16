@@ -23,6 +23,16 @@ void main() {
       expect(result, Matrix.scalar(0.5));
     });
 
+    test('evaluates scientific notation in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('1e-3 + 2');
+      expect(result.almostEquals(Matrix.scalar(2.001)), isTrue);
+    });
+
+    test('evaluates explicit unary plus in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('+3 + (+4)');
+      expect(result, Matrix.scalar(7));
+    });
+
     test('evaluates scalar rpn expression', () {
       final Matrix result = Calculatrix.evaluateRpn(<String>['3', '4', '+']);
       expect(result, Matrix.scalar(7));
@@ -39,6 +49,11 @@ void main() {
 
       expect(sqrt, Matrix.scalar(3));
       expect(percent, Matrix.scalar(0.5));
+    });
+
+    test('evaluates scientific notation in rpn mode', () {
+      final Matrix result = Calculatrix.evaluateRpn(<String>['1e-3', '2', '+']);
+      expect(result.almostEquals(Matrix.scalar(2.001)), isTrue);
     });
 
     test('evaluates matrix product in infix mode', () {

@@ -304,7 +304,8 @@ class Calculatrix {
   }
 
   static bool _isNumberStart(String char) {
-    return RegExp(r'[0-9.]').hasMatch(char);
+    final int code = char.codeUnitAt(0);
+    return _isAsciiDigit(code) || code == _dotCode;
   }
 
   static bool _isSignedNumberStart(
@@ -312,7 +313,8 @@ class Calculatrix {
     int index,
     List<String> tokens,
   ) {
-    if (source[index] != '-') {
+    final String sign = source[index];
+    if (sign != '-' && sign != '+') {
       return false;
     }
 
@@ -344,20 +346,20 @@ class Calculatrix {
     }
 
     while (index < source.length) {
-      final String current = source[index];
+      final int current = source.codeUnitAt(index);
 
-      if (RegExp(r'[0-9]').hasMatch(current)) {
+      if (_isAsciiDigit(current)) {
         index++;
         continue;
       }
 
-      if (current == '.' && !seenDot && !seenExponent) {
+      if (current == _dotCode && !seenDot && !seenExponent) {
         seenDot = true;
         index++;
         continue;
       }
 
-      if ((current == 'e' || current == 'E') && !seenExponent) {
+      if ((current == _lowerECode || current == _upperECode) && !seenExponent) {
         seenExponent = true;
         index++;
         if (index < source.length &&
@@ -372,6 +374,16 @@ class Calculatrix {
 
     return _NumberScanResult(source.substring(start, index), index);
   }
+
+  static bool _isAsciiDigit(int code) {
+    return code >= _zeroCode && code <= _nineCode;
+  }
+
+  static const int _zeroCode = 48;
+  static const int _nineCode = 57;
+  static const int _dotCode = 46;
+  static const int _lowerECode = 101;
+  static const int _upperECode = 69;
 }
 
 class _NumberScanResult {

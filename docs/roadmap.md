@@ -128,10 +128,10 @@ core package as the single source of truth for all calculator semantics.
 
 #### v2.3.0 — Parser and Evaluation Performance Baseline
 
-- [ ] Optimize tokenization/evaluation hot paths without changing semantics
-- [ ] Add TDD coverage for scientific notation and signed numeric edge cases
-- [ ] Capture baseline benchmark/smoke measurements for supported workloads
-- [ ] Verify no regressions in core, app, and CLI behaviors
+- [x] Optimize tokenization/evaluation hot paths without changing semantics
+- [x] Add TDD coverage for scientific notation and signed numeric edge cases
+- [x] Capture baseline benchmark/smoke measurements for supported workloads
+- [x] Verify no regressions in core, app, and CLI behaviors
 
 #### v2.4.0 — Hardening and API Freeze Before Stage 3
 
