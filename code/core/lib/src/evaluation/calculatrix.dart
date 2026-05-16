@@ -43,6 +43,9 @@ class Calculatrix {
         case '*':
           engine.applyBinary(RpnBinaryOperator.multiply);
           continue;
+        case '/':
+          engine.applyBinary(RpnBinaryOperator.divide);
+          continue;
         default:
           engine.push(_parseOperandToken(token));
       }
@@ -243,7 +246,7 @@ class Calculatrix {
   }
 
   static bool _isOperator(String token) {
-    return token == '+' || token == '-' || token == '*';
+    return token == '+' || token == '-' || token == '*' || token == '/';
   }
 
   static int _precedence(String token) {
@@ -252,6 +255,7 @@ class Calculatrix {
       case '-':
         return 1;
       case '*':
+      case '/':
         return 2;
       default:
         return -1;

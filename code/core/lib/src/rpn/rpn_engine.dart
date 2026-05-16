@@ -1,7 +1,7 @@
 import '../errors/errors.dart';
 import '../matrix/matrix.dart';
 
-enum RpnBinaryOperator { add, subtract, multiply }
+enum RpnBinaryOperator { add, subtract, multiply, divide }
 
 class RpnEngine {
   final List<Matrix> _stack = <Matrix>[];
@@ -101,9 +101,26 @@ class RpnEngine {
         result = left - right;
       case RpnBinaryOperator.multiply:
         result = left * right;
+      case RpnBinaryOperator.divide:
+        result = _divide(left, right);
     }
 
     _stack.add(result);
     return result;
+  }
+
+  Matrix _divide(Matrix left, Matrix right) {
+    if (!right.isScalar) {
+      throw UnsupportedCalculatrixOperationError(
+        'Matrix division is only supported by scalar (1x1) denominator.',
+      );
+    }
+
+    final double divisor = right.scalarValue;
+    if (divisor == 0) {
+      throw MatrixDomainError('Division by zero scalar is undefined.');
+    }
+
+    return left.scale(1 / divisor);
   }
 }

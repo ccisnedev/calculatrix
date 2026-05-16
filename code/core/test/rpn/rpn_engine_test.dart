@@ -52,6 +52,17 @@ void main() {
       expect(engine.depth, 1);
     });
 
+    test('applies scalar division through stack operations', () {
+      final RpnEngine engine = RpnEngine();
+
+      engine.pushScalar(9);
+      engine.pushScalar(3);
+      final Matrix result = engine.applyBinary(RpnBinaryOperator.divide);
+
+      expect(result, Matrix.scalar(3));
+      expect(engine.depth, 1);
+    });
+
     test('throws when binary operation has fewer than two values', () {
       final RpnEngine engine = RpnEngine();
       engine.pushScalar(1);

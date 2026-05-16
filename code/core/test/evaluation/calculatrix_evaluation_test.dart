@@ -8,9 +8,19 @@ void main() {
       expect(result, Matrix.scalar(23));
     });
 
+    test('evaluates scalar division in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('10 / 4');
+      expect(result, Matrix.scalar(2.5));
+    });
+
     test('evaluates scalar rpn expression', () {
       final Matrix result = Calculatrix.evaluateRpn(<String>['3', '4', '+']);
       expect(result, Matrix.scalar(7));
+    });
+
+    test('evaluates scalar division in rpn mode', () {
+      final Matrix result = Calculatrix.evaluateRpn(<String>['10', '4', '/']);
+      expect(result, Matrix.scalar(2.5));
     });
 
     test('evaluates matrix product in infix mode', () {
@@ -70,6 +80,24 @@ void main() {
           '+',
         ]),
         throwsA(isA<MatrixShapeError>()),
+      );
+    });
+
+    test('throws unsupported operation error for matrix division by non-scalar', () {
+      expect(
+        () => Calculatrix.evaluateRpn(<String>[
+          '[[1,2],[3,4]]',
+          '[[1,0],[0,1]]',
+          '/',
+        ]),
+        throwsA(isA<UnsupportedCalculatrixOperationError>()),
+      );
+    });
+
+    test('throws matrix domain error for division by zero scalar', () {
+      expect(
+        () => Calculatrix.evaluateRpn(<String>['5', '0', '/']),
+        throwsA(isA<MatrixDomainError>()),
       );
     });
   });
