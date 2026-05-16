@@ -83,6 +83,14 @@ void main() {
       expect(infix, Matrix.scalar(11));
     });
 
+    test('produces numerically equivalent floating results across notations', () {
+      final Matrix infix = Calculatrix.evaluateInfix('0.1 + 0.2');
+      final Matrix rpn = Calculatrix.evaluateRpn(<String>['0.1', '0.2', '+']);
+
+      expect(infix.almostEquals(rpn), isTrue);
+      expect(infix.almostEquals(Matrix.scalar(0.3)), isTrue);
+    });
+
     test('throws syntax error for invalid infix', () {
       expect(
         () => Calculatrix.evaluateInfix('3 + * 4'),

@@ -96,4 +96,53 @@ void main() {
       );
     });
   });
+
+  group('Numeric policy', () {
+    test('exact equality remains strict for floating-point values', () {
+      expect(Matrix.scalar(0.1 + 0.2) == Matrix.scalar(0.3), isFalse);
+    });
+
+    test('almostEquals accepts values within default tolerance', () {
+      final Matrix a = Matrix.scalar(0.1 + 0.2);
+      final Matrix b = Matrix.scalar(0.3);
+
+      expect(a.almostEquals(b), isTrue);
+    });
+
+    test('almostEquals rejects values outside tolerance', () {
+      final Matrix a = Matrix.scalar(1.0);
+      final Matrix b = Matrix.scalar(1.01);
+
+      expect(a.almostEquals(b), isFalse);
+    });
+
+    test('almostEquals works for non-square matrices', () {
+      final Matrix a = Matrix(<List<double>>[
+        <double>[1.0, 2.0],
+        <double>[3.0, 4.000000000001],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[1.0, 2.0],
+        <double>[3.0, 4.0],
+      ]);
+
+      expect(a.almostEquals(b), isTrue);
+    });
+
+    test('almostEquals returns false for mismatched shapes', () {
+      final Matrix a = Matrix(<List<double>>[
+        <double>[1.0],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[1.0, 2.0],
+      ]);
+
+      expect(a.almostEquals(b), isFalse);
+    });
+
+    test('numeric policy exposes default tolerances', () {
+      expect(CalculatrixNumericPolicy.defaultRelativeTolerance, greaterThan(0));
+      expect(CalculatrixNumericPolicy.defaultAbsoluteTolerance, greaterThan(0));
+    });
+  });
 }

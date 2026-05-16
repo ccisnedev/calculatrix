@@ -1,4 +1,5 @@
 import '../errors/errors.dart';
+import '../numeric/numeric_policy.dart';
 
 class Matrix {
   Matrix(List<List<double>> rows) : _rows = _normalize(rows) {
@@ -117,6 +118,33 @@ class Matrix {
     );
 
     return Matrix(result);
+  }
+
+  bool almostEquals(
+    Matrix other, {
+    double relativeTolerance =
+        CalculatrixNumericPolicy.defaultRelativeTolerance,
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    if (rowCount != other.rowCount || columnCount != other.columnCount) {
+      return false;
+    }
+
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = 0; c < columnCount; c++) {
+        if (!CalculatrixNumericPolicy.nearlyEqual(
+          _rows[r][c],
+          other._rows[r][c],
+          relativeTolerance: relativeTolerance,
+          absoluteTolerance: absoluteTolerance,
+        )) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   static List<List<double>> _normalize(List<List<double>> rows) {

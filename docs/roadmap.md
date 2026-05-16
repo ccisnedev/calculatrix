@@ -121,10 +121,10 @@ core package as the single source of truth for all calculator semantics.
 
 #### v2.2.0 — Numeric Policy and Determinism
 
-- [ ] Define formal tolerance policy for floating-point comparison
-- [ ] Implement approximate matrix comparison helpers in core
-- [ ] Add tests for floating-point determinism and tolerance boundaries
-- [ ] Document numeric comparison policy in README and tests
+- [x] Define formal tolerance policy for floating-point comparison
+- [x] Implement approximate matrix comparison helpers in core
+- [x] Add tests for floating-point determinism and tolerance boundaries
+- [x] Document numeric comparison policy in README and tests
 
 #### v2.3.0 — Parser and Evaluation Performance Baseline
 

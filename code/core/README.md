@@ -22,6 +22,14 @@ matrices, so algebraic and stack-based workflows share the same math core.
 - `Calculatrix` facade: `evaluateInfix` and `evaluateRpn`
 - Unit tests for matrix, RPN, and cross-notation evaluation
 
+## Numeric policy
+
+- Exact `==` on `Matrix` remains strict and value-based.
+- Approximate floating-point comparison is available through `Matrix.almostEquals`.
+- Default tolerances:
+	- relative: `1e-10`
+	- absolute: `1e-12`
+
 ## Quick start
 
 ```dart
