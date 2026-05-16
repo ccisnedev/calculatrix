@@ -16,6 +16,7 @@ class CalculatorController extends ChangeNotifier {
   String _lastOperand = '';
   CalculatorMode _mode = CalculatorMode.infix;
   final RpnEngine _rpnEngine = RpnEngine();
+  Matrix? _displayMatrix;
 
   CalculatorMode get mode => _mode;
 
@@ -27,6 +28,8 @@ class CalculatorController extends ChangeNotifier {
 
   /// Error message if evaluation failed (empty otherwise).
   String get error => _error;
+
+  Matrix? get displayMatrix => _displayMatrix;
 
   /// Whether memory contains a non-zero value.
   bool get hasMemory => _memory != 0;
@@ -40,6 +43,10 @@ class CalculatorController extends ChangeNotifier {
         .reversed
         .map(_serializeMatrix)
         .toList(growable: false);
+  }
+
+  List<Matrix> get rpnStackValues {
+    return List<Matrix>.unmodifiable(_rpnEngine.stack.reversed);
   }
 
   String get rpnTopLiteral {
@@ -70,6 +77,7 @@ class CalculatorController extends ChangeNotifier {
     _mode = mode;
     _expression = '';
     _error = '';
+    _displayMatrix = isRpnMode && _rpnEngine.depth > 0 ? _rpnEngine.peek() : null;
     _result = isRpnMode ? rpnTopLiteral : '';
     notifyListeners();
   }
@@ -79,6 +87,7 @@ class CalculatorController extends ChangeNotifier {
 
     _error = '';
     if (_mode == CalculatorMode.infix) {
+      _displayMatrix = null;
       if (_result.isNotEmpty) {
         _expression = literal;
         _result = '';
@@ -91,6 +100,7 @@ class CalculatorController extends ChangeNotifier {
 
     _rpnEngine.push(matrix);
     _expression = '';
+    _displayMatrix = matrix;
     _result = _serializeMatrix(matrix);
     notifyListeners();
   }
@@ -101,6 +111,7 @@ class CalculatorController extends ChangeNotifier {
       if (_result.isNotEmpty && _expression.isEmpty) {
         _result = '';
       }
+      _displayMatrix = null;
       _error = '';
       _expression += value;
       notifyListeners();
@@ -110,13 +121,15 @@ class CalculatorController extends ChangeNotifier {
     // If showing result, start new expression with operators, or replace with digits
     if (_result.isNotEmpty) {
       if (_isOperator(value)) {
-        _expression = _result + value;
+        _expression = _expressionSeedFromResult() + value;
       } else {
         _expression = value;
       }
       _result = '';
+      _displayMatrix = null;
       _error = '';
     } else {
+      _displayMatrix = null;
       _error = '';
       _expression += value;
     }
@@ -138,31 +151,35 @@ class CalculatorController extends ChangeNotifier {
     try {
       // Save the last operator and operand for repeat
       _saveLastOperation(_expression);
-      final double value = _evaluateExpression(_expression);
-      _result = _formatResult(value);
+      final Matrix value = _evaluateExpression(_expression);
+      _displayMatrix = value.isScalar ? null : value;
+      _result = value.isScalar
+          ? _formatResult(value.scalarValue)
+          : MatrixDisplayFormatter.compact(value);
       _expression = '';
       _error = '';
     } on FormatException catch (e) {
       _error = 'Error';
       _result = '';
+      _displayMatrix = null;
       _expression = '';
       debugPrint('Eval error: $e');
     } on CalculatrixError catch (e) {
       _error = 'Error';
       _result = '';
+      _displayMatrix = null;
       _expression = '';
       debugPrint('Eval error: $e');
     }
     notifyListeners();
   }
 
-  double _evaluateExpression(String expression) {
+  Matrix _evaluateExpression(String expression) {
     final String normalized = expression
         .replaceAll('×', '*')
         .replaceAll('÷', '/');
 
-    final Matrix value = Calculatrix.evaluateInfix(normalized);
-    return value.scalarValue;
+    return Calculatrix.evaluateInfix(normalized);
   }
 
   void _saveLastOperation(String expr) {
@@ -195,10 +212,12 @@ class CalculatorController extends ChangeNotifier {
     if (isRpnMode) {
       if (_expression.isNotEmpty) {
         _expression = '';
+        _displayMatrix = _rpnEngine.depth > 0 ? _rpnEngine.peek() : null;
         _error = '';
       } else {
         _rpnEngine.clear();
         _result = '';
+        _displayMatrix = null;
         _error = '';
       }
       notifyListeners();
@@ -207,6 +226,7 @@ class CalculatorController extends ChangeNotifier {
 
     _expression = '';
     _result = '';
+  _displayMatrix = null;
     _error = '';
     _lastOperator = '';
     _lastOperand = '';
@@ -218,6 +238,7 @@ class CalculatorController extends ChangeNotifier {
     if (isRpnMode) {
       if (_expression.isNotEmpty) {
         _expression = _expression.substring(0, _expression.length - 1);
+        _displayMatrix = null;
         _error = '';
         notifyListeners();
       }
@@ -231,6 +252,7 @@ class CalculatorController extends ChangeNotifier {
     }
     if (_expression.isNotEmpty) {
       _expression = _expression.substring(0, _expression.length - 1);
+      _displayMatrix = null;
       _error = '';
       notifyListeners();
     }
@@ -245,6 +267,7 @@ class CalculatorController extends ChangeNotifier {
         } else {
           _expression = '-$_expression';
         }
+        _displayMatrix = null;
         notifyListeners();
       }
       return;
@@ -254,6 +277,7 @@ class CalculatorController extends ChangeNotifier {
       final value = double.tryParse(_result);
       if (value != null) {
         _result = _formatResult(-value);
+        _displayMatrix = Matrix.scalar(-value);
         notifyListeners();
       }
       return;
@@ -264,6 +288,7 @@ class CalculatorController extends ChangeNotifier {
       } else {
         _expression = '-$_expression';
       }
+      _displayMatrix = null;
       notifyListeners();
     }
   }
@@ -291,8 +316,10 @@ class CalculatorController extends ChangeNotifier {
     if (_result.isNotEmpty) {
       _expression = memStr;
       _result = '';
+      _displayMatrix = null;
       _error = '';
     } else {
+      _displayMatrix = null;
       _expression += memStr;
     }
     notifyListeners();
@@ -341,10 +368,12 @@ class CalculatorController extends ChangeNotifier {
     } on FormatException catch (error) {
       _error = 'Error';
       _result = '';
+      _displayMatrix = null;
       debugPrint('Eval error: $error');
     } on CalculatrixError catch (error) {
       _error = 'Error';
       _result = '';
+      _displayMatrix = null;
       debugPrint('Eval error: $error');
     }
 
@@ -465,11 +494,13 @@ class CalculatorController extends ChangeNotifier {
     } on FormatException catch (error) {
       _error = 'Error';
       _result = '';
+      _displayMatrix = null;
       _expression = '';
       debugPrint('Eval error: $error');
     } on CalculatrixError catch (error) {
       _error = 'Error';
       _result = '';
+      _displayMatrix = null;
       _expression = '';
       debugPrint('Eval error: $error');
     }
@@ -478,7 +509,17 @@ class CalculatorController extends ChangeNotifier {
   }
 
   void _syncRpnDisplay() {
+    _displayMatrix = _rpnEngine.depth > 0 ? _rpnEngine.peek() : null;
     _result = rpnTopLiteral;
+  }
+
+  String _expressionSeedFromResult() {
+    final Matrix? matrix = _displayMatrix;
+    if (matrix != null && !matrix.isScalar) {
+      return _serializeMatrix(matrix);
+    }
+
+    return _result;
   }
 
   String _serializeMatrix(Matrix matrix) {

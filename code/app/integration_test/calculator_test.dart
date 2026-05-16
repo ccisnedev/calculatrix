@@ -175,6 +175,45 @@ void main() {
       );
     });
 
+    testWidgets('infix mode displays a non-scalar matrix result', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Matrix editor'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '0');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '0');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '1');
+      await tester.tap(find.text('Insert'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Multiply'));
+      await tester.pump();
+
+      await tester.tap(find.bySemanticsLabel('Matrix editor'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '3');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '4');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '5');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '6');
+      await tester.tap(find.text('Insert'));
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(PageView), const Offset(500, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Equals'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: \[\[3, 4\], \[5, 6\]\]')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('rpn mode commits with ENTER and applies binary addition', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
       await tester.pumpAndSettle();

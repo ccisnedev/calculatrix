@@ -268,7 +268,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsLabel(RegExp(r'Stack depth: 1')), findsOneWidget);
-      expect(find.bySemanticsLabel(RegExp(r'Stack item 1: \[\[42\]\]')), findsOneWidget);
+      expect(find.text('X1'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(ListView), matching: find.text('[[42]]')),
+        findsOneWidget,
+      );
       handle.dispose();
     });
 
@@ -283,6 +287,47 @@ void main() {
       expect(find.text('DUP'), findsOneWidget);
       expect(find.text('DROP'), findsOneWidget);
       expect(find.text('SWAP'), findsOneWidget);
+    });
+
+    testWidgets('infix mode renders non-scalar matrix results in the display', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('MAT'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '0');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '0');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '1');
+      await tester.tap(find.text('Insert'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('×'));
+      await tester.pump();
+
+      await tester.tap(find.text('MAT'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '3');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '4');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '5');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '6');
+      await tester.tap(find.text('Insert'));
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(PageView), const Offset(500, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('='));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: \[\[3, 4\], \[5, 6\]\]')),
+        findsOneWidget,
+      );
+      expect(find.text('[3 4]\n[5 6]'), findsOneWidget);
+      handle.dispose();
     });
   });
 }

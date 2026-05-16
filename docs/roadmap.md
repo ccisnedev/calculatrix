@@ -183,12 +183,12 @@ explicit notation modes, and richer display contracts.
 
 #### v2.8.0 — Matrix Display and Formatting
 
-- [ ] Display non-scalar matrix results in the app without collapsing them to `scalarValue`
-- [ ] Define compact and expanded matrix render policies for small and large screens
-- [ ] Add overflow, scrolling, and readability rules for matrix output
-- [ ] Align matrix formatting expectations between Flutter app and CLI
-- [ ] Add accessibility semantics for matrix structures and stack previews
-- [ ] Add regression coverage for matrix render, formatting, and cross-consumer parity
+ [x] Display non-scalar matrix results in the app without collapsing them to `scalarValue`
+ [x] Define compact and expanded matrix render policies for small and large screens
+ [x] Add overflow, scrolling, and readability rules for matrix output
+ [x] Align matrix formatting expectations between Flutter app and CLI
+ [x] Add accessibility semantics for matrix structures and stack previews
+ [x] Add regression coverage for matrix render, formatting, and cross-consumer parity
 
 #### v2.9.0 — Consumer Cleanup and Freeze Before Stage 3
 

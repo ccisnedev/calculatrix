@@ -16,14 +16,14 @@ void main(List<String> args) {
         }
         final String expression = args.sublist(1).join(' ');
         final Matrix infixResult = Calculatrix.evaluateInfix(expression);
-        print(infixResult);
+        print(MatrixDisplayFormatter.compact(infixResult));
       case 'rpn':
         if (args.length < 2) {
           throw const FormatException('Missing RPN tokens.');
         }
         final List<String> rpnTokens = args.sublist(1);
         final Matrix rpnResult = Calculatrix.evaluateRpn(rpnTokens);
-        print(rpnResult);
+        print(MatrixDisplayFormatter.compact(rpnResult));
       default:
         throw FormatException('Unknown command: $mode');
     }

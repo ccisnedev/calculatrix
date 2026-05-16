@@ -299,22 +299,7 @@ class _CalculatorViewState extends State<CalculatorView> {
           ),
         ),
         const Spacer(),
-        Semantics(
-          label: 'Display: ${_controller.display}',
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            reverse: true,
-            child: Text(
-              _controller.display,
-              style: const TextStyle(
-                fontSize: 40,
-                fontWeight: FontWeight.w300,
-                color: Colors.white,
-                fontFamily: 'monospace',
-              ),
-            ),
-          ),
-        ),
+        Expanded(child: _buildDisplayValue(fontSize: 40)),
       ],
     );
   }
@@ -323,7 +308,10 @@ class _CalculatorViewState extends State<CalculatorView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Expanded(child: _buildRpnStackSummary()),
+        Flexible(
+          flex: 3,
+          child: _buildRpnStackSummary(),
+        ),
         const SizedBox(height: 8),
         Semantics(
           label: 'Expression: ${_controller.expression}',
@@ -341,15 +329,34 @@ class _CalculatorViewState extends State<CalculatorView> {
           ),
         ),
         const SizedBox(height: 8),
-        Semantics(
+        Flexible(
+          flex: 2,
+          child: _buildDisplayValue(fontSize: 32),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDisplayValue({required double fontSize}) {
+    final Matrix? matrix = _controller.displayMatrix;
+    final bool showMatrix = matrix != null &&
+        !matrix.isScalar &&
+        _controller.error.isEmpty &&
+        _controller.expression.isEmpty &&
+        _controller.result.isNotEmpty;
+
+    if (!showMatrix) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Semantics(
           label: 'Display: ${_controller.display}',
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             reverse: true,
             child: Text(
               _controller.display,
-              style: const TextStyle(
-                fontSize: 32,
+              style: TextStyle(
+                fontSize: fontSize,
                 fontWeight: FontWeight.w300,
                 color: Colors.white,
                 fontFamily: 'monospace',
@@ -357,7 +364,44 @@ class _CalculatorViewState extends State<CalculatorView> {
             ),
           ),
         ),
-      ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool useExpanded = constraints.maxWidth >= 240 &&
+            matrix.rowCount <= 4 &&
+            matrix.columnCount <= 4;
+        final String semanticValue = MatrixDisplayFormatter.compact(matrix);
+        final String visualValue = useExpanded
+            ? MatrixDisplayFormatter.expanded(matrix)
+            : semanticValue;
+
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Semantics(
+            label:
+                'Display: $semanticValue. Matrix ${matrix.rowCount} by ${matrix.columnCount}',
+            child: SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                reverse: !useExpanded,
+                child: Text(
+                  visualValue,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: useExpanded ? fontSize * 0.78 : fontSize,
+                    fontWeight: FontWeight.w300,
+                    color: Colors.white,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -558,30 +602,33 @@ class _CalculatorViewState extends State<CalculatorView> {
                 return Padding(
                   padding: EdgeInsets.only(bottom: index < stack.length - 1 ? 6 : 0),
                   child: Semantics(
+                    container: true,
                     label: 'Stack item ${index + 1}: $literal',
-                    child: Row(
-                      children: [
-                        Text(
-                          'X${index + 1}',
-                          style: const TextStyle(
-                            color: Color(0xFF4FC3F7),
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            literal,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                    child: ExcludeSemantics(
+                      child: Row(
+                        children: [
+                          Text(
+                            'X${index + 1}',
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: Color(0xFF4FC3F7),
+                              fontWeight: FontWeight.w700,
                               fontFamily: 'monospace',
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              literal,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

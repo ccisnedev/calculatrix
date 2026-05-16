@@ -432,5 +432,24 @@ void main() {
       expect(controller.rpnTopLiteral, '[[8]]');
     });
   });
+
+  group('CalculatorController - matrix display', () {
+    test('keeps non-scalar infix results instead of collapsing to scalarValue', () {
+      controller.input('[[1],[2]]');
+      controller.input('×');
+      controller.input('[[3,4]]');
+
+      controller.evaluate();
+
+      expect(controller.display, '[[3, 4], [6, 8]]');
+      expect(
+        controller.displayMatrix,
+        Matrix(<List<double>>[
+          <double>[3, 4],
+          <double>[6, 8],
+        ]),
+      );
+    });
+  });
 }
 
