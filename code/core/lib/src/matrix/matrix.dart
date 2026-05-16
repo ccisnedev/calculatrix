@@ -1,3 +1,5 @@
+import '../errors/errors.dart';
+
 class Matrix {
   Matrix(List<List<double>> rows) : _rows = _normalize(rows) {
     _validateRectangular(_rows);
@@ -19,7 +21,7 @@ class Matrix {
 
   double get scalarValue {
     if (!isScalar) {
-      throw StateError('Matrix is not scalar.');
+      throw MatrixDomainError('Matrix is not scalar.');
     }
     return _rows.first.first;
   }
@@ -67,15 +69,8 @@ class Matrix {
   }
 
   Matrix operator *(Matrix other) {
-    if (isScalar) {
-      return other.scale(scalarValue);
-    }
-    if (other.isScalar) {
-      return scale(other.scalarValue);
-    }
-
     if (columnCount != other.rowCount) {
-      throw ArgumentError(
+      throw MatrixShapeError(
         'Cannot multiply ${rowCount}x${columnCount} by '
         '${other.rowCount}x${other.columnCount}.',
       );
@@ -135,24 +130,24 @@ class Matrix {
 
   static void _validateRectangular(List<List<double>> rows) {
     if (rows.isEmpty) {
-      throw ArgumentError('Matrix cannot be empty.');
+      throw MatrixShapeError('Matrix cannot be empty.');
     }
 
     if (rows.first.isEmpty) {
-      throw ArgumentError('Matrix rows cannot be empty.');
+      throw MatrixShapeError('Matrix rows cannot be empty.');
     }
 
     final int width = rows.first.length;
     for (final List<double> row in rows) {
       if (row.length != width) {
-        throw ArgumentError('All rows must have the same number of columns.');
+        throw MatrixShapeError('All rows must have the same number of columns.');
       }
     }
   }
 
   void _requireSameDimensions(Matrix other, {required String operation}) {
     if (rowCount != other.rowCount || columnCount != other.columnCount) {
-      throw ArgumentError(
+      throw MatrixShapeError(
         'Cannot perform $operation for ${rowCount}x${columnCount} and '
         '${other.rowCount}x${other.columnCount}.',
       );

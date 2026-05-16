@@ -3,10 +3,16 @@
 > **Versioning philosophy**: each stage ends with a stable major release.
 > Versions `X.y.z` after each `.0` are improvements and fixes on top of that base.
 
-- **Package**: `dev.ccisne.calculatrix`
+- **Core package**: `calculatrix`
+- **Flutter consumer**: `calculatrix_app`
+- **CLI consumer**: `calculatrix_cli`
 - **Framework**: Flutter (web-first for QA, then multi-platform)
 - **Architecture**: MVVM (Controller extends ChangeNotifier + notifyListeners)
 - **QA**: TDD + Widget tests + Integration tests (Semantics-driven)
+
+> **Architecture rule**: calculator logic (algebraic evaluation, matrix operations,
+> and RPN stack semantics) lives in `package:calculatrix`. Flutter app and CLI
+> are UI/interaction layers over the same core API.
 
 ---
 
@@ -79,24 +85,28 @@ with Google Calculator-style operator precedence.
 ## Stage 2 — "Core Engine Package" (1.x.x → 2.0.0)
 
 Implementation of `package:calculatrix` as a pure Dart computation core,
-reusable from Flutter, CLI, and other consumers.
+reusable from Flutter, CLI, and other consumers. This stage establishes the
+core package as the single source of truth for all calculator semantics.
 
 ### v1.x.x → v2.0.0
 
 - [ ] Create and stabilize `package:calculatrix` (pure Dart, no Flutter dependency)
-- [ ] Define a matrix model as the domain baseline (scalars as 1×1 matrices)
-- [ ] Implement the RPN core (`RpnEngine`) with stack and binary operations
-- [ ] Implement the matrix API (`Matrix`) with addition, subtraction, multiplication, and transpose
-- [ ] Add algebraic parser/evaluator on top of the same matrix domain
+- [ ] Define matrix-first domain model for all arithmetic (`1x1`, vectors, square, non-square)
+- [ ] Implement matrix API (`Matrix`) with uniform semantics for all valid shapes
+- [ ] Implement RPN core (`RpnEngine`) with stack operations over the same matrix domain
+- [ ] Implement algebraic parser/evaluator (`evaluateInfix`) mapped to the same core rules
+- [ ] Implement RPN evaluator facade (`evaluateRpn`) equivalent in semantics to algebraic mode
 - [ ] Define an error taxonomy (invalid dimensions, insufficient stack depth, unsupported operations)
-- [ ] Publish a complete unit test suite for the package
-- [ ] Document package integration for Flutter app and CLI
+- [ ] Publish complete unit/property test suite for matrix, RPN, and cross-notation equivalence
+- [ ] Migrate Flutter app to consume core math APIs (no duplicated math engine in app)
+- [ ] Scaffold CLI commands consuming the same core APIs (no duplicated algorithms in CLI)
+- [ ] Document package integration contracts for Flutter app and CLI
 
 ### v2.0.0 — Stable Release
 
 - [ ] `package:calculatrix` published as the official computation engine
-- [ ] Flutter app migrated to consume the package instead of embedded logic
-- [ ] Updated architecture documentation (shared core: Flutter + CLI)
+- [ ] Flutter app and CLI both running against shared core semantics
+- [ ] Updated architecture documentation (shared core: app + CLI + backend)
 
 ### v2.x.x — Improvements and fixes on top of v2
 
@@ -106,28 +116,25 @@ reusable from Flutter, CLI, and other consumers.
 
 ---
 
-## Stage 3 — "Matrices" (2.x.x → 3.0.0)
+## Stage 3 — "Advanced Matrix UX and Linear Algebra" (2.x.x → 3.0.0)
 
-Matrix operations: input, visualization, and basic linear algebra.
+User-facing matrix workflows and advanced linear algebra on top of the Stage 2 core.
 
 ### v2.x.x → v3.0.0
 
-- [ ] Data model: Matrix (m×n)
 - [ ] Matrix editor (cell-based input)
-- [ ] Matrix addition and subtraction
-- [ ] Matrix multiplication
-- [ ] Scalar multiplication
-- [ ] Transpose
+- [ ] Matrix stack visualization for RPN mode (top levels + depth navigation)
+- [ ] Matrix input/output UX for app and CLI
 - [ ] Determinant
 - [ ] Matrix inverse
-- [ ] Matrix display in a grid
-- [ ] Integration with algebraic and RPN modes
-- [ ] Linear algebra tests
+- [ ] Additional decompositions (priority subset: LU or QR)
+- [ ] Matrix display and formatting policies (readability + precision)
+- [ ] Extended linear algebra tests (advanced ops)
 
 ### v3.0.0 — Stable Release
 
-- [ ] Calculator with full matrix support
-- [ ] Matrix operations documentation
+- [ ] Calculator UX with advanced matrix workflows over shared core
+- [ ] Advanced matrix operations documentation
 
 ### v3.x.x — Improvements and fixes on top of v3
 

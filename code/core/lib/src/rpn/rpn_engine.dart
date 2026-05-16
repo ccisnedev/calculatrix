@@ -1,3 +1,4 @@
+import '../errors/errors.dart';
 import '../matrix/matrix.dart';
 
 enum RpnBinaryOperator { add, subtract, multiply }
@@ -23,9 +24,52 @@ class RpnEngine {
     push(Matrix.scalar(value));
   }
 
+  Matrix dup() {
+    if (_stack.isEmpty) {
+      throw RpnStackUnderflowError('Cannot dup from an empty RPN stack.');
+    }
+
+    final Matrix top = _stack.last;
+    _stack.add(top);
+    return top;
+  }
+
+  Matrix drop() {
+    if (_stack.isEmpty) {
+      throw RpnStackUnderflowError('Cannot drop from an empty RPN stack.');
+    }
+
+    return _stack.removeLast();
+  }
+
+  void swap() {
+    if (_stack.length < 2) {
+      throw RpnStackUnderflowError(
+        'Swap requires at least two values in the stack.',
+      );
+    }
+
+    final int top = _stack.length - 1;
+    final Matrix a = _stack[top];
+    _stack[top] = _stack[top - 1];
+    _stack[top - 1] = a;
+  }
+
+  Matrix over() {
+    if (_stack.length < 2) {
+      throw RpnStackUnderflowError(
+        'Over requires at least two values in the stack.',
+      );
+    }
+
+    final Matrix second = _stack[_stack.length - 2];
+    _stack.add(second);
+    return second;
+  }
+
   Matrix peek() {
     if (_stack.isEmpty) {
-      throw StateError('Cannot peek from an empty RPN stack.');
+      throw RpnStackUnderflowError('Cannot peek from an empty RPN stack.');
     }
 
     return _stack.last;
@@ -33,7 +77,7 @@ class RpnEngine {
 
   Matrix pop() {
     if (_stack.isEmpty) {
-      throw StateError('Cannot pop from an empty RPN stack.');
+      throw RpnStackUnderflowError('Cannot pop from an empty RPN stack.');
     }
 
     return _stack.removeLast();
@@ -41,7 +85,9 @@ class RpnEngine {
 
   Matrix applyBinary(RpnBinaryOperator operatorType) {
     if (_stack.length < 2) {
-      throw StateError('A binary operation requires at least two values.');
+      throw RpnStackUnderflowError(
+        'A binary operation requires at least two values.',
+      );
     }
 
     final Matrix right = _stack.removeLast();

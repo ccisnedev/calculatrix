@@ -13,7 +13,7 @@ void main() {
     });
 
     test('throws for empty matrix', () {
-      expect(() => Matrix(<List<double>>[]), throwsArgumentError);
+      expect(() => Matrix(<List<double>>[]), throwsA(isA<MatrixShapeError>()));
     });
 
     test('throws for ragged matrix', () {
@@ -22,7 +22,7 @@ void main() {
           <double>[1, 2],
           <double>[3],
         ]),
-        throwsArgumentError,
+        throwsA(isA<MatrixShapeError>()),
       );
     });
   });
@@ -54,11 +54,31 @@ void main() {
       ]);
 
       expect(
-        matrix * Matrix.scalar(3),
+        () => matrix * Matrix.scalar(3),
+        throwsA(isA<MatrixShapeError>()),
+      );
+
+      expect(
+        matrix.scale(3),
         Matrix(<List<double>>[
           <double>[3, 6],
           <double>[9, 12],
         ]),
+      );
+    });
+
+    test('throws typed shape error when adding incompatible matrices', () {
+      final Matrix a = Matrix(<List<double>>[
+        <double>[1, 2],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[3, 4],
+      ]);
+
+      expect(
+        () => a + b,
+        throwsA(isA<MatrixShapeError>()),
       );
     });
 
