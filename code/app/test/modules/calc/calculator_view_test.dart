@@ -243,6 +243,47 @@ void main() {
 
       expect(find.text('Matrix cells cannot be empty.'), findsOneWidget);
     });
+
+    testWidgets('switching to rpn relabels the primary action to ENTER', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ENTER'), findsOneWidget);
+      expect(find.text('='), findsNothing);
+    });
+
+    testWidgets('rpn mode shows stack summary after ENTER', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('4'));
+      await tester.pump();
+      await tester.tap(find.text('2'));
+      await tester.pump();
+      await tester.tap(find.text('ENTER'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel(RegExp(r'Stack depth: 1')), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp(r'Stack item 1: \[\[42\]\]')), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('rpn mode exposes a stack actions page', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('DUP'), findsOneWidget);
+      expect(find.text('DROP'), findsOneWidget);
+      expect(find.text('SWAP'), findsOneWidget);
+    });
   });
 }
 

@@ -35,6 +35,13 @@ class CalculatorController extends ChangeNotifier {
 
   int get rpnStackDepth => _rpnEngine.depth;
 
+  List<String> get rpnStackLiterals {
+    return _rpnEngine.stack
+        .reversed
+        .map(_serializeMatrix)
+        .toList(growable: false);
+  }
+
   String get rpnTopLiteral {
     if (_rpnEngine.depth == 0) {
       return '';
@@ -46,6 +53,11 @@ class CalculatorController extends ChangeNotifier {
   /// The display text shown to the user.
   String get display {
     if (_error.isNotEmpty) return _error;
+    if (isRpnMode) {
+      if (_expression.isNotEmpty) return _expression;
+      if (_result.isNotEmpty) return _result;
+      return '0';
+    }
     if (_result.isNotEmpty) return _result;
     return _expression.isEmpty ? '0' : _expression;
   }
@@ -56,6 +68,9 @@ class CalculatorController extends ChangeNotifier {
     }
 
     _mode = mode;
+    _expression = '';
+    _error = '';
+    _result = isRpnMode ? rpnTopLiteral : '';
     notifyListeners();
   }
 
@@ -82,6 +97,16 @@ class CalculatorController extends ChangeNotifier {
 
   /// Appends a character (digit, operator, paren) to the expression.
   void input(String value) {
+    if (isRpnMode) {
+      if (_result.isNotEmpty && _expression.isEmpty) {
+        _result = '';
+      }
+      _error = '';
+      _expression += value;
+      notifyListeners();
+      return;
+    }
+
     // If showing result, start new expression with operators, or replace with digits
     if (_result.isNotEmpty) {
       if (_isOperator(value)) {
@@ -100,6 +125,11 @@ class CalculatorController extends ChangeNotifier {
 
   /// Evaluates the current expression.
   void evaluate() {
+    if (isRpnMode) {
+      enter();
+      return;
+    }
+
     if (_expression.isEmpty && _result.isNotEmpty && _lastOperator.isNotEmpty) {
       // Repeat last operation: result op lastOperand
       _expression = '$_result$_lastOperator$_lastOperand';
@@ -162,6 +192,19 @@ class CalculatorController extends ChangeNotifier {
 
   /// Clears the entire expression and result.
   void clear() {
+    if (isRpnMode) {
+      if (_expression.isNotEmpty) {
+        _expression = '';
+        _error = '';
+      } else {
+        _rpnEngine.clear();
+        _result = '';
+        _error = '';
+      }
+      notifyListeners();
+      return;
+    }
+
     _expression = '';
     _result = '';
     _error = '';
@@ -172,6 +215,15 @@ class CalculatorController extends ChangeNotifier {
 
   /// Deletes the last character from the expression.
   void backspace() {
+    if (isRpnMode) {
+      if (_expression.isNotEmpty) {
+        _expression = _expression.substring(0, _expression.length - 1);
+        _error = '';
+        notifyListeners();
+      }
+      return;
+    }
+
     if (_result.isNotEmpty) {
       // After result, clear all
       clear();
@@ -186,6 +238,18 @@ class CalculatorController extends ChangeNotifier {
 
   /// Toggles the sign of the current value.
   void toggleSign() {
+    if (isRpnMode) {
+      if (_expression.isNotEmpty) {
+        if (_expression.startsWith('-')) {
+          _expression = _expression.substring(1);
+        } else {
+          _expression = '-$_expression';
+        }
+        notifyListeners();
+      }
+      return;
+    }
+
     if (_result.isNotEmpty) {
       final value = double.tryParse(_result);
       if (value != null) {
@@ -213,6 +277,16 @@ class CalculatorController extends ChangeNotifier {
   /// Recalls memory value into expression.
   void memoryRecall() {
     if (_memory == 0) return;
+
+    if (isRpnMode) {
+      _rpnEngine.pushScalar(_memory);
+      _expression = '';
+      _error = '';
+      _syncRpnDisplay();
+      notifyListeners();
+      return;
+    }
+
     final memStr = _formatResult(_memory);
     if (_result.isNotEmpty) {
       _expression = memStr;
@@ -230,6 +304,12 @@ class CalculatorController extends ChangeNotifier {
     if (value != null) {
       _memory += value;
       notifyListeners();
+      return;
+    }
+
+    if (isRpnMode && _rpnEngine.depth > 0) {
+      _error = 'Error';
+      notifyListeners();
     }
   }
 
@@ -239,10 +319,98 @@ class CalculatorController extends ChangeNotifier {
     if (value != null) {
       _memory -= value;
       notifyListeners();
+      return;
+    }
+
+    if (isRpnMode && _rpnEngine.depth > 0) {
+      _error = 'Error';
+      notifyListeners();
     }
   }
 
+  void enter() {
+    if (!isRpnMode || _expression.isEmpty) {
+      return;
+    }
+
+    try {
+      _rpnEngine.push(_parseDraftOperand(_expression));
+      _expression = '';
+      _error = '';
+      _syncRpnDisplay();
+    } on FormatException catch (error) {
+      _error = 'Error';
+      _result = '';
+      debugPrint('Eval error: $error');
+    } on CalculatrixError catch (error) {
+      _error = 'Error';
+      _result = '';
+      debugPrint('Eval error: $error');
+    }
+
+    notifyListeners();
+  }
+
+  void applyRpnBinary(RpnBinaryOperator operator) {
+    if (!isRpnMode) {
+      return;
+    }
+
+    _runRpnAction(() {
+      _commitDraftIfNeeded();
+      _rpnEngine.applyBinary(operator);
+    });
+  }
+
+  void applyRpnUnary(RpnUnaryOperator operator) {
+    if (!isRpnMode) {
+      return;
+    }
+
+    _runRpnAction(() {
+      _commitDraftIfNeeded();
+      _rpnEngine.applyUnary(operator);
+    });
+  }
+
+  void dupRpn() {
+    _runRpnAction(_rpnEngine.dup);
+  }
+
+  void dropRpn() {
+    _runRpnAction(_rpnEngine.drop);
+  }
+
+  void swapRpn() {
+    _runRpnAction(_rpnEngine.swap);
+  }
+
+  void overRpn() {
+    _runRpnAction(_rpnEngine.over);
+  }
+
+  void rotRpn() {
+    _runRpnAction(_rpnEngine.rot);
+  }
+
   double? _currentNumericValue() {
+    if (isRpnMode) {
+      if (_expression.isNotEmpty) {
+        return double.tryParse(_expression);
+      }
+
+      if (_rpnEngine.depth == 0) {
+        return null;
+      }
+
+      final Matrix value = _rpnEngine.peek();
+      if (value.isScalar) {
+        return value.scalarValue;
+      }
+
+      return null;
+    }
+
     if (_result.isNotEmpty) return double.tryParse(_result);
     if (_expression.isNotEmpty) return double.tryParse(_expression);
     return null;
@@ -266,6 +434,51 @@ class CalculatorController extends ChangeNotifier {
 
   bool _isOperator(String value) {
     return value == '+' || value == '-' || value == '×' || value == '÷';
+  }
+
+  Matrix _parseDraftOperand(String expression) {
+    final String normalized = expression
+        .replaceAll('×', '*')
+        .replaceAll('÷', '/');
+
+    return Calculatrix.evaluateInfix(normalized);
+  }
+
+  void _commitDraftIfNeeded() {
+    if (_expression.isEmpty) {
+      return;
+    }
+
+    _rpnEngine.push(_parseDraftOperand(_expression));
+    _expression = '';
+  }
+
+  void _runRpnAction(void Function() action) {
+    if (!isRpnMode) {
+      return;
+    }
+
+    try {
+      action();
+      _error = '';
+      _syncRpnDisplay();
+    } on FormatException catch (error) {
+      _error = 'Error';
+      _result = '';
+      _expression = '';
+      debugPrint('Eval error: $error');
+    } on CalculatrixError catch (error) {
+      _error = 'Error';
+      _result = '';
+      _expression = '';
+      debugPrint('Eval error: $error');
+    }
+
+    notifyListeners();
+  }
+
+  void _syncRpnDisplay() {
+    _result = rpnTopLiteral;
   }
 
   String _serializeMatrix(Matrix matrix) {

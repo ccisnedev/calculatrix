@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:calculatrix/calculatrix.dart';
 import 'package:flutter/material.dart';
 import 'controller.dart';
 import 'matrix_editor_draft.dart';
@@ -80,6 +81,33 @@ class _CalculatorViewState extends State<CalculatorView> {
     _ButtonDef('=', _ButtonCategory.equals),
   ];
 
+  static const _rpnPrimaryButtons = [
+    _ButtonDef('MC', _ButtonCategory.function),
+    _ButtonDef('MR', _ButtonCategory.function),
+    _ButtonDef('M-', _ButtonCategory.function),
+    _ButtonDef('M+', _ButtonCategory.function),
+    _ButtonDef('C', _ButtonCategory.function),
+    _ButtonDef('√', _ButtonCategory.function),
+    _ButtonDef('%', _ButtonCategory.function),
+    _ButtonDef('÷', _ButtonCategory.operator),
+    _ButtonDef('7', _ButtonCategory.number),
+    _ButtonDef('8', _ButtonCategory.number),
+    _ButtonDef('9', _ButtonCategory.number),
+    _ButtonDef('×', _ButtonCategory.operator),
+    _ButtonDef('4', _ButtonCategory.number),
+    _ButtonDef('5', _ButtonCategory.number),
+    _ButtonDef('6', _ButtonCategory.number),
+    _ButtonDef('-', _ButtonCategory.operator),
+    _ButtonDef('1', _ButtonCategory.number),
+    _ButtonDef('2', _ButtonCategory.number),
+    _ButtonDef('3', _ButtonCategory.number),
+    _ButtonDef('+', _ButtonCategory.operator),
+    _ButtonDef('±', _ButtonCategory.function),
+    _ButtonDef('0', _ButtonCategory.number),
+    _ButtonDef('.', _ButtonCategory.number),
+    _ButtonDef('ENTER', _ButtonCategory.equals),
+  ];
+
   static const _editingButtons = [
     _ButtonDef('MAT', _ButtonCategory.function),
     _ButtonDef('(', _ButtonCategory.function),
@@ -110,6 +138,36 @@ class _CalculatorViewState extends State<CalculatorView> {
   static const List<_KeypadPageDef> _infixPages = <_KeypadPageDef>[
     _KeypadPageDef('Primary', _primaryButtons),
     _KeypadPageDef('Edit', _editingButtons),
+  ];
+
+  static const List<_KeypadPageDef> _rpnPages = <_KeypadPageDef>[
+    _KeypadPageDef('RPN Entry', _rpnPrimaryButtons),
+    _KeypadPageDef('RPN Stack', <_ButtonDef>[
+      _ButtonDef('MAT', _ButtonCategory.function),
+      _ButtonDef('DUP', _ButtonCategory.function),
+      _ButtonDef('DROP', _ButtonCategory.function),
+      _ButtonDef('SWAP', _ButtonCategory.function),
+      _ButtonDef('OVER', _ButtonCategory.function),
+      _ButtonDef('ROT', _ButtonCategory.function),
+      _ButtonDef('√', _ButtonCategory.function),
+      _ButtonDef('%', _ButtonCategory.function),
+      _ButtonDef('7', _ButtonCategory.number),
+      _ButtonDef('8', _ButtonCategory.number),
+      _ButtonDef('9', _ButtonCategory.number),
+      _ButtonDef('÷', _ButtonCategory.operator),
+      _ButtonDef('4', _ButtonCategory.number),
+      _ButtonDef('5', _ButtonCategory.number),
+      _ButtonDef('6', _ButtonCategory.number),
+      _ButtonDef('×', _ButtonCategory.operator),
+      _ButtonDef('1', _ButtonCategory.number),
+      _ButtonDef('2', _ButtonCategory.number),
+      _ButtonDef('3', _ButtonCategory.number),
+      _ButtonDef('-', _ButtonCategory.operator),
+      _ButtonDef('±', _ButtonCategory.function),
+      _ButtonDef('0', _ButtonCategory.number),
+      _ButtonDef('.', _ButtonCategory.number),
+      _ButtonDef('+', _ButtonCategory.operator),
+    ]),
   ];
 
   @override
@@ -194,53 +252,112 @@ class _CalculatorViewState extends State<CalculatorView> {
                   ),
                 ),
               const Spacer(),
+              if (_controller.isRpnMode)
+                Semantics(
+                  label: 'Stack depth: ${_controller.rpnStackDepth}',
+                  child: Text(
+                    'Stack ${_controller.rpnStackDepth}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF4FC3F7),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 8),
-          // Expression line
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Semantics(
-                  label: 'Expression: ${_controller.expression}',
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    reverse: true,
-                    child: Text(
-                      _controller.expression.isEmpty
-                          ? ' '
-                          : _controller.expression,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        color: Color(0xFF8A8FA3),
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Semantics(
-                  label: 'Display: ${_controller.display}',
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    reverse: true,
-                    child: Text(
-                      _controller.display,
-                      style: const TextStyle(
-                        fontSize: 40,
-                        fontWeight: FontWeight.w300,
-                        color: Colors.white,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            child: _controller.isRpnMode
+                ? _buildRpnDisplayBody()
+                : _buildInfixDisplayBody(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfixDisplayBody() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Semantics(
+          label: 'Expression: ${_controller.expression}',
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            reverse: true,
+            child: Text(
+              _controller.expression.isEmpty
+                  ? ' '
+                  : _controller.expression,
+              style: const TextStyle(
+                fontSize: 20,
+                color: Color(0xFF8A8FA3),
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ),
+        const Spacer(),
+        Semantics(
+          label: 'Display: ${_controller.display}',
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            reverse: true,
+            child: Text(
+              _controller.display,
+              style: const TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.w300,
+                color: Colors.white,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRpnDisplayBody() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(child: _buildRpnStackSummary()),
+        const SizedBox(height: 8),
+        Semantics(
+          label: 'Expression: ${_controller.expression}',
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            reverse: true,
+            child: Text(
+              _controller.expression.isEmpty ? ' ' : _controller.expression,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF8A8FA3),
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Semantics(
+          label: 'Display: ${_controller.display}',
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            reverse: true,
+            child: Text(
+              _controller.display,
+              style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w300,
+                color: Colors.white,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -411,7 +528,66 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   List<_KeypadPageDef> _pagesForMode(CalculatorMode mode) {
-    return _infixPages;
+    return mode == CalculatorMode.rpn ? _rpnPages : _infixPages;
+  }
+
+  Widget _buildRpnStackSummary() {
+    final List<String> stack = _controller.rpnStackLiterals;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F2940),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: stack.isEmpty
+          ? const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Stack empty',
+                style: TextStyle(
+                  color: Color(0xFF8A8FA3),
+                  fontFamily: 'monospace',
+                ),
+              ),
+            )
+          : ListView.builder(
+              itemCount: stack.length,
+              itemBuilder: (BuildContext context, int index) {
+                final String literal = stack[index];
+                return Padding(
+                  padding: EdgeInsets.only(bottom: index < stack.length - 1 ? 6 : 0),
+                  child: Semantics(
+                    label: 'Stack item ${index + 1}: $literal',
+                    child: Row(
+                      children: [
+                        Text(
+                          'X${index + 1}',
+                          style: const TextStyle(
+                            color: Color(0xFF4FC3F7),
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            literal,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
   }
 
   Widget _buildModeSwitch() {
@@ -482,6 +658,54 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   void _onButtonPressed(String label) {
+    if (_controller.isRpnMode) {
+      switch (label) {
+        case 'MAT':
+          _openMatrixEditor();
+        case 'C':
+          _controller.clear();
+        case '⌫':
+          _controller.backspace();
+        case 'ENTER':
+          _controller.enter();
+        case '+':
+          _controller.applyRpnBinary(RpnBinaryOperator.add);
+        case '-':
+          _controller.applyRpnBinary(RpnBinaryOperator.subtract);
+        case '×':
+          _controller.applyRpnBinary(RpnBinaryOperator.multiply);
+        case '÷':
+          _controller.applyRpnBinary(RpnBinaryOperator.divide);
+        case '√':
+          _controller.applyRpnUnary(RpnUnaryOperator.sqrt);
+        case '%':
+          _controller.applyRpnUnary(RpnUnaryOperator.percent);
+        case 'DUP':
+          _controller.dupRpn();
+        case 'DROP':
+          _controller.dropRpn();
+        case 'SWAP':
+          _controller.swapRpn();
+        case 'OVER':
+          _controller.overRpn();
+        case 'ROT':
+          _controller.rotRpn();
+        case '±':
+          _controller.toggleSign();
+        case 'MC':
+          _controller.memoryClear();
+        case 'MR':
+          _controller.memoryRecall();
+        case 'M+':
+          _controller.memoryAdd();
+        case 'M-':
+          _controller.memorySubtract();
+        default:
+          _controller.input(label);
+      }
+      return;
+    }
+
     switch (label) {
       case 'MAT':
         _openMatrixEditor();
@@ -512,12 +736,18 @@ class _CalculatorViewState extends State<CalculatorView> {
       'C' => 'Clear',
       '⌫' => 'Backspace',
       '=' => 'Equals',
+      'ENTER' => 'Enter',
       '+' => 'Plus',
       '-' => 'Minus',
       '×' => 'Multiply',
       '÷' => 'Divide',
       '(' => 'Left parenthesis',
       ')' => 'Right parenthesis',
+      'DUP' => 'Duplicate top',
+      'DROP' => 'Drop top',
+      'SWAP' => 'Swap top two',
+      'OVER' => 'Copy second to top',
+      'ROT' => 'Rotate top three',
       '.' => 'Decimal point',
       '√' => 'Square root',
       '%' => 'Percent',

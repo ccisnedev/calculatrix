@@ -174,6 +174,32 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('rpn mode commits with ENTER and applies binary addition', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('RPN mode'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('4'));
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('2'));
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('Enter'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('8'));
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('Enter'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Plus'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel(RegExp(r'Display: \[\[50\]\]')), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp(r'Stack depth: 1')), findsOneWidget);
+    });
   });
 }
 

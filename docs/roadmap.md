@@ -171,15 +171,15 @@ explicit notation modes, and richer display contracts.
 
 #### v2.7.0 — RPN Mode UX
 
-- [ ] Make notation mode persistent and visible in app state
-- [ ] Add an `RPN`-focused keypad page for stack actions and operand entry
-- [ ] Add stack visualization (top levels + depth navigation) in the app
-- [ ] Relabel the primary action key from `=` to `ENTER` in `RPN` mode
-- [ ] Define `ENTER` as commit of the current draft operand; duplication remains an explicit `dup` action
-- [ ] Auto-commit any active draft before unary or binary stack operators execute through the core
-- [ ] Define `C`, `⌫`, `MC`, `MR`, `M+`, and `M-` semantics for draft-aware `RPN` workflows
-- [ ] Support switching between `Infix` and `RPN` without ambiguous display state
-- [ ] Add controller, widget, integration, and CLI smoke tests for stack workflows, notation switching, and error presentation
+- [x] Make notation mode persistent and visible in app state
+- [x] Add an `RPN`-focused keypad page for stack actions and operand entry
+- [x] Add stack visualization (top levels + depth navigation) in the app
+- [x] Relabel the primary action key from `=` to `ENTER` in `RPN` mode
+- [x] Define `ENTER` as commit of the current draft operand; duplication remains an explicit `dup` action
+- [x] Auto-commit any active draft before unary or binary stack operators execute through the core
+- [x] Define `C`, `⌫`, `MC`, `MR`, `M+`, and `M-` semantics for draft-aware `RPN` workflows
+- [x] Support switching between `Infix` and `RPN` without ambiguous display state
+- [x] Add controller, widget, integration, and CLI smoke tests for stack workflows, notation switching, and error presentation
 
 #### v2.8.0 — Matrix Display and Formatting
 

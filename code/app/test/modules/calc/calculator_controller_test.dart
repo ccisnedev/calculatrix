@@ -1,3 +1,4 @@
+import 'package:calculatrix/calculatrix.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:calculatrix_app/modules/calc/controller.dart';
 import 'package:calculatrix_app/modules/calc/matrix_editor_draft.dart';
@@ -377,6 +378,58 @@ void main() {
 
       expect(controller.rpnStackDepth, 1);
       expect(controller.rpnTopLiteral, '[[1,2],[3,4]]');
+    });
+  });
+
+  group('CalculatorController - rpn mode', () {
+    test('evaluate acts as ENTER and commits current draft in rpn mode', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.input('4');
+      controller.input('2');
+
+      controller.evaluate();
+
+      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnTopLiteral, '[[42]]');
+      expect(controller.expression, '');
+    });
+
+    test('binary operator auto-commits active draft before execution', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.input('3');
+      controller.evaluate();
+      controller.input('4');
+
+      controller.applyRpnBinary(RpnBinaryOperator.add);
+
+      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnTopLiteral, '[[7]]');
+      expect(controller.display, '[[7]]');
+    });
+
+    test('clear removes draft but preserves committed stack in rpn mode', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.input('3');
+      controller.evaluate();
+      controller.input('4');
+
+      controller.clear();
+
+      expect(controller.expression, '');
+      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnTopLiteral, '[[3]]');
+    });
+
+    test('memory recall pushes scalar onto RPN stack', () {
+      controller.input('8');
+      controller.evaluate();
+      controller.memoryAdd();
+      controller.setMode(CalculatorMode.rpn);
+
+      controller.memoryRecall();
+
+      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnTopLiteral, '[[8]]');
     });
   });
 }
