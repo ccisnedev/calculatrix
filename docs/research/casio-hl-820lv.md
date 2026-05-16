@@ -1,130 +1,137 @@
-# Casio HL-820LV — Referencia de Layout, Botones y Funcionalidades
+# Casio HL-820LV — Layout, Keys, and Features Reference
 
-## Descripción General
+## Overview
 
-La Casio HL-820LV es una calculadora de bolsillo básica de 8 dígitos, representativa del diseño clásico de calculadoras compactas de los años 2000-2010. Es una calculadora de "ejecución inmediata" (chain calculation / AES — Algebraic Entry System), donde cada operación binaria se ejecuta al presionar el siguiente operador o la tecla `=`.
+The Casio HL-820LV is an 8-digit pocket calculator and a classic example of
+compact calculator design from the 2000s-2010s. It uses immediate execution
+(chain calculation / AES — Algebraic Entry System), where each binary operation
+is executed when the next operator or `=` is pressed.
 
-**No usa orden de operaciones** — evalúa estrictamente de izquierda a derecha.
+It does not use operator precedence and evaluates strictly left to right.
 
-## Especificaciones Técnicas
+## Technical Specifications
 
-| Propiedad | Valor |
-|-----------|-------|
-| Dígitos del display | 8 |
-| Tipo de display | LCD de 7 segmentos |
-| Alimentación | Dual: Solar + Batería (LR1130 × 1) |
-| Dimensiones | ~100 × 62 × 9 mm |
-| Peso | ~45g (con batería) |
-| Carcasa | Tipo wallet/cartera rígida plegable |
+| Property | Value |
+|----------|-------|
+| Display digits | 8 |
+| Display type | 7-segment LCD |
+| Power | Dual: Solar + Battery (LR1130 × 1) |
+| Dimensions | ~100 × 62 × 9 mm |
+| Weight | ~45g (with battery) |
+| Body | Folding hard wallet-style cover |
 
-## Layout de Botones
+## Button Layout
 
-### Distribución Física (4 columnas × 6 filas aprox.)
+### Physical Distribution (4 columns × ~6 rows)
 
 ```
 ┌─────────────────────────────────────────┐
-│            [ DISPLAY 8 DÍGITOS ]        │
-│  Indicadores: M  -  E                  │
+│            [ 8-DIGIT DISPLAY ]          │
+│  Indicators: M  -  E                    │
 ├─────────────────────────────────────────┤
 │                                         │
-│   [MC]    [MR]    [M-]    [M+]         │
+│   [MC]    [MR]    [M-]    [M+]          │
 │                                         │
-│   [OFF]   [√]     [%]     [÷]          │
+│   [OFF]   [√]     [%]     [÷]           │
 │                                         │
-│   [7]     [8]     [9]     [×]          │
+│   [7]     [8]     [9]     [×]           │
 │                                         │
-│   [4]     [5]     [6]     [-]          │
+│   [4]     [5]     [6]     [-]           │
 │                                         │
-│   [1]     [2]     [3]     [+]          │
+│   [1]     [2]     [3]     [+]           │
 │                                         │
-│   [0]     [.]     [+/-]   [=]          │
+│   [0]     [.]     [+/-]   [=]           │
 │                                         │
 │               [AC]  [C]                 │
 │                                         │
 └─────────────────────────────────────────┘
 ```
 
-### Nota sobre variantes
-Algunas variantes tienen `AC/C` como un solo botón de doble función, o `ON/AC` combinado. El layout exacto puede variar ligeramente entre regiones (HL-820LV-BK, HL-820LV-WE, etc.), pero las funcionalidades son idénticas.
+### Variant note
 
-## Catálogo Completo de Teclas
+Some variants have a single dual-purpose `AC/C` key, or combined `ON/AC`.
+Exact layout may differ slightly by region (HL-820LV-BK, HL-820LV-WE, etc.),
+but feature behavior is equivalent.
 
-### Teclas Numéricas (10)
+## Full Key Catalog
 
-| Tecla | Función |
-|-------|---------|
-| `0` - `9` | Entrada de dígitos |
-| `.` | Punto decimal |
+### Numeric Keys (10)
 
-### Teclas de Operación (4)
+| Key | Function |
+|-----|----------|
+| `0` - `9` | Digit input |
+| `.` | Decimal point |
 
-| Tecla | Función | Comportamiento |
-|-------|---------|---------------|
-| `+` | Suma | Ejecuta operación pendiente, establece suma como próxima operación |
-| `-` | Resta | Ejecuta operación pendiente, establece resta como próxima operación |
-| `×` | Multiplicación | Ejecuta operación pendiente, establece multiplicación |
-| `÷` | División | Ejecuta operación pendiente, establece división |
+### Operation Keys (4)
 
-### Tecla de Resultado
+| Key | Function | Behavior |
+|-----|----------|----------|
+| `+` | Add | Executes pending operation, sets addition as next operation |
+| `-` | Subtract | Executes pending operation, sets subtraction as next operation |
+| `×` | Multiply | Executes pending operation, sets multiplication |
+| `÷` | Divide | Executes pending operation, sets division |
 
-| Tecla | Función | Comportamiento |
-|-------|---------|---------------|
-| `=` | Igual / Ejecutar | Ejecuta la operación pendiente y muestra resultado. Presiones repetidas repiten la última operación con el último operando |
+### Result Key
 
-### Teclas de Memoria (4)
+| Key | Function | Behavior |
+|-----|----------|----------|
+| `=` | Equals / Execute | Executes pending operation and shows result. Repeated presses repeat the last operation with the last operand |
 
-| Tecla | Función | Comportamiento |
-|-------|---------|---------------|
-| `MC` | Memory Clear | Borra el contenido de la memoria (M → 0) |
-| `MR` | Memory Recall | Muestra el valor almacenado en memoria |
-| `M-` | Memory Subtract | Resta el valor mostrado del valor en memoria |
-| `M+` | Memory Add | Suma el valor mostrado al valor en memoria |
+### Memory Keys (4)
 
-### Teclas Especiales
+| Key | Function | Behavior |
+|-----|----------|----------|
+| `MC` | Memory Clear | Clears memory content (M → 0) |
+| `MR` | Memory Recall | Displays value stored in memory |
+| `M-` | Memory Subtract | Subtracts displayed value from memory |
+| `M+` | Memory Add | Adds displayed value to memory |
 
-| Tecla | Función | Comportamiento |
-|-------|---------|---------------|
-| `√` | Raíz cuadrada | Calcula √ del valor mostrado inmediatamente (operación unaria postfija) |
-| `%` | Porcentaje | Contexto-dependiente (ver sección Porcentaje) |
-| `+/-` | Cambio de signo | Invierte el signo del valor mostrado |
+### Special Keys
 
-### Teclas de Control
+| Key | Function | Behavior |
+|-----|----------|----------|
+| `√` | Square root | Computes square root of displayed value immediately |
+| `%` | Percentage | Context-dependent (see Percentage section) |
+| `+/-` | Sign toggle | Inverts sign of displayed value |
 
-| Tecla | Función | Comportamiento |
-|-------|---------|---------------|
-| `AC` | All Clear | Resetea todo: display, operación pendiente, acumulador. NO borra memoria |
-| `C` | Clear Entry | Borra solo la entrada actual (último número ingresado), mantiene la operación |
-| `OFF` | Apagar | Apaga la calculadora (en modelos solo-batería; en solar, puede ser ON/OFF) |
+### Control Keys
 
-## Indicadores del Display
+| Key | Function | Behavior |
+|-----|----------|----------|
+| `AC` | All Clear | Resets display, pending operation, accumulator. Does not clear memory |
+| `C` | Clear Entry | Clears only current entry, keeps operation context |
+| `OFF` | Power off | Turns calculator off (battery-only models; solar models may differ) |
 
-| Indicador | Significado |
-|-----------|-------------|
-| `M` | Hay un valor almacenado en memoria (≠ 0) |
-| `-` | El valor mostrado es negativo |
-| `E` | Error (overflow, división por cero, √ de negativo) |
+## Display Indicators
 
-## Comportamiento Funcional Detallado
+| Indicator | Meaning |
+|-----------|---------|
+| `M` | A non-zero value is stored in memory |
+| `-` | The displayed value is negative |
+| `E` | Error (overflow, division by zero, square root of negative) |
 
-### Modelo de Ejecución: Immediate Execution (Chain Calculation)
+## Detailed Functional Behavior
 
-La HL-820LV usa el modelo AES (Algebraic Entry System) **sin jerarquía de operadores**:
+### Execution Model: Immediate Execution (Chain Calculation)
+
+The HL-820LV uses AES without operator hierarchy:
 
 ```
-Entrada: 2 + 3 × 4 =
-Resultado: 20  (NO 14)
+Input: 2 + 3 × 4 =
+Result: 20 (NOT 14)
 
-Razón: (2 + 3) = 5, luego 5 × 4 = 20
-Cada operador ejecuta la operación anterior inmediatamente.
+Reason: (2 + 3) = 5, then 5 × 4 = 20.
+Each operator executes the previous operation immediately.
 ```
 
-### Regla de Evaluación
+### Evaluation Rule
 
-1. El usuario ingresa un número → se muestra en display
-2. El usuario presiona un operador (+, -, ×, ÷) → se ejecuta cualquier operación pendiente, el resultado se muestra, y el nuevo operador queda pendiente
-3. El usuario presiona `=` → se ejecuta la operación pendiente con el número actual
+1. User enters a number, which is shown on display
+2. User presses an operator (`+`, `-`, `×`, `÷`): pending operation executes,
+   result is shown, new operator becomes pending
+3. User presses `=`: pending operation executes with current number
 
-### Constante de Repetición (= repetido)
+### Repeat Constant (`=` repeatedly)
 
 ```
 5 + 3 = → 8
@@ -132,82 +139,80 @@ Cada operador ejecuta la operación anterior inmediatamente.
       = → 14  (11 + 3)
 ```
 
-El último operando y operador se "recuerdan" para repeticiones con `=`.
+The last operand and operator are remembered for repeated equals.
 
-### Comportamiento del Porcentaje (%)
+### Percentage Behavior (`%`)
 
-El `%` es la tecla más compleja. Su comportamiento depende del contexto:
+| Sequence | Interpretation | Result |
+|----------|----------------|--------|
+| `200 × 10 %` | 10% of 200 | 20 |
+| `200 + 10 %` | 200 + 10% of 200 | 220 |
+| `200 - 10 %` | 200 - 10% of 200 | 180 |
+| `200 ÷ 10 %` | (200 ÷ 10) × 100 | 2000 (markup style) |
 
-| Secuencia | Interpretación | Resultado |
-|-----------|---------------|-----------|
-| `200 × 10 %` | 10% de 200 | 20 |
-| `200 + 10 %` | 200 + 10% de 200 | 220 |
-| `200 - 10 %` | 200 - 10% de 200 | 180 |
-| `200 ÷ 10 %` | (200 ÷ 10) × 100 | 2000 (markup) |
+### Square Root (`√`)
 
-### Raíz Cuadrada (√)
-
-- Operación unaria inmediata (postfija al display)
+- Immediate unary operation
 - `9 √` → 3
-- √ de negativo → Error (`E`)
-- Puede encadenarse: `81 √ √` → 3
+- Square root of negative → Error (`E`)
+- Chainable: `81 √ √` → 3
 
-### Condiciones de Error
+### Error Conditions
 
-| Condición | Display |
+| Condition | Display |
 |-----------|---------|
-| Resultado > 99,999,999 | `E` (overflow) |
-| Resultado < -99,999,999 | `E` (underflow) |
-| División por 0 | `E` |
-| √ de número negativo | `E` |
+| Result > 99,999,999 | `E` (overflow) |
+| Result < -99,999,999 | `E` (underflow) |
+| Division by 0 | `E` |
+| Square root of negative | `E` |
 
-**Recuperación de error:** Presionar `C` o `AC` para limpiar el estado de error.
+Error recovery: press `C` or `AC` to clear error state.
 
 ### Auto Power-Off
 
-La calculadora se apaga automáticamente después de ~7 minutos de inactividad (en modo batería).
+Calculator powers off automatically after ~7 minutes of inactivity
+(in battery mode).
 
-## Ergonomía y Diseño Visual
+## Ergonomics and Visual Design
 
-### Diferenciación de Teclas por Color
+### Color-based Key Grouping
 
-| Grupo | Color típico |
-|-------|-------------|
-| Dígitos (0-9, .) | Gris claro / blanco |
-| Operadores (+, -, ×, ÷) | Gris oscuro |
-| Igual (=) | Gris oscuro / azul |
-| AC / C | Rojo / naranja |
-| Memoria (MC, MR, M-, M+) | Gris medio |
-| Funciones (√, %, +/-) | Gris medio |
+| Group | Typical color |
+|-------|---------------|
+| Digits (`0-9`, `.`) | Light gray / white |
+| Operators (`+`, `-`, `×`, `÷`) | Dark gray |
+| Equals (`=`) | Dark gray / blue |
+| `AC` / `C` | Red / orange |
+| Memory (`MC`, `MR`, `M-`, `M+`) | Medium gray |
+| Functions (`√`, `%`, `+/-`) | Medium gray |
 
-### Características Táctiles
+### Tactile Characteristics
 
-- Teclas planas tipo membrana (ligeramente elevadas)
-- Tamaño de tecla numérica: ~9mm × 7mm
-- Separación entre teclas: ~2mm
-- Textura mate antideslizante en la carcasa
+- Flat membrane-style keys (slightly raised)
+- Numeric key size: ~9mm × 7mm
+- Key spacing: ~2mm
+- Matte anti-slip body texture
 
-## Implicaciones para Calculatrix
+## Implications for Calculatrix
 
-### Lo que adoptamos de la HL-820LV:
+### What we adopt from HL-820LV
 
-1. **Layout de 4 columnas** — Estándar de la industria, ergonómico
-2. **Separación visual de grupos funcionales** — Color/tamaño distingue categorías
-3. **Tecla `=` prominente** — Posición inferior-derecha, fácil acceso con pulgar
-4. **Minimalismo funcional** — Solo las operaciones esenciales, sin clutter
-5. **Display de 8 dígitos** — Limitación deliberada que define el carácter del producto
-6. **Indicadores de estado** — M, -, E como feedback mínimo pero suficiente
-7. **Dual clear (AC/C)** — Dos niveles de "deshacer" son intuitivos
+1. 4-column layout (industry-standard and ergonomic)
+2. Visual separation by key function groups
+3. Prominent `=` key at lower-right position
+4. Functional minimalism
+5. State indicators (`M`, `-`, `E`)
+6. Dual clear concept (`AC` and `C`)
 
-### Lo que NO adoptamos:
+### What we do not adopt
 
-1. **Ejecución inmediata sin precedencia** — Usaremos el motor de Google (con orden de operaciones)
-2. **Sin paréntesis** — Nuestro motor los soportará, aunque el layout no tenga botón visible
-3. **Comportamiento % dependiente de contexto** — Lo simplificaremos
-4. **Auto power-off** — No aplica en software
+1. Immediate execution without precedence
+2. No-parentheses behavior
+3. Fully context-dependent `%` behavior
+4. Auto power-off
 
-## Referencias
+## References
 
-- Casio Official Product Page: HL-820LV series
+- Casio official product page: HL-820LV series
 - Wikipedia: Calculator Input Methods — Immediate Execution / AES
-- Manual de usuario Casio HL-820LV (versión multi-idioma incluida en packaging)
+- Casio HL-820LV user manual (multi-language booklet)

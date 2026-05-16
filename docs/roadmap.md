@@ -1,145 +1,146 @@
 # Roadmap
 
-> **Filosofía de versionado**: cada etapa culmina en una major release estable.
-> Las versiones `X.y.z` posteriores a cada `.0` son mejoras y correcciones sobre esa base.
+> **Versioning philosophy**: each stage ends with a stable major release.
+> Versions `X.y.z` after each `.0` are improvements and fixes on top of that base.
 
 - **Package**: `dev.ccisne.calculatrix`
-- **Framework**: Flutter (web-first para QA, luego multiplataforma)
-- **Arquitectura**: MVVM (Controller extends ChangeNotifier + notifyListeners)
+- **Framework**: Flutter (web-first for QA, then multi-platform)
+- **Architecture**: MVVM (Controller extends ChangeNotifier + notifyListeners)
 - **QA**: TDD + Widget tests + Integration tests (Semantics-driven)
 
 ---
 
-## Etapa 1 — "Casio Skin, Google Brain" (0.x.x → 1.0.0)
+## Stage 1 — "Casio Skin, Google Brain" (0.x.x → 1.0.0)
 
-Calculadora básica con layout inspirado en la Casio HL-820LV y motor de evaluación
-con precedencia de operadores al estilo Google Calculator.
+Basic calculator with a Casio HL-820LV-inspired layout and an evaluation engine
+with Google Calculator-style operator precedence.
 
 ### v0.1.0 — Foundation ✅
 
-- [x] Proyecto Flutter scaffolded (`dev.ccisne.calculatrix`)
-- [x] Estructura MVVM: `lib/{models,controllers,views,widgets}`
-- [x] Modelo de dominio: `Token` (number, operator, paren), `TokenType` enum
+- [x] Flutter project scaffolded (`dev.ccisne.calculatrix`)
+- [x] MVVM structure: `lib/{models,controllers,views,widgets}`
+- [x] Domain model: `Token` (number, operator, paren), `TokenType` enum
 - [x] `Tokenizer`: string → List\<Token\>
-- [x] Unit tests del Tokenizer (TDD)
-- [x] Widget test básico: app arranca sin crash
+- [x] Tokenizer unit tests (TDD)
+- [x] Basic widget test: app starts without crash
 
 ### v0.2.0 — Parser & Evaluator ✅
 
-- [x] `Parser`: List\<Token\> → árbol de expresión (AST)
-- [x] Recursive descent con precedencia PEMDAS
+- [x] `Parser`: List\<Token\> → expression tree (AST)
+- [x] Recursive descent with PEMDAS precedence
 - [x] `Evaluator`: AST → double
-- [x] Operaciones: `+`, `-`, `×`, `÷`
-- [x] Paréntesis y negación unaria
-- [x] Unit tests exhaustivos (TDD): casos normales + edge cases
-- [x] `CalculatorController` (ChangeNotifier) conecta input → evaluación
+- [x] Operations: `+`, `-`, `×`, `÷`
+- [x] Parentheses and unary negation
+- [x] Exhaustive unit tests (TDD): normal cases + edge cases
+- [x] `CalculatorController` (ChangeNotifier) connects input → evaluation
 
-### v0.3.0 — UI Casio Layout ✅
+### v0.3.0 — Casio UI Layout ✅
 
-- [x] Grid de botones 4 columnas (layout HL-820LV)
-- [x] Todos los widgets con `Semantics` labels
-- [x] Display: expresión arriba + resultado abajo (live preview)
-- [x] Diferenciación visual de teclas por grupo funcional
-- [x] Widget tests: cada botón tiene semántica, display actualiza
-- [x] Integration test: secuencia completa `3 + 4 = 7`
+- [x] 4-column button grid (HL-820LV layout)
+- [x] All widgets with `Semantics` labels
+- [x] Display: expression on top + result below (live preview)
+- [x] Visual differentiation by functional key group
+- [x] Widget tests: every button has semantics, display updates
+- [x] Integration test: complete flow `3 + 4 = 7`
 
-### v0.4.0 — Funcionalidades Casio ✅
+### v0.4.0 — Casio Features ✅
 
-- [x] Raíz cuadrada (`√`)
-- [x] Porcentaje (`%`)
-- [x] Memoria (MC, MR, M-, M+)
-- [x] Cambio de signo (`+/-`)
-- [x] Indicadores de estado: M, Error
-- [x] Tests unitarios de cada función
-- [x] Integration test: flujo con memoria
+- [x] Square root (`√`)
+- [x] Percentage (`%`)
+- [x] Memory (MC, MR, M-, M+)
+- [x] Sign toggle (`+/-`)
+- [x] Status indicators: M, Error
+- [x] Unit tests for each feature
+- [x] Integration test: memory workflow
 
 ### v0.5.0 — Polish & Hardening ✅
 
-- [x] Manejo de errores (÷0, overflow, √ negativo)
-- [x] Precisión numérica con redondeo inteligente (12 dígitos significativos)
-- [x] Constante de repetición (`=` repetido)
-- [x] Haptic/visual feedback en botones
-- [x] Integration test: todos los flujos de error
+- [x] Error handling (÷0, overflow, negative √)
+- [x] Numeric precision with smart rounding (12 significant digits)
+- [x] Repeat constant (`=` pressed repeatedly)
+- [x] Haptic/visual feedback on buttons
+- [x] Integration test: all error flows
 
-### v1.0.0 — Release Estable ✅
+### v1.0.0 — Stable Release ✅
 
-- [x] Feature-complete para calculadora básica con precedencia
-- [x] Documentación de usuario
+- [x] Feature-complete basic calculator with operator precedence
+- [x] User documentation
 - [x] CI/CD pipeline (GitHub Actions: test + build web)
 - [x] Full regression test suite passing
 
-### v1.x.x — Mejoras y correcciones sobre v1
+### v1.x.x — Improvements and fixes on top of v1
 
 - Bug fixes
-- Mejoras de UX/rendimiento
-- Refinamiento visual
+- UX/performance improvements
+- Visual refinement
 
 ---
 
-## Etapa 2 — "RPN / Notación Polaca Inversa" (1.x.x → 2.0.0)
+## Stage 2 — "Core Engine Package" (1.x.x → 2.0.0)
 
-Modo RPN con stack visible, inspirado en la HP-50g. El usuario opera con una pila
-de resultados usando `Enter` para push y operadores para pop-apply-push.
+Implementation of `package:calculatrix` as a pure Dart computation core,
+reusable from Flutter, CLI, and other consumers.
 
 ### v1.x.x → v2.0.0
 
-- [ ] Modelo de stack (pila de N niveles con display)
-- [ ] Entrada RPN: número → Enter → número → operador
-- [ ] Display de stack (X, Y, Z, T registers visibles)
-- [ ] Toggle de modo: Algebraico ↔ RPN
-- [ ] Operaciones de stack: SWAP, DROP, DUP, ROT
-- [ ] Historial de stack (undo)
-- [ ] UI adaptada: botón `Enter` prominente, sin `=`
-- [ ] Tests completos para modo RPN
+- [ ] Create and stabilize `package:calculatrix` (pure Dart, no Flutter dependency)
+- [ ] Define a matrix model as the domain baseline (scalars as 1×1 matrices)
+- [ ] Implement the RPN core (`RpnEngine`) with stack and binary operations
+- [ ] Implement the matrix API (`Matrix`) with addition, subtraction, multiplication, and transpose
+- [ ] Add algebraic parser/evaluator on top of the same matrix domain
+- [ ] Define an error taxonomy (invalid dimensions, insufficient stack depth, unsupported operations)
+- [ ] Publish a complete unit test suite for the package
+- [ ] Document package integration for Flutter app and CLI
 
-### v2.0.0 — Release Estable
+### v2.0.0 — Stable Release
 
-- [ ] Dual-mode calculator (algebraico + RPN)
-- [ ] Documentación de ambos modos
+- [ ] `package:calculatrix` published as the official computation engine
+- [ ] Flutter app migrated to consume the package instead of embedded logic
+- [ ] Updated architecture documentation (shared core: Flutter + CLI)
 
-### v2.x.x — Mejoras y correcciones sobre v2
+### v2.x.x — Improvements and fixes on top of v2
 
-- Bug fixes
-- Operaciones de stack avanzadas
-- Macros / programación keystroke (backlog)
+- Bug fixes in the math core
+- Extended RPN operations and stack utilities
+- Performance and numeric precision improvements
 
 ---
 
-## Etapa 3 — "Matrices" (2.x.x → 3.0.0)
+## Stage 3 — "Matrices" (2.x.x → 3.0.0)
 
-Operaciones con matrices: entrada, visualización y álgebra lineal básica.
+Matrix operations: input, visualization, and basic linear algebra.
 
 ### v2.x.x → v3.0.0
 
-- [ ] Modelo de datos: Matrix (m×n)
-- [ ] Editor de matrices (entrada por celdas)
-- [ ] Suma y resta de matrices
-- [ ] Multiplicación de matrices
-- [ ] Multiplicación escalar
-- [ ] Transpuesta
-- [ ] Determinante
-- [ ] Matriz inversa
-- [ ] Display de matrices en grid
-- [ ] Integración con modos algebraico y RPN
-- [ ] Tests de álgebra lineal
+- [ ] Data model: Matrix (m×n)
+- [ ] Matrix editor (cell-based input)
+- [ ] Matrix addition and subtraction
+- [ ] Matrix multiplication
+- [ ] Scalar multiplication
+- [ ] Transpose
+- [ ] Determinant
+- [ ] Matrix inverse
+- [ ] Matrix display in a grid
+- [ ] Integration with algebraic and RPN modes
+- [ ] Linear algebra tests
 
-### v3.0.0 — Release Estable
+### v3.0.0 — Stable Release
 
-- [ ] Calculadora con soporte completo de matrices
-- [ ] Documentación de operaciones matriciales
+- [ ] Calculator with full matrix support
+- [ ] Matrix operations documentation
 
-### v3.x.x — Mejoras y correcciones sobre v3
+### v3.x.x — Improvements and fixes on top of v3
 
 - Eigenvalues / eigenvectors (backlog)
-- Factorizaciones (LU, QR)
-- Matrices dispersas
+- Factorizations (LU, QR)
+- Sparse matrices
 
 ---
 
-## Backlog General
+## General Backlog
 
 - Performance profiling
 - Observability (metrics, tracing)
-- Temas visuales / dark mode
-- Exportación de historial
-- PWA / modo offline
+- Visual themes / dark mode
+- History export
+- PWA / offline mode

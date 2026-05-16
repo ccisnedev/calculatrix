@@ -15,5 +15,5 @@ document significant architectural decisions.
 ## Consequences
 
 - Every significant architectural choice gets a short document.
-- ADRs are numbered sequentially and never deleted (superseded ones are marked as such).
+- ADRs are numbered sequentially and never deleted (superseded ones are marked accordingly).
 - The record grows as the project evolves.

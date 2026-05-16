@@ -2,21 +2,21 @@
 
 ## Overview
 
-Calculatrix es una calculadora Flutter web-first con evaluación algebraica.
-Usa MVVM: la vista observa un `ChangeNotifier` (controller) que coordina el pipeline de evaluación.
+Calculatrix is a web-first Flutter calculator with algebraic evaluation.
+It uses MVVM: the view observes a `ChangeNotifier` (controller) that coordinates the evaluation pipeline.
 
-## Pipeline de Evaluación
+## Evaluation Pipeline
 
 ```
 Input (String) → Tokenizer → List<Token> → Parser → AST → Evaluator → double
 ```
 
-| Componente | Responsabilidad |
+| Component | Responsibility |
 |-----------|----------------|
-| `Tokenizer` | String → tokens (números, operadores, paréntesis, √, %) |
-| `Parser` | Recursive descent, precedencia PEMDAS, genera AST sealed |
-| `Evaluator` | Pattern matching sobre AST → resultado numérico |
-| `Controller` | ChangeNotifier, orquesta pipeline, maneja memoria y repeat = |
+| `Tokenizer` | String → tokens (numbers, operators, parentheses, √, %) |
+| `Parser` | Recursive descent, PEMDAS precedence, builds a sealed AST |
+| `Evaluator` | Pattern matching over AST → numeric result |
+| `Controller` | ChangeNotifier, orchestrates the pipeline, manages memory and repeat `=` |
 
 ## AST (Sealed Classes)
 
@@ -27,7 +27,7 @@ class BinaryOpNode(AstNode left, TokenType op, AstNode right)
 class UnaryOpNode(TokenType op, AstNode operand)
 ```
 
-## Estructura de Módulos
+## Module Structure
 
 ```
 code/app/lib/
@@ -43,9 +43,9 @@ code/app/lib/
       calc.dart           # Barrel export
 ```
 
-## Principios
+## Principles
 
-- **TDD**: tests escritos antes de la implementación
-- **Semantics-driven**: toda la UI tiene labels accesibles
-- **MVVM**: separación estricta vista ↔ lógica
-- **Inmutabilidad**: AST sealed, Token inmutable
+- **TDD**: tests are written before implementation
+- **Semantics-driven**: the entire UI has accessible labels
+- **MVVM**: strict separation between view and logic
+- **Immutability**: sealed AST, immutable `Token`

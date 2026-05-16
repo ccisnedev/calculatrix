@@ -1,5 +1,5 @@
-name: calculatrix
-description: "Casio Skin, Google Brain — High-quality calculator app"
+name: calculatrix_app
+description: "RPN Matrix calculator app"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -15,6 +15,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  calculatrix:
+    path: ../core
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

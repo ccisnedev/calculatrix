@@ -1,34 +1,38 @@
-# Calculadora de Google — Referencia de Código Interno y Arquitectura
+# Google Calculator — Internal Logic and Architecture Reference
 
-## Descripción General
+## Overview
 
-La calculadora de Google es una herramienta integrada en Google Search que aparece como widget interactivo cuando el usuario busca expresiones matemáticas o la palabra "calculator". A diferencia de las calculadoras físicas de ejecución inmediata, Google usa un **modelo de entrada por expresión (formula calculator)** con evaluación que respeta el orden de operaciones estándar (PEMDAS/BODMAS).
+Google Calculator is an interactive widget integrated into Google Search. It
+appears when users search for math expressions or the word "calculator".
+Unlike immediate-execution physical calculators, Google uses an expression-based
+(formula) model and evaluates with standard operator precedence (PEMDAS/BODMAS).
 
-Es un ejemplo canónico de calculadora **declarativa**: el usuario escribe QUÉ quiere calcular, no CÓMO hacerlo paso a paso.
+It is a canonical declarative calculator: users describe what to compute, not
+how to execute it step by step.
 
-## Modelo de Entrada: Infix Notation con Precedencia
+## Input Model: Infix Notation with Precedence
 
 ```
-Entrada: 2 + 3 × 4
-Resultado: 14  (NOT 20)
+Input: 2 + 3 × 4
+Result: 14 (NOT 20)
 
-Razón: La multiplicación tiene mayor precedencia que la suma.
-Se evalúa como 2 + (3 × 4) = 2 + 12 = 14
+Reason: Multiplication has higher precedence than addition.
+2 + (3 × 4) = 2 + 12 = 14
 ```
 
-### Contraste con calculadoras básicas (como la Casio HL-820LV)
+### Contrast with basic calculators (such as Casio HL-820LV)
 
-| Aspecto | Casio HL-820LV | Google Calculator |
-|---------|---------------|-------------------|
-| Modelo | Imperative (chain) | Declarative (formula) |
-| Precedencia | No — izquierda a derecha | Sí — PEMDAS completo |
-| Paréntesis | No soportados | Soportados y anidables |
-| Display | Solo resultado | Expresión completa + resultado |
-| Evaluación | En cada operador | Solo al presionar `=` |
+| Aspect | Casio HL-820LV | Google Calculator |
+|--------|----------------|-------------------|
+| Model | Imperative (chain) | Declarative (formula) |
+| Precedence | No, left-to-right | Yes, full PEMDAS |
+| Parentheses | Not supported | Supported and nestable |
+| Display | Result only | Full expression + result |
+| Evaluation | On each operator | On `=` (or live preview updates) |
 
-## Arquitectura Interna
+## Internal Architecture
 
-### Pipeline de Evaluación
+### Evaluation Pipeline
 
 ```
 ┌──────────┐    ┌───────────┐    ┌──────────┐    ┌────────────┐    ┌──────────┐
@@ -37,27 +41,27 @@ Se evalúa como 2 + (3 × 4) = 2 + 12 = 14
 └──────────┘    └───────────┘    └──────────┘    └────────────┘    └──────────┘
 ```
 
-### Fase 1: Tokenización (Lexer)
+### Phase 1: Tokenization (Lexer)
 
-El lexer convierte la cadena de entrada en una secuencia de tokens tipados.
+The lexer converts input text into typed tokens.
 
-#### Tipos de Token
+#### Token types
 
 ```
-NUMBER      → enteros y decimales: 42, 3.14, .5, 0.001
-OPERATOR    → +, -, ×, ÷, ^  (binarios)
-UNARY_OP    → - (negación, cuando aparece al inicio o después de operador/paréntesis)
+NUMBER      → integers and decimals: 42, 3.14, .5, 0.001
+OPERATOR    → +, -, ×, ÷, ^
+UNARY_OP    → - (negation when found at expression start or after operator/paren)
 FUNCTION    → sin, cos, tan, log, ln, sqrt, abs, etc.
 LPAREN      → (
 RPAREN      → )
-COMMA       → , (separador de argumentos)
+COMMA       → ,
 CONSTANT    → π, e
 ```
 
-#### Ejemplo de tokenización
+#### Tokenization example
 
 ```
-Input:  "2 + sin(3.14) × -4"
+Input: "2 + sin(3.14) × -4"
 
 Tokens: [
   { type: NUMBER,   value: 2 },
@@ -72,264 +76,190 @@ Tokens: [
 ]
 ```
 
-#### Desafíos del Lexer
+#### Lexer challenges
 
-- **Signo negativo vs resta**: `-` es unario si aparece al inicio, después de `(`, o después de otro operador
-- **Multiplicación implícita**: `2π` → `2 × π`, `3(4+5)` → `3 × (4+5)`
-- **Funciones**: Identificar nombres como `sin`, `cos`, `log` como tokens de función
+- Distinguish unary minus from binary subtraction
+- Handle implicit multiplication: `2π`, `3(4+5)`
+- Recognize function identifiers (`sin`, `cos`, `log`)
 
-### Fase 2: Parsing — Shunting Yard Algorithm
+### Phase 2: Parsing — Shunting Yard Algorithm
 
-Google usa internamente una variante del **algoritmo Shunting Yard** de Dijkstra (1961) para convertir la expresión infix a un AST o a Reverse Polish Notation (RPN) para evaluación.
+Google-style calculators can use a Shunting Yard variant (Dijkstra, 1961) to
+convert infix notation into either RPN or an AST.
 
-#### Tabla de Precedencia
+#### Precedence table
 
-| Precedencia | Operadores | Asociatividad |
-|-------------|-----------|---------------|
-| 1 (más baja) | `+`, `-` | Izquierda |
-| 2 | `×`, `÷` | Izquierda |
-| 3 | Negación unaria `-` | Derecha |
-| 4 | `^` (potencia) | Derecha |
-| 5 (más alta) | Funciones (`sin`, `cos`, etc.) | — |
+| Precedence | Operators | Associativity |
+|------------|-----------|---------------|
+| 1 (lowest) | `+`, `-` | Left |
+| 2 | `×`, `÷` | Left |
+| 3 | unary `-` | Right |
+| 4 | `^` | Right |
+| 5 (highest) | functions | N/A |
 
-#### Pseudocódigo del Shunting Yard
+#### Shunting Yard pseudocode
 
 ```
-input: lista de tokens
-output: cola de salida (RPN) o AST
+input: token list
+output: output queue (RPN) or AST
 
 operator_stack = []
 output_queue = []
 
 for each token:
     if token is NUMBER or CONSTANT:
-        push to output_queue
-    
+        push token to output_queue
+
     if token is FUNCTION:
-        push to operator_stack
-    
+        push token to operator_stack
+
     if token is OPERATOR (o1):
-        while (top of stack is operator o2
-               AND o2 is not LPAREN
-               AND (o2 has greater precedence than o1
-                    OR (same precedence AND o1 is left-associative))):
-            pop o2 from stack → output_queue
+        while top of stack is operator (o2)
+              and o2 is not LPAREN
+              and (o2 precedence > o1 precedence
+                   or (same precedence and o1 is left-associative)):
+            pop o2 to output_queue
         push o1 to operator_stack
-    
+
     if token is LPAREN:
         push to operator_stack
-    
+
     if token is RPAREN:
-        while top of stack is not LPAREN:
-            pop from stack → output_queue
-        pop LPAREN (discard)
-        if top of stack is FUNCTION:
-            pop function → output_queue
+        while top is not LPAREN:
+            pop to output_queue
+        pop LPAREN
+        if top is FUNCTION:
+            pop FUNCTION to output_queue
 
-// After all tokens processed:
-while operator_stack is not empty:
-    pop → output_queue
+while operator_stack not empty:
+    pop to output_queue
 ```
 
-#### Ejemplo paso a paso
+### Phase 3: Evaluation
 
-```
-Input tokens: 3 + 4 × 2 ÷ ( 1 - 5 ) ^ 2
+After conversion to RPN or AST, evaluation is straightforward.
 
-Paso a paso:
-Token  │ Output Queue          │ Operator Stack    │ Notas
-───────┼───────────────────────┼───────────────────┼──────────────────
-3      │ 3                     │                   │
-+      │ 3                     │ +                 │
-4      │ 3 4                   │ +                 │
-×      │ 3 4                   │ × +               │ × > +, push
-2      │ 3 4 2                 │ × +               │
-÷      │ 3 4 2 ×              │ ÷ +               │ ÷ = ×, pop ×
-(      │ 3 4 2 ×              │ ( ÷ +             │
-1      │ 3 4 2 × 1            │ ( ÷ +             │
--      │ 3 4 2 × 1            │ - ( ÷ +           │
-5      │ 3 4 2 × 1 5          │ - ( ÷ +           │
-)      │ 3 4 2 × 1 5 -        │ ÷ +               │ pop until (
-^      │ 3 4 2 × 1 5 -        │ ^ ÷ +             │ ^ > ÷, push
-2      │ 3 4 2 × 1 5 - 2      │ ^ ÷ +             │
-END    │ 3 4 2 × 1 5 - 2 ^ ÷ +│                   │ flush stack
-
-RPN: 3 4 2 × 1 5 - 2 ^ ÷ +
-Resultado: 3 + ((4×2) ÷ ((1-5)^2)) = 3 + (8 ÷ 16) = 3.5
-```
-
-### Fase 3: Evaluación
-
-Una vez en RPN o AST, la evaluación es directa:
-
-#### Evaluación de RPN (stack-based)
+#### RPN evaluation (stack-based)
 
 ```
 evaluation_stack = []
 
-for each token in RPN output:
+for each token in RPN:
     if token is NUMBER:
-        push to evaluation_stack
-    
+        push token
+
     if token is BINARY_OPERATOR:
         right = pop()
         left = pop()
-        result = apply(operator, left, right)
-        push(result)
-    
+        push apply(operator, left, right)
+
     if token is UNARY_OPERATOR or FUNCTION:
         operand = pop()
-        result = apply(function, operand)
-        push(result)
+        push apply(function, operand)
 
-final_result = pop()  // último valor en el stack
+final_result = pop()
 ```
 
-#### Evaluación por AST (tree walking)
+#### AST evaluation (tree walking)
 
 ```
 function evaluate(node):
     if node is NumberLiteral:
         return node.value
-    
+
     if node is BinaryExpression:
         left = evaluate(node.left)
         right = evaluate(node.right)
         return applyOp(node.operator, left, right)
-    
+
     if node is UnaryExpression:
         operand = evaluate(node.operand)
         return applyUnary(node.operator, operand)
-    
+
     if node is FunctionCall:
         arg = evaluate(node.argument)
         return applyFunction(node.name, arg)
 ```
 
-### Alternativa: Recursive Descent Parser
+### Alternative: Recursive Descent Parser
 
-Una implementación alternativa (usada en V8/Chrome, GCC, Roslyn) es el **Recursive Descent Parser**, donde cada nivel de precedencia se convierte en una función:
+A common alternative is recursive descent, where each precedence level maps to
+a parsing function.
 
-```
-function expression():
-    return addition()
+Advantages:
 
-function addition():
-    left = multiplication()
-    while current_token is '+' or '-':
-        op = consume_token()
-        right = multiplication()
-        left = BinaryNode(op, left, right)
-    return left
+- Excellent error locality
+- Easy to extend with new operators/functions
+- O(n) complexity for expression size
+- No external parser generator required
 
-function multiplication():
-    left = unary()
-    while current_token is '×' or '÷':
-        op = consume_token()
-        right = unary()
-        left = BinaryNode(op, left, right)
-    return left
+## Google Calculator Functional Set
 
-function unary():
-    if current_token is '-':
-        consume_token()
-        operand = unary()  // recursivo para !!x o --x
-        return UnaryNode('-', operand)
-    return primary()
+### Supported operators
 
-function primary():
-    if current_token is NUMBER:
-        return NumberNode(consume_token().value)
-    if current_token is FUNCTION:
-        name = consume_token()
-        expect('(')
-        arg = expression()
-        expect(')')
-        return FunctionNode(name, arg)
-    if current_token is '(':
-        consume_token()
-        expr = expression()
-        expect(')')
-        return GroupNode(expr)
-    if current_token is CONSTANT:
-        return NumberNode(constant_value(consume_token()))
-    error("Expresión inesperada")
-```
-
-**Ventajas del recursive descent:**
-- Código simple y legible
-- Excelente manejo de errores (se sabe exactamente dónde falló)
-- Fácil de extender con nuevos operadores
-- O(n) — lineal en el tamaño de la entrada
-- No requiere herramientas externas (yacc, bison, ANTLR)
-
-## Funcionalidades de la Calculadora de Google
-
-### Operadores Soportados
-
-| Operador | Símbolo | Precedencia |
-|----------|---------|-------------|
-| Suma | `+` | 1 |
-| Resta | `-` | 1 |
-| Multiplicación | `×` | 2 |
-| División | `÷` | 2 |
-| Módulo | `mod` | 2 |
-| Potencia | `^` | 3 (right-assoc) |
+| Operator | Symbol | Precedence |
+|----------|--------|------------|
+| Addition | `+` | 1 |
+| Subtraction | `-` | 1 |
+| Multiplication | `×` | 2 |
+| Division | `÷` | 2 |
+| Modulo | `mod` | 2 |
+| Power | `^` | 3 (right-assoc) |
 | Factorial | `!` | 4 (postfix) |
 
-### Funciones Soportadas
+### Supported functions
 
-| Función | Descripción |
-|---------|-------------|
-| `sin`, `cos`, `tan` | Trigonométricas |
-| `arcsin`, `arccos`, `arctan` | Trigonométricas inversas |
-| `ln` | Logaritmo natural |
-| `log` | Logaritmo base 10 |
-| `sqrt` (o `√`) | Raíz cuadrada |
-| `abs` | Valor absoluto |
+| Function | Description |
+|----------|-------------|
+| `sin`, `cos`, `tan` | Trigonometric |
+| `arcsin`, `arccos`, `arctan` | Inverse trigonometric |
+| `ln` | Natural logarithm |
+| `log` | Base-10 logarithm |
+| `sqrt` (`√`) | Square root |
+| `abs` | Absolute value |
 | `exp` | e^x |
 
-### Constantes
+### Constants
 
-| Constante | Valor |
-|-----------|-------|
-| `π` (pi) | 3.14159265358... |
+| Constant | Value |
+|----------|-------|
+| `π` | 3.14159265358... |
 | `e` | 2.71828182845... |
 
-### Modos de Ángulo
+### Angle modes
 
-- Radianes (default)
-- Grados (toggle en la UI)
+- Radians (default)
+- Degrees (UI toggle)
 
-## Manejo de Errores
+## Error Handling
 
-### Errores Detectables en Parsing
+### Parsing-detectable errors
 
-| Error | Ejemplo | Mensaje |
+| Error | Example | Message |
 |-------|---------|---------|
-| Paréntesis sin cerrar | `(2 + 3` | "Missing )" |
-| Paréntesis extra | `2 + 3)` | "Unexpected )" |
-| Operadores consecutivos | `2 + × 3` | "Unexpected operator" |
-| Expresión vacía | ` ` | "No expression" |
-| Función sin argumento | `sin()` | "Expected expression" |
+| Missing closing parenthesis | `(2 + 3` | "Missing )" |
+| Extra closing parenthesis | `2 + 3)` | "Unexpected )" |
+| Consecutive operators | `2 + × 3` | "Unexpected operator" |
+| Empty expression | ` ` | "No expression" |
+| Function without argument | `sin()` | "Expected expression" |
 
-### Errores Detectables en Evaluación
+### Evaluation-detectable errors
 
-| Error | Ejemplo | Resultado |
-|-------|---------|-----------|
-| División por cero | `1 ÷ 0` | `Infinity` o Error |
-| √ de negativo | `√(-1)` | `NaN` o Error |
+| Error | Example | Result |
+|-------|---------|--------|
+| Division by zero | `1 ÷ 0` | `Infinity` or error |
+| Square root of negative | `√(-1)` | `NaN` or error |
 | Overflow | `10^999` | `Infinity` |
-| Dominio inválido | `arcsin(2)` | `NaN` o Error |
+| Invalid domain | `arcsin(2)` | `NaN` or error |
 
-## Modelo de Estado de la UI
+## UI State Model
 
 ```
 State = {
-    expression: string,      // "2 + 3 × "
-    displayValue: string,    // Lo que se muestra arriba (expresión)
-    result: string | null,   // Preview del resultado (evaluación en tiempo real)
-    cursor: number,          // Posición del cursor en la expresión
+    expression: string,
+    displayValue: string,
+    result: string | null,
+    cursor: number,
     angleMode: 'rad' | 'deg',
     memory: number,
     history: Expression[],
@@ -337,73 +267,71 @@ State = {
 }
 ```
 
-### Evaluación en Tiempo Real (Live Preview)
+### Live preview
 
-Google muestra el resultado parcial mientras el usuario escribe. Esto requiere:
+Google often shows a partial result while typing. This requires:
 
-1. **Parsing tolerante**: El parser debe manejar expresiones incompletas sin crashear
-2. **Cierre automático de paréntesis**: Si faltan `)`, se asumen al final
-3. **Trailing operators ignorados**: `2 + 3 +` evalúa como `2 + 3`
-4. **Debounce**: No reevaluar en cada keystroke sino con un pequeño delay
+1. Tolerant parsing for incomplete expressions
+2. Auto-closing missing parentheses in preview mode
+3. Ignoring trailing operators for preview
+4. Debouncing re-evaluation
 
-## Precisión Numérica
+## Numeric Precision
 
-### IEEE 754 Double Precision
+### IEEE 754 double precision
 
-Google Calculator usa punto flotante de 64 bits (como JavaScript `Number`):
+- ~15-17 significant digits
+- Range: ±5.0 × 10^−324 to ±1.7976931348623157 × 10^308
+- Known issue: `0.1 + 0.2` is not exactly `0.3`
 
-- Precisión: ~15-17 dígitos significativos
-- Rango: ±5.0 × 10^−324 a ±1.7976931348623157 × 10^308
-- Problemas conocidos: `0.1 + 0.2 ≠ 0.3` exactamente
+### Mitigation strategies
 
-### Estrategias de Mitigación
+1. Display rounding (10-12 significant digits)
+2. Epsilon-based integer checks
+3. Smart formatting (`0.30000000000000004` → `0.3`)
 
-1. **Redondeo para display**: Mostrar máximo 10-12 dígitos significativos
-2. **Comparación con epsilon**: Para determinar si un resultado es "entero"
-3. **Formato inteligente**: `0.30000000000000004` → `0.3`
+## Implications for Calculatrix
 
-## Implicaciones para Calculatrix
+### What we adopt
 
-### Lo que adoptamos del modelo Google:
+1. Precedence-based evaluation (full PEMDAS)
+2. Parentheses support
+3. Tokenizer → Parser → Evaluator architecture
+4. Recursive descent parser for maintainability
+5. Live preview experience
+6. Graceful error handling
+7. IEEE 754 with smart display rounding
 
-1. **Evaluación con precedencia de operadores** — PEMDAS completo
-2. **Soporte de paréntesis** — Aunque el layout visual sea minimalista
-3. **Arquitectura Tokenizer → Parser → Evaluator** — Separación clara de concerns
-4. **Recursive Descent Parser** — Simple, robusto, extensible (preferido sobre Shunting Yard para mantenibilidad)
-5. **Live preview del resultado** — UX moderna que diferencia de calculadoras físicas
-6. **Manejo graceful de errores** — No crashes, mensajes útiles
-7. **Precisión con IEEE 754** — Con redondeo inteligente para display
+### What we do not adopt
 
-### Lo que NO adoptamos:
+1. Full scientific function set
+2. Graphing features
+3. Persistent history by default
+4. Free text input in the Casio-style mode
 
-1. **Funciones científicas completas** — La Casio HL-820LV no las tiene; mantenemos minimalismo
-2. **Graficación** — Fuera de scope para una calculadora de bolsillo
-3. **Historial persistente** — Mantenemos simplicidad
-4. **Input por texto libre** — Usamos botones como la Casio
-
-### Híbrido resultante: "Casio skin, Google brain"
+### Resulting hybrid: Casio skin, Google brain
 
 ```
 ┌─────────────────────────────────────────────┐
 │  UI/Layout: Casio HL-820LV                  │
-│  • 4 columnas de botones                    │
-│  • Estética minimalista                     │
-│  • Botones físicos familiares               │
+│  • 4-column keypad                           │
+│  • Minimal visual language                   │
+│  • Familiar tactile button mapping           │
 │                                             │
-│  Motor interno: Google-style                │
-│  • Construye expresión como string          │
-│  • Tokeniza → Parsea → Evalúa              │
-│  • Respeta orden de operaciones             │
-│  • Live preview del resultado               │
-│  • Error handling robusto                   │
+│  Internal engine: Google-style               │
+│  • Build expression string                   │
+│  • Tokenize → Parse → Evaluate              │
+│  • Respect operator precedence               │
+│  • Live result preview                       │
+│  • Robust error handling                     │
 └─────────────────────────────────────────────┘
 ```
 
-## Referencias
+## References
 
-- Dijkstra, E. (1961). "Algol 60 translation: An Algol 60 translator for the X1" — Origen del Shunting Yard Algorithm
-- Nystrom, R. "Crafting Interpreters", Chapter 6: Parsing Expressions — Recursive Descent
-- Wikipedia: Shunting Yard Algorithm — Pseudocódigo y ejemplos detallados
-- Wikipedia: Calculator Input Methods — Taxonomía de métodos de entrada
-- Google Support: "Manage calculator, unit converter & color codes" — Funcionalidades oficiales
-- IEEE 754-2019: Standard for Floating-Point Arithmetic
+- Dijkstra, E. (1961). Algol 60 translation (Shunting Yard origins)
+- Nystrom, R. Crafting Interpreters, chapter on expression parsing
+- Wikipedia: Shunting Yard Algorithm
+- Wikipedia: Calculator input methods
+- Google support documentation for calculator capabilities
+- IEEE 754-2019 floating-point standard

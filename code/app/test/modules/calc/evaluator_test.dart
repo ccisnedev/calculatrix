@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:calculatrix/modules/calc/models/evaluator.dart';
-import 'package:calculatrix/modules/calc/models/parser.dart';
-import 'package:calculatrix/modules/calc/models/tokenizer.dart';
+import 'package:calculatrix_app/modules/calc/models/evaluator.dart';
+import 'package:calculatrix_app/modules/calc/models/parser.dart';
+import 'package:calculatrix_app/modules/calc/models/tokenizer.dart';
 
 void main() {
   late Tokenizer tokenizer;
@@ -91,3 +91,4 @@ void main() {
     test('200+10% = 200.1', () => expect(eval('200+10%'), 200.1));
   });
 }
+

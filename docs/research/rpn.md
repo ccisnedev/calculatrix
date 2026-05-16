@@ -1,318 +1,291 @@
 # RPN — Reverse Polish Notation
 
-## Resumen
+## Summary
 
-Investigación sobre la notación polaca inversa (RPN), cómo la gestiona la HP-50g
-mediante RPL, y alternativas modernas de implementación para Calculatrix Etapa 2.
+Research on Reverse Polish Notation (RPN), HP-50g stack behavior through RPL,
+and modern implementation alternatives for Calculatrix Stage 2.
 
 ---
 
-## 1. Fundamentos de RPN
+## 1. RPN fundamentals
 
-### 1.1 Definición
+### 1.1 Definition
 
-RPN (Reverse Polish Notation) es una notación matemática donde los operadores
-siguen a sus operandos, eliminando la necesidad de paréntesis y reglas de
-precedencia.
+RPN (Reverse Polish Notation) is a mathematical notation where operators come
+after their operands, removing the need for parentheses and precedence rules.
 
-| Infija            | RPN              |
-|-------------------|------------------|
-| `3 + 4`          | `3 4 +`          |
-| `(3 + 4) × 5`   | `3 4 + 5 ×`     |
-| `3 + 4 × 5`     | `3 4 5 × +`     |
-| `(1+2)×(3+4)`   | `1 2 + 3 4 + ×` |
+| Infix | RPN |
+|-------|-----|
+| `3 + 4` | `3 4 +` |
+| `(3 + 4) × 5` | `3 4 + 5 ×` |
+| `3 + 4 × 5` | `3 4 5 × +` |
+| `(1+2)×(3+4)` | `1 2 + 3 4 + ×` |
 
-### 1.2 Cómo funciona el stack
+### 1.2 How the stack works
 
-1. Leer token de izquierda a derecha
-2. Si es número → **push** al stack
-3. Si es operador → **pop** n operandos, operar, **push** resultado
+1. Read token from left to right
+2. If token is a number, push it to stack
+3. If token is an operator, pop operands, apply operation, push result
 
 ```
-Entrada: 3 4 + 5 ×
+Input: 3 4 + 5 ×
 
 Stack:  []
 → 3    [3]
 → 4    [3, 4]
-→ +    [7]         ← pop 3,4; push 3+4
+→ +    [7]
 → 5    [7, 5]
-→ ×    [35]        ← pop 7,5; push 7×5
+→ ×    [35]
 ```
 
-### 1.3 Ventajas sobre notación infija
+### 1.3 Advantages over infix notation
 
-- **Sin paréntesis**: la precedencia está implícita en el orden de entrada
-- **Menos keystrokes**: estudios (Kasprzyk 1979, Agate 1980) demuestran ~20% menos pulsaciones
-- **Menos errores**: los usuarios cometen menos equivocaciones en cálculos complejos
-- **Evaluación lineal**: se procesa de izquierda a derecha, sin backtracking
-- **Implementación simple**: solo requiere un stack, sin parser de precedencia
+- No parentheses required
+- Fewer keystrokes in many scenarios
+- Fewer user mistakes in complex calculations
+- Linear left-to-right evaluation
+- Simple implementation with a stack model
 
-### 1.4 Historia
+### 1.4 Timeline
 
-| Año  | Hito |
-|------|------|
-| 1924 | Jan Łukasiewicz inventa notación polaca (prefija) |
-| 1941 | Konrad Zuse usa postfija en Z3 (2 operandos → operador) |
-| 1957 | Charles Hamblin propone RPN formalmente |
-| 1963 | Friden EC-130: primera calculadora con RPN y stack de 4 niveles |
-| 1972 | HP-35: primera calculadora científica portátil, 4-level RPN |
-| 1986 | HP introduce RPL: stack dinámico ilimitado |
-| 2006 | HP 50g: última calculadora RPL de HP |
-| 2013 | HP Prime: "Advanced RPN" con stack de 128 niveles |
+| Year | Milestone |
+|------|-----------|
+| 1924 | Jan Łukasiewicz introduces Polish notation (prefix) |
+| 1941 | Konrad Zuse uses postfix in Z3-like workflows |
+| 1957 | Charles Hamblin formalizes RPN |
+| 1963 | Friden EC-130: first RPN calculator with 4-level stack |
+| 1972 | HP-35: first portable scientific RPN calculator |
+| 1986 | HP introduces RPL with dynamic stack |
+| 2006 | HP 50g: final HP RPL flagship |
+| 2013 | HP Prime: Advanced RPN with deep fixed stack |
 
 ---
 
-## 2. El stack clásico de 4 niveles (HP-35 a HP-42S)
+## 2. Classic 4-level stack (HP-35 to HP-42S)
 
-### 2.1 Arquitectura
+### 2.1 Architecture
 
 ```
 ┌─────┐
-│  T  │  ← Top (nivel 4)
+│  T  │
 ├─────┤
-│  Z  │  ← nivel 3
+│  Z  │
 ├─────┤
-│  Y  │  ← nivel 2
+│  Y  │
 ├─────┤
-│  X  │  ← nivel 1 (display / resultado)
+│  X  │  ← displayed result level
 └─────┘
 ```
 
-### 2.2 Comportamiento del ENTER
+### 2.2 ENTER behavior
 
-La tecla **ENTER↑** copia X → Y, empujando Y → Z → T. El valor anterior de T
-se pierde (overflow silencioso).
+`ENTER` copies X to Y, pushing Y to Z and Z to T.
+Previous T is dropped silently.
 
-### 2.3 Reglas especiales
+### 2.3 Special rules
 
-- **Stack lift automático**: tras ingresar un número, el siguiente dígito
-  levanta el stack automáticamente
-- **Stack lift disable temporal**: después de ENTER, el siguiente número
-  reemplaza X sin levantar (evita duplicar)
-- **T-duplication on drop**: cuando un operador consume valores y el stack baja,
-  T se duplica (T → T, Z) para facilitar cálculos repetitivos
+- Automatic stack lift after entering numbers
+- Temporary lift disable after `ENTER`
+- T duplication on drop in some classic behaviors
 
-### 2.4 Comandos de manipulación
+### 2.4 Stack manipulation commands
 
-| Comando  | Efecto |
-|----------|--------|
-| ENTER    | Duplica X → Y, levanta stack |
-| x↔y     | Intercambia X ↔ Y (SWAP) |
-| R↓       | Rota stack hacia abajo: X→T, T→Z, Z→Y, Y→X |
-| R↑       | Rota stack hacia arriba |
-| LASTx    | Recupera último X antes de operación |
+| Command | Effect |
+|---------|--------|
+| `ENTER` | Duplicate X to Y and lift |
+| `x↔y` | Swap X and Y |
+| `R↓` | Rotate down |
+| `R↑` | Rotate up |
+| `LASTx` | Recall previous X |
 
-### 2.5 Limitaciones
+### 2.5 Limitations
 
-- Solo 4 valores simultáneos → expresiones con >4 niveles de anidamiento
-  requieren trucos con STO/RCL
-- Overflow silencioso: se pierden datos sin aviso
-- T-duplication confunde a usuarios nuevos
+- Only four simultaneous values
+- Silent overflow in deep workflows
+- T-duplication can confuse new users
 
 ---
 
-## 3. RPL en la HP-50g — Stack dinámico ilimitado
+## 3. HP-50g RPL — dynamic stack
 
-### 3.1 Arquitectura
+### 3.1 Architecture
 
-La HP-50g usa **RPL** (Reverse Polish Lisp), un sistema operativo y lenguaje
-que reemplaza el stack fijo de 4 niveles con un **stack dinámico** limitado
-solo por la RAM disponible (512 KB RAM + 2 MB flash).
+HP-50g uses RPL (Reverse Polish Lisp), replacing fixed 4-level stack with a
+dynamic stack bounded by available memory.
 
 ```
 ┌─────────┐
-│ Nivel n │  ← sin límite superior
+│ Level n │
 ├─────────┤
 │   ...   │
 ├─────────┤
-│ Nivel 3 │
+│ Level 3 │
 ├─────────┤
-│ Nivel 2 │
+│ Level 2 │
 ├─────────┤
-│ Nivel 1 │  ← "bottom" del stack visible
+│ Level 1 │
 └─────────┘
 ```
 
-### 3.2 Diferencias clave con RPN clásica
+### 3.2 Key differences from classic RPN
 
-| Aspecto | RPN clásica (HP-42S) | RPL (HP-50g) |
-|---------|---------------------|--------------|
-| Tamaño stack | 4 niveles fijos | Ilimitado (solo RAM) |
-| Overflow | Silencioso (se pierde T) | Error "Insufficient Memory" |
-| Underflow | T se duplica hacia abajo | Error "Too Few Arguments" |
-| ENTER | Duplica X→Y + stack lift disable | No duplica, solo separa entradas |
-| Tipos en stack | Solo números reales | Cualquier objeto: números, strings, listas, matrices, programas, gráficos |
-| Programabilidad | FOCAL keystroke | RPL (Forth + Lisp) |
+| Aspect | Classic RPN | RPL (HP-50g) |
+|--------|-------------|--------------|
+| Stack size | 4 fixed levels | Dynamic (memory-limited) |
+| Overflow | Silent value loss | Explicit memory error |
+| Underflow | Duplication behavior | Explicit argument error |
+| ENTER | Duplicate and lift | Separator, no forced duplication |
+| Stack types | Mostly numeric | Typed objects (numbers, strings, lists, matrices, programs) |
+| Programmability | Keystroke model | RPL language |
 
-### 3.3 Operaciones de stack en HP-50g
+### 3.3 Common HP-50g stack ops
 
-| Comando | Stack antes | Stack después | Descripción |
-|---------|-------------|---------------|-------------|
-| DUP     | ...a        | ...a a        | Duplicar nivel 1 |
-| DUP2    | ...a b      | ...a b a b    | Duplicar niveles 1-2 |
-| DUPN    | ...n        | ...×n         | Duplicar n niveles |
-| DROP    | ...a        | ...           | Eliminar nivel 1 |
-| DROP2   | ...a b      | ...           | Eliminar niveles 1-2 |
-| DROPN   | ...n        | ...           | Eliminar n niveles |
-| SWAP    | ...a b      | ...b a        | Intercambiar 1↔2 |
-| ROT     | ...a b c    | ...b c a      | Rotar 3 niveles |
-| UNROT   | ...a b c    | ...c a b      | Rotar inverso |
-| ROLL    | ...n        | ...           | Rotar n niveles |
-| ROLLD   | ...n        | ...           | Rotar n niveles inverso |
-| PICK    | ...n        | ...copia(n)   | Copiar nivel n al tope |
-| OVER    | ...a b      | ...a b a      | Copiar nivel 2 al tope |
-| DEPTH   | ...         | ...n          | Número de elementos en stack |
-| CLEAR   | ...         | (vacío)       | Vaciar todo el stack |
+| Command | Description |
+|---------|-------------|
+| `DUP` | Duplicate top |
+| `DROP` | Remove top |
+| `SWAP` | Swap top two |
+| `ROT` / `UNROT` | Rotate top 3 |
+| `PICK` | Copy nth level to top |
+| `OVER` | Copy second element to top |
+| `DEPTH` | Push stack size |
+| `CLEAR` | Clear stack |
 
-### 3.4 RPL como lenguaje
+### 3.4 RPL language model
 
-RPL combina:
-- **RPN** para cálculo interactivo
-- **Forth** para programación concatenativa (composición por stack)
-- **Lisp** para manipulación de listas y evaluación perezosa
+RPL combines:
 
-```rpl
-« DUP * »              @ Programa: elevar al cuadrado
-« 1 10 FOR I I + NEXT » @ Sumar 1..10 al valor en stack
-« IF DUP 0 < THEN NEG END » @ Valor absoluto
-```
+- RPN interaction model
+- Forth-like concatenative programming
+- Lisp-like list and symbolic handling
 
-### 3.5 Objetos tipados en stack
+### 3.5 Typed stack objects
 
-El stack RPL puede contener cualquier tipo:
+RPL stack can hold:
 
-- Números reales y complejos
+- Real and complex numbers
 - Strings
-- Listas `{ 1 2 3 }`
-- Vectores y matrices `[[ 1 2 ][ 3 4 ]]`
-- Expresiones algebraicas `'X^2+1'`
-- Programas `« ... »`
-- Nombres `'variable'`
-- Unidades `25_m/s`
+- Lists
+- Vectors and matrices
+- Algebraic expressions
+- Programs
+- Symbols
+- Unit-aware values
 
 ---
 
-## 4. Alternativas y mejoras modernas al RPN
+## 4. Modern RPN alternatives
 
-### 4.1 Entry RPN (HP post-2006)
+### 4.1 Entry RPN
 
-Variante donde ENTER **no** duplica el valor (comportamiento RPL) pero el stack
-sigue siendo fijo. Usado en HP-35s y modelos nuevos no-RPL.
-- Elimina la confusión de duplicación de ENTER
-- Mantiene el stack fijo de 4 niveles
+`ENTER` acts as a separator without implicit duplication.
+Reduces confusion while keeping RPN flow.
 
-### 4.2 Advanced RPN (HP Prime, 2013)
+### 4.2 Advanced RPN (HP Prime)
 
-- Stack de **128 niveles** (fijo, no dinámico)
-- Comportamiento Entry RPN (ENTER no duplica)
-- Overflow silencioso como RPN clásica (se pierde el fondo)
-- No soporta objetos tipados como RPL
+- Deep fixed stack (e.g., 128 levels)
+- Entry RPN behavior
+- Still less flexible than fully dynamic typed stack
 
-### 4.3 Stack dinámico + tipos (RPL / newRPL / DB48X)
+### 4.3 Dynamic typed stacks (RPL / newRPL / DB48X)
 
-- **newRPL**: reimplementación open-source de RPL para HP-50g y SwissMicros DM42
-  - Más rápido que RPL original (compilado nativo ARM)
-  - Misma semántica de stack ilimitado
-- **DB48X**: otra reimplementación para SwissMicros DM42
-  - Extiende RPL con Unicode, tipos adicionales
-  - Presentado en FOSDEM 2023
+- newRPL: modern open-source RPL implementation
+- DB48X: RPL-inspired system with modern extensions
 
-### 4.4 Free42 dynamic stack
+### 4.4 Free42 dynamic stack option
 
-Desde v3 (2021), el emulador Free42 (clon de HP-42S) soporta stack dinámico
-ilimitado como opción, manteniendo la interfaz RPN clásica. Mejor de ambos
-mundos: UX de HP-42S + profundidad ilimitada.
+Free42 optionally provides dynamic depth while keeping classic RPN interaction.
 
-### 4.5 Stacks de 8 niveles (WP 34S/43S)
+### 4.5 8-level stack compromise
 
-Las calculadoras comunitarias WP 34S (2011) y WP 43S ofrecen stack
-seleccionable de 4 u 8 niveles con soporte de tipos (reales, complejos,
-enteros, strings, matrices). Compromiso entre simplicidad y capacidad.
+Community calculators often use 4/8-level selectable stacks as a balance between
+simplicity and depth.
 
-### 4.6 Concatenative programming (Forth, Factor, Joy)
+### 4.6 Concatenative programming languages
 
-Lenguajes que extienden el concepto de RPN a programación completa:
-
-| Lenguaje | Particularidad |
-|----------|---------------|
-| **Forth** | Stack de datos + stack de retorno. Palabras como funciones. Muy bajo nivel. |
-| **Factor** | Stack typing moderno, garbage collection, quotations como closures |
-| **Joy** | Puramente funcional y concatenativo. Sin variables nombradas. |
-| **PostScript** | Stack para rendering de páginas. Operadores gráficos. |
-| **dc** (Unix) | Calculadora RPN de precisión arbitraria |
+| Language | Focus |
+|----------|-------|
+| Forth | Low-level stack programming |
+| Factor | Modern typed stack language |
+| Joy | Pure concatenative functional style |
+| PostScript | Stack model for page rendering |
+| `dc` | Unix arbitrary-precision RPN calculator |
 
 ---
 
-## 5. Análisis comparativo para Calculatrix
+## 5. Comparative analysis for Calculatrix
 
-### 5.1 Opciones de diseño
+### 5.1 Design options
 
-| Opción | Ventajas | Desventajas |
-|--------|----------|-------------|
-| **A) Stack fijo 4 niveles** | Simple de implementar y visualizar. Nostalgia HP-35. | Limitante para expresiones complejas. Requiere trucos STO/RCL. |
-| **B) Stack fijo 8 niveles** | Buen compromiso. Rara vez se necesitan más. | Aún tiene overflow silencioso. |
-| **C) Stack dinámico ilimitado** | Nunca pierde datos. Más potente. | Requiere scrolling en UI. Más complejidad visual. |
-| **D) Híbrido: visual 4 + overflow visible** | UX de 4 niveles con indicador "+n más". No se pierden datos. | Implementación UI más compleja. |
+| Option | Pros | Cons |
+|--------|------|------|
+| A) Fixed 4-level stack | Very simple, classic HP familiarity | Restrictive for nested workflows |
+| B) Fixed 8-level stack | Better capacity, still simple | Silent overflow remains possible |
+| C) Dynamic unlimited stack | No data loss, maximum power | More complex UI/scrolling |
+| D) Hybrid: dynamic internal + 4-level visual window | Familiar UX + no internal data loss | More advanced UI logic |
 
-### 5.2 Recomendación para Etapa 2
+### 5.2 Recommendation for Stage 2
 
-**Opción D: Stack dinámico con visualización de 4 niveles y overflow visible.**
+Recommended: **Option D**.
 
-Razones:
-1. El stack interno es ilimitado (como RPL) → nunca se pierde información
-2. La UI muestra los 4 niveles superiores (familiar para usuarios de HP)
-3. Un indicador muestra cuántos niveles adicionales existen debajo
-4. Scroll o gesto para ver niveles profundos
-5. Error explícito en underflow (como RPL, nunca duplicar silenciosamente)
+Reasons:
 
-### 5.3 Operaciones a implementar
+1. Internal stack remains dynamic (RPL-style)
+2. UI displays top 4 levels (HP familiarity)
+3. Overflow indicator shows hidden depth (`+n more`)
+4. Scroll/gesture reveals deeper levels
+5. Explicit underflow errors (no silent duplication)
 
-**Mínimo viable:**
-- ENTER (separador, sin duplicación — estilo Entry RPN)
-- SWAP (x↔y)
+### 5.3 Operations to implement
+
+Minimum viable set:
+
+- ENTER (separator, no duplication)
+- SWAP
 - DROP
 - DUP
 - ROT
 - CLEAR
 - DEPTH
-- UNDO (deshacer última operación — mejora sobre HP)
+- UNDO
 
-**Extensiones Etapa 2:**
+Stage 2 extensions:
+
 - PICK n
 - ROLL n
 - OVER
 - DUP2 / DROP2
-- LAST (recuperar argumentos de última operación, como LASTx)
-- Stack visual con drag-and-drop para reordenar
+- LAST-like recovery
+- Drag-and-drop visual reordering
 
-### 5.4 Mejoras sobre HP-50g
+### 5.4 Improvements over HP-50g
 
-| Mejora | Justificación |
-|--------|---------------|
-| **UNDO infinito** | La HP-50g no tiene undo general. Nosotros podemos mantener historial de estados del stack. |
-| **ENTER sin duplicación** | Evita confusión del modelo clásico. Consenso moderno (Entry RPN). |
-| **Tipos visuales** | Mostrar tipo del objeto en cada nivel (número, expresión, lista). |
-| **Error explícito en underflow** | Nunca duplicar T silenciosamente. Mostrar "Stack vacío". |
-| **Animaciones de stack** | Visualizar push/pop/swap como transiciones para entender el flujo. |
-| **Expresiones inline** | Mostrar `3 4 +` como preview de resultado antes de confirmar. |
+| Improvement | Why |
+|-------------|-----|
+| Unlimited undo | Better recoverability for users |
+| ENTER without duplication | Reduced onboarding confusion |
+| Type badges in stack UI | Better object visibility |
+| Explicit underflow error | Predictable behavior |
+| Stack animations | Better mental model |
+| Inline preview | Faster confidence while typing |
 
 ---
 
-## 6. Implementación del evaluador RPN
+## 6. RPN evaluator implementation
 
-### 6.1 Estructura de datos
+### 6.1 Data model
 
 ```
 Stack = List<StackObject>
 
-StackObject = 
+StackObject =
   | RealNumber(value: double)
   | Expression(tokens: List<Token>)
   | Matrix(rows: List<List<double>>)
   | ...
 ```
 
-### 6.2 Algoritmo de evaluación
+### 6.2 Evaluation algorithm
 
 ```
 function evaluate(input: Token[]):
@@ -321,83 +294,57 @@ function evaluate(input: Token[]):
       case Number(n):
         stack.push(RealNumber(n))
       case UnaryOp(op):
-        a = stack.pop()  // error si stack vacío
+        a = stack.pop()
         stack.push(apply(op, a))
       case BinaryOp(op):
-        b = stack.pop()  // error si stack vacío
-        a = stack.pop()  // error si stack vacío
+        b = stack.pop()
+        a = stack.pop()
         stack.push(apply(op, a, b))
       case StackOp(cmd):
         executeStackCommand(cmd)
 ```
 
-### 6.3 Conversión infija → RPN (Shunting Yard)
+### 6.3 Infix to RPN conversion
 
-Para soportar modo algebraico que internamente usa el mismo engine:
-
-```
-function shuntingYard(infix: Token[]) -> Token[]:
-  output = Queue()
-  operators = Stack()
-  for token in infix:
-    match token:
-      case Number: output.enqueue(token)
-      case Operator(op):
-        while operators.peek() has higher precedence:
-          output.enqueue(operators.pop())
-        operators.push(op)
-      case '(': operators.push(token)
-      case ')':
-        while operators.peek() != '(':
-          output.enqueue(operators.pop())
-        operators.pop()  // descartar '('
-  while operators not empty:
-    output.enqueue(operators.pop())
-  return output
-```
-
-Esto permite que Etapa 1 (algebraica) y Etapa 2 (RPN) compartan el mismo
-backend de evaluación.
+To support algebraic mode over the same backend, use Shunting Yard conversion.
+This allows Stage 1 (algebraic) and Stage 2 (RPN) to share one evaluator core.
 
 ---
 
-## 7. UX del modo RPN
+## 7. RPN UX
 
-### 7.1 Layout de pantalla propuesto
+### 7.1 Proposed screen layout
 
 ```
 ┌────────────────────────────┐
-│ [+3 más]                   │  ← indicador de profundidad
+│ [+3 more]                  │
 │                            │
 │ 4:    12.5                 │
 │ 3:    3.14159              │
 │ 2:    42                   │
-│ 1:    7.5          ←result │
+│ 1:    7.5         ← result │
 ├────────────────────────────┤
-│ entrada: _                 │  ← línea de entrada activa
+│ input: _                   │
 └────────────────────────────┘
 ```
 
-### 7.2 Feedback visual
+### 7.2 Visual feedback
 
-- Push: nuevo valor "cae" al nivel 1, otros suben con animación
-- Pop: valor sale, otros bajan
-- Swap: los dos valores intercambian posición con crossfade
-- Error: shake en el stack + mensaje
+- Push: top value enters with upward shift animation
+- Pop: top value exits and stack compresses
+- Swap: top two values cross-fade positions
+- Error: stack shake + message
 
 ---
 
-## 8. Fuentes
+## 8. Sources
 
-- Wikipedia: Reverse Polish notation (2026-05-12)
-- Wikipedia: HP 49/50 series (2026-05-08)
-- Wikipedia: RPL programming language (2026-05-13)
-- HP-35 User's Manual — "The operational stack and reverse Polish notation"
-- HP 50g User's Guide (F2229AA-90006)
-- Ball, J.A. (1978) "Algorithms for RPN calculators"
-- Agate & Drury (1980) "Electronic calculators: which notation is the better?"
-- Hoffman et al. (1994) "Calculator logic: when and why is RPN superior to algebraic?"
-- Nelson, R.J. (2012) "HP RPN Evolves" — HP Solve #27
-- Wickes, W.C. (1988) "RPL: A Mathematical Control Language"
-- newRPL: https://newrpl.wiki.hpgcc3.org
-- DB48X (FOSDEM 2023): Reviving Reverse Polish Lisp
+- Wikipedia: Reverse Polish notation
+- Wikipedia: HP 49/50 series
+- Wikipedia: RPL programming language
+- HP-35 user manual (operational stack)
+- HP 50g user guide
+- Ball (1978), Agate & Drury (1980), Hoffman et al. (1994)
+- Nelson (2012) on HP RPN evolution
+- Wickes (1988), RPL language references
+- newRPL and DB48X project docs

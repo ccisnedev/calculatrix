@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:calculatrix/modules/calc/models/token.dart';
-import 'package:calculatrix/modules/calc/models/tokenizer.dart';
+import 'package:calculatrix_app/modules/calc/models/token.dart';
+import 'package:calculatrix_app/modules/calc/models/tokenizer.dart';
 
 void main() {
   late Tokenizer tokenizer;
@@ -157,3 +157,4 @@ void main() {
     });
   });
 }
+

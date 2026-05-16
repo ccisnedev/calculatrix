@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:calculatrix/main.dart';
+import 'package:calculatrix_app/main.dart';
 
 void main() {
   group('CalculatorView - widget tests', () {
@@ -145,3 +145,4 @@ void main() {
     });
   });
 }
+
