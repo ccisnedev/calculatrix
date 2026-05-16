@@ -201,6 +201,48 @@ explicit notation modes, and richer display contracts.
 - [x] Confirm advanced linear algebra work can build on the consumer UX without breaking changes
 - [x] Refresh architecture and integration docs for the late-v2 app/CLI experience
 
+#### v2.10.0 — Shared Current Value Across Infix and RPN
+
+- [x] Define the shell as one calculator with two notation modes operating over the same committed current value (`X`)
+- [x] Preserve the committed current value across `Infix` ↔ `RPN` mode switches
+- [x] Keep draft state private to each notation mode until an explicit commit action occurs
+- [x] Define `=` in `Infix` as evaluation of the current expression and replacement of `X`
+- [x] Define the `RPN` top-of-stack as the same shared current value `X`
+- [x] Invalidate stale `Infix` repeat-`=` state whenever `X` is mutated through `RPN` actions or other external state changes
+- [x] Define no-draft display semantics for both notation modes against the shared `X` contract
+- [x] Add TDD coverage for mode switching, preserved current value, repeat-`=` invalidation, and mixed-notation workflows
+
+##### Proposed Product Contract
+
+**What is always preserved**
+
+- The committed current value `X` is shared by `Infix` and `RPN`.
+- Switching notation mode never clears `X`.
+- In `RPN`, `X` is the top of the committed stack.
+- In `Infix`, `=` evaluates the current expression and replaces `X` with that result.
+- Matrix/scalar formatting rules stay consumer-level; the shared state remains matrix-first.
+
+**What is always invalidated**
+
+- A draft remains a draft until an explicit commit action happens (`=`, `ENTER`, or an `RPN` operator that auto-commits the active draft).
+- Mode switching never auto-evaluates, auto-pushes, or silently translates a draft from one notation to the other.
+- `Infix` repeat-`=` memory (`last operator` / `last operand`) is invalidated when `X` changes through `RPN` stack operators, stack reordering (`SWAP`, `ROT`, `ROLL`, `PICK`, `DROP`, `OVER`, `DUP`), `ENTER`, `MR`, matrix insertion, or any other non-`Infix` mutation path.
+- Transient error state is not treated as a committed current value.
+
+**What each mode shows when there is no draft**
+
+- `Infix`: show the shared committed current value `X`; if no committed value exists yet, show `0`.
+- `RPN`: show the top-of-stack summary, which is the same shared committed current value `X`; if the committed stack is empty, show `0`.
+- If `RPN` changes the top of stack, then returning to `Infix` with no draft must show that new `X`.
+- If `Infix` evaluates a new expression, then returning to `RPN` with no draft must show that new `X` at the top of stack.
+
+**Implementation notes for TDD**
+
+- Prefer a single source of truth for committed current value instead of parallel `Infix result` versus `RPN top` state.
+- Treat notation-specific drafts as separate transient state from committed value.
+- Reject any design where mode switching makes the app feel like two independent calculators.
+- Add regression tests for examples such as `3+3= -> 6`, repeated `= -> 9`, then `RPN` top mutation invalidating a stale `+3` repetition before returning to `Infix`.
+
 ---
 
 ## Stage 3 — "Advanced Linear Algebra on Mature Matrix UX" (2.x.x → 3.0.0)

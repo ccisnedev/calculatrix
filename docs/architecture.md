@@ -67,10 +67,19 @@ multiple independent calculators.
 
 ## RPN Interaction Contract (Late v2.x)
 
+### Shared Current Value
+
+- The shell maintains one committed current value, `X`, shared by `Infix` and `RPN`.
+- In `Infix`, pressing `=` evaluates the current expression and replaces `X`.
+- In `RPN`, `X` is the top of the committed stack.
+- Switching notation mode must not clear `X`.
+- If `RPN` mutates `X`, any stale `Infix` repeat-`=` state must be invalidated.
+
 ### Mode and Draft State
 
 - `RPN` is an explicit user-visible mode, not a hidden internal implementation detail.
-- The shell maintains a current operand draft while the user is typing a scalar or matrix literal.
+- The shell maintains notation-specific drafts while the user is typing a scalar or matrix literal.
+- `Infix` and `RPN` drafts are private to their notation mode until explicitly committed.
 - Mode switching must not silently reinterpret an uncommitted draft.
 
 ### Primary Action Key
@@ -104,7 +113,8 @@ multiple independent calculators.
 
 ### Display Semantics
 
-- In `RPN` mode, the primary display shows the active draft when editing, otherwise the top-of-stack summary.
+- In `Infix` mode, the primary display shows the active draft when editing, otherwise the shared committed current value `X`.
+- In `RPN` mode, the primary display shows the active draft when editing, otherwise the top-of-stack summary for `X`.
 - A dedicated stack surface shows recent stack levels and current depth.
 - Matrix rendering policy belongs to the consumer shell, while matrix computation remains in the core package.
 

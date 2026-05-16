@@ -27,6 +27,20 @@ Future<void> _tapEquals(WidgetTester tester) async {
   await tester.pump();
 }
 
+Future<void> _switchMode(WidgetTester tester, String mode) async {
+  await tester.tap(find.text(mode));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _showRpnStackPage(WidgetTester tester) async {
+  if (_button('SWAP').evaluate().isNotEmpty) {
+    return;
+  }
+
+  await tester.drag(find.byType(PageView), const Offset(-1000, 0));
+  await tester.pumpAndSettle();
+}
+
 Finder _button(String label) {
   if (label == '=') {
     return find.text('=');
@@ -239,8 +253,7 @@ void main() {
     testWidgets('rpn mode commits with ENTER and applies binary addition', (tester) async {
       await _pumpApp(tester);
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
+      await _switchMode(tester, 'RPN');
 
       await tester.tap(_button('4'));
       await tester.pump();
@@ -260,6 +273,154 @@ void main() {
       expect(_displayText('[[50]]'), findsOneWidget);
       expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsOneWidget);
       expect(find.text('Stack 1'), findsOneWidget);
+    });
+
+    testWidgets('switching to rpn preserves the committed infix result as X', (tester) async {
+      await _pumpApp(tester);
+
+      await tester.tap(_button('3'));
+      await tester.pump();
+      await tester.tap(_button('+'));
+      await tester.pump();
+      await tester.tap(_button('4'));
+      await tester.pump();
+      await _tapEquals(tester);
+
+      await _switchMode(tester, 'RPN');
+
+      expect(_displayText('[[7]]'), findsOneWidget);
+      expect(_expressionText(' '), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+    });
+
+    testWidgets('returning to infix continues from the current rpn top', (tester) async {
+      await _pumpApp(tester);
+
+      await tester.tap(_button('3'));
+      await tester.pump();
+      await tester.tap(_button('+'));
+      await tester.pump();
+      await tester.tap(_button('3'));
+      await tester.pump();
+      await _tapEquals(tester);
+
+      await _switchMode(tester, 'RPN');
+      await tester.tap(_button('5'));
+      await tester.pump();
+      await tester.tap(_button('ENTER'));
+      await tester.pumpAndSettle();
+
+      await _switchMode(tester, 'Infix');
+
+      expect(_displayText('5'), findsOneWidget);
+
+      await tester.tap(_button('+'));
+      await tester.pump();
+      await tester.tap(_button('3'));
+      await tester.pump();
+      await _tapEquals(tester);
+
+      expect(_displayText('8'), findsOneWidget);
+    });
+
+    testWidgets('rpn mutation invalidates stale infix repeat equals state', (tester) async {
+      await _pumpApp(tester);
+
+      await tester.tap(_button('3'));
+      await tester.pump();
+      await tester.tap(_button('+'));
+      await tester.pump();
+      await tester.tap(_button('3'));
+      await tester.pump();
+      await _tapEquals(tester);
+      await _tapEquals(tester);
+
+      expect(_displayText('9'), findsOneWidget);
+
+      await _switchMode(tester, 'RPN');
+      await tester.tap(_button('5'));
+      await tester.pump();
+      await tester.tap(_button('ENTER'));
+      await tester.pumpAndSettle();
+
+      await _switchMode(tester, 'Infix');
+      expect(_displayText('5'), findsOneWidget);
+
+      await _tapEquals(tester);
+
+      expect(_displayText('5'), findsOneWidget);
+    });
+
+    testWidgets('rpn stack reordering updates the infix current value', (tester) async {
+      await _pumpApp(tester);
+
+      await tester.tap(_button('3'));
+      await tester.pump();
+      await tester.tap(_button('+'));
+      await tester.pump();
+      await tester.tap(_button('3'));
+      await tester.pump();
+      await _tapEquals(tester);
+
+      await _switchMode(tester, 'RPN');
+      await tester.tap(_button('5'));
+      await tester.pump();
+      await tester.tap(_button('ENTER'));
+      await tester.pumpAndSettle();
+
+      await _showRpnStackPage(tester);
+      await tester.tap(_button('SWAP'));
+      await tester.pumpAndSettle();
+
+      await _switchMode(tester, 'Infix');
+
+      expect(_displayText('6'), findsOneWidget);
+    });
+
+    testWidgets('infix draft survives a round trip through rpn without being committed', (tester) async {
+      await _pumpApp(tester);
+
+      await tester.tap(_button('1'));
+      await tester.pump();
+      await tester.tap(_button('+'));
+      await tester.pump();
+
+      expect(_expressionText('1+'), findsOneWidget);
+
+      await _switchMode(tester, 'RPN');
+
+      expect(_displayText('0'), findsOneWidget);
+      expect(_expressionText(' '), findsOneWidget);
+      expect(find.text('Stack 0'), findsOneWidget);
+
+      await _switchMode(tester, 'Infix');
+
+      expect(_expressionText('1+'), findsOneWidget);
+      expect(_displayText('1+'), findsOneWidget);
+    });
+
+    testWidgets('rpn draft survives a round trip through infix without being committed', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await tester.tap(_button('4'));
+      await tester.pump();
+      await tester.tap(_button('2'));
+      await tester.pump();
+
+      expect(_expressionText('42'), findsOneWidget);
+      expect(_displayText('42'), findsOneWidget);
+
+      await _switchMode(tester, 'Infix');
+
+      expect(_displayText('0'), findsOneWidget);
+      expect(_expressionText(' '), findsOneWidget);
+
+      await _switchMode(tester, 'RPN');
+
+      expect(_expressionText('42'), findsOneWidget);
+      expect(_displayText('42'), findsOneWidget);
+      expect(find.text('Stack 0'), findsOneWidget);
     });
   });
 }

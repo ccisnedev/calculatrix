@@ -450,8 +450,97 @@ void main() {
 
       controller.memoryRecall();
 
-      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnStackDepth, 2);
       expect(controller.rpnTopLiteral, '[[8]]');
+    });
+  });
+
+  group('CalculatorController - shared current value', () {
+    test('switching to rpn keeps an infix draft private and uncommitted', () {
+      controller.input('1');
+      controller.input('+');
+
+      controller.setMode(CalculatorMode.rpn);
+
+      expect(controller.rpnStackDepth, 0);
+      expect(controller.expression, '');
+      expect(controller.display, '0');
+
+      controller.setMode(CalculatorMode.infix);
+
+      expect(controller.expression, '1+');
+      expect(controller.display, '1+');
+    });
+
+    test('switching away from rpn keeps the rpn draft private and uncommitted', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.input('4');
+      controller.input('2');
+
+      controller.setMode(CalculatorMode.infix);
+
+      expect(controller.rpnStackDepth, 0);
+      expect(controller.expression, '');
+      expect(controller.display, '0');
+
+      controller.setMode(CalculatorMode.rpn);
+
+      expect(controller.expression, '42');
+      expect(controller.display, '42');
+      expect(controller.rpnStackDepth, 0);
+    });
+
+    test('switching from infix to rpn preserves committed current value as top of stack', () {
+      controller.input('3');
+      controller.input('+');
+      controller.input('4');
+
+      controller.evaluate();
+      controller.setMode(CalculatorMode.rpn);
+
+      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnTopLiteral, '[[7]]');
+      expect(controller.display, '[[7]]');
+    });
+
+    test('switching back to infix uses the current rpn top as the next operand seed', () {
+      controller.input('3');
+      controller.input('+');
+      controller.input('3');
+      controller.evaluate();
+
+      controller.setMode(CalculatorMode.rpn);
+      controller.input('5');
+      controller.evaluate();
+
+      controller.setMode(CalculatorMode.infix);
+      expect(controller.display, '5');
+
+      controller.input('+');
+      controller.input('3');
+      controller.evaluate();
+
+      expect(controller.display, '8');
+    });
+
+    test('rpn mutations invalidate stale infix repeat-equals state', () {
+      controller.input('3');
+      controller.input('+');
+      controller.input('3');
+      controller.evaluate();
+      controller.evaluate();
+      expect(controller.display, '9');
+
+      controller.setMode(CalculatorMode.rpn);
+      controller.input('5');
+      controller.evaluate();
+
+      controller.setMode(CalculatorMode.infix);
+      expect(controller.display, '5');
+
+      controller.evaluate();
+
+      expect(controller.display, '5');
     });
   });
 

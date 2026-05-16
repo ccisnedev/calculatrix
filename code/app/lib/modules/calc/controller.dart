@@ -8,7 +8,8 @@ enum CalculatorMode { infix, rpn }
 /// Manages the current expression input and delegates evaluation to the
 /// shared core package. Notifies listeners on state changes.
 class CalculatorController extends ChangeNotifier {
-  String _expression = '';
+  String _infixExpression = '';
+  String _rpnDraft = '';
   String _result = '';
   String _error = '';
   double _memory = 0;
@@ -17,11 +18,12 @@ class CalculatorController extends ChangeNotifier {
   CalculatorMode _mode = CalculatorMode.infix;
   final RpnEngine _rpnEngine = RpnEngine();
   Matrix? _displayMatrix;
+  Matrix? _currentValue;
 
   CalculatorMode get mode => _mode;
 
   /// The current expression being composed.
-  String get expression => _expression;
+  String get expression => isRpnMode ? _rpnDraft : _infixExpression;
 
   /// The computed result (empty until equals is pressed).
   String get result => _result;
@@ -35,6 +37,12 @@ class CalculatorController extends ChangeNotifier {
   bool get hasMemory => _memory != 0;
 
   bool get isRpnMode => _mode == CalculatorMode.rpn;
+
+  bool get _hasCommittedValue => _currentValue != null;
+
+  bool get _showsCommittedValueInInfix {
+    return !isRpnMode && _infixExpression.isEmpty && _hasCommittedValue;
+  }
 
   int get rpnStackDepth => _rpnEngine.depth;
 
@@ -56,13 +64,9 @@ class CalculatorController extends ChangeNotifier {
   /// The display text shown to the user.
   String get display {
     if (_error.isNotEmpty) return _error;
-    if (isRpnMode) {
-      if (_expression.isNotEmpty) return _expression;
-      if (_result.isNotEmpty) return _result;
-      return '0';
-    }
+    if (expression.isNotEmpty) return expression;
     if (_result.isNotEmpty) return _result;
-    return _expression.isEmpty ? '0' : _expression;
+    return '0';
   }
 
   void setMode(CalculatorMode mode) {
@@ -71,10 +75,15 @@ class CalculatorController extends ChangeNotifier {
     }
 
     _mode = mode;
-    _expression = '';
     _error = '';
-    _displayMatrix = isRpnMode && _rpnEngine.depth > 0 ? _rpnEngine.peek() : null;
-    _result = isRpnMode ? rpnTopLiteral : '';
+
+    if (isRpnMode) {
+      _ensureRpnStackMatchesCommittedValue();
+    } else {
+      _syncCommittedValueFromRpnStack();
+    }
+
+    _syncDisplayForMode();
     notifyListeners();
   }
 
@@ -82,44 +91,44 @@ class CalculatorController extends ChangeNotifier {
     final Matrix matrix = Calculatrix.evaluateInfix(literal);
 
     _error = '';
-    if (_mode == CalculatorMode.infix) {
+    if (!isRpnMode) {
       _displayMatrix = null;
-      if (_result.isNotEmpty) {
-        _expression = literal;
+      if (_showsCommittedValueInInfix) {
+        _infixExpression = literal;
         _result = '';
       } else {
-        _expression += literal;
+        _infixExpression += literal;
       }
       notifyListeners();
       return;
     }
 
     _rpnEngine.push(matrix);
-    _expression = '';
-    _displayMatrix = matrix;
-    _result = _serializeMatrix(matrix);
+    _rpnDraft = '';
+    _error = '';
+    _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
     notifyListeners();
   }
 
   /// Appends a character (digit, operator, paren) to the expression.
   void input(String value) {
     if (isRpnMode) {
-      if (_result.isNotEmpty && _expression.isEmpty) {
+      if (_result.isNotEmpty && _rpnDraft.isEmpty) {
         _result = '';
       }
       _displayMatrix = null;
       _error = '';
-      _expression += value;
+      _rpnDraft += value;
       notifyListeners();
       return;
     }
 
     // If showing result, start new expression with operators, or replace with digits
-    if (_result.isNotEmpty) {
+    if (_showsCommittedValueInInfix) {
       if (_isOperator(value)) {
-        _expression = _expressionSeedFromResult() + value;
+        _infixExpression = _expressionSeedFromCurrentValue() + value;
       } else {
-        _expression = value;
+        _infixExpression = value;
       }
       _result = '';
       _displayMatrix = null;
@@ -127,7 +136,7 @@ class CalculatorController extends ChangeNotifier {
     } else {
       _displayMatrix = null;
       _error = '';
-      _expression += value;
+      _infixExpression += value;
     }
     notifyListeners();
   }
@@ -139,32 +148,29 @@ class CalculatorController extends ChangeNotifier {
       return;
     }
 
-    if (_expression.isEmpty && _result.isNotEmpty && _lastOperator.isNotEmpty) {
+    if (_infixExpression.isEmpty && _hasCommittedValue && _lastOperator.isNotEmpty) {
       // Repeat last operation: result op lastOperand
-      _expression = '$_result$_lastOperator$_lastOperand';
+      _infixExpression = '${_expressionSeedFromCurrentValue()}$_lastOperator$_lastOperand';
     }
-    if (_expression.isEmpty) return;
+    if (_infixExpression.isEmpty) return;
     try {
       // Save the last operator and operand for repeat
-      _saveLastOperation(_expression);
-      final Matrix value = _evaluateExpression(_expression);
-      _displayMatrix = value.isScalar ? null : value;
-      _result = value.isScalar
-          ? _formatResult(value.scalarValue)
-          : MatrixDisplayFormatter.compact(value);
-      _expression = '';
+      _saveLastOperation(_infixExpression);
+      final Matrix value = _evaluateExpression(_infixExpression);
+      _infixExpression = '';
       _error = '';
+      _updateCommittedValueFromInfix(value);
     } on FormatException catch (e) {
       _error = 'Error';
       _result = '';
       _displayMatrix = null;
-      _expression = '';
+      _infixExpression = '';
       debugPrint('Eval error: $e');
     } on CalculatrixError catch (e) {
       _error = 'Error';
       _result = '';
       _displayMatrix = null;
-      _expression = '';
+      _infixExpression = '';
       debugPrint('Eval error: $e');
     }
     notifyListeners();
@@ -206,50 +212,48 @@ class CalculatorController extends ChangeNotifier {
   /// Clears the entire expression and result.
   void clear() {
     if (isRpnMode) {
-      if (_expression.isNotEmpty) {
-        _expression = '';
-        _displayMatrix = _rpnEngine.depth > 0 ? _rpnEngine.peek() : null;
+      if (_rpnDraft.isNotEmpty) {
+        _rpnDraft = '';
         _error = '';
+        _syncDisplayForMode();
       } else {
-        _rpnEngine.clear();
-        _result = '';
-        _displayMatrix = null;
-        _error = '';
+        _clearAllState();
       }
       notifyListeners();
       return;
     }
 
-    _expression = '';
-    _result = '';
-  _displayMatrix = null;
-    _error = '';
-    _lastOperator = '';
-    _lastOperand = '';
+    _clearAllState();
     notifyListeners();
   }
 
   /// Deletes the last character from the expression.
   void backspace() {
     if (isRpnMode) {
-      if (_expression.isNotEmpty) {
-        _expression = _expression.substring(0, _expression.length - 1);
+      if (_rpnDraft.isNotEmpty) {
+        _rpnDraft = _rpnDraft.substring(0, _rpnDraft.length - 1);
         _displayMatrix = null;
         _error = '';
+        if (_rpnDraft.isEmpty) {
+          _syncDisplayForMode();
+        }
         notifyListeners();
       }
       return;
     }
 
-    if (_result.isNotEmpty) {
+    if (_showsCommittedValueInInfix) {
       // After result, clear all
       clear();
       return;
     }
-    if (_expression.isNotEmpty) {
-      _expression = _expression.substring(0, _expression.length - 1);
+    if (_infixExpression.isNotEmpty) {
+      _infixExpression = _infixExpression.substring(0, _infixExpression.length - 1);
       _displayMatrix = null;
       _error = '';
+      if (_infixExpression.isEmpty) {
+        _syncDisplayForMode();
+      }
       notifyListeners();
     }
   }
@@ -257,11 +261,11 @@ class CalculatorController extends ChangeNotifier {
   /// Toggles the sign of the current value.
   void toggleSign() {
     if (isRpnMode) {
-      if (_expression.isNotEmpty) {
-        if (_expression.startsWith('-')) {
-          _expression = _expression.substring(1);
+      if (_rpnDraft.isNotEmpty) {
+        if (_rpnDraft.startsWith('-')) {
+          _rpnDraft = _rpnDraft.substring(1);
         } else {
-          _expression = '-$_expression';
+          _rpnDraft = '-$_rpnDraft';
         }
         _displayMatrix = null;
         notifyListeners();
@@ -269,22 +273,23 @@ class CalculatorController extends ChangeNotifier {
       return;
     }
 
-    if (_result.isNotEmpty) {
-      final value = double.tryParse(_result);
-      if (value != null) {
-        _result = _formatResult(-value);
-        _displayMatrix = Matrix.scalar(-value);
-        notifyListeners();
-      }
+    if (_showsCommittedValueInInfix && _currentValue!.isScalar) {
+      _error = '';
+      _updateCommittedValueFromInfix(
+        Matrix.scalar(-_currentValue!.scalarValue),
+        invalidateRepeatEquals: true,
+      );
+      notifyListeners();
       return;
     }
-    if (_expression.isNotEmpty) {
-      if (_expression.startsWith('-')) {
-        _expression = _expression.substring(1);
+    if (_infixExpression.isNotEmpty) {
+      if (_infixExpression.startsWith('-')) {
+        _infixExpression = _infixExpression.substring(1);
       } else {
-        _expression = '-$_expression';
+        _infixExpression = '-$_infixExpression';
       }
       _displayMatrix = null;
+      _error = '';
       notifyListeners();
     }
   }
@@ -301,22 +306,23 @@ class CalculatorController extends ChangeNotifier {
 
     if (isRpnMode) {
       _rpnEngine.pushScalar(_memory);
-      _expression = '';
+      _rpnDraft = '';
       _error = '';
-      _syncRpnDisplay();
+      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
       notifyListeners();
       return;
     }
 
     final memStr = _formatResult(_memory);
-    if (_result.isNotEmpty) {
-      _expression = memStr;
+    if (_showsCommittedValueInInfix) {
+      _infixExpression = memStr;
       _result = '';
       _displayMatrix = null;
       _error = '';
     } else {
       _displayMatrix = null;
-      _expression += memStr;
+      _error = '';
+      _infixExpression += memStr;
     }
     notifyListeners();
   }
@@ -354,15 +360,15 @@ class CalculatorController extends ChangeNotifier {
   }
 
   void enter() {
-    if (!isRpnMode || _expression.isEmpty) {
+    if (!isRpnMode || _rpnDraft.isEmpty) {
       return;
     }
 
     try {
-      _rpnEngine.push(_parseDraftOperand(_expression));
-      _expression = '';
+      _rpnEngine.push(_parseDraftOperand(_rpnDraft));
+      _rpnDraft = '';
       _error = '';
-      _syncRpnDisplay();
+      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
     } on FormatException catch (error) {
       _error = 'Error';
       _result = '';
@@ -422,24 +428,21 @@ class CalculatorController extends ChangeNotifier {
 
   double? _currentNumericValue() {
     if (isRpnMode) {
-      if (_expression.isNotEmpty) {
-        return double.tryParse(_expression);
+      if (_rpnDraft.isNotEmpty) {
+        return double.tryParse(_rpnDraft);
       }
 
-      if (_rpnEngine.depth == 0) {
-        return null;
-      }
-
-      final Matrix value = _rpnEngine.peek();
-      if (value.isScalar) {
-        return value.scalarValue;
+      if (_currentValue?.isScalar ?? false) {
+        return _currentValue!.scalarValue;
       }
 
       return null;
     }
 
-    if (_result.isNotEmpty) return double.tryParse(_result);
-    if (_expression.isNotEmpty) return double.tryParse(_expression);
+    if (_infixExpression.isNotEmpty) return double.tryParse(_infixExpression);
+    if (_currentValue?.isScalar ?? false) {
+      return _currentValue!.scalarValue;
+    }
     return null;
   }
 
@@ -460,15 +463,12 @@ class CalculatorController extends ChangeNotifier {
   }
 
   bool _hasNonScalarMemoryOperand() {
-    if (_expression.isNotEmpty) {
-      final Matrix? draft = _tryParseOperand(_expression);
+    if (expression.isNotEmpty) {
+      final Matrix? draft = _tryParseOperand(expression);
       return draft != null && !draft.isScalar;
     }
 
-    final Matrix? matrix = isRpnMode
-        ? (_rpnEngine.depth > 0 ? _rpnEngine.peek() : null)
-        : _displayMatrix;
-    return matrix != null && !matrix.isScalar;
+    return _currentValue != null && !_currentValue!.isScalar;
   }
 
   bool _isOperator(String value) {
@@ -494,12 +494,12 @@ class CalculatorController extends ChangeNotifier {
   }
 
   void _commitDraftIfNeeded() {
-    if (_expression.isEmpty) {
+    if (_rpnDraft.isEmpty) {
       return;
     }
 
-    _rpnEngine.push(_parseDraftOperand(_expression));
-    _expression = '';
+    _rpnEngine.push(_parseDraftOperand(_rpnDraft));
+    _rpnDraft = '';
   }
 
   void _runRpnAction(void Function() action) {
@@ -510,36 +510,110 @@ class CalculatorController extends ChangeNotifier {
     try {
       action();
       _error = '';
-      _syncRpnDisplay();
+      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
     } on FormatException catch (error) {
       _error = 'Error';
       _result = '';
       _displayMatrix = null;
-      _expression = '';
+      _rpnDraft = '';
       debugPrint('Eval error: $error');
     } on CalculatrixError catch (error) {
       _error = 'Error';
       _result = '';
       _displayMatrix = null;
-      _expression = '';
+      _rpnDraft = '';
       debugPrint('Eval error: $error');
     }
 
     notifyListeners();
   }
 
-  void _syncRpnDisplay() {
-    _displayMatrix = _rpnEngine.depth > 0 ? _rpnEngine.peek() : null;
-    _result = rpnTopLiteral;
+  void _updateCommittedValueFromInfix(
+    Matrix value, {
+    bool invalidateRepeatEquals = false,
+  }) {
+    _currentValue = value;
+    _replaceRpnTopWith(value);
+    if (invalidateRepeatEquals) {
+      _clearRepeatState();
+    }
+    _syncDisplayForMode();
   }
 
-  String _expressionSeedFromResult() {
-    final Matrix? matrix = _displayMatrix;
-    if (matrix != null && !matrix.isScalar) {
+  void _syncCommittedValueFromRpnStack({
+    bool invalidateRepeatEquals = false,
+  }) {
+    _currentValue = _rpnEngine.depth > 0 ? _rpnEngine.peek() : null;
+    if (invalidateRepeatEquals) {
+      _clearRepeatState();
+    }
+    _syncDisplayForMode();
+  }
+
+  void _ensureRpnStackMatchesCommittedValue() {
+    if (_currentValue == null) {
+      return;
+    }
+
+    _replaceRpnTopWith(_currentValue!);
+  }
+
+  void _replaceRpnTopWith(Matrix value) {
+    if (_rpnEngine.depth == 0) {
+      _rpnEngine.push(value);
+      return;
+    }
+
+    _rpnEngine.pop();
+    _rpnEngine.push(value);
+  }
+
+  void _syncDisplayForMode() {
+    if (_currentValue == null) {
+      _result = '';
+      _displayMatrix = null;
+      return;
+    }
+
+    if (isRpnMode) {
+      _displayMatrix = _currentValue;
+      _result = rpnTopLiteral;
+      return;
+    }
+
+    _displayMatrix = _currentValue!.isScalar ? null : _currentValue;
+    _result = _currentValue!.isScalar
+        ? _formatResult(_currentValue!.scalarValue)
+        : MatrixDisplayFormatter.compact(_currentValue!);
+  }
+
+  void _clearAllState() {
+    _infixExpression = '';
+    _rpnDraft = '';
+    _result = '';
+    _displayMatrix = null;
+    _error = '';
+    _currentValue = null;
+    _rpnEngine.clear();
+    _clearRepeatState();
+  }
+
+  void _clearRepeatState() {
+    _lastOperator = '';
+    _lastOperand = '';
+  }
+
+  String _expressionSeedFromCurrentValue() {
+    final Matrix? matrix = _currentValue;
+    if (matrix == null) {
+      return '';
+    }
+
+    if (!matrix.isScalar) {
       return _serializeMatrix(matrix);
     }
 
-    return _result;
+    return _formatResult(matrix.scalarValue);
   }
 
   String _serializeMatrix(Matrix matrix) {
