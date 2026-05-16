@@ -16,6 +16,7 @@ matrices, so algebraic and stack-based workflows share the same math core.
 
 - Immutable `Matrix` type with dimension validation
 - Matrix operations: `+`, `-`, `*`, scale, transpose
+- Multiplication treats `1x1` operands as scalar scaling, so both `A * [[s]]` and `[[s]] * A` are valid
 - `RpnEngine` stack with binary operators (`add`, `subtract`, `multiply`, `divide`)
 - `RpnEngine` stack utilities: `dup`, `drop`, `swap`, `over`
 - Unary operators: square root (`sqrt`) and percent (`%`)

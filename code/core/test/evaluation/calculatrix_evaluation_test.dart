@@ -82,6 +82,30 @@ void main() {
       );
     });
 
+    test('evaluates matrix multiplied by scalar 1x1 in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('[[1,0],[0,1]] * 3');
+
+      expect(
+        result,
+        Matrix(<List<double>>[
+          <double>[3, 0],
+          <double>[0, 3],
+        ]),
+      );
+    });
+
+    test('evaluates scalar 1x1 multiplied by matrix in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('3 * [[1,0],[0,1]]');
+
+      expect(
+        result,
+        Matrix(<List<double>>[
+          <double>[3, 0],
+          <double>[0, 3],
+        ]),
+      );
+    });
+
     test('evaluates matrix product in rpn mode', () {
       final Matrix result = Calculatrix.evaluateRpn(<String>[
         '[[1,2],[3,4]]',
@@ -94,6 +118,38 @@ void main() {
         Matrix(<List<double>>[
           <double>[17],
           <double>[39],
+        ]),
+      );
+    });
+
+    test('evaluates matrix multiplied by scalar 1x1 in rpn mode', () {
+      final Matrix result = Calculatrix.evaluateRpn(<String>[
+        '[[1,0],[0,1]]',
+        '3',
+        '*',
+      ]);
+
+      expect(
+        result,
+        Matrix(<List<double>>[
+          <double>[3, 0],
+          <double>[0, 3],
+        ]),
+      );
+    });
+
+    test('evaluates scalar 1x1 multiplied by matrix in rpn mode', () {
+      final Matrix result = Calculatrix.evaluateRpn(<String>[
+        '3',
+        '[[1,0],[0,1]]',
+        '*',
+      ]);
+
+      expect(
+        result,
+        Matrix(<List<double>>[
+          <double>[3, 0],
+          <double>[0, 3],
         ]),
       );
     });

@@ -70,6 +70,14 @@ class Matrix {
   }
 
   Matrix operator *(Matrix other) {
+    if (isScalar) {
+      return other.scale(scalarValue);
+    }
+
+    if (other.isScalar) {
+      return scale(other.scalarValue);
+    }
+
     if (columnCount != other.rowCount) {
       throw MatrixShapeError(
         'Cannot multiply ${rowCount}x${columnCount} by '

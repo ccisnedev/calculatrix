@@ -52,6 +52,29 @@ void main() {
       expect(engine.depth, 1);
     });
 
+    test('applies scalar 1x1 multiplication through stack operations', () {
+      final RpnEngine engine = RpnEngine();
+
+      engine.push(
+        Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[3, 4],
+        ]),
+      );
+      engine.pushScalar(3);
+
+      final Matrix result = engine.applyBinary(RpnBinaryOperator.multiply);
+
+      expect(
+        result,
+        Matrix(<List<double>>[
+          <double>[3, 6],
+          <double>[9, 12],
+        ]),
+      );
+      expect(engine.depth, 1);
+    });
+
     test('applies scalar division through stack operations', () {
       final RpnEngine engine = RpnEngine();
 

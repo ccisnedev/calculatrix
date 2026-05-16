@@ -53,10 +53,16 @@ void main() {
         <double>[3, 4],
       ]);
 
-      expect(() => matrix * Matrix.scalar(3), throwsA(isA<MatrixShapeError>()));
+      expect(
+        matrix * Matrix.scalar(3),
+        Matrix(<List<double>>[
+          <double>[3, 6],
+          <double>[9, 12],
+        ]),
+      );
 
       expect(
-        matrix.scale(3),
+        Matrix.scalar(3) * matrix,
         Matrix(<List<double>>[
           <double>[3, 6],
           <double>[9, 12],

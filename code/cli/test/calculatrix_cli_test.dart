@@ -45,6 +45,25 @@ void main() {
       expect(infix.stdout.toString().trim(), '[[3, 4], [5, 6]]');
     });
 
+    test('supports matrix multiplied by scalar 1x1 in infix and rpn modes', () async {
+      final ProcessResult infix = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', 'infix', '[[1,0],[0,1]] * 3'],
+        workingDirectory: Directory.current.path,
+      );
+
+      final ProcessResult rpn = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', 'rpn', '[[1,0],[0,1]]', '3', '*'],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(infix.exitCode, 0);
+      expect(rpn.exitCode, 0);
+      expect(infix.stdout.toString().trim(), '[[3, 0], [0, 3]]');
+      expect(rpn.stdout.toString().trim(), infix.stdout.toString().trim());
+    });
+
     test('returns non-zero for unknown commands and prints usage', () async {
       final ProcessResult invalid = await Process.run(
         Platform.resolvedExecutable,

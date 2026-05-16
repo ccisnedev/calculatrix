@@ -41,6 +41,27 @@ Future<void> _showRpnStackPage(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _submitMatrix(
+  WidgetTester tester,
+  List<List<String>> values, {
+  required String actionLabel,
+}) async {
+  await tester.tap(_button('MAT'));
+  await tester.pumpAndSettle();
+
+  for (int row = 0; row < values.length; row++) {
+    for (int column = 0; column < values[row].length; column++) {
+      await tester.enterText(
+        find.byKey(ValueKey<String>('matrix-cell-$row-$column')),
+        values[row][column],
+      );
+    }
+  }
+
+  await tester.tap(find.text(actionLabel));
+  await tester.pumpAndSettle();
+}
+
 Finder _button(String label) {
   if (label == '=') {
     return find.text('=');
@@ -153,8 +174,7 @@ void main() {
       await tester.pump();
       await tester.tap(_button('8'));
       await tester.pump();
-      await tester.tap(_button('='));
-      await tester.pump();
+      await _tapEquals(tester);
       expect(_displayText('50'), findsOneWidget);
     });
 
@@ -250,6 +270,31 @@ void main() {
       expect(_displayText('[3 4]\n[5 6]'), findsOneWidget);
     });
 
+    testWidgets('infix mode multiplies a matrix by a scalar 1x1', (tester) async {
+      await _pumpApp(tester);
+
+      await tester.drag(find.byType(PageView), const Offset(-1000, 0));
+      await tester.pumpAndSettle();
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '0'],
+          <String>['0', '1'],
+        ],
+        actionLabel: 'Insert',
+      );
+
+      await tester.tap(_button('×'));
+      await tester.pump();
+      await tester.tap(_button('3'));
+      await tester.pump();
+
+      await _tapEquals(tester);
+
+      expect(_displayText('[3 0]\n[0 3]'), findsOneWidget);
+    });
+
     testWidgets('rpn mode commits with ENTER and applies binary addition', (tester) async {
       await _pumpApp(tester);
 
@@ -272,6 +317,30 @@ void main() {
 
       expect(_displayText('[[50]]'), findsOneWidget);
       expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+    });
+
+    testWidgets('rpn mode multiplies a matrix by a scalar 1x1', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '0'],
+          <String>['0', '1'],
+        ],
+        actionLabel: 'Push',
+      );
+
+      await tester.tap(_button('3'));
+      await tester.pump();
+      await tester.tap(_button('×'));
+      await tester.pumpAndSettle();
+
+      expect(_displayText('[3 0]\n[0 3]'), findsOneWidget);
       expect(find.text('Stack 1'), findsOneWidget);
     });
 
