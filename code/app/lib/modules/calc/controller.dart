@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:calculatrix/calculatrix.dart';
 
+enum CalculatorMode { infix, rpn }
+
 /// Controller for the calculator.
 ///
 /// Manages the current expression input and delegates to the
@@ -12,6 +14,9 @@ class CalculatorController extends ChangeNotifier {
   double _memory = 0;
   String _lastOperator = '';
   String _lastOperand = '';
+  CalculatorMode _mode = CalculatorMode.infix;
+
+  CalculatorMode get mode => _mode;
 
   /// The current expression being composed.
   String get expression => _expression;
@@ -25,11 +30,22 @@ class CalculatorController extends ChangeNotifier {
   /// Whether memory contains a non-zero value.
   bool get hasMemory => _memory != 0;
 
+  bool get isRpnMode => _mode == CalculatorMode.rpn;
+
   /// The display text shown to the user.
   String get display {
     if (_error.isNotEmpty) return _error;
     if (_result.isNotEmpty) return _result;
     return _expression.isEmpty ? '0' : _expression;
+  }
+
+  void setMode(CalculatorMode mode) {
+    if (_mode == mode) {
+      return;
+    }
+
+    _mode = mode;
+    notifyListeners();
   }
 
   /// Appends a character (digit, operator, paren) to the expression.

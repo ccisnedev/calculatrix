@@ -143,6 +143,37 @@ void main() {
       );
       handle.dispose();
     });
+
+    testWidgets('shows visible notation mode switch', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(find.text('Infix'), findsOneWidget);
+      expect(find.text('RPN'), findsOneWidget);
+    });
+
+    testWidgets('supports horizontal keypad paging', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(find.text('('), findsNothing);
+
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('('), findsOneWidget);
+      expect(find.text('⌫'), findsOneWidget);
+    });
+
+    testWidgets('uses square calculator keys', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      final Finder buttonMaterial = find.ancestor(
+        of: find.text('7'),
+        matching: find.byType(Material),
+      ).first;
+
+      final Size size = tester.getSize(buttonMaterial);
+      expect((size.width - size.height).abs(), lessThanOrEqualTo(1.0));
+    });
   });
 }
 

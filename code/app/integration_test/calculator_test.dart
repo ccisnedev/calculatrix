@@ -6,6 +6,21 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('Calculator integration tests', () {
+    testWidgets('notation mode switch is visible and interactive', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Infix mode'), findsOneWidget);
+      expect(find.bySemanticsLabel('RPN mode'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel('RPN mode'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Infix mode'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel(RegExp(r'Display: 0')), findsOneWidget);
+    });
+
     testWidgets('3 + 4 = 7', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
       await tester.pumpAndSettle();
@@ -96,6 +111,9 @@ void main() {
 
     testWidgets('parentheses: (2 + 3) × 4 = 20', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
       await tester.pumpAndSettle();
 
       await tester.tap(find.bySemanticsLabel('Left parenthesis'));

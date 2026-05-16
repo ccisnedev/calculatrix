@@ -13,6 +13,16 @@ void main() {
   });
 
   group('CalculatorController', () {
+    test('initial notation mode is infix', () {
+      expect(controller.mode, CalculatorMode.infix);
+    });
+
+    test('can switch notation mode', () {
+      controller.setMode(CalculatorMode.rpn);
+
+      expect(controller.mode, CalculatorMode.rpn);
+    });
+
     test('initial display is "0"', () {
       expect(controller.display, '0');
       expect(controller.expression, '');

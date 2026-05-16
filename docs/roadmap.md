@@ -14,6 +14,12 @@
 > and RPN stack semantics) lives in `package:calculatrix`. Flutter app and CLI
 > are UI/interaction layers over the same core API.
 
+> **Testing policy**:
+> 1. `code/core` must keep TDD and full unit/contract coverage for public semantics and new logic.
+> 2. `code/app` controller/view-model/editor state should target full unit coverage; widget tests protect only critical UI invariants.
+> 3. `code/app/integration_test` covers user-visible end-to-end flows for released features.
+> 4. `code/cli` must have automated unit + smoke/integration coverage for argument parsing, output, and representative commands.
+
 ---
 
 ## Stage 1 — "Casio Skin, Google Brain" (0.x.x → 1.0.0)
@@ -110,6 +116,11 @@ core package as the single source of truth for all calculator semantics.
 
 ### v2.x.x — Improvements and fixes on top of v2
 
+Late v2.x focuses on consumer UX expansion over the already-stable core
+semantics. The default experience remains the current scalar/`1x1`
+calculator shell, while app and CLI progressively expose arbitrary matrices,
+explicit notation modes, and richer display contracts.
+
 #### v2.1.0 — Advanced RPN Stack Utilities
 
 - [x] Define and document stack semantics for `pick(n)`, `roll(n)`, and `rot`
@@ -140,26 +151,75 @@ core package as the single source of truth for all calculator semantics.
 - [x] Review API stability and update docs for app/CLI consumers
 - [x] Confirm Stage 3 can build on the current core without breaking changes
 
+#### v2.5.0 — Multi-Page Shell and Layout Geometry
+
+- [x] Add an explicit notation mode switch (`Infix` / `RPN`) in the shared calculator shell
+- [x] Preserve the current scalar / `1x1` workflow as the default keypad page
+- [x] Introduce horizontally paged keypad layouts (swipe left/right + visible page indicators)
+- [x] Make calculator keys square across supported screen sizes
+- [x] Target a display/keypad vertical proportion near the golden ratio when screen constraints allow
+- [x] Add controller/layout unit coverage plus widget and integration tests for keypad paging, mode visibility, and key geometry invariants
+
+#### v2.6.0 — Generic Matrix Entry
+
+- [ ] Add a dedicated `NxM` matrix editor surface with row/column selection
+- [ ] Validate cell editing and serialize matrices using the core literal contract
+- [ ] Insert matrices into infix expressions without changing the shared shell model
+- [ ] Push matrices directly onto the stack in `RPN` mode
+- [ ] Define copy/paste and confirmation flows for matrix literals across app and CLI
+- [ ] Add TDD coverage for matrix editor state, cancellation, validation, insertion/push flows, and CLI literal parity
+
+#### v2.7.0 — RPN Mode UX
+
+- [ ] Make notation mode persistent and visible in app state
+- [ ] Add an `RPN`-focused keypad page for stack actions and operand entry
+- [ ] Add stack visualization (top levels + depth navigation) in the app
+- [ ] Relabel the primary action key from `=` to `ENTER` in `RPN` mode
+- [ ] Define `ENTER` as commit of the current draft operand; duplication remains an explicit `dup` action
+- [ ] Auto-commit any active draft before unary or binary stack operators execute through the core
+- [ ] Define `C`, `⌫`, `MC`, `MR`, `M+`, and `M-` semantics for draft-aware `RPN` workflows
+- [ ] Support switching between `Infix` and `RPN` without ambiguous display state
+- [ ] Add controller, widget, integration, and CLI smoke tests for stack workflows, notation switching, and error presentation
+
+#### v2.8.0 — Matrix Display and Formatting
+
+- [ ] Display non-scalar matrix results in the app without collapsing them to `scalarValue`
+- [ ] Define compact and expanded matrix render policies for small and large screens
+- [ ] Add overflow, scrolling, and readability rules for matrix output
+- [ ] Align matrix formatting expectations between Flutter app and CLI
+- [ ] Add accessibility semantics for matrix structures and stack previews
+- [ ] Add regression coverage for matrix render, formatting, and cross-consumer parity
+
+#### v2.9.0 — Consumer Cleanup and Freeze Before Stage 3
+
+- [ ] Remove legacy app-side parser/tokenizer/evaluator artifacts no longer used at runtime
+- [ ] Generalize controller/view-model state from scalar-only display to scalar-or-matrix display
+- [ ] Revisit whether memory remains scalar-only or generalizes to matrices before Stage 3
+- [ ] Run full regression QA across multi-page keypad, matrix editor, and `RPN` mode
+- [ ] Add or complete automated CLI tests before the Stage 3 handoff
+- [ ] Confirm advanced linear algebra work can build on the consumer UX without breaking changes
+- [ ] Refresh architecture and integration docs for the late-v2 app/CLI experience
+
 ---
 
-## Stage 3 — "Advanced Matrix UX and Linear Algebra" (2.x.x → 3.0.0)
+## Stage 3 — "Advanced Linear Algebra on Mature Matrix UX" (2.x.x → 3.0.0)
 
-User-facing matrix workflows and advanced linear algebra on top of the Stage 2 core.
+Advanced linear algebra and release-grade matrix workflows on top of the
+stabilized multi-page shell, matrix editor, and RPN UX delivered in late v2.x.
 
 ### v2.x.x → v3.0.0
 
-- [ ] Matrix editor (cell-based input)
-- [ ] Matrix stack visualization for RPN mode (top levels + depth navigation)
-- [ ] Matrix input/output UX for app and CLI
 - [ ] Determinant
 - [ ] Matrix inverse
 - [ ] Additional decompositions (priority subset: LU or QR)
-- [ ] Matrix display and formatting policies (readability + precision)
+- [ ] Promote late-v2 matrix workflows to major-release quality across app and CLI
+- [ ] Extend display and interaction polish for complex matrix workflows
 - [ ] Extended linear algebra tests (advanced ops)
+- [ ] End-to-end workflows combining matrix input, notation switching, and advanced operations
 
 ### v3.0.0 — Stable Release
 
-- [ ] Calculator UX with advanced matrix workflows over shared core
+- [ ] Calculator UX with matrix editing, notation switching, and advanced linear algebra over shared core
 - [ ] Advanced matrix operations documentation
 
 ### v3.x.x — Improvements and fixes on top of v3
