@@ -35,7 +35,7 @@ class CalculatorView extends StatefulWidget {
 
 class _CalculatorViewState extends State<CalculatorView> {
   final _controller = CalculatorController();
-  final PageController _pageController = PageController();
+  final PageController _pageController = PageController(keepPage: false);
 
   static const int _columnCount = 4;
   static const int _rowCount = 6;
@@ -256,6 +256,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                 Semantics(
                   label: 'Stack depth: ${_controller.rpnStackDepth}',
                   child: Text(
+                    key: const ValueKey<String>('calculator-stack-depth'),
                     'Stack ${_controller.rpnStackDepth}',
                     style: const TextStyle(
                       fontSize: 14,
@@ -287,6 +288,7 @@ class _CalculatorViewState extends State<CalculatorView> {
             scrollDirection: Axis.horizontal,
             reverse: true,
             child: Text(
+              key: const ValueKey<String>('calculator-expression-text'),
               _controller.expression.isEmpty
                   ? ' '
                   : _controller.expression,
@@ -319,6 +321,7 @@ class _CalculatorViewState extends State<CalculatorView> {
             scrollDirection: Axis.horizontal,
             reverse: true,
             child: Text(
+              key: const ValueKey<String>('calculator-expression-text'),
               _controller.expression.isEmpty ? ' ' : _controller.expression,
               style: const TextStyle(
                 fontSize: 16,
@@ -354,6 +357,7 @@ class _CalculatorViewState extends State<CalculatorView> {
             scrollDirection: Axis.horizontal,
             reverse: true,
             child: Text(
+              key: const ValueKey<String>('calculator-display-text'),
               _controller.display,
               style: TextStyle(
                 fontSize: fontSize,
@@ -388,6 +392,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                 scrollDirection: Axis.horizontal,
                 reverse: !useExpanded,
                 child: Text(
+                  key: const ValueKey<String>('calculator-display-text'),
                   visualValue,
                   textAlign: TextAlign.right,
                   style: TextStyle(

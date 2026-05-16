@@ -211,7 +211,8 @@ stabilized multi-page shell, matrix editor, and RPN UX delivered in late v2.x.
 
 - [ ] Determinant
 - [ ] Matrix inverse
-- [ ] Additional decompositions (priority subset: LU or QR)
+- [ ] LU decomposition
+- [ ] QR decomposition
 - [ ] Promote late-v2 matrix workflows to major-release quality across app and CLI
 - [ ] Extend display and interaction polish for complex matrix workflows
 - [ ] Extended linear algebra tests (advanced ops)
@@ -219,13 +220,13 @@ stabilized multi-page shell, matrix editor, and RPN UX delivered in late v2.x.
 
 ### v3.0.0 — Stable Release
 
-- [ ] Calculator UX with matrix editing, notation switching, and advanced linear algebra over shared core
+- [ ] Calculator UX with matrix editing, notation switching, and determinant/inverse/LU/QR over shared core
 - [ ] Advanced matrix operations documentation
 
 ### v3.x.x — Improvements and fixes on top of v3
 
 - Eigenvalues / eigenvectors (backlog)
-- Factorizations (LU, QR)
+- Additional factorizations beyond LU/QR
 - Sparse matrices
 
 ---
