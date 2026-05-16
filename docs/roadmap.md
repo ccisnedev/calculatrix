@@ -104,7 +104,7 @@ core package as the single source of truth for all calculator semantics.
 
 ### v2.0.0 — Stable Release
 
-- [ ] `package:calculatrix` published as the official computation engine
+- [x] `package:calculatrix` published as the official computation engine
 - [x] Flutter app and CLI both running against shared core semantics
 - [x] Updated architecture documentation (shared core: app + CLI + backend)
 

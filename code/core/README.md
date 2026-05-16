@@ -8,16 +8,19 @@ matrices, so algebraic and stack-based workflows share the same math core.
 
 ## Status
 
-- Current line: `2.0.0-dev`
-- Focus: Stage 2 foundation (matrix core + RPN core)
+- Current published version: `0.0.1`
+- Focus: stable Stage 2 core baseline
 - Runtime dependencies: none (pure Dart)
 
 ## Features available now
 
 - Immutable `Matrix` type with dimension validation
-- Matrix operations: `+`, `-`, `*`, transpose, scalar helpers
-- `RpnEngine` stack with binary operators (`add`, `subtract`, `multiply`)
-- Unit tests for matrix and RPN fundamentals
+- Matrix operations: `+`, `-`, `*`, scale, transpose
+- `RpnEngine` stack with binary operators (`add`, `subtract`, `multiply`, `divide`)
+- `RpnEngine` stack utilities: `dup`, `drop`, `swap`, `over`
+- Unary operators: square root (`sqrt`) and percent (`%`)
+- `Calculatrix` facade: `evaluateInfix` and `evaluateRpn`
+- Unit tests for matrix, RPN, and cross-notation evaluation
 
 ## Quick start
 
