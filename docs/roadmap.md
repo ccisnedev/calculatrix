@@ -110,9 +110,35 @@ core package as the single source of truth for all calculator semantics.
 
 ### v2.x.x — Improvements and fixes on top of v2
 
-- Bug fixes in the math core
-- Extended RPN operations and stack utilities
-- Performance and numeric precision improvements
+#### v2.1.0 — Advanced RPN Stack Utilities
+
+- [x] Define and document stack semantics for `pick(n)`, `roll(n)`, and `rot`
+- [x] Implement `pick(n)` with 1-based indexing from the top of the stack
+- [x] Implement `roll(n)` moving the nth stack value to the top
+- [x] Implement `rot` as a top-3 stack rotation
+- [x] Add typed range/underflow errors for advanced stack utilities
+- [x] Add TDD coverage for invariants and edge cases of all advanced stack ops
+
+#### v2.2.0 — Numeric Policy and Determinism
+
+- [ ] Define formal tolerance policy for floating-point comparison
+- [ ] Implement approximate matrix comparison helpers in core
+- [ ] Add tests for floating-point determinism and tolerance boundaries
+- [ ] Document numeric comparison policy in README and tests
+
+#### v2.3.0 — Parser and Evaluation Performance Baseline
+
+- [ ] Optimize tokenization/evaluation hot paths without changing semantics
+- [ ] Add TDD coverage for scientific notation and signed numeric edge cases
+- [ ] Capture baseline benchmark/smoke measurements for supported workloads
+- [ ] Verify no regressions in core, app, and CLI behaviors
+
+#### v2.4.0 — Hardening and API Freeze Before Stage 3
+
+- [ ] Expand contract tests for vectors, non-square matrices, and parser failures
+- [ ] Harden public error taxonomy for stack range/domain failures
+- [ ] Review API stability and update docs for app/CLI consumers
+- [ ] Confirm Stage 3 can build on the current core without breaking changes
 
 ---
 

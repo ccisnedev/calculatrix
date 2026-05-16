@@ -19,6 +19,10 @@ class RpnStackUnderflowError extends CalculatrixError {
   RpnStackUnderflowError(super.message);
 }
 
+class RpnStackRangeError extends CalculatrixError {
+  RpnStackRangeError(super.message);
+}
+
 class ExpressionSyntaxError extends CalculatrixError {
   ExpressionSyntaxError(super.message);
 }

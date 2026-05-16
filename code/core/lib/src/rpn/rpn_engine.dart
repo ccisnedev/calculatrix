@@ -71,6 +71,33 @@ class RpnEngine {
     return second;
   }
 
+  Matrix pick(int indexFromTop) {
+    _requireValidRange(indexFromTop);
+
+    final Matrix value = _stack[_stack.length - indexFromTop];
+    _stack.add(value);
+    return value;
+  }
+
+  Matrix roll(int indexFromTop) {
+    _requireValidRange(indexFromTop);
+
+    final int sourceIndex = _stack.length - indexFromTop;
+    final Matrix value = _stack.removeAt(sourceIndex);
+    _stack.add(value);
+    return value;
+  }
+
+  Matrix rot() {
+    if (_stack.length < 3) {
+      throw RpnStackUnderflowError(
+        'Rot requires at least three values in the stack.',
+      );
+    }
+
+    return roll(3);
+  }
+
   Matrix peek() {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError('Cannot peek from an empty RPN stack.');
@@ -166,5 +193,23 @@ class RpnEngine {
 
   Matrix _percent(Matrix value) {
     return value.scale(0.01);
+  }
+
+  void _requireValidRange(int indexFromTop) {
+    if (indexFromTop < 1) {
+      throw RpnStackRangeError(
+        'Stack index must be 1-based and greater than zero.',
+      );
+    }
+
+    if (_stack.isEmpty) {
+      throw RpnStackUnderflowError('Stack is empty.');
+    }
+
+    if (indexFromTop > _stack.length) {
+      throw RpnStackRangeError(
+        'Stack index $indexFromTop exceeds current depth ${_stack.length}.',
+      );
+    }
   }
 }

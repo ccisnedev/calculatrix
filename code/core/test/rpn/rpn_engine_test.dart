@@ -167,5 +167,74 @@ void main() {
 
       expect(() => engine.over(), throwsA(isA<RpnStackUnderflowError>()));
     });
+
+    test('pick copies nth value from top using 1-based indexing', () {
+      final RpnEngine engine = RpnEngine();
+      engine.pushScalar(10);
+      engine.pushScalar(20);
+      engine.pushScalar(30);
+
+      final Matrix copied = engine.pick(2);
+
+      expect(copied, Matrix.scalar(20));
+      expect(engine.depth, 4);
+      expect(engine.pop(), Matrix.scalar(20));
+      expect(engine.pop(), Matrix.scalar(30));
+      expect(engine.pop(), Matrix.scalar(20));
+      expect(engine.pop(), Matrix.scalar(10));
+    });
+
+    test('roll moves nth value from top to the top using 1-based indexing', () {
+      final RpnEngine engine = RpnEngine();
+      engine.pushScalar(10);
+      engine.pushScalar(20);
+      engine.pushScalar(30);
+
+      final Matrix moved = engine.roll(3);
+
+      expect(moved, Matrix.scalar(10));
+      expect(engine.depth, 3);
+      expect(engine.pop(), Matrix.scalar(10));
+      expect(engine.pop(), Matrix.scalar(30));
+      expect(engine.pop(), Matrix.scalar(20));
+    });
+
+    test('rot rotates top three values', () {
+      final RpnEngine engine = RpnEngine();
+      engine.pushScalar(1);
+      engine.pushScalar(2);
+      engine.pushScalar(3);
+
+      final Matrix moved = engine.rot();
+
+      expect(moved, Matrix.scalar(1));
+      expect(engine.pop(), Matrix.scalar(1));
+      expect(engine.pop(), Matrix.scalar(3));
+      expect(engine.pop(), Matrix.scalar(2));
+    });
+
+    test('pick throws range error for invalid index', () {
+      final RpnEngine engine = RpnEngine();
+      engine.pushScalar(1);
+
+      expect(() => engine.pick(0), throwsA(isA<RpnStackRangeError>()));
+      expect(() => engine.pick(2), throwsA(isA<RpnStackRangeError>()));
+    });
+
+    test('roll throws range error for invalid index', () {
+      final RpnEngine engine = RpnEngine();
+      engine.pushScalar(1);
+
+      expect(() => engine.roll(0), throwsA(isA<RpnStackRangeError>()));
+      expect(() => engine.roll(2), throwsA(isA<RpnStackRangeError>()));
+    });
+
+    test('rot throws underflow with fewer than three values', () {
+      final RpnEngine engine = RpnEngine();
+      engine.pushScalar(1);
+      engine.pushScalar(2);
+
+      expect(() => engine.rot(), throwsA(isA<RpnStackUnderflowError>()));
+    });
   });
 }
