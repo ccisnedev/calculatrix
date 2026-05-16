@@ -6,9 +6,9 @@
 - **Core package**: `calculatrix`
 - **Flutter consumer**: `calculatrix_app`
 - **CLI consumer**: `calculatrix_cli`
-- **Framework**: Flutter (web-first for QA, then multi-platform)
+- **Framework**: Flutter (multi-platform, with Android as the canonical `integration_test` target)
 - **Architecture**: MVVM (Controller extends ChangeNotifier + notifyListeners)
-- **QA**: TDD + Widget tests + Integration tests (Semantics-driven)
+- **QA**: TDD + Widget tests + Android integration tests
 
 > **Architecture rule**: calculator logic (algebraic evaluation, matrix operations,
 > and RPN stack semantics) lives in `package:calculatrix`. Flutter app and CLI
@@ -17,7 +17,7 @@
 > **Testing policy**:
 > 1. `code/core` must keep TDD and full unit/contract coverage for public semantics and new logic.
 > 2. `code/app` controller/view-model/editor state should target full unit coverage; widget tests protect only critical UI invariants.
-> 3. `code/app/integration_test` covers user-visible end-to-end flows for released features.
+> 3. `code/app/integration_test` covers user-visible end-to-end flows for released features and runs on Android emulator/device as the canonical automated integration environment.
 > 4. `code/cli` must have automated unit + smoke/integration coverage for argument parsing, output, and representative commands.
 
 ---
@@ -195,6 +195,7 @@ explicit notation modes, and richer display contracts.
 - [x] Remove legacy app-side parser/tokenizer/evaluator artifacts no longer used at runtime
 - [x] Generalize controller/view-model state from scalar-only display to scalar-or-matrix display
 - [x] Revisit whether memory remains scalar-only or generalizes to matrices before Stage 3
+- [x] Add Android project support so `integration_test` runs on a real emulator/device target
 - [x] Run full regression QA across multi-page keypad, matrix editor, and `RPN` mode
 - [x] Add or complete automated CLI tests before the Stage 3 handoff
 - [x] Confirm advanced linear algebra work can build on the consumer UX without breaking changes
