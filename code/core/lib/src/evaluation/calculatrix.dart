@@ -166,17 +166,9 @@ class Calculatrix {
       }
 
       if (_isNumberStart(char)) {
-        final int start = index;
-        index++;
-        while (index < expression.length) {
-          final String current = expression[index];
-          if (_isNumberPart(current)) {
-            index++;
-            continue;
-          }
-          break;
-        }
-        tokens.add(expression.substring(start, index));
+        final _NumberScanResult scan = _scanNumber(expression, index);
+        tokens.add(scan.token);
+        index = scan.nextIndex;
         continue;
       }
 
@@ -266,7 +258,45 @@ class Calculatrix {
     return RegExp(r'[0-9.]').hasMatch(char);
   }
 
-  static bool _isNumberPart(String char) {
-    return RegExp(r'[0-9.eE+-]').hasMatch(char);
+  static _NumberScanResult _scanNumber(String source, int start) {
+    int index = start;
+    bool seenDot = false;
+    bool seenExponent = false;
+
+    while (index < source.length) {
+      final String current = source[index];
+
+      if (RegExp(r'[0-9]').hasMatch(current)) {
+        index++;
+        continue;
+      }
+
+      if (current == '.' && !seenDot && !seenExponent) {
+        seenDot = true;
+        index++;
+        continue;
+      }
+
+      if ((current == 'e' || current == 'E') && !seenExponent) {
+        seenExponent = true;
+        index++;
+        if (index < source.length &&
+            (source[index] == '+' || source[index] == '-')) {
+          index++;
+        }
+        continue;
+      }
+
+      break;
+    }
+
+    return _NumberScanResult(source.substring(start, index), index);
   }
+}
+
+class _NumberScanResult {
+  const _NumberScanResult(this.token, this.nextIndex);
+
+  final String token;
+  final int nextIndex;
 }

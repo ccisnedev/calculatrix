@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:calculatrix/calculatrix.dart';
 import 'models/tokenizer.dart';
 import 'models/parser.dart';
 import 'models/evaluator.dart';
@@ -66,9 +67,7 @@ class CalculatorController extends ChangeNotifier {
     try {
       // Save the last operator and operand for repeat
       _saveLastOperation(_expression);
-      final tokens = _tokenizer.tokenize(_expression);
-      final ast = _parser.parse(tokens);
-      final value = _evaluator.evaluate(ast);
+      final double value = _evaluateExpression(_expression);
       _result = _formatResult(value);
       _expression = '';
       _error = '';
@@ -77,8 +76,34 @@ class CalculatorController extends ChangeNotifier {
       _result = '';
       _expression = '';
       debugPrint('Eval error: $e');
+    } on CalculatrixError catch (e) {
+      _error = 'Error';
+      _result = '';
+      _expression = '';
+      debugPrint('Eval error: $e');
     }
     notifyListeners();
+  }
+
+  double _evaluateExpression(String expression) {
+    if (_canUseCore(expression)) {
+      final String normalized = expression
+          .replaceAll('×', '*')
+          .replaceAll('÷', '/');
+
+      final Matrix value = Calculatrix.evaluateInfix(normalized);
+      return value.scalarValue;
+    }
+
+    final tokens = _tokenizer.tokenize(expression);
+    final ast = _parser.parse(tokens);
+    return _evaluator.evaluate(ast);
+  }
+
+  bool _canUseCore(String expression) {
+    // Transitional rule for Stage 2 migration:
+    // keep legacy pipeline for operations not yet represented in core parser.
+    return !expression.contains('√') && !expression.contains('%');
   }
 
   void _saveLastOperation(String expr) {
