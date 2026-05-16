@@ -162,12 +162,12 @@ explicit notation modes, and richer display contracts.
 
 #### v2.6.0 — Generic Matrix Entry
 
-- [ ] Add a dedicated `NxM` matrix editor surface with row/column selection
-- [ ] Validate cell editing and serialize matrices using the core literal contract
-- [ ] Insert matrices into infix expressions without changing the shared shell model
-- [ ] Push matrices directly onto the stack in `RPN` mode
-- [ ] Define copy/paste and confirmation flows for matrix literals across app and CLI
-- [ ] Add TDD coverage for matrix editor state, cancellation, validation, insertion/push flows, and CLI literal parity
+- [x] Add a dedicated `NxM` matrix editor surface with row/column selection
+- [x] Validate cell editing and serialize matrices using the core literal contract
+- [x] Insert matrices into infix expressions without changing the shared shell model
+- [x] Push matrices directly onto the stack in `RPN` mode
+- [x] Define copy/paste and confirmation flows for matrix literals across app and CLI
+- [x] Add TDD coverage for matrix editor state, cancellation, validation, insertion/push flows, and CLI literal parity
 
 #### v2.7.0 — RPN Mode UX
 

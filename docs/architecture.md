@@ -48,6 +48,13 @@ multiple independent calculators.
 - Square keys across supported screen sizes
 - Display/keypad height guided by a golden-ratio-like split when constraints allow
 
+### Matrix Literal Entry Contract
+
+- The app-side matrix editor serializes values to the same bracket literal accepted by the core package, for example `[[1,2],[3,4]]`.
+- In `Infix` mode, confirming the matrix editor inserts that literal into the expression buffer.
+- In `RPN` mode, confirming the matrix editor pushes the parsed matrix onto the stack.
+- CLI workflows use the same literal format directly on the command line, so copy/paste between app and CLI remains lossless.
+
 ## Testing Policy
 
 - **TDD is mandatory** for all new behavior.

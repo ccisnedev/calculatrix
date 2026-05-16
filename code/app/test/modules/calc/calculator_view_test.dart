@@ -174,6 +174,75 @@ void main() {
       final Size size = tester.getSize(buttonMaterial);
       expect((size.width - size.height).abs(), lessThanOrEqualTo(1.0));
     });
+
+    testWidgets('matrix editor opens from MAT key', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('MAT'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Matrix editor'), findsOneWidget);
+      expect(find.text('Rows'), findsOneWidget);
+      expect(find.text('Columns'), findsOneWidget);
+    });
+
+    testWidgets('matrix editor inserts serialized matrix into infix expression', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('MAT'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '2');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '3');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '4');
+
+      await tester.tap(find.text('Insert'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Expression: \[\[1,2\],\[3,4\]\]')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('matrix editor cancel keeps expression unchanged', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('MAT'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel(RegExp(r'Display: 0')), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('matrix editor shows validation error for incomplete matrix', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('MAT'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
+      await tester.tap(find.text('Insert'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Matrix cells cannot be empty.'), findsOneWidget);
+    });
   });
 }
 

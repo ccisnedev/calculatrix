@@ -15,6 +15,7 @@ class CalculatorController extends ChangeNotifier {
   String _lastOperator = '';
   String _lastOperand = '';
   CalculatorMode _mode = CalculatorMode.infix;
+  final RpnEngine _rpnEngine = RpnEngine();
 
   CalculatorMode get mode => _mode;
 
@@ -32,6 +33,16 @@ class CalculatorController extends ChangeNotifier {
 
   bool get isRpnMode => _mode == CalculatorMode.rpn;
 
+  int get rpnStackDepth => _rpnEngine.depth;
+
+  String get rpnTopLiteral {
+    if (_rpnEngine.depth == 0) {
+      return '';
+    }
+
+    return _serializeMatrix(_rpnEngine.peek());
+  }
+
   /// The display text shown to the user.
   String get display {
     if (_error.isNotEmpty) return _error;
@@ -45,6 +56,27 @@ class CalculatorController extends ChangeNotifier {
     }
 
     _mode = mode;
+    notifyListeners();
+  }
+
+  void insertMatrixLiteral(String literal) {
+    final Matrix matrix = Calculatrix.evaluateInfix(literal);
+
+    _error = '';
+    if (_mode == CalculatorMode.infix) {
+      if (_result.isNotEmpty) {
+        _expression = literal;
+        _result = '';
+      } else {
+        _expression += literal;
+      }
+      notifyListeners();
+      return;
+    }
+
+    _rpnEngine.push(matrix);
+    _expression = '';
+    _result = _serializeMatrix(matrix);
     notifyListeners();
   }
 
@@ -234,5 +266,36 @@ class CalculatorController extends ChangeNotifier {
 
   bool _isOperator(String value) {
     return value == '+' || value == '-' || value == '×' || value == '÷';
+  }
+
+  String _serializeMatrix(Matrix matrix) {
+    final StringBuffer buffer = StringBuffer('[');
+
+    for (int r = 0; r < matrix.rowCount; r++) {
+      if (r > 0) {
+        buffer.write(',');
+      }
+
+      buffer.write('[');
+      for (int c = 0; c < matrix.columnCount; c++) {
+        if (c > 0) {
+          buffer.write(',');
+        }
+
+        buffer.write(_formatMatrixNumber(matrix.at(r, c)));
+      }
+      buffer.write(']');
+    }
+
+    buffer.write(']');
+    return buffer.toString();
+  }
+
+  String _formatMatrixNumber(double value) {
+    if (value == value.toInt().toDouble()) {
+      return value.toInt().toString();
+    }
+
+    return value.toString();
   }
 }

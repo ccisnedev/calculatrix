@@ -151,6 +151,29 @@ void main() {
 
       expect(find.bySemanticsLabel(RegExp(r'Display: 0\.25')), findsOneWidget);
     });
+
+    testWidgets('matrix editor inserts a matrix literal into infix input', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Matrix editor'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '2');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '3');
+      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '4');
+      await tester.tap(find.text('Insert'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Expression: \[\[1,2\],\[3,4\]\]')),
+        findsOneWidget,
+      );
+    });
   });
 }
 

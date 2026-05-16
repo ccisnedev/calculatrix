@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'controller.dart';
+import 'matrix_editor_draft.dart';
 
 /// Button category for visual differentiation.
 enum _ButtonCategory { number, operator, function, equals }
@@ -80,10 +81,10 @@ class _CalculatorViewState extends State<CalculatorView> {
   ];
 
   static const _editingButtons = [
+    _ButtonDef('MAT', _ButtonCategory.function),
     _ButtonDef('(', _ButtonCategory.function),
     _ButtonDef(')', _ButtonCategory.function),
     _ButtonDef('⌫', _ButtonCategory.function),
-    _ButtonDef('C', _ButtonCategory.function),
     _ButtonDef('7', _ButtonCategory.number),
     _ButtonDef('8', _ButtonCategory.number),
     _ButtonDef('9', _ButtonCategory.number),
@@ -100,9 +101,9 @@ class _CalculatorViewState extends State<CalculatorView> {
     _ButtonDef('0', _ButtonCategory.number),
     _ButtonDef('.', _ButtonCategory.number),
     _ButtonDef('+', _ButtonCategory.operator),
+    _ButtonDef('C', _ButtonCategory.function),
     _ButtonDef('MC', _ButtonCategory.function),
     _ButtonDef('MR', _ButtonCategory.function),
-    _ButtonDef('M-', _ButtonCategory.function),
     _ButtonDef('M+', _ButtonCategory.function),
   ];
 
@@ -482,6 +483,8 @@ class _CalculatorViewState extends State<CalculatorView> {
 
   void _onButtonPressed(String label) {
     switch (label) {
+      case 'MAT':
+        _openMatrixEditor();
       case 'C':
         _controller.clear();
       case '⌫':
@@ -505,6 +508,7 @@ class _CalculatorViewState extends State<CalculatorView> {
 
   String _semanticLabel(String label) {
     return switch (label) {
+      'MAT' => 'Matrix editor',
       'C' => 'Clear',
       '⌫' => 'Backspace',
       '=' => 'Equals',
@@ -524,5 +528,182 @@ class _CalculatorViewState extends State<CalculatorView> {
       'M-' => 'Memory subtract',
       _ => label,
     };
+  }
+
+  Future<void> _openMatrixEditor() async {
+    final String? literal = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return _MatrixEditorDialog(isRpnMode: _controller.isRpnMode);
+      },
+    );
+
+    if (!mounted || literal == null) {
+      return;
+    }
+
+    _controller.insertMatrixLiteral(literal);
+  }
+}
+
+class _MatrixEditorDialog extends StatefulWidget {
+  const _MatrixEditorDialog({required this.isRpnMode});
+
+  final bool isRpnMode;
+
+  @override
+  State<_MatrixEditorDialog> createState() => _MatrixEditorDialogState();
+}
+
+class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
+  final MatrixEditorDraft _draft = MatrixEditorDraft();
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Matrix editor'),
+      content: SizedBox(
+        width: 360,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDimensionSelector(
+                      label: 'Rows',
+                      value: _draft.rowCount,
+                      onChanged: (int value) {
+                        setState(() {
+                          _draft.resize(
+                            rowCount: value,
+                            columnCount: _draft.columnCount,
+                          );
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildDimensionSelector(
+                      label: 'Columns',
+                      value: _draft.columnCount,
+                      onChanged: (int value) {
+                        setState(() {
+                          _draft.resize(
+                            rowCount: _draft.rowCount,
+                            columnCount: value,
+                          );
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              for (int row = 0; row < _draft.rowCount; row++)
+                Padding(
+                  padding: EdgeInsets.only(
+                    bottom: row < _draft.rowCount - 1 ? 8 : 0,
+                  ),
+                  child: Row(
+                    children: [
+                      for (int column = 0; column < _draft.columnCount; column++) ...[
+                        Expanded(
+                          child: TextFormField(
+                            key: ValueKey<String>('matrix-cell-$row-$column'),
+                            initialValue: _draft.cellValue(row, column),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              border: const OutlineInputBorder(),
+                              hintText: '0',
+                              labelText: 'r${row + 1}c${column + 1}',
+                            ),
+                            onChanged: (String value) {
+                              _draft.setCell(row, column, value);
+                            },
+                          ),
+                        ),
+                        if (column < _draft.columnCount - 1)
+                          const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+                ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: Color(0xFFE57373)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(widget.isRpnMode ? 'Push' : 'Insert'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDimensionSelector({
+    required String label,
+    required int value,
+    required ValueChanged<int> onChanged,
+  }) {
+    return InputDecorator(
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
+        labelText: label,
+        isDense: true,
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: value,
+          isExpanded: true,
+          items: List<DropdownMenuItem<int>>.generate(
+            4,
+            (int index) {
+              final int dimension = index + 1;
+              return DropdownMenuItem<int>(
+                value: dimension,
+                child: Text('$dimension'),
+              );
+            },
+          ),
+          onChanged: (int? next) {
+            if (next != null) {
+              onChanged(next);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    try {
+      final String literal = _draft.buildLiteral();
+      Navigator.of(context).pop(literal);
+    } on FormatException catch (error) {
+      setState(() {
+        _error = error.message;
+      });
+    }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:calculatrix_app/modules/calc/controller.dart';
+import 'package:calculatrix_app/modules/calc/matrix_editor_draft.dart';
 
 void main() {
   late CalculatorController controller;
@@ -328,6 +329,54 @@ void main() {
       controller.input('9');
       controller.evaluate();
       expect(controller.result, '999999999');
+    });
+  });
+
+  group('MatrixEditorDraft', () {
+    test('serializes rectangular cells into core literal format', () {
+      final MatrixEditorDraft draft = MatrixEditorDraft(rowCount: 2, columnCount: 2);
+
+      draft.setCell(0, 0, '1');
+      draft.setCell(0, 1, '2');
+      draft.setCell(1, 0, '3');
+      draft.setCell(1, 1, '4');
+
+      expect(draft.buildLiteral(), '[[1,2],[3,4]]');
+    });
+
+    test('throws when any cell is empty', () {
+      final MatrixEditorDraft draft = MatrixEditorDraft(rowCount: 1, columnCount: 2);
+      draft.setCell(0, 0, '1');
+
+      expect(draft.buildLiteral, throwsFormatException);
+    });
+
+    test('preserves overlapping values when resized', () {
+      final MatrixEditorDraft draft = MatrixEditorDraft(rowCount: 1, columnCount: 1);
+      draft.setCell(0, 0, '9');
+
+      draft.resize(rowCount: 2, columnCount: 2);
+
+      expect(draft.cellValue(0, 0), '9');
+      expect(draft.cellValue(1, 1), '');
+    });
+  });
+
+  group('CalculatorController - matrix entry', () {
+    test('inserts matrix literal into infix expression', () {
+      controller.insertMatrixLiteral('[[1,2],[3,4]]');
+
+      expect(controller.expression, '[[1,2],[3,4]]');
+      expect(controller.display, '[[1,2],[3,4]]');
+    });
+
+    test('pushes matrix literal onto RPN stack in rpn mode', () {
+      controller.setMode(CalculatorMode.rpn);
+
+      controller.insertMatrixLiteral('[[1,2],[3,4]]');
+
+      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnTopLiteral, '[[1,2],[3,4]]');
     });
   });
 }
