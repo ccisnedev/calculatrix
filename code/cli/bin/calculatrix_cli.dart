@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:calculatrix/calculatrix.dart';
 
 void main(List<String> args) {
@@ -29,9 +31,11 @@ void main(List<String> args) {
     }
   } on CalculatrixError catch (error) {
     print(error);
+    exitCode = 1;
   } on FormatException catch (error) {
     print('CLI error: ${error.message}');
     _printUsage();
+    exitCode = 64;
   }
 }
 

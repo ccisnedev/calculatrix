@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'modules/calc/calc.dart';
+import 'modules/calc/view.dart';
 
 void main() {
   runApp(const CalculatrixApp());

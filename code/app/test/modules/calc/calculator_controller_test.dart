@@ -218,6 +218,28 @@ void main() {
       controller.memoryRecall();
       expect(controller.expression, '');
     });
+
+    test('M+ rejects non-scalar infix results', () {
+      controller.input('[[1],[2]]');
+      controller.input('×');
+      controller.input('[[3,4]]');
+      controller.evaluate();
+
+      controller.memoryAdd();
+
+      expect(controller.error, 'Error');
+      expect(controller.hasMemory, isFalse);
+    });
+
+    test('M- rejects non-scalar RPN stack values', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.insertMatrixLiteral('[[1,2],[3,4]]');
+
+      controller.memorySubtract();
+
+      expect(controller.error, 'Error');
+      expect(controller.hasMemory, isFalse);
+    });
   });
 
   group('CalculatorController - sign toggle', () {

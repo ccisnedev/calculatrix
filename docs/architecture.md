@@ -99,7 +99,7 @@ multiple independent calculators.
 - Memory remains scalar-only through the initial late-v2 `RPN` rollout.
 - `MR` pushes the recalled scalar as a `1x1` operand in `RPN` mode.
 - `M+` and `M-` read from the active scalar draft when present; otherwise they read from the top of stack when that value is scalar.
-- Non-scalar matrix values are rejected for memory accumulation until matrix memory semantics are explicitly broadened.
+- Non-scalar matrix values are rejected for memory accumulation in both `Infix` and `RPN` consumer flows until matrix memory semantics are explicitly broadened.
 - `MC` clears the memory register in both notation modes.
 
 ### Display Semantics
@@ -108,8 +108,20 @@ multiple independent calculators.
 - A dedicated stack surface shows recent stack levels and current depth.
 - Matrix rendering policy belongs to the consumer shell, while matrix computation remains in the core package.
 
-## Legacy Note
+## Stage 3 Readiness
 
-Historical app-side tokenizer/parser/evaluator files may still exist as
-migration artifacts, but they are not the runtime source of truth. They are
-scheduled for removal during the late-v2 cleanup/freeze work.
+Stage 3 advanced linear algebra can extend the current consumers without
+breaking the late-v2 UX contract.
+
+- App and CLI already accept full-matrix results from the shared core.
+- Matrix literal entry remains the stable interchange format across app and CLI.
+- The notation switch, paged keypad shell, matrix editor, and `RPN` stack surface do not need structural changes to host determinant, inverse, or decomposition actions.
+- New advanced operations can be added as core semantics plus consumer controls/output affordances, without reintroducing app-local evaluation pipelines.
+
+## Cleanup Status
+
+The historical app-side tokenizer/parser/evaluator pipeline has been removed
+from `calculatrix_app`. Late-v2 consumers now rely exclusively on the shared
+core package for evaluation semantics.
+Only shell concerns remain in the app: mode switching, matrix entry, display,
+stack presentation, memory UX, and accessibility.

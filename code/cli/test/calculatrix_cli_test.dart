@@ -4,6 +4,17 @@ import 'package:test/test.dart';
 
 void main() {
   group('calculatrix_cli', () {
+    test('prints usage and exits successfully for --help', () async {
+      final ProcessResult help = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', '--help'],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(help.exitCode, 0);
+      expect(help.stdout.toString(), contains('calculatrix_cli usage:'));
+    });
+
     test('keeps matrix literal parity between infix and rpn modes', () async {
       final ProcessResult infix = await Process.run(
         Platform.resolvedExecutable,
@@ -32,6 +43,32 @@ void main() {
 
       expect(infix.exitCode, 0);
       expect(infix.stdout.toString().trim(), '[[3, 4], [5, 6]]');
+    });
+
+    test('returns non-zero for unknown commands and prints usage', () async {
+      final ProcessResult invalid = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', 'bogus'],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(invalid.exitCode, isNonZero);
+      expect(invalid.stdout.toString(), contains('Unknown command: bogus'));
+      expect(invalid.stdout.toString(), contains('calculatrix_cli usage:'));
+    });
+
+    test('returns non-zero for evaluation errors', () async {
+      final ProcessResult invalid = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', 'rpn', '1', '0', '/'],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(invalid.exitCode, isNonZero);
+      expect(
+        invalid.stdout.toString(),
+        contains('Division by zero scalar is undefined'),
+      );
     });
   });
 }

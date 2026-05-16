@@ -192,13 +192,13 @@ explicit notation modes, and richer display contracts.
 
 #### v2.9.0 — Consumer Cleanup and Freeze Before Stage 3
 
-- [ ] Remove legacy app-side parser/tokenizer/evaluator artifacts no longer used at runtime
-- [ ] Generalize controller/view-model state from scalar-only display to scalar-or-matrix display
-- [ ] Revisit whether memory remains scalar-only or generalizes to matrices before Stage 3
-- [ ] Run full regression QA across multi-page keypad, matrix editor, and `RPN` mode
-- [ ] Add or complete automated CLI tests before the Stage 3 handoff
-- [ ] Confirm advanced linear algebra work can build on the consumer UX without breaking changes
-- [ ] Refresh architecture and integration docs for the late-v2 app/CLI experience
+- [x] Remove legacy app-side parser/tokenizer/evaluator artifacts no longer used at runtime
+- [x] Generalize controller/view-model state from scalar-only display to scalar-or-matrix display
+- [x] Revisit whether memory remains scalar-only or generalizes to matrices before Stage 3
+- [x] Run full regression QA across multi-page keypad, matrix editor, and `RPN` mode
+- [x] Add or complete automated CLI tests before the Stage 3 handoff
+- [x] Confirm advanced linear algebra work can build on the consumer UX without breaking changes
+- [x] Refresh architecture and integration docs for the late-v2 app/CLI experience
 
 ---
 

@@ -5,8 +5,8 @@ enum CalculatorMode { infix, rpn }
 
 /// Controller for the calculator.
 ///
-/// Manages the current expression input and delegates to the
-/// tokenizer/evaluator pipeline. Notifies listeners on state changes.
+/// Manages the current expression input and delegates evaluation to the
+/// shared core package. Notifies listeners on state changes.
 class CalculatorController extends ChangeNotifier {
   String _expression = '';
   String _result = '';
@@ -43,10 +43,6 @@ class CalculatorController extends ChangeNotifier {
         .reversed
         .map(_serializeMatrix)
         .toList(growable: false);
-  }
-
-  List<Matrix> get rpnStackValues {
-    return List<Matrix>.unmodifiable(_rpnEngine.stack.reversed);
   }
 
   String get rpnTopLiteral {
@@ -329,12 +325,13 @@ class CalculatorController extends ChangeNotifier {
   void memoryAdd() {
     final value = _currentNumericValue();
     if (value != null) {
+      _error = '';
       _memory += value;
       notifyListeners();
       return;
     }
 
-    if (isRpnMode && _rpnEngine.depth > 0) {
+    if (_hasNonScalarMemoryOperand()) {
       _error = 'Error';
       notifyListeners();
     }
@@ -344,12 +341,13 @@ class CalculatorController extends ChangeNotifier {
   void memorySubtract() {
     final value = _currentNumericValue();
     if (value != null) {
+      _error = '';
       _memory -= value;
       notifyListeners();
       return;
     }
 
-    if (isRpnMode && _rpnEngine.depth > 0) {
+    if (_hasNonScalarMemoryOperand()) {
       _error = 'Error';
       notifyListeners();
     }
@@ -461,6 +459,18 @@ class CalculatorController extends ChangeNotifier {
     return str;
   }
 
+  bool _hasNonScalarMemoryOperand() {
+    if (_expression.isNotEmpty) {
+      final Matrix? draft = _tryParseOperand(_expression);
+      return draft != null && !draft.isScalar;
+    }
+
+    final Matrix? matrix = isRpnMode
+        ? (_rpnEngine.depth > 0 ? _rpnEngine.peek() : null)
+        : _displayMatrix;
+    return matrix != null && !matrix.isScalar;
+  }
+
   bool _isOperator(String value) {
     return value == '+' || value == '-' || value == '×' || value == '÷';
   }
@@ -471,6 +481,16 @@ class CalculatorController extends ChangeNotifier {
         .replaceAll('÷', '/');
 
     return Calculatrix.evaluateInfix(normalized);
+  }
+
+  Matrix? _tryParseOperand(String expression) {
+    try {
+      return _parseDraftOperand(expression);
+    } on FormatException {
+      return null;
+    } on CalculatrixError {
+      return null;
+    }
   }
 
   void _commitDraftIfNeeded() {
