@@ -135,10 +135,10 @@ core package as the single source of truth for all calculator semantics.
 
 #### v2.4.0 — Hardening and API Freeze Before Stage 3
 
-- [ ] Expand contract tests for vectors, non-square matrices, and parser failures
-- [ ] Harden public error taxonomy for stack range/domain failures
-- [ ] Review API stability and update docs for app/CLI consumers
-- [ ] Confirm Stage 3 can build on the current core without breaking changes
+- [x] Expand contract tests for vectors, non-square matrices, and parser failures
+- [x] Harden public error taxonomy for stack range/domain failures
+- [x] Review API stability and update docs for app/CLI consumers
+- [x] Confirm Stage 3 can build on the current core without breaking changes
 
 ---
 

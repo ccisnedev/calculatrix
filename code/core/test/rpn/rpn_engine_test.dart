@@ -219,6 +219,7 @@ void main() {
 
       expect(() => engine.pick(0), throwsA(isA<RpnStackRangeError>()));
       expect(() => engine.pick(2), throwsA(isA<RpnStackRangeError>()));
+      expect(() => engine.pick(0), throwsA(isA<RpnStackError>()));
     });
 
     test('roll throws range error for invalid index', () {
@@ -235,6 +236,16 @@ void main() {
       engine.pushScalar(2);
 
       expect(() => engine.rot(), throwsA(isA<RpnStackUnderflowError>()));
+      expect(() => engine.rot(), throwsA(isA<RpnStackError>()));
+    });
+
+    test('applyUnary throws stack error on empty stack', () {
+      final RpnEngine engine = RpnEngine();
+
+      expect(
+        () => engine.applyUnary(RpnUnaryOperator.sqrt),
+        throwsA(isA<RpnStackError>()),
+      );
     });
   });
 }

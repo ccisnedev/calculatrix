@@ -70,6 +70,18 @@ void main() {
       );
     });
 
+    test('evaluates non-square outer product in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('[[1],[2]] * [[3,4]]');
+
+      expect(
+        result,
+        Matrix(<List<double>>[
+          <double>[3, 4],
+          <double>[6, 8],
+        ]),
+      );
+    });
+
     test('evaluates matrix product in rpn mode', () {
       final Matrix result = Calculatrix.evaluateRpn(<String>[
         '[[1,2],[3,4]]',
@@ -110,6 +122,20 @@ void main() {
       expect(
         () => Calculatrix.evaluateInfix('3 + * 4'),
         throwsA(isA<ExpressionSyntaxError>()),
+      );
+    });
+
+    test('throws syntax error for mismatched parentheses', () {
+      expect(
+        () => Calculatrix.evaluateInfix('(3 + 4'),
+        throwsA(isA<ExpressionSyntaxError>()),
+      );
+    });
+
+    test('throws shape error for ragged matrix literal', () {
+      expect(
+        () => Calculatrix.evaluateInfix('[[1,2],[3]]'),
+        throwsA(isA<MatrixShapeError>()),
       );
     });
 

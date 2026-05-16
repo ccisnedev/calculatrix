@@ -30,6 +30,14 @@ matrices, so algebraic and stack-based workflows share the same math core.
 	- relative: `1e-10`
 	- absolute: `1e-12`
 
+## API stability
+
+- The current Stage 2.x API is intended to remain stable as the base for Stage 3 UX work.
+- RPN stack failures are exposed through the `RpnStackError` hierarchy:
+	- `RpnStackUnderflowError`
+	- `RpnStackRangeError`
+- App and CLI consumers should depend on the public barrel `package:calculatrix/calculatrix.dart`.
+
 ## Quick start
 
 ```dart
