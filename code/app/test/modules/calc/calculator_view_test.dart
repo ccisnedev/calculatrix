@@ -1,6 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:calculatrix_app/main.dart';
+
+Finder _matrixCell(int row, int column) {
+  return find.byKey(ValueKey<String>('matrix-cell-$row-$column'));
+}
+
+EditableText _matrixEditableText(WidgetTester tester, int row, int column) {
+  return tester.widget<EditableText>(
+    find.descendant(
+      of: _matrixCell(row, column),
+      matching: find.byType(EditableText),
+    ),
+  );
+}
+
+Future<void> _openMatrixEditor(WidgetTester tester) async {
+  await tester.drag(find.byType(PageView), const Offset(-500, 0));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('MAT'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _enterMatrixCell(
+  WidgetTester tester,
+  int row,
+  int column,
+  String value,
+) async {
+  final Finder cell = _matrixCell(row, column);
+  await tester.tap(cell);
+  await tester.pumpAndSettle();
+  await tester.enterText(cell, value);
+  await tester.pumpAndSettle();
+}
 
 void main() {
   group('CalculatorView - widget tests', () {
@@ -178,30 +212,30 @@ void main() {
     testWidgets('matrix editor opens from MAT key', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('MAT'));
-      await tester.pumpAndSettle();
+      await _openMatrixEditor(tester);
 
       expect(find.text('Matrix editor'), findsOneWidget);
-      expect(find.text('Rows'), findsOneWidget);
-      expect(find.text('Columns'), findsOneWidget);
+      expect(find.text('2x2'), findsOneWidget);
+      expect(find.text('3x3'), findsOneWidget);
+      expect(find.text('4x4'), findsOneWidget);
+      expect(find.text('Zeros'), findsOneWidget);
+      expect(find.text('Identity'), findsOneWidget);
+      expect(find.text('Clear'), findsOneWidget);
+      expect(find.text('Preview unavailable until valid'), findsOneWidget);
+      expect(find.text('Rows'), findsNothing);
+      expect(find.text('Columns'), findsNothing);
     });
 
     testWidgets('matrix editor inserts serialized matrix into infix expression', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('MAT'));
-      await tester.pumpAndSettle();
+      await _openMatrixEditor(tester);
 
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '2');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '3');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '4');
+      await _enterMatrixCell(tester, 0, 0, '1');
+      await _enterMatrixCell(tester, 0, 1, '2');
+      await _enterMatrixCell(tester, 1, 0, '3');
+      await _enterMatrixCell(tester, 1, 1, '4');
 
       await tester.tap(find.text('Insert'));
       await tester.pumpAndSettle();
@@ -217,10 +251,7 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('MAT'));
-      await tester.pumpAndSettle();
+      await _openMatrixEditor(tester);
 
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
@@ -232,16 +263,117 @@ void main() {
     testWidgets('matrix editor shows validation error for incomplete matrix', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('MAT'));
-      await tester.pumpAndSettle();
+      await _openMatrixEditor(tester);
 
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
+      await _enterMatrixCell(tester, 0, 0, '1');
       await tester.tap(find.text('Insert'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Matrix cells cannot be empty.'), findsOneWidget);
+      expect(find.text('Enter a value for r1 c2'), findsOneWidget);
+    });
+
+    testWidgets('matrix editor identity preset and order switch preserve hidden values', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+
+      await tester.tap(find.text('4x4'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Identity'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Preview: [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('2x2'));
+      await tester.pumpAndSettle();
+      expect(find.text('Preview: [[1,0],[0,1]]'), findsOneWidget);
+
+      await tester.tap(find.text('4x4'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Preview: [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('matrix editor separates keyboard navigation from edit mode', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+
+      expect(_matrixEditableText(tester, 0, 0).focusNode.hasFocus, isTrue);
+      expect(_matrixEditableText(tester, 0, 0).readOnly, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+
+      expect(_matrixEditableText(tester, 0, 1).focusNode.hasFocus, isTrue);
+      expect(_matrixEditableText(tester, 0, 1).readOnly, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(_matrixEditableText(tester, 0, 1).readOnly, isFalse);
+
+      await tester.enterText(_matrixCell(0, 1), '7');
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(_matrixEditableText(tester, 0, 1).focusNode.hasFocus, isTrue);
+      expect(_matrixEditableText(tester, 0, 1).readOnly, isTrue);
+      expect(_matrixEditableText(tester, 0, 1).controller.text, isEmpty);
+    });
+
+    testWidgets('matrix editor tab commits the current cell and advances focus', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      await tester.enterText(_matrixCell(0, 0), '5');
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '5');
+      expect(_matrixEditableText(tester, 0, 0).readOnly, isTrue);
+      expect(_matrixEditableText(tester, 0, 1).focusNode.hasFocus, isTrue);
+      expect(_matrixEditableText(tester, 0, 1).readOnly, isTrue);
+    });
+
+    testWidgets('matrix editor keeps actions usable while editing a 4x4 draft', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+      await tester.tap(find.text('4x4'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Zeros'));
+      await tester.pumpAndSettle();
+      await _enterMatrixCell(tester, 3, 3, '9');
+
+      expect(find.text('Cancel'), findsOneWidget);
+      expect(find.text('Insert'), findsOneWidget);
+
+      await tester.tap(find.text('Insert'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(
+          RegExp(
+            r'Expression: \[\[0,0,0,0\],\[0,0,0,0\],\[0,0,0,0\],\[0,0,0,9\]\]',
+          ),
+        ),
+        findsOneWidget,
+      );
+      handle.dispose();
     });
 
     testWidgets('switching to rpn relabels the primary action to ENTER', (tester) async {
@@ -350,15 +482,11 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('MAT'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '0');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '0');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '1');
+      await _openMatrixEditor(tester);
+      await _enterMatrixCell(tester, 0, 0, '1');
+      await _enterMatrixCell(tester, 0, 1, '0');
+      await _enterMatrixCell(tester, 1, 0, '0');
+      await _enterMatrixCell(tester, 1, 1, '1');
       await tester.tap(find.text('Insert'));
       await tester.pumpAndSettle();
 
@@ -367,10 +495,10 @@ void main() {
 
       await tester.tap(find.text('MAT'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '3');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '4');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '5');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '6');
+      await _enterMatrixCell(tester, 0, 0, '3');
+      await _enterMatrixCell(tester, 0, 1, '4');
+      await _enterMatrixCell(tester, 1, 0, '5');
+      await _enterMatrixCell(tester, 1, 1, '6');
       await tester.tap(find.text('Insert'));
       await tester.pumpAndSettle();
 

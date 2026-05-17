@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:calculatrix_app/main.dart';
@@ -9,6 +8,18 @@ const Duration _uiStep = Duration(milliseconds: 100);
 Future<void> _pumpForUi(WidgetTester tester, {int steps = 6}) async {
   for (int i = 0; i < steps; i++) {
     await tester.pump(_uiStep);
+  }
+}
+
+Future<void> _pumpUntilSettled(
+  WidgetTester tester, {
+  int maxSteps = 30,
+}) async {
+  for (int i = 0; i < maxSteps; i++) {
+    await tester.pump(_uiStep);
+    if (!tester.binding.hasScheduledFrame) {
+      return;
+    }
   }
 }
 
@@ -100,33 +111,80 @@ Future<void> _showRpnStackPage(WidgetTester tester) async {
   await _pumpUntilFound(tester, _button('SWAP'));
 }
 
+Future<void> _showRpnPrimaryPage(WidgetTester tester) async {
+  if (_button('ENTER').evaluate().isNotEmpty) {
+    return;
+  }
+
+  await tester.drag(find.byType(PageView), const Offset(1000, 0));
+  await _pumpUntilFound(tester, _button('ENTER'));
+}
+
 Future<void> _submitMatrix(
   WidgetTester tester,
   List<List<String>> values, {
   required String actionLabel,
+  int? order,
 }) async {
+  await _openMatrixEditorDialog(tester);
+
+  if (order != null) {
+    await _selectMatrixOrder(tester, order);
+  }
+
+  for (int row = 0; row < values.length; row++) {
+    for (int column = 0; column < values[row].length; column++) {
+      await _setMatrixCell(tester, row, column, values[row][column]);
+    }
+  }
+
+  await _confirmMatrixDialog(tester, actionLabel);
+  await _pumpUntilGone(
+    tester,
+    find.widgetWithText(FilledButton, actionLabel),
+  );
+  await _pumpForUi(tester, steps: 2);
+}
+
+Future<void> _openMatrixEditorDialog(WidgetTester tester) async {
   await tester.tap(_button('MAT'));
   await _pumpUntilFound(
     tester,
     find.byKey(const ValueKey<String>('matrix-cell-0-0')),
   );
+}
 
-  for (int row = 0; row < values.length; row++) {
-    for (int column = 0; column < values[row].length; column++) {
-      final Finder cellFinder = find.byKey(
-        ValueKey<String>('matrix-cell-$row-$column'),
-      );
-      final TextFormField field = tester.widget<TextFormField>(cellFinder);
-      field.controller!.text = values[row][column];
-      field.onChanged?.call(values[row][column]);
-      await tester.pump();
-    }
-  }
+Future<void> _setMatrixCell(
+  WidgetTester tester,
+  int row,
+  int column,
+  String value,
+) async {
+  final Finder cellFinder = find.byKey(
+    ValueKey<String>('matrix-cell-$row-$column'),
+  );
+  final TextFormField field = tester.widget<TextFormField>(cellFinder);
+  field.controller!.text = value;
+  field.onChanged?.call(value);
+  await tester.pump();
+}
 
+Future<void> _selectMatrixOrder(WidgetTester tester, int order) async {
+  await tester.tap(find.text('${order}x$order'));
+  await _pumpForUi(tester, steps: 2);
+}
+
+Future<void> _tapMatrixQuickAction(WidgetTester tester, String label) async {
+  await tester.tap(find.text(label));
+  await _pumpForUi(tester, steps: 2);
+}
+
+Future<void> _confirmMatrixDialog(
+  WidgetTester tester,
+  String actionLabel,
+) async {
   final Finder actionButton = find.widgetWithText(FilledButton, actionLabel);
-  final FilledButton button = tester.widget<FilledButton>(actionButton);
-  button.onPressed!.call();
-  await _pumpUntilGone(tester, actionButton);
+  await tester.tap(actionButton);
   await _pumpForUi(tester, steps: 2);
 }
 
@@ -174,9 +232,9 @@ void main() {
       expect(find.text('RPN'), findsOneWidget);
 
       await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
       await tester.tap(find.text('Infix'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       expect(_displayText('0'), findsOneWidget);
     });
@@ -258,7 +316,7 @@ void main() {
       await _pumpApp(tester);
 
       await tester.drag(find.byType(PageView), const Offset(-1000, 0));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       await tester.tap(_button('('));
       await tester.pump();
@@ -307,6 +365,22 @@ void main() {
       );
 
       expect(_expressionText('[[1,2],[3,4]]'), findsOneWidget);
+    });
+
+    testWidgets('matrix editor inserts a 4x4 identity literal into infix input', (tester) async {
+      await _pumpApp(tester);
+
+      await _showInfixEditPage(tester);
+      await _openMatrixEditorDialog(tester);
+      await _selectMatrixOrder(tester, 4);
+      await _tapMatrixQuickAction(tester, 'Identity');
+      await _confirmMatrixDialog(tester, 'Insert');
+      await _pumpUntilGone(tester, find.widgetWithText(FilledButton, 'Insert'));
+
+      expect(
+        _expressionText('[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('infix mode displays a non-scalar matrix result', (tester) async {
@@ -380,7 +454,7 @@ void main() {
 
       await _tapEquals(tester);
       await tester.tap(_button('±'));
-      await tester.pumpAndSettle();
+  await _pumpUntilSettled(tester);
 
       expect(_displayText('[-1 -2]\n[-3 -4]'), findsOneWidget);
     });
@@ -419,10 +493,12 @@ void main() {
     testWidgets('infix mode computes the square root of a square matrix', (tester) async {
       await _pumpApp(tester);
 
-      await _showInfixEditPage(tester);
+      await _showInfixPrimaryPage(tester);
 
       await tester.tap(_button('√'));
       await tester.pump();
+
+      await _showInfixEditPage(tester);
 
       await _submitMatrix(
         tester,
@@ -475,15 +551,15 @@ void main() {
       await tester.tap(_button('2'));
       await tester.pump();
       await tester.tap(_button('ENTER'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       await tester.tap(_button('8'));
       await tester.pump();
       await tester.tap(_button('ENTER'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       await tester.tap(_button('+'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       expect(_displayText('[[50]]'), findsOneWidget);
       expect(_rpnStackCard(0), findsOneWidget);
@@ -510,12 +586,56 @@ void main() {
       await tester.tap(_button('3'));
       await tester.pump();
       await tester.tap(_button('×'));
-      await tester.pumpAndSettle();
+  await _pumpUntilSettled(tester);
 
       expect(_displayText('[3 0]\n[0 3]'), findsOneWidget);
       expect(_rpnStackCard(0), findsOneWidget);
       expect(_rpnStackText(0, 'X0'), findsOneWidget);
       expect(find.text('Stack 1'), findsOneWidget);
+    });
+
+    testWidgets('rpn mode pushes a 3x3 matrix from the matrix editor', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '2', '3'],
+          <String>['4', '5', '6'],
+          <String>['7', '8', '9'],
+        ],
+        actionLabel: 'Push',
+        order: 3,
+      );
+
+      expect(_displayText('[1 2 3]\n[4 5 6]\n[7 8 9]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+    });
+
+    testWidgets('matrix editor keeps the dialog open until an invalid cell is corrected', (tester) async {
+      await _pumpApp(tester);
+
+      await _showInfixEditPage(tester);
+      await _openMatrixEditorDialog(tester);
+
+      await _setMatrixCell(tester, 0, 0, '1');
+      await _confirmMatrixDialog(tester, 'Insert');
+
+      expect(find.text('Enter a value for r1 c2'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Insert'), findsOneWidget);
+
+      await _setMatrixCell(tester, 0, 1, '2');
+      await _setMatrixCell(tester, 1, 0, '3');
+      await _setMatrixCell(tester, 1, 1, '4');
+      await _confirmMatrixDialog(tester, 'Insert');
+      await _pumpUntilGone(tester, find.widgetWithText(FilledButton, 'Insert'));
+
+      expect(_expressionText('[[1,2],[3,4]]'), findsOneWidget);
     });
 
     testWidgets('rpn mode toggles the sign of the committed top matrix', (tester) async {
@@ -534,7 +654,7 @@ void main() {
       );
 
       await tester.tap(_button('±'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       expect(_displayText('[-1 -2]\n[-3 -4]'), findsOneWidget);
       expect(_rpnStackCard(0), findsOneWidget);
@@ -557,10 +677,12 @@ void main() {
         actionLabel: 'Push',
       );
 
+      await _showRpnPrimaryPage(tester);
+
       await tester.tap(_button('M+'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
       await tester.tap(_button('MR'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       expect(_rpnStackCard(0), findsOneWidget);
       expect(_rpnStackText(0, 'X0'), findsOneWidget);
@@ -575,7 +697,7 @@ void main() {
       await tester.tap(_button('4'));
       await tester.pump();
       await tester.tap(_button('ENTER'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
       await tester.tap(_button('7'));
       await tester.pump();
 
@@ -623,7 +745,7 @@ void main() {
       await tester.tap(_button('5'));
       await tester.pump();
       await tester.tap(_button('ENTER'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       await _switchMode(tester, 'Infix');
 
@@ -656,7 +778,7 @@ void main() {
       await tester.tap(_button('5'));
       await tester.pump();
       await tester.tap(_button('ENTER'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       await _switchMode(tester, 'Infix');
       expect(_displayText('5'), findsOneWidget);
@@ -681,11 +803,11 @@ void main() {
       await tester.tap(_button('5'));
       await tester.pump();
       await tester.tap(_button('ENTER'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       await _showRpnStackPage(tester);
       await tester.tap(_button('SWAP'));
-      await tester.pumpAndSettle();
+      await _pumpUntilSettled(tester);
 
       await _switchMode(tester, 'Infix');
 

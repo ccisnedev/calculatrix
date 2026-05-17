@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.12.0] - 2026-05-17
+
+App-only matrix editor UX refinement release for late v2.
+
+### App
+
+- Replaced free row/column matrix sizing with direct `2x2`, `3x3`, and `4x4`
+	selection for the educational editor workflow.
+- Preserved overlapping matrix values while changing order within a draft and
+	added `Zeros`, `Identity`, and `Clear` quick actions.
+- Added literal preview, clearer bracketed grid presentation, and explicit
+	row/column validation errors for incomplete visible cells.
+
+### Docs
+
+- Added a matrix editor UX specification with verified references, wireframes,
+	and implementation checklist.
+- Added the matrix editor TDD plan and updated the roadmap with v2.12.0
+	execution progress.
+
+### QA
+
+- Completed green `dart analyze` and `dart test` runs for `code/core` and
+	`code/cli`.
+- Completed green `flutter analyze`, `flutter test`, and full Android
+	integration coverage for `code/app`, using `flutter drive` for the complete
+	emulator suite.
+
 ## [2.11.0] - 2026-05-16
 
 Core-only matrix semantics release for late v2.

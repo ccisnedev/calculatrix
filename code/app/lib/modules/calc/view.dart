@@ -869,16 +869,33 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
   final MatrixEditorDraft _draft = MatrixEditorDraft();
   String? _error;
   late List<List<TextEditingController>> _controllers;
+  late List<List<FocusNode>> _focusNodes;
+  int _selectedRow = 0;
+  int _selectedColumn = 0;
+  int? _editingRow;
+  int? _editingColumn;
+  String? _editingStartValue;
+
+  static const List<int> _supportedOrders = <int>[2, 3, 4];
 
   @override
   void initState() {
     super.initState();
     _controllers = _buildControllers();
+    _focusNodes = _buildFocusNodes();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _requestCellFocus(_selectedRow, _selectedColumn);
+    });
   }
 
   @override
   void dispose() {
     _disposeControllers();
+    _disposeFocusNodes();
     super.dispose();
   }
 
@@ -893,75 +910,77 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _supportedOrders.map((int order) {
+                  final bool isSelected =
+                      _draft.rowCount == order && _draft.columnCount == order;
+                  return ChoiceChip(
+                    label: Text('${order}x$order'),
+                    selected: isSelected,
+                    onSelected: (_) {
+                      setState(() {
+                        _draft.setOrder(order);
+                        _resetEditingState();
+                        _rebuildInputs();
+                        _error = null;
+                      });
+                    },
+                  );
+                }).toList(growable: false),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Expanded(
-                    child: _buildDimensionSelector(
-                      label: 'Rows',
-                      value: _draft.rowCount,
-                      onChanged: (int value) {
-                        setState(() {
-                          _draft.resize(
-                            rowCount: value,
-                            columnCount: _draft.columnCount,
-                          );
-                          _rebuildControllers();
-                        });
-                      },
-                    ),
+                  OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _resetEditingState();
+                        _draft.fillZeros();
+                        _syncControllersFromDraft();
+                        _error = null;
+                      });
+                    },
+                    child: const Text('Zeros'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildDimensionSelector(
-                      label: 'Columns',
-                      value: _draft.columnCount,
-                      onChanged: (int value) {
-                        setState(() {
-                          _draft.resize(
-                            rowCount: _draft.rowCount,
-                            columnCount: value,
-                          );
-                          _rebuildControllers();
-                        });
-                      },
-                    ),
+                  OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _resetEditingState();
+                        _draft.fillIdentity();
+                        _syncControllersFromDraft();
+                        _error = null;
+                      });
+                    },
+                    child: const Text('Identity'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _resetEditingState();
+                        _draft.clearVisible();
+                        _syncControllersFromDraft();
+                        _error = null;
+                      });
+                    },
+                    child: const Text('Clear'),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              for (int row = 0; row < _draft.rowCount; row++)
-                Padding(
-                  padding: EdgeInsets.only(
-                    bottom: row < _draft.rowCount - 1 ? 8 : 0,
-                  ),
-                  child: Row(
-                    children: [
-                      for (int column = 0; column < _draft.columnCount; column++) ...[
-                        Expanded(
-                          child: TextFormField(
-                            key: ValueKey<String>('matrix-cell-$row-$column'),
-                            controller: _controllers[row][column],
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                              signed: true,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              border: const OutlineInputBorder(),
-                              hintText: '0',
-                              labelText: 'r${row + 1}c${column + 1}',
-                            ),
-                            onChanged: (String value) {
-                              _draft.setCell(row, column, value);
-                            },
-                          ),
-                        ),
-                        if (column < _draft.columnCount - 1)
-                          const SizedBox(width: 8),
-                      ],
-                    ],
-                  ),
-                ),
+              CallbackShortcuts(
+                bindings: _shortcutBindings(),
+                child: _buildMatrixGrid(),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _buildPreviewText(),
+                key: const ValueKey<String>('matrix-preview-text'),
+                style: const TextStyle(color: Color(0xFFCFD8DC)),
+              ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 Text(
@@ -990,38 +1009,82 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     );
   }
 
-  Widget _buildDimensionSelector({
-    required String label,
-    required int value,
-    required ValueChanged<int> onChanged,
-  }) {
-    return InputDecorator(
-      decoration: InputDecoration(
-        border: const OutlineInputBorder(),
-        labelText: label,
-        isDense: true,
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<int>(
-          value: value,
-          isExpanded: true,
-          items: List<DropdownMenuItem<int>>.generate(
-            4,
-            (int index) {
-              final int dimension = index + 1;
-              return DropdownMenuItem<int>(
-                value: dimension,
-                child: Text('$dimension'),
-              );
-            },
+  Widget _buildMatrixGrid() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 12),
+          child: Text(
+            '[',
+            style: TextStyle(fontSize: 48, height: 1),
           ),
-          onChanged: (int? next) {
-            if (next != null) {
-              onChanged(next);
-            }
-          },
         ),
-      ),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (int row = 0; row < _draft.rowCount; row++)
+                Padding(
+                  padding: EdgeInsets.only(
+                    bottom: row < _draft.rowCount - 1 ? 8 : 0,
+                  ),
+                  child: Row(
+                    children: [
+                      for (int column = 0; column < _draft.columnCount; column++) ...[
+                        Expanded(
+                          child: TextFormField(
+                            key: ValueKey<String>('matrix-cell-$row-$column'),
+                            controller: _controllers[row][column],
+                            focusNode: _focusNodes[row][column],
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                            readOnly: !_isEditingCell(row, column),
+                            showCursor: _isEditingCell(row, column),
+                            textInputAction: _isLastVisibleCell(row, column)
+                                ? TextInputAction.done
+                                : TextInputAction.next,
+                            textAlign: TextAlign.end,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              border: const OutlineInputBorder(),
+                              labelText: 'r${row + 1}c${column + 1}',
+                            ),
+                            onTap: () {
+                              _beginEditingCell(row, column);
+                            },
+                            onChanged: (String value) {
+                              setState(() {
+                                _draft.setCell(row, column, value);
+                                _error = null;
+                              });
+                            },
+                            onFieldSubmitted: (_) {
+                              if (_isEditingCell(row, column)) {
+                                _finishEditing();
+                              }
+                            },
+                          ),
+                        ),
+                        if (column < _draft.columnCount - 1)
+                          const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(top: 12),
+          child: Text(
+            ']',
+            style: TextStyle(fontSize: 48, height: 1),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1039,6 +1102,37 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     );
   }
 
+  List<List<FocusNode>> _buildFocusNodes() {
+    return List<List<FocusNode>>.generate(
+      _draft.rowCount,
+      (int row) => List<FocusNode>.generate(
+        _draft.columnCount,
+        (int column) {
+          final FocusNode node = FocusNode(
+            debugLabel: 'matrix-cell-$row-$column',
+          );
+          node.addListener(() {
+            if (!mounted || !node.hasFocus) {
+              return;
+            }
+
+            if (_selectedRow == row && _selectedColumn == column) {
+              return;
+            }
+
+            setState(() {
+              _selectedRow = row;
+              _selectedColumn = column;
+            });
+          });
+          return node;
+        },
+        growable: false,
+      ),
+      growable: false,
+    );
+  }
+
   void _disposeControllers() {
     for (final List<TextEditingController> row in _controllers) {
       for (final TextEditingController controller in row) {
@@ -1047,9 +1141,36 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     }
   }
 
-  void _rebuildControllers() {
+  void _disposeFocusNodes() {
+    for (final List<FocusNode> row in _focusNodes) {
+      for (final FocusNode focusNode in row) {
+        focusNode.dispose();
+      }
+    }
+  }
+
+  void _rebuildInputs() {
     _disposeControllers();
+    _disposeFocusNodes();
     _controllers = _buildControllers();
+    _focusNodes = _buildFocusNodes();
+    _selectedRow = _clampIndex(_selectedRow, _draft.rowCount - 1);
+    _selectedColumn = _clampIndex(_selectedColumn, _draft.columnCount - 1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _requestCellFocus(_selectedRow, _selectedColumn);
+    });
+  }
+
+  void _syncControllersFromDraft() {
+    for (int row = 0; row < _draft.rowCount; row++) {
+      for (int column = 0; column < _draft.columnCount; column++) {
+        _controllers[row][column].text = _draft.cellValue(row, column);
+      }
+    }
   }
 
   void _syncDraftFromControllers() {
@@ -1058,6 +1179,193 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
         _draft.setCell(row, column, _controllers[row][column].text);
       }
     }
+  }
+
+  String _buildPreviewText() {
+    _syncDraftFromControllers();
+    final String? error = _draft.validationError();
+    if (error != null) {
+      return 'Preview unavailable until valid';
+    }
+
+    return 'Preview: ${_draft.buildLiteral()}';
+  }
+
+  bool _isEditingCell(int row, int column) {
+    return _editingRow == row && _editingColumn == column;
+  }
+
+  bool get _isEditing => _editingRow != null && _editingColumn != null;
+
+  bool _isLastVisibleCell(int row, int column) {
+    return row == _draft.rowCount - 1 && column == _draft.columnCount - 1;
+  }
+
+  Map<ShortcutActivator, VoidCallback> _shortcutBindings() {
+    if (_isEditing) {
+      return <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.escape): _cancelEditing,
+        const SingleActivator(LogicalKeyboardKey.tab): _commitAndMoveNext,
+        const SingleActivator(LogicalKeyboardKey.tab, shift: true):
+            _commitAndMovePrevious,
+      };
+    }
+
+    return <ShortcutActivator, VoidCallback>{
+      const SingleActivator(LogicalKeyboardKey.arrowLeft):
+          () => _moveSelection(rowDelta: 0, columnDelta: -1),
+      const SingleActivator(LogicalKeyboardKey.arrowRight):
+          () => _moveSelection(rowDelta: 0, columnDelta: 1),
+      const SingleActivator(LogicalKeyboardKey.arrowUp):
+          () => _moveSelection(rowDelta: -1, columnDelta: 0),
+      const SingleActivator(LogicalKeyboardKey.arrowDown):
+          () => _moveSelection(rowDelta: 1, columnDelta: 0),
+      const SingleActivator(LogicalKeyboardKey.enter): _beginEditingSelectedCell,
+      const SingleActivator(LogicalKeyboardKey.numpadEnter):
+          _beginEditingSelectedCell,
+    };
+  }
+
+  void _moveSelection({required int rowDelta, required int columnDelta}) {
+    final int nextRow = _clampIndex(
+      _selectedRow + rowDelta,
+      _draft.rowCount - 1,
+    );
+    final int nextColumn = _clampIndex(
+      _selectedColumn + columnDelta,
+      _draft.columnCount - 1,
+    );
+    _requestCellFocus(nextRow, nextColumn);
+  }
+
+  void _beginEditingSelectedCell() {
+    _beginEditingCell(_selectedRow, _selectedColumn);
+  }
+
+  void _beginEditingCell(int row, int column) {
+    if (_isEditingCell(row, column)) {
+      _requestCellFocus(row, column, selectAll: true);
+      return;
+    }
+
+    setState(() {
+      _selectedRow = row;
+      _selectedColumn = column;
+      _editingRow = row;
+      _editingColumn = column;
+      _editingStartValue = _draft.cellValue(row, column);
+      _error = null;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _requestCellFocus(row, column, selectAll: true);
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+    });
+  }
+
+  void _commitAndMoveNext() {
+    _finishEditing(move: 1);
+  }
+
+  void _commitAndMovePrevious() {
+    _finishEditing(move: -1);
+  }
+
+  void _cancelEditing() {
+    if (!_isEditing) {
+      return;
+    }
+
+    final int row = _editingRow!;
+    final int column = _editingColumn!;
+    final String originalValue = _editingStartValue ?? '';
+
+    _controllers[row][column].text = originalValue;
+    _draft.setCell(row, column, originalValue);
+
+    setState(() {
+      _resetEditingState();
+      _error = null;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _requestCellFocus(row, column);
+      SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    });
+  }
+
+  void _finishEditing({int move = 0}) {
+    if (!_isEditing) {
+      return;
+    }
+
+    final int row = _editingRow!;
+    final int column = _editingColumn!;
+    _draft.setCell(row, column, _controllers[row][column].text);
+
+    final int nextIndex = _clampIndex(
+      row * _draft.columnCount + column + move,
+      _draft.rowCount * _draft.columnCount - 1,
+    );
+    final int nextRow = nextIndex ~/ _draft.columnCount;
+    final int nextColumn = nextIndex % _draft.columnCount;
+
+    setState(() {
+      _selectedRow = nextRow;
+      _selectedColumn = nextColumn;
+      _resetEditingState();
+      _error = null;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _requestCellFocus(nextRow, nextColumn);
+      SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    });
+  }
+
+  void _resetEditingState() {
+    _editingRow = null;
+    _editingColumn = null;
+    _editingStartValue = null;
+  }
+
+  void _requestCellFocus(int row, int column, {bool selectAll = false}) {
+    _selectedRow = row;
+    _selectedColumn = column;
+
+    final FocusNode focusNode = _focusNodes[row][column];
+    if (!focusNode.hasFocus) {
+      focusNode.requestFocus();
+    }
+
+    final TextEditingController controller = _controllers[row][column];
+    if (selectAll) {
+      controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: controller.text.length,
+      );
+      return;
+    }
+
+    controller.selection = TextSelection.collapsed(
+      offset: controller.text.length,
+    );
+  }
+
+  int _clampIndex(int value, int upperBound) {
+    return math.max(0, math.min(value, upperBound));
   }
 
   void _submit() {

@@ -16,7 +16,7 @@ flutter test
 Run integration tests on the Android emulator:
 
 ```text
-flutter test integration_test/calculator_test.dart -d emulator-5554
+flutter drive --driver=test_driver/integration_test.dart --target=integration_test/calculator_test.dart -d emulator-5554
 ```
 
 Build a debug APK:
@@ -28,5 +28,5 @@ flutter build apk --debug
 Static analysis:
 
 ```text
-dart analyze
+flutter analyze
 ```

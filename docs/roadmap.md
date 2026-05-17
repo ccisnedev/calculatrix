@@ -262,6 +262,25 @@ explicit notation modes, and richer display contracts.
 - [x] Step 4: migrate Flutter app to that core session/state API and keep CLI on public core APIs only
 - [x] Step 5: refresh roadmap/docs/changelog/versioning only after executable validation is green
 
+#### v2.12.0 — Matrix Editor UX Refinement
+
+- [x] Restrict the matrix editor order selector to direct `2x2`, `3x3`, and `4x4` choices for the supported educational workflow
+- [x] Preserve overlapping top-left cell values when switching order within the same draft session
+- [x] Add lightweight quick actions for `Zeros`, `Identity`, and `Clear`
+- [x] Split navigation mode from edit mode in the matrix grid, including arrow-key movement and `Enter`/`Esc` semantics
+- [x] Replace spinbutton-like numeric entry assumptions with text-based numeric cells optimized for exact signed decimal input
+- [x] Add explicit row-and-column error copy for invalid or empty visible cells
+- [x] Keep the mobile action row usable while the software keyboard is open for `4x4` entry
+- [x] Add focused TDD coverage for draft state, controller parity, widget contracts, and canonical end-to-end flows
+
+##### TDD Execution Order
+
+- [x] Step 1: lock draft-state contracts for order changes, visible-cell preservation, and literal generation
+- [x] Step 2: add draft-level helpers or editor-local state for `Zeros`, `Identity`, and `Clear`
+- [x] Step 3: prove controller parity for `Infix` insert and `RPN` push using the exact serialized literal
+- [ ] Step 4: lock widget contracts for order controls, validation, quick actions, and keyboard edit/navigation behavior
+- [x] Step 5: add narrow emulator coverage for one `Infix` insert flow, one `RPN` push flow, and one invalid-cell recovery flow
+
 ---
 
 ## Stage 3 — "Advanced Linear Algebra on Mature Matrix UX" (2.x.x → 3.0.0)

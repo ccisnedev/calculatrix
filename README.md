@@ -5,11 +5,13 @@
 
 [![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
 
-## Features (v2.11.0)
+## Features (v2.12.0)
 
 - Motor compartido `package:calculatrix` para app y CLI
+- Editor matricial refinado con selección directa `2x2` a `4x4`, presets
+  `Zeros`/`Identity`, y validación explícita por celda
 - Evaluación `Infix` y `RPN` sobre la misma semántica matricial
-- División matricial por escalares y matrices cuadradas invertibles
+- División matricial por denominadores escalares `1x1`
 - Raíz cuadrada de matrices cuadradas con errores explícitos en dominio real
 - Memoria matricial (`MC`, `MR`, `M+`, `M-`) y cambio de signo (`±`) en el core
 - Valor comprometido compartido entre `Infix` y `RPN`
@@ -59,4 +61,4 @@ exitosos.
 ## Roadmap
 
 Ver [docs/roadmap.md](docs/roadmap.md) para la hoja de ruta y la entrada
-v2.11.0 de semántica matricial en el core.
+v2.12.0 de refinamiento UX del editor matricial.

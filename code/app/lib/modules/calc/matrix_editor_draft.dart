@@ -1,18 +1,24 @@
 class MatrixEditorDraft {
   MatrixEditorDraft({
-    this.rowCount = 2,
-    this.columnCount = 2,
-  }) : assert(rowCount > 0),
-       assert(columnCount > 0),
+    int? order,
+    int rowCount = 2,
+    int columnCount = 2,
+  }) : assert(order == null || (order >= 1 && order <= _maxDimension)),
+       assert(rowCount > 0 && rowCount <= _maxDimension),
+       assert(columnCount > 0 && columnCount <= _maxDimension),
+       rowCount = order ?? rowCount,
+       columnCount = order ?? columnCount,
        _cells = List<List<String>>.generate(
-         rowCount,
-         (_) => List<String>.filled(columnCount, '', growable: false),
+         _maxDimension,
+         (_) => List<String>.filled(_maxDimension, '', growable: false),
          growable: false,
        );
 
+  static const int _maxDimension = 4;
+
   int rowCount;
   int columnCount;
-  List<List<String>> _cells;
+  final List<List<String>> _cells;
 
   String cellValue(int row, int column) {
     return _cells[row][column];
@@ -22,36 +28,76 @@ class MatrixEditorDraft {
     _cells[row][column] = value.trim();
   }
 
+  void setOrder(int order) {
+    resize(rowCount: order, columnCount: order);
+  }
+
   void resize({required int rowCount, required int columnCount}) {
-    final List<List<String>> resized = List<List<String>>.generate(
-      rowCount,
-      (int row) => List<String>.generate(columnCount, (int column) {
-        if (row < this.rowCount && column < this.columnCount) {
-          return _cells[row][column];
-        }
-        return '';
-      }, growable: false),
-      growable: false,
-    );
+    assert(rowCount > 0 && rowCount <= _maxDimension);
+    assert(columnCount > 0 && columnCount <= _maxDimension);
 
     this.rowCount = rowCount;
     this.columnCount = columnCount;
-    _cells = resized;
+  }
+
+  void fillZeros() {
+    for (int row = 0; row < rowCount; row++) {
+      for (int column = 0; column < columnCount; column++) {
+        _cells[row][column] = '0';
+      }
+    }
+  }
+
+  void fillIdentity() {
+    for (int row = 0; row < rowCount; row++) {
+      for (int column = 0; column < columnCount; column++) {
+        _cells[row][column] = row == column ? '1' : '0';
+      }
+    }
+  }
+
+  void clearVisible() {
+    for (int row = 0; row < rowCount; row++) {
+      for (int column = 0; column < columnCount; column++) {
+        _cells[row][column] = '';
+      }
+    }
+  }
+
+  String? validationError() {
+    for (int row = 0; row < rowCount; row++) {
+      for (int column = 0; column < columnCount; column++) {
+        final String cell = _cells[row][column];
+        if (cell.isEmpty) {
+          return 'Enter a value for r${row + 1} c${column + 1}';
+        }
+
+        if (num.tryParse(cell) == null) {
+          return 'r${row + 1} c${column + 1} must be a number, like -2 or 3.5';
+        }
+      }
+    }
+
+    return null;
   }
 
   String buildLiteral() {
+    final String? error = validationError();
+    if (error != null) {
+      throw FormatException(error);
+    }
+
     final List<List<num>> rows = <List<num>>[];
 
-    for (final List<String> row in _cells) {
+    for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
       final List<num> parsedRow = <num>[];
-      for (final String cell in row) {
-        if (cell.isEmpty) {
-          throw const FormatException('Matrix cells cannot be empty.');
-        }
-
+      for (int columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+        final String cell = _cells[rowIndex][columnIndex];
         final num? parsed = num.tryParse(cell);
         if (parsed == null) {
-          throw FormatException('Invalid numeric cell: $cell');
+          throw FormatException(
+            'r${rowIndex + 1} c${columnIndex + 1} must be a number, like -2 or 3.5',
+          );
         }
 
         parsedRow.add(parsed);
