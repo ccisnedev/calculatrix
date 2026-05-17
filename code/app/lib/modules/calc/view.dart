@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:calculatrix/calculatrix.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'controller.dart';
 import 'matrix_editor_draft.dart';
 
@@ -21,6 +22,13 @@ class _KeypadPageDef {
   final List<_ButtonDef> buttons;
 
   const _KeypadPageDef(this.title, this.buttons);
+}
+
+class _RpnStackSlot {
+  final int register;
+  final String? literal;
+
+  const _RpnStackSlot({required this.register, this.literal});
 }
 
 /// The Casio HL-820LV inspired calculator layout.
@@ -307,36 +315,118 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildRpnDisplayBody() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Flexible(
-          flex: 3,
-          child: _buildRpnStackSummary(),
+    final List<_RpnStackSlot> slots = _buildRpnDisplaySlots();
+    final List<_RpnStackSlot> visualOrder = slots.reversed.toList(growable: false);
+
+    return SingleChildScrollView(
+      reverse: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (int index = 0; index < visualOrder.length; index++) ...[
+            _buildRpnStackCard(visualOrder[index]),
+            if (index < visualOrder.length - 1) const SizedBox(height: 4),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<_RpnStackSlot> _buildRpnDisplaySlots() {
+    final bool overlaysCommittedTop =
+        _controller.expression.isNotEmpty || _controller.error.isNotEmpty;
+    final Iterable<String> stackedLiterals = overlaysCommittedTop
+        ? _controller.rpnStackLiterals
+        : _controller.rpnStackLiterals.skip(1);
+    final List<_RpnStackSlot> slots = <_RpnStackSlot>[
+      const _RpnStackSlot(register: 0),
+    ];
+
+    int register = 1;
+    for (final String literal in stackedLiterals) {
+      slots.add(_RpnStackSlot(register: register, literal: literal));
+      register += 1;
+    }
+
+    return slots;
+  }
+
+  Widget _buildRpnStackCard(_RpnStackSlot slot) {
+    final bool isPrimary = slot.register == 0;
+
+    return AnimatedContainer(
+      key: ValueKey<String>('rpn-stack-card-${slot.register}'),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      constraints: BoxConstraints(minHeight: isPrimary ? 72 : 44),
+      padding: EdgeInsets.all(isPrimary ? 12 : 8),
+      decoration: BoxDecoration(
+        color: isPrimary ? const Color(0xFF1F2940) : const Color(0xFF18243A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isPrimary
+              ? const Color(0xFF4FC3F7).withAlpha(80)
+              : const Color(0xFF2D2D44),
         ),
-        const SizedBox(height: 8),
-        Semantics(
-          label: 'Expression: ${_controller.expression}',
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            reverse: true,
-            child: Text(
-              key: const ValueKey<String>('calculator-expression-text'),
-              _controller.expression.isEmpty ? ' ' : _controller.expression,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF8A8FA3),
-                fontFamily: 'monospace',
-              ),
-            ),
+      ),
+      child: isPrimary
+          ? _buildPrimaryRpnStackCard()
+          : _buildSecondaryRpnStackCard(slot),
+    );
+  }
+
+  Widget _buildPrimaryRpnStackCard() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'X0',
+          style: TextStyle(
+            color: Color(0xFF4FC3F7),
+            fontWeight: FontWeight.w700,
+            fontFamily: 'monospace',
           ),
         ),
         const SizedBox(height: 8),
-        Flexible(
-          flex: 2,
-          child: _buildDisplayValue(fontSize: 32),
-        ),
+        _buildDisplayValue(fontSize: 28),
       ],
+    );
+  }
+
+  Widget _buildSecondaryRpnStackCard(_RpnStackSlot slot) {
+    final String literal = slot.literal!;
+
+    return Semantics(
+      container: true,
+      label: 'Stack item ${slot.register}: $literal',
+      child: ExcludeSemantics(
+        child: Row(
+          children: [
+            Text(
+              'X${slot.register}',
+              style: const TextStyle(
+                color: Color(0xFF4FC3F7),
+                fontWeight: FontWeight.w700,
+                fontFamily: 'monospace',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                literal,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -580,68 +670,6 @@ class _CalculatorViewState extends State<CalculatorView> {
     return mode == CalculatorMode.rpn ? _rpnPages : _infixPages;
   }
 
-  Widget _buildRpnStackSummary() {
-    final List<String> stack = _controller.rpnStackLiterals;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1F2940),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: stack.isEmpty
-          ? const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Stack empty',
-                style: TextStyle(
-                  color: Color(0xFF8A8FA3),
-                  fontFamily: 'monospace',
-                ),
-              ),
-            )
-          : ListView.builder(
-              itemCount: stack.length,
-              itemBuilder: (BuildContext context, int index) {
-                final String literal = stack[index];
-                return Padding(
-                  padding: EdgeInsets.only(bottom: index < stack.length - 1 ? 6 : 0),
-                  child: Semantics(
-                    container: true,
-                    label: 'Stack item ${index + 1}: $literal',
-                    child: ExcludeSemantics(
-                      child: Row(
-                        children: [
-                          Text(
-                            'X${index + 1}',
-                            style: const TextStyle(
-                              color: Color(0xFF4FC3F7),
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              literal,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-    );
-  }
-
   Widget _buildModeSwitch() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -840,6 +868,19 @@ class _MatrixEditorDialog extends StatefulWidget {
 class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
   final MatrixEditorDraft _draft = MatrixEditorDraft();
   String? _error;
+  late List<List<TextEditingController>> _controllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = _buildControllers();
+  }
+
+  @override
+  void dispose() {
+    _disposeControllers();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -864,6 +905,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
                             rowCount: value,
                             columnCount: _draft.columnCount,
                           );
+                          _rebuildControllers();
                         });
                       },
                     ),
@@ -879,6 +921,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
                             rowCount: _draft.rowCount,
                             columnCount: value,
                           );
+                          _rebuildControllers();
                         });
                       },
                     ),
@@ -897,7 +940,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
                         Expanded(
                           child: TextFormField(
                             key: ValueKey<String>('matrix-cell-$row-$column'),
-                            initialValue: _draft.cellValue(row, column),
+                            controller: _controllers[row][column],
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                               signed: true,
@@ -932,7 +975,11 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+            FocusScope.of(context).unfocus();
+            Navigator.of(context).pop();
+          },
           child: const Text('Cancel'),
         ),
         FilledButton(
@@ -978,9 +1025,47 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     );
   }
 
+  List<List<TextEditingController>> _buildControllers() {
+    return List<List<TextEditingController>>.generate(
+      _draft.rowCount,
+      (int row) => List<TextEditingController>.generate(
+        _draft.columnCount,
+        (int column) => TextEditingController(
+          text: _draft.cellValue(row, column),
+        ),
+        growable: false,
+      ),
+      growable: false,
+    );
+  }
+
+  void _disposeControllers() {
+    for (final List<TextEditingController> row in _controllers) {
+      for (final TextEditingController controller in row) {
+        controller.dispose();
+      }
+    }
+  }
+
+  void _rebuildControllers() {
+    _disposeControllers();
+    _controllers = _buildControllers();
+  }
+
+  void _syncDraftFromControllers() {
+    for (int row = 0; row < _draft.rowCount; row++) {
+      for (int column = 0; column < _draft.columnCount; column++) {
+        _draft.setCell(row, column, _controllers[row][column].text);
+      }
+    }
+  }
+
   void _submit() {
     try {
+      _syncDraftFromControllers();
       final String literal = _draft.buildLiteral();
+      SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+      FocusScope.of(context).unfocus();
       Navigator.of(context).pop(literal);
     } on FormatException catch (error) {
       setState(() {

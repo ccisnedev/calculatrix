@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import '../errors/errors.dart';
 import '../matrix/matrix.dart';
 
@@ -162,33 +160,11 @@ class RpnEngine {
   }
 
   Matrix _divide(Matrix left, Matrix right) {
-    if (!right.isScalar) {
-      throw UnsupportedCalculatrixOperationError(
-        'Matrix division is only supported by scalar (1x1) denominator.',
-      );
-    }
-
-    final double divisor = right.scalarValue;
-    if (divisor == 0) {
-      throw MatrixDomainError('Division by zero scalar is undefined.');
-    }
-
-    return left.scale(1 / divisor);
+    return left / right;
   }
 
   Matrix _sqrt(Matrix value) {
-    if (!value.isScalar) {
-      throw UnsupportedCalculatrixOperationError(
-        'Square root is only supported for scalar (1x1) values.',
-      );
-    }
-
-    final double source = value.scalarValue;
-    if (source < 0) {
-      throw MatrixDomainError('Square root of negative scalar is undefined.');
-    }
-
-    return Matrix.scalar(math.sqrt(source));
+    return value.sqrt();
   }
 
   Matrix _percent(Matrix value) {

@@ -101,6 +101,39 @@ void main() {
         ]),
       );
     });
+
+    test('rejects division by a non-scalar matrix denominator', () {
+      final Matrix left = Matrix(<List<double>>[
+        <double>[3, 1],
+        <double>[7, 3],
+      ]);
+      final Matrix right = Matrix(<List<double>>[
+        <double>[2, 1],
+        <double>[1, 1],
+      ]);
+
+      expect(
+        () => left / right,
+        throwsA(isA<UnsupportedCalculatrixOperationError>()),
+      );
+    });
+
+    test('computes the principal square root of a square matrix', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[5, 4],
+        <double>[4, 5],
+      ]);
+
+      expect(
+        value.sqrt().almostEquals(
+          Matrix(<List<double>>[
+            <double>[2, 1],
+            <double>[1, 2],
+          ]),
+        ),
+        isTrue,
+      );
+    });
   });
 
   group('Numeric policy', () {

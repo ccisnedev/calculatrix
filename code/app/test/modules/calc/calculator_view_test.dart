@@ -254,7 +254,7 @@ void main() {
       expect(find.text('='), findsNothing);
     });
 
-    testWidgets('rpn mode shows stack summary after ENTER', (tester) async {
+    testWidgets('rpn mode renders the committed top as X0 without duplicating the display', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
@@ -268,11 +268,68 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsLabel(RegExp(r'Stack depth: 1')), findsOneWidget);
-      expect(find.text('X1'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('rpn-stack-card-0')), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('rpn-stack-card-1')), findsNothing);
       expect(
-        find.descendant(of: find.byType(ListView), matching: find.text('[[42]]')),
+        find.descendant(
+          of: find.byKey(const ValueKey<String>('rpn-stack-card-0')),
+          matching: find.text('X0'),
+        ),
         findsOneWidget,
       );
+      expect(find.text('[[42]]'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('calculator-expression-text')), findsNothing);
+      handle.dispose();
+    });
+
+    testWidgets('rpn mode shows the draft in X0 and the committed top in X1', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('4'));
+      await tester.pump();
+      await tester.tap(find.text('ENTER'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('7'));
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey<String>('rpn-stack-card-0')), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('rpn-stack-card-1')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey<String>('rpn-stack-card-0')),
+          matching: find.text('X0'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey<String>('rpn-stack-card-0')),
+          matching: find.text('7'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey<String>('rpn-stack-card-1')),
+          matching: find.text('X1'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey<String>('rpn-stack-card-1')),
+          matching: find.text('[[4]]'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey<String>('rpn-stack-card-1'))).dy,
+        lessThan(tester.getTopLeft(find.byKey(const ValueKey<String>('rpn-stack-card-0'))).dy),
+      );
+      expect(find.byKey(const ValueKey<String>('calculator-expression-text')), findsNothing);
       handle.dispose();
     });
 

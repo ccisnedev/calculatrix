@@ -243,6 +243,25 @@ explicit notation modes, and richer display contracts.
 - Reject any design where mode switching makes the app feel like two independent calculators.
 - Add regression tests for examples such as `3+3= -> 6`, repeated `= -> 9`, then `RPN` top mutation invalidating a stale `+3` repetition before returning to `Infix`.
 
+#### v2.11.0 — Core-Only Matrix Semantics
+
+- [x] Define `package:calculatrix` as the only owner of calculator semantics for memory, unary operators, binary operators, stack mutations, and committed-value transitions
+- [x] Introduce a core session/state API for interactive consumers while keeping CLI behavior on public core APIs only
+- [x] Generalize memory from scalar-only storage to matrix-first storage in the core
+- [x] Keep matrix division in the core restricted to scalar `1x1` denominators and defer general matrix right-division until the determinant/inverse stage
+- [x] Implement square-matrix root in the core with explicit real-domain errors when no real root is supported
+- [x] Ensure `%`, `+/-`, `MC`, `MR`, `M+`, and `M-` all operate on matrices through shared core rules
+- [x] Remove remaining app-side math/state rules other than input translation, presentation, and interaction wiring
+- [x] Add TDD contract coverage in `code/core` first, then consumer regression coverage proving app and CLI are thin adapters
+
+##### TDD Execution Order
+
+- [x] Step 1: lock matrix-level contracts in `code/core/test/matrix` for scalar division, square root, and matrix memory primitives while explicitly deferring general matrix division and inverse
+- [x] Step 2: update `RpnEngine` and facade tests so unary/binary operators delegate to matrix semantics instead of scalar-only branches
+- [x] Step 3: add a core calculator session/state model covering committed value `X`, drafts, memory, and notation-independent mutations
+- [x] Step 4: migrate Flutter app to that core session/state API and keep CLI on public core APIs only
+- [x] Step 5: refresh roadmap/docs/changelog/versioning only after executable validation is green
+
 ---
 
 ## Stage 3 — "Advanced Linear Algebra on Mature Matrix UX" (2.x.x → 3.0.0)

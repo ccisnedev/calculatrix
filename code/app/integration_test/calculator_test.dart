@@ -1,35 +1,94 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:calculatrix_app/main.dart';
 
+const Duration _uiStep = Duration(milliseconds: 100);
+
+Future<void> _pumpForUi(WidgetTester tester, {int steps = 6}) async {
+  for (int i = 0; i < steps; i++) {
+    await tester.pump(_uiStep);
+  }
+}
+
+Future<void> _pumpUntilFound(
+  WidgetTester tester,
+  Finder finder, {
+  int maxSteps = 30,
+}) async {
+  for (int i = 0; i < maxSteps; i++) {
+    if (finder.evaluate().isNotEmpty) {
+      return;
+    }
+
+    await tester.pump(_uiStep);
+  }
+
+  expect(finder, findsOneWidget);
+}
+
+Future<void> _pumpUntilGone(
+  WidgetTester tester,
+  Finder finder, {
+  int maxSteps = 30,
+}) async {
+  for (int i = 0; i < maxSteps; i++) {
+    if (finder.evaluate().isEmpty) {
+      return;
+    }
+
+    await tester.pump(_uiStep);
+  }
+
+  expect(finder, findsNothing);
+}
+
 Future<void> _pumpApp(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump();
   await tester.pumpWidget(CalculatrixApp(key: UniqueKey()));
-  await tester.pumpAndSettle();
+  await _pumpForUi(tester);
   await tester.tap(find.text('Infix'));
-  await tester.pumpAndSettle();
+  await _pumpForUi(tester);
 }
 
 Future<void> _tapEquals(WidgetTester tester) async {
   if (_button('=').evaluate().isEmpty) {
     await tester.tap(find.text('Infix'));
-    await tester.pumpAndSettle();
+    await _pumpForUi(tester);
   }
 
   if (_button('=').evaluate().isEmpty) {
     await tester.drag(find.byType(PageView), const Offset(1000, 0));
-    await tester.pumpAndSettle();
+    await _pumpUntilFound(tester, _button('='));
   }
 
   await tester.tap(_button('='));
-  await tester.pump();
+  await _pumpForUi(tester, steps: 2);
 }
 
 Future<void> _switchMode(WidgetTester tester, String mode) async {
   await tester.tap(find.text(mode));
-  await tester.pumpAndSettle();
+  await _pumpForUi(tester);
+}
+
+Future<void> _showInfixEditPage(WidgetTester tester) async {
+  if (_button('MAT').evaluate().isNotEmpty) {
+    return;
+  }
+
+  await tester.drag(find.byType(PageView), const Offset(-1000, 0));
+  await _pumpUntilFound(tester, _button('MAT'));
+}
+
+Future<void> _showInfixPrimaryPage(WidgetTester tester) async {
+  if (_button('=').evaluate().isNotEmpty) {
+    return;
+  }
+
+  await tester.drag(find.byType(PageView), const Offset(1000, 0));
+  await _pumpUntilFound(tester, _button('='));
 }
 
 Future<void> _showRpnStackPage(WidgetTester tester) async {
@@ -38,7 +97,7 @@ Future<void> _showRpnStackPage(WidgetTester tester) async {
   }
 
   await tester.drag(find.byType(PageView), const Offset(-1000, 0));
-  await tester.pumpAndSettle();
+  await _pumpUntilFound(tester, _button('SWAP'));
 }
 
 Future<void> _submitMatrix(
@@ -47,19 +106,28 @@ Future<void> _submitMatrix(
   required String actionLabel,
 }) async {
   await tester.tap(_button('MAT'));
-  await tester.pumpAndSettle();
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey<String>('matrix-cell-0-0')),
+  );
 
   for (int row = 0; row < values.length; row++) {
     for (int column = 0; column < values[row].length; column++) {
-      await tester.enterText(
-        find.byKey(ValueKey<String>('matrix-cell-$row-$column')),
-        values[row][column],
+      final Finder cellFinder = find.byKey(
+        ValueKey<String>('matrix-cell-$row-$column'),
       );
+      final TextFormField field = tester.widget<TextFormField>(cellFinder);
+      field.controller!.text = values[row][column];
+      field.onChanged?.call(values[row][column]);
+      await tester.pump();
     }
   }
 
-  await tester.tap(find.text(actionLabel));
-  await tester.pumpAndSettle();
+  final Finder actionButton = find.widgetWithText(FilledButton, actionLabel);
+  final FilledButton button = tester.widget<FilledButton>(actionButton);
+  button.onPressed!.call();
+  await _pumpUntilGone(tester, actionButton);
+  await _pumpForUi(tester, steps: 2);
 }
 
 Finder _button(String label) {
@@ -85,6 +153,14 @@ Finder _displayText(String value) {
 
 Finder _expressionText(String value) {
   return _keyedText('calculator-expression-text', value);
+}
+
+Finder _rpnStackCard(int register) {
+  return find.byKey(ValueKey<String>('rpn-stack-card-$register'));
+}
+
+Finder _rpnStackText(int register, String value) {
+  return find.descendant(of: _rpnStackCard(register), matching: find.text(value));
 }
 
 void main() {
@@ -220,18 +296,15 @@ void main() {
     testWidgets('matrix editor inserts a matrix literal into infix input', (tester) async {
       await _pumpApp(tester);
 
-      await tester.drag(find.byType(PageView), const Offset(-1000, 0));
-      await tester.pumpAndSettle();
-
-      await tester.tap(_button('MAT'));
-      await tester.pumpAndSettle();
-
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '2');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '3');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '4');
-      await tester.tap(find.text('Insert'));
-      await tester.pumpAndSettle();
+      await _showInfixEditPage(tester);
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '2'],
+          <String>['3', '4'],
+        ],
+        actionLabel: 'Insert',
+      );
 
       expect(_expressionText('[[1,2],[3,4]]'), findsOneWidget);
     });
@@ -239,32 +312,29 @@ void main() {
     testWidgets('infix mode displays a non-scalar matrix result', (tester) async {
       await _pumpApp(tester);
 
-      await tester.drag(find.byType(PageView), const Offset(-1000, 0));
-      await tester.pumpAndSettle();
-
-      await tester.tap(_button('MAT'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '1');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '0');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '0');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '1');
-      await tester.tap(find.text('Insert'));
-      await tester.pumpAndSettle();
+      await _showInfixEditPage(tester);
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '0'],
+          <String>['0', '1'],
+        ],
+        actionLabel: 'Insert',
+      );
 
       await tester.tap(_button('×'));
       await tester.pump();
 
-      await tester.tap(_button('MAT'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-0')), '3');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-0-1')), '4');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-0')), '5');
-      await tester.enterText(find.byKey(const ValueKey<String>('matrix-cell-1-1')), '6');
-      await tester.tap(find.text('Insert'));
-      await tester.pumpAndSettle();
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['3', '4'],
+          <String>['5', '6'],
+        ],
+        actionLabel: 'Insert',
+      );
 
-      await tester.drag(find.byType(PageView), const Offset(1000, 0));
-      await tester.pumpAndSettle();
+      await _showInfixPrimaryPage(tester);
       await _tapEquals(tester);
 
       expect(_displayText('[3 4]\n[5 6]'), findsOneWidget);
@@ -273,8 +343,7 @@ void main() {
     testWidgets('infix mode multiplies a matrix by a scalar 1x1', (tester) async {
       await _pumpApp(tester);
 
-      await tester.drag(find.byType(PageView), const Offset(-1000, 0));
-      await tester.pumpAndSettle();
+      await _showInfixEditPage(tester);
 
       await _submitMatrix(
         tester,
@@ -293,6 +362,107 @@ void main() {
       await _tapEquals(tester);
 
       expect(_displayText('[3 0]\n[0 3]'), findsOneWidget);
+    });
+
+    testWidgets('infix mode toggles the sign of a committed matrix', (tester) async {
+      await _pumpApp(tester);
+
+      await _showInfixEditPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '2'],
+          <String>['3', '4'],
+        ],
+        actionLabel: 'Insert',
+      );
+
+      await _tapEquals(tester);
+      await tester.tap(_button('±'));
+      await tester.pumpAndSettle();
+
+      expect(_displayText('[-1 -2]\n[-3 -4]'), findsOneWidget);
+    });
+
+    testWidgets('infix mode rejects division by a non-scalar matrix denominator', (tester) async {
+      await _pumpApp(tester);
+
+      await _showInfixEditPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['3', '1'],
+          <String>['7', '3'],
+        ],
+        actionLabel: 'Insert',
+      );
+
+      await tester.tap(_button('÷'));
+      await tester.pump();
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['2', '1'],
+          <String>['1', '1'],
+        ],
+        actionLabel: 'Insert',
+      );
+
+      await _tapEquals(tester);
+
+      expect(_displayText('Error'), findsOneWidget);
+    });
+
+    testWidgets('infix mode computes the square root of a square matrix', (tester) async {
+      await _pumpApp(tester);
+
+      await _showInfixEditPage(tester);
+
+      await tester.tap(_button('√'));
+      await tester.pump();
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['5', '4'],
+          <String>['4', '5'],
+        ],
+        actionLabel: 'Insert',
+      );
+
+      await _tapEquals(tester);
+
+      expect(_displayText('[2 1]\n[1 2]'), findsOneWidget);
+    });
+
+    testWidgets('infix mode recalls matrix memory into the expression', (tester) async {
+      await _pumpApp(tester);
+
+      await _showInfixEditPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '2'],
+          <String>['3', '4'],
+        ],
+        actionLabel: 'Insert',
+      );
+
+      await _showInfixPrimaryPage(tester);
+      await _tapEquals(tester);
+
+      await tester.tap(_button('M+'));
+      await _pumpForUi(tester);
+      await tester.tap(_button('C'));
+      await _pumpForUi(tester);
+      await tester.tap(_button('MR'));
+      await _pumpForUi(tester);
+
+      expect(_expressionText('[[1,2],[3,4]]'), findsOneWidget);
     });
 
     testWidgets('rpn mode commits with ENTER and applies binary addition', (tester) async {
@@ -316,6 +486,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(_displayText('[[50]]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
       expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsOneWidget);
       expect(find.text('Stack 1'), findsOneWidget);
     });
@@ -341,7 +513,79 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(_displayText('[3 0]\n[0 3]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
       expect(find.text('Stack 1'), findsOneWidget);
+    });
+
+    testWidgets('rpn mode toggles the sign of the committed top matrix', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '2'],
+          <String>['3', '4'],
+        ],
+        actionLabel: 'Push',
+      );
+
+      await tester.tap(_button('±'));
+      await tester.pumpAndSettle();
+
+      expect(_displayText('[-1 -2]\n[-3 -4]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+    });
+
+    testWidgets('rpn mode recalls matrix memory onto the stack', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '2'],
+          <String>['3', '4'],
+        ],
+        actionLabel: 'Push',
+      );
+
+      await tester.tap(_button('M+'));
+      await tester.pumpAndSettle();
+      await tester.tap(_button('MR'));
+      await tester.pumpAndSettle();
+
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(_displayText('[1 2]\n[3 4]'), findsOneWidget);
+      expect(find.text('Stack 2'), findsOneWidget);
+    });
+
+    testWidgets('rpn mode shows the draft in X0 and the committed top in X1', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await tester.tap(_button('4'));
+      await tester.pump();
+      await tester.tap(_button('ENTER'));
+      await tester.pumpAndSettle();
+      await tester.tap(_button('7'));
+      await tester.pump();
+
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(_rpnStackText(0, '7'), findsOneWidget);
+      expect(_rpnStackCard(1), findsOneWidget);
+      expect(_rpnStackText(1, 'X1'), findsOneWidget);
+      expect(_rpnStackText(1, '[[4]]'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('calculator-expression-text')), findsNothing);
     });
 
     testWidgets('switching to rpn preserves the committed infix result as X', (tester) async {
@@ -358,7 +602,9 @@ void main() {
       await _switchMode(tester, 'RPN');
 
       expect(_displayText('[[7]]'), findsOneWidget);
-      expect(_expressionText(' '), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('calculator-expression-text')), findsNothing);
       expect(find.text('Stack 1'), findsOneWidget);
     });
 
@@ -459,7 +705,9 @@ void main() {
       await _switchMode(tester, 'RPN');
 
       expect(_displayText('0'), findsOneWidget);
-      expect(_expressionText(' '), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('calculator-expression-text')), findsNothing);
       expect(find.text('Stack 0'), findsOneWidget);
 
       await _switchMode(tester, 'Infix');
@@ -477,8 +725,9 @@ void main() {
       await tester.tap(_button('2'));
       await tester.pump();
 
-      expect(_expressionText('42'), findsOneWidget);
       expect(_displayText('42'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
 
       await _switchMode(tester, 'Infix');
 
@@ -487,8 +736,10 @@ void main() {
 
       await _switchMode(tester, 'RPN');
 
-      expect(_expressionText('42'), findsOneWidget);
       expect(_displayText('42'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('calculator-expression-text')), findsNothing);
       expect(find.text('Stack 0'), findsOneWidget);
     });
   });

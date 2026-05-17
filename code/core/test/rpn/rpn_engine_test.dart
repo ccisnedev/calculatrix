@@ -86,6 +86,28 @@ void main() {
       expect(engine.depth, 1);
     });
 
+    test('rejects matrix division through stack operations', () {
+      final RpnEngine engine = RpnEngine();
+
+      engine.push(
+        Matrix(<List<double>>[
+          <double>[3, 1],
+          <double>[7, 3],
+        ]),
+      );
+      engine.push(
+        Matrix(<List<double>>[
+          <double>[2, 1],
+          <double>[1, 1],
+        ]),
+      );
+
+      expect(
+        () => engine.applyBinary(RpnBinaryOperator.divide),
+        throwsA(isA<UnsupportedCalculatrixOperationError>()),
+      );
+    });
+
     test('applies square root unary operation', () {
       final RpnEngine engine = RpnEngine();
 
@@ -93,6 +115,29 @@ void main() {
       final Matrix result = engine.applyUnary(RpnUnaryOperator.sqrt);
 
       expect(result, Matrix.scalar(3));
+      expect(engine.depth, 1);
+    });
+
+    test('applies square root unary operation to a square matrix', () {
+      final RpnEngine engine = RpnEngine();
+
+      engine.push(
+        Matrix(<List<double>>[
+          <double>[5, 4],
+          <double>[4, 5],
+        ]),
+      );
+      final Matrix result = engine.applyUnary(RpnUnaryOperator.sqrt);
+
+      expect(
+        result.almostEquals(
+          Matrix(<List<double>>[
+            <double>[2, 1],
+            <double>[1, 2],
+          ]),
+        ),
+        isTrue,
+      );
       expect(engine.depth, 1);
     });
 

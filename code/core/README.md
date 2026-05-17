@@ -3,25 +3,32 @@
 # Calculatrix
 
 Calculatrix is a pure Dart computation engine designed for calculator products.
-It is matrix-first and RPN-first by design: scalar values are represented as `1x1`
-matrices, so algebraic and stack-based workflows share the same math core.
+It is matrix-first and RPN-first by design: scalar values are represented as
+`1x1` matrices, so algebraic and stack-based workflows share the same math core.
 
 ## Status
 
-- Current published version: `0.0.1`
-- Focus: stable Stage 2 core baseline
+- Current package version: `2.11.0`
+- Focus: Stage 2.11.0 core-only matrix semantics
 - Runtime dependencies: none (pure Dart)
 
 ## Features available now
 
 - Immutable `Matrix` type with dimension validation
-- Matrix operations: `+`, `-`, `*`, scale, transpose
-- Multiplication treats `1x1` operands as scalar scaling, so both `A * [[s]]` and `[[s]] * A` are valid
+- Matrix operations: `+`, `-`, `*`, `/`, `sqrt`, `scale`, `transpose`
+- Multiplication treats `1x1` operands as scalar scaling, so both `A * [[s]]`
+	and `[[s]] * A` are valid
+- Division currently supports scalar `1x1` denominators only; general matrix
+	right-division is deferred to the determinant/inverse stage
+- Square root supports square matrices in the real domain and throws typed
+	domain errors when no real root is available
 - `RpnEngine` stack with binary operators (`add`, `subtract`, `multiply`, `divide`)
-- `RpnEngine` stack utilities: `dup`, `drop`, `swap`, `over`
+- `RpnEngine` stack utilities: `dup`, `drop`, `swap`, `over`, `pick`, `roll`, `rot`
 - Unary operators: square root (`sqrt`) and percent (`%`)
+- `CalculatrixSession` for shared calculator state, notation drafts,
+	committed value `X`, matrix memory, and stack mutations
 - `Calculatrix` facade: `evaluateInfix` and `evaluateRpn`
-- Unit tests for matrix, RPN, and cross-notation evaluation
+- Unit tests for matrix, RPN, session, and cross-notation evaluation
 
 ## Numeric policy
 
@@ -45,19 +52,19 @@ matrices, so algebraic and stack-based workflows share the same math core.
 import 'package:calculatrix/calculatrix.dart';
 
 void main() {
-	final Matrix a = Matrix(<List<double>>[
-		<double>[1, 2],
-		<double>[3, 4],
-	]);
+	final CalculatrixSession session = CalculatrixSession();
+	session.insertMatrixLiteral('[[5,4],[4,5]]');
+	session.evaluate();
+	session.memoryAdd();
 
-	final Matrix result = a * Matrix.scalar(2);
-	print(result); // Matrix([[2.0, 4.0], [6.0, 8.0]])
+	final Matrix sqrt = session.currentValue!.sqrt();
+	print(sqrt); // Matrix([[2.0, 1.0], [1.0, 2.0]])
 }
 ```
 
 ## Roadmap
 
-See the roadmap in [ROADMAP.md](ROADMAP.md).
+See the roadmap in [../../docs/roadmap.md](../../docs/roadmap.md).
 
 ## License
 

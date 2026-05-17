@@ -13,9 +13,30 @@ void main() {
       expect(result, Matrix.scalar(2.5));
     });
 
+    test('rejects matrix division in infix mode', () {
+      expect(
+        () => Calculatrix.evaluateInfix('[[3,1],[7,3]] / [[2,1],[1,1]]'),
+        throwsA(isA<UnsupportedCalculatrixOperationError>()),
+      );
+    });
+
     test('evaluates scalar square root in infix mode', () {
       final Matrix result = Calculatrix.evaluateInfix('√9');
       expect(result, Matrix.scalar(3));
+    });
+
+    test('evaluates matrix square root in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('√[[5,4],[4,5]]');
+
+      expect(
+        result.almostEquals(
+          Matrix(<List<double>>[
+            <double>[2, 1],
+            <double>[1, 2],
+          ]),
+        ),
+        isTrue,
+      );
     });
 
     test('evaluates scalar percent in infix mode', () {
@@ -43,12 +64,40 @@ void main() {
       expect(result, Matrix.scalar(2.5));
     });
 
+    test('rejects matrix division in rpn mode', () {
+      expect(
+        () => Calculatrix.evaluateRpn(<String>[
+          '[[3,1],[7,3]]',
+          '[[2,1],[1,1]]',
+          '/',
+        ]),
+        throwsA(isA<UnsupportedCalculatrixOperationError>()),
+      );
+    });
+
     test('evaluates scalar unary operators in rpn mode', () {
       final Matrix sqrt = Calculatrix.evaluateRpn(<String>['9', '√']);
       final Matrix percent = Calculatrix.evaluateRpn(<String>['50', '%']);
 
       expect(sqrt, Matrix.scalar(3));
       expect(percent, Matrix.scalar(0.5));
+    });
+
+    test('evaluates matrix square root in rpn mode', () {
+      final Matrix sqrt = Calculatrix.evaluateRpn(<String>[
+        '[[5,4],[4,5]]',
+        '√',
+      ]);
+
+      expect(
+        sqrt.almostEquals(
+          Matrix(<List<double>>[
+            <double>[2, 1],
+            <double>[1, 2],
+          ]),
+        ),
+        isTrue,
+      );
     });
 
     test('evaluates scientific notation in rpn mode', () {
@@ -202,20 +251,6 @@ void main() {
         throwsA(isA<MatrixShapeError>()),
       );
     });
-
-    test(
-      'throws unsupported operation error for matrix division by non-scalar',
-      () {
-        expect(
-          () => Calculatrix.evaluateRpn(<String>[
-            '[[1,2],[3,4]]',
-            '[[1,0],[0,1]]',
-            '/',
-          ]),
-          throwsA(isA<UnsupportedCalculatrixOperationError>()),
-        );
-      },
-    );
 
     test('throws matrix domain error for division by zero scalar', () {
       expect(

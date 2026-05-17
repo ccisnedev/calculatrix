@@ -1,5 +1,6 @@
 import '../errors/errors.dart';
 import '../numeric/numeric_policy.dart';
+import 'dart:math' as math;
 
 class Matrix {
   Matrix(List<List<double>> rows) : _rows = _normalize(rows) {
@@ -12,11 +13,31 @@ class Matrix {
     ]);
   }
 
+  factory Matrix.identity(int size) {
+    if (size < 1) {
+      throw MatrixShapeError('Identity matrix size must be greater than zero.');
+    }
+
+    return Matrix(
+      List<List<double>>.generate(
+        size,
+        (int row) => List<double>.generate(
+          size,
+          (int column) => row == column ? 1 : 0,
+          growable: false,
+        ),
+        growable: false,
+      ),
+    );
+  }
+
   final List<List<double>> _rows;
 
   int get rowCount => _rows.length;
 
   int get columnCount => _rows.isEmpty ? 0 : _rows.first.length;
+
+  bool get isSquare => rowCount == columnCount;
 
   bool get isScalar => rowCount == 1 && columnCount == 1;
 
@@ -114,6 +135,170 @@ class Matrix {
     return Matrix(result);
   }
 
+  Matrix operator /(Matrix other) {
+    if (other.isScalar) {
+      final double divisor = other.scalarValue;
+      if (divisor == 0) {
+        throw MatrixDomainError('Division by zero scalar is undefined.');
+      }
+
+      return scale(1 / divisor);
+    }
+
+    throw UnsupportedCalculatrixOperationError(
+      'Matrix division is only supported by scalar (1x1) denominator.',
+    );
+  }
+
+  Matrix _inverse({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    _requireSquare(operation: 'inverse');
+
+    final int size = rowCount;
+    final List<List<double>> augmented = List<List<double>>.generate(
+      size,
+      (int row) => <double>[
+        ..._rows[row],
+        ...List<double>.generate(
+          size,
+          (int column) => row == column ? 1 : 0,
+          growable: false,
+        ),
+      ],
+      growable: false,
+    );
+
+    for (int pivotColumn = 0; pivotColumn < size; pivotColumn++) {
+      int pivotRow = pivotColumn;
+      double pivotMagnitude = augmented[pivotRow][pivotColumn].abs();
+
+      for (int row = pivotColumn + 1; row < size; row++) {
+        final double candidateMagnitude = augmented[row][pivotColumn].abs();
+        if (candidateMagnitude > pivotMagnitude) {
+          pivotMagnitude = candidateMagnitude;
+          pivotRow = row;
+        }
+      }
+
+      if (pivotMagnitude <= absoluteTolerance) {
+        throw MatrixDomainError('Matrix is singular and cannot be inverted.');
+      }
+
+      if (pivotRow != pivotColumn) {
+        final List<double> temp = augmented[pivotColumn];
+        augmented[pivotColumn] = augmented[pivotRow];
+        augmented[pivotRow] = temp;
+      }
+
+      final double pivot = augmented[pivotColumn][pivotColumn];
+      for (int column = 0; column < augmented[pivotColumn].length; column++) {
+        augmented[pivotColumn][column] /= pivot;
+      }
+
+      for (int row = 0; row < size; row++) {
+        if (row == pivotColumn) {
+          continue;
+        }
+
+        final double factor = augmented[row][pivotColumn];
+        if (factor == 0) {
+          continue;
+        }
+
+        for (int column = 0; column < augmented[row].length; column++) {
+          augmented[row][column] -= factor * augmented[pivotColumn][column];
+        }
+      }
+    }
+
+    return Matrix(
+      List<List<double>>.generate(
+        size,
+        (int row) => List<double>.generate(
+          size,
+          (int column) => augmented[row][size + column],
+          growable: false,
+        ),
+        growable: false,
+      ),
+    );
+  }
+
+  Matrix sqrt({
+    double relativeTolerance =
+        CalculatrixNumericPolicy.defaultRelativeTolerance,
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+    int maxIterations = 64,
+  }) {
+    _requireSquare(operation: 'square root');
+
+    if (isScalar) {
+      final double source = scalarValue;
+      if (source < 0) {
+        throw MatrixDomainError('Square root of negative scalar is undefined.');
+      }
+      return Matrix.scalar(math.sqrt(source));
+    }
+
+    final double norm = _infinityNorm();
+    if (norm == 0) {
+      return Matrix(
+        List<List<double>>.generate(
+          rowCount,
+          (_) => List<double>.filled(columnCount, 0, growable: false),
+          growable: false,
+        ),
+      );
+    }
+
+    Matrix scaledTarget = this;
+    int scalingSteps = 0;
+    while (scaledTarget._infinityNorm() > 4) {
+      scaledTarget = scaledTarget.scale(0.25);
+      scalingSteps++;
+    }
+
+    Matrix current = Matrix.identity(rowCount);
+    final double targetNorm = scaledTarget._infinityNorm();
+    final double threshold = math.max(
+      absoluteTolerance,
+      relativeTolerance * math.max(targetNorm, 1),
+    );
+
+    for (int iteration = 0; iteration < maxIterations; iteration++) {
+      final Matrix inverseCurrent;
+      try {
+        inverseCurrent = current._inverse(absoluteTolerance: absoluteTolerance);
+      } on MatrixDomainError {
+        throw MatrixDomainError(
+          'Square root is undefined for this matrix in the real domain.',
+        );
+      }
+
+      final Matrix next = (current + (inverseCurrent * scaledTarget)).scale(0.5);
+      final double stepNorm = (next - current)._infinityNorm();
+      final double residualNorm = ((next * next) - scaledTarget)._infinityNorm();
+
+      current = next;
+      if (stepNorm <= threshold && residualNorm <= threshold) {
+        return current.scale(math.pow(2, scalingSteps).toDouble());
+      }
+    }
+
+    final Matrix result = current.scale(math.pow(2, scalingSteps).toDouble());
+    final double residualNorm = ((result * result) - this)._infinityNorm();
+    if (residualNorm <= math.max(absoluteTolerance, relativeTolerance * norm)) {
+      return result;
+    }
+
+    throw MatrixDomainError(
+      'Square root did not converge for this matrix in the real domain.',
+    );
+  }
+
   Matrix transpose() {
     final List<List<double>> result = List<List<double>>.generate(
       columnCount,
@@ -190,6 +375,32 @@ class Matrix {
         '${other.rowCount}x${other.columnCount}.',
       );
     }
+  }
+
+  void _requireSquare({required String operation}) {
+    if (!isSquare) {
+      throw MatrixShapeError(
+        'Cannot perform $operation for non-square '
+        '${rowCount}x${columnCount} matrix.',
+      );
+    }
+  }
+
+  double _infinityNorm() {
+    double maxRowSum = 0;
+
+    for (final List<double> row in _rows) {
+      double rowSum = 0;
+      for (final double value in row) {
+        rowSum += value.abs();
+      }
+
+      if (rowSum > maxRowSum) {
+        maxRowSum = rowSum;
+      }
+    }
+
+    return maxRowSum;
   }
 
   @override

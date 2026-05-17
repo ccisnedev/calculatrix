@@ -4,6 +4,29 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.11.0] - 2026-05-16
+
+### Added
+
+- Square-matrix root on the public `Matrix` API.
+- `CalculatrixSession` as a public core API for notation drafts, committed
+  value `X`, matrix memory, and stack/state mutations.
+- Core TDD coverage for scalar-only division, matrix square root, and
+  session-based shared-value workflows.
+
+### Changed
+
+- `RpnEngine` square root now delegates to `Matrix` semantics, and division
+  remains restricted to scalar `1x1` denominators.
+- Shared calculator memory semantics are now matrix-first in the core.
+
+### Fixed
+
+- Removed scalar-only behavior for square root when valid matrix semantics
+  exist.
+- Moved interactive calculator behavior out of the Flutter controller and into
+  the core package contract.
+
 ## [2.9.0] - 2026-05-16
 
 First SemVer-aligned package release recorded under the accepted repository
@@ -27,14 +50,9 @@ versioning policy.
 ### Fixed
 
 - Contract coverage for vectors, non-square matrices, parser failures, and
-  cross-notation equivalence.# Changelog
+  cross-notation equivalence.
 
-All notable changes to this project will be documented in this file.
-
-The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
-and the project adheres to [Semantic Versioning](https://semver.org/).
-
-## 0.0.1
+## [0.0.1]
 
 Initial core package release.
 
@@ -44,7 +62,7 @@ Initial core package release.
 - Matrix operations: addition, subtraction, multiplication, scale, transpose.
 - Typed error model for matrix, RPN stack, and expression syntax/domain errors.
 - `RpnEngine` with stack primitives and operators:
-	`+`, `-`, `*`, `/`, `sqrt`, `%`, `dup`, `drop`, `swap`, `over`.
+  `+`, `-`, `*`, `/`, `sqrt`, `%`, `dup`, `drop`, `swap`, `over`.
 - `Calculatrix` facade with `evaluateInfix` and `evaluateRpn`.
 - Test suite for matrix operations, RPN behavior, and cross-notation evaluation.
 

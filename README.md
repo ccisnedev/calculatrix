@@ -1,47 +1,62 @@
 # Calculatrix
 
-> Calculadora multiplataforma con motor de evaluación algebraica y precedencia PEMDAS.
-> Skin inspirado en la Casio HL-820LV.
+> Calculadora multiplataforma matrix-first con semántica compartida entre
+> `Infix` y `RPN`.
 
 [![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
 
-## Features (v1.0.0)
+## Features (v2.11.0)
 
-- Evaluación algebraica con precedencia de operadores (PEMDAS)
-- Paréntesis y negación unaria
-- Raíz cuadrada, porcentaje
-- Memoria (MC, MR, M-, M+)
-- Cambio de signo (±)
-- Constante de repetición (= repetido)
-- Precisión de 12 dígitos significativos
-- Manejo de errores (÷0, √ negativo)
+- Motor compartido `package:calculatrix` para app y CLI
+- Evaluación `Infix` y `RPN` sobre la misma semántica matricial
+- División matricial por escalares y matrices cuadradas invertibles
+- Raíz cuadrada de matrices cuadradas con errores explícitos en dominio real
+- Memoria matricial (`MC`, `MR`, `M+`, `M-`) y cambio de signo (`±`) en el core
+- Valor comprometido compartido entre `Infix` y `RPN`
+- Errores tipados y política numérica determinista
 
 ## Architecture
 
-MVVM con Flutter — Controller extiende `ChangeNotifier`.
+La lógica matemática y operativa vive en `package:calculatrix`.
+Flutter y CLI son capas de interfaz sobre ese core compartido.
 
 ```
+code/core/lib/src/
+  matrix/       # Matrix, formatting, matrix algebra
+  rpn/          # RPN engine and stack primitives
+  evaluation/   # infix/rpn facade
+  session/      # shared calculator state and matrix memory
+
 code/app/lib/modules/calc/
-  models/       # Token, Tokenizer, Parser (AST), Evaluator
-  controller.dart
-  view.dart
-```
+  controller.dart  # presentation adapter over CalculatrixSession
+  view.dart        # Flutter UI
 
-Pipeline: `String → Tokenizer → Parser (AST) → Evaluator → double`
+code/cli/bin/
+  calculatrix_cli.dart
+```
 
 ## Getting Started
 
 ```bash
-cd code/app
+cd code/core
+dart test
+
+cd ../cli
+dart test
+
+cd ../app
 flutter pub get
-flutter test          # 124+ tests
-flutter run -d chrome # Web
+flutter test test
+flutter analyze
+flutter run -d chrome
 ```
 
 ## CI/CD
 
-GitHub Actions ejecuta `flutter analyze` + `flutter test` en cada push/PR, y genera artefacto web en build exitoso.
+GitHub Actions valida core, app y CLI, y genera artefacto web en builds
+exitosos.
 
 ## Roadmap
 
-Ver [docs/roadmap.md](docs/roadmap.md) para etapas futuras (RPN, matrices).
+Ver [docs/roadmap.md](docs/roadmap.md) para la hoja de ruta y la entrada
+v2.11.0 de semántica matricial en el core.

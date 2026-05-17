@@ -141,6 +141,17 @@ void main() {
       expect(controller.display, 'Error');
     });
 
+    test('evaluate matrix division by a non-scalar denominator shows Error', () {
+      controller.input('[[3,1],[7,3]]');
+      controller.input('÷');
+      controller.input('[[2,1],[1,1]]');
+
+      controller.evaluate();
+
+      expect(controller.error, 'Error');
+      expect(controller.display, 'Error');
+    });
+
     test('after result, operator continues expression', () {
       controller.input('3');
       controller.input('+');
@@ -219,7 +230,7 @@ void main() {
       expect(controller.expression, '');
     });
 
-    test('M+ rejects non-scalar infix results', () {
+    test('M+ stores non-scalar infix results in memory', () {
       controller.input('[[1],[2]]');
       controller.input('×');
       controller.input('[[3,4]]');
@@ -227,18 +238,26 @@ void main() {
 
       controller.memoryAdd();
 
-      expect(controller.error, 'Error');
-      expect(controller.hasMemory, isFalse);
+      controller.clear();
+      controller.memoryRecall();
+
+      expect(controller.error, '');
+      expect(controller.hasMemory, isTrue);
+      expect(controller.expression, '[[3,4],[6,8]]');
     });
 
-    test('M- rejects non-scalar RPN stack values', () {
+    test('M- stores non-scalar RPN stack values in memory', () {
       controller.setMode(CalculatorMode.rpn);
       controller.insertMatrixLiteral('[[1,2],[3,4]]');
 
       controller.memorySubtract();
 
-      expect(controller.error, 'Error');
-      expect(controller.hasMemory, isFalse);
+      controller.memoryRecall();
+
+      expect(controller.error, '');
+      expect(controller.hasMemory, isTrue);
+      expect(controller.rpnStackDepth, 2);
+      expect(controller.rpnTopLiteral, '[[-1,-2],[-3,-4]]');
     });
   });
 
@@ -264,6 +283,39 @@ void main() {
       expect(controller.result, '7');
       controller.toggleSign();
       expect(controller.result, '-7');
+    });
+
+    test('toggle sign multiplies a committed infix matrix by -1', () {
+      controller.insertMatrixLiteral('[[1,2],[3,4]]');
+      controller.evaluate();
+
+      controller.toggleSign();
+
+      expect(controller.display, '[[-1, -2], [-3, -4]]');
+      expect(
+        controller.displayMatrix,
+        Matrix(<List<double>>[
+          <double>[-1, -2],
+          <double>[-3, -4],
+        ]),
+      );
+    });
+
+    test('toggle sign multiplies the committed rpn top matrix by -1', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.insertMatrixLiteral('[[1,2],[3,4]]');
+
+      controller.toggleSign();
+
+      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnTopLiteral, '[[-1,-2],[-3,-4]]');
+      expect(
+        controller.displayMatrix,
+        Matrix(<List<double>>[
+          <double>[-1, -2],
+          <double>[-3, -4],
+        ]),
+      );
     });
   });
 
