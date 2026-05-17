@@ -1,3 +1,5 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -191,6 +193,23 @@ void main() {
       expect(find.text('('), findsNothing);
 
       await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('('), findsOneWidget);
+      expect(find.text('⌫'), findsOneWidget);
+    });
+
+    testWidgets('supports horizontal keypad paging with mouse drag', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(find.text('('), findsNothing);
+
+      final TestGesture gesture = await tester.startGesture(
+        tester.getCenter(find.byType(PageView)),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(const Offset(-500, 0));
+      await gesture.up();
       await tester.pumpAndSettle();
 
       expect(find.text('('), findsOneWidget);
