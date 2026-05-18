@@ -81,7 +81,7 @@ class Matrix {
     );
   }
 
-  /// Hilbert matrix of order [n]: H[i,j] = 1/(i+j+1).
+  /// Hilbert matrix of order [n]: `H(i,j) = 1/(i+j+1)`.
   /// Canonical ill-conditioned test matrix with κ(H_n) growing exponentially.
   factory Matrix.hilbert(int n) {
     if (n < 1) {
@@ -100,7 +100,7 @@ class Matrix {
     );
   }
 
-  /// Pascal matrix of order [n]: P[i,j] = C(i+j, i).
+  /// Pascal matrix of order [n]: `P(i,j) = C(i+j, i)`.
   /// Symmetric positive definite with det(P) = 1.
   factory Matrix.pascal(int n) {
     if (n < 1) {
@@ -124,7 +124,7 @@ class Matrix {
   }
 
   /// Frank matrix of order [n]: upper-Hessenberg with known eigenvalue structure.
-  /// F[i,j] = n - max(i,j) for j >= i-1, else 0.
+  /// `F(i,j) = n - max(i,j)` for `j >= i-1`, else 0.
   factory Matrix.frank(int n) {
     if (n < 1) {
       throw MatrixShapeError('Frank matrix size must be at least 1.');

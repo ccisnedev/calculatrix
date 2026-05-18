@@ -678,22 +678,22 @@ Before publishing `calculatrix` as a developer preview on pub.dev, the package
 must pass `dart pub publish --dry-run` cleanly, include a working example,
 have complete dartdoc coverage on public members, and present an accurate README.
 
-- [ ] Create `code/core/example/example.dart` demonstrating matrix creation, operations, RPN evaluation, and session usage
-- [ ] Update `code/core/README.md`: fix version references, add complete feature list, add usage examples matching example.dart
-- [ ] Add missing `topics` to pubspec.yaml: include `linear-algebra` and `math`
-- [ ] Run `dart doc` and fix all undocumented public member warnings
-- [ ] Run `dart pub publish --dry-run` and fix all reported issues
-- [ ] Add `funding` and/or `screenshots` metadata if applicable
-- [ ] Verify `dart analyze` reports zero issues on the public API surface
-- [ ] Bump version to `0.5.0` as developer-preview milestone
+- [x] Create `code/core/example/example.dart` demonstrating matrix creation, operations, RPN evaluation, and session usage
+- [x] Update `code/core/README.md`: fix version references, add complete feature list, add usage examples matching example.dart
+- [x] Add missing `topics` to pubspec.yaml: include `linear-algebra` and `math`
+- [x] Run `dart doc` and fix all undocumented public member warnings
+- [x] Run `dart pub publish --dry-run` and fix all reported issues
+- [x] Add `funding` and/or `screenshots` metadata if applicable
+- [x] Verify `dart analyze` reports zero issues on the public API surface
+- [x] Bump version to `0.5.0` as developer-preview milestone
 
 ##### TDD Execution Order
 
-- [ ] Step 1: create `example/example.dart` with representative usage patterns
-- [ ] Step 2: update README with accurate version, features, and code examples
-- [ ] Step 3: add topics and fix pubspec metadata
-- [ ] Step 4: run `dart doc`, fix documentation gaps on public members
-- [ ] Step 5: run `dart pub publish --dry-run` and resolve all blocking issues, then cut `0.5.0`
+- [x] Step 1: create `example/example.dart` with representative usage patterns
+- [x] Step 2: update README with accurate version, features, and code examples
+- [x] Step 3: add topics and fix pubspec metadata
+- [x] Step 4: run `dart doc`, fix documentation gaps on public members
+- [x] Step 5: run `dart pub publish --dry-run` and resolve all blocking issues, then cut `0.5.0`
 
 - Additional factorizations beyond LU/QR
 - Sparse matrices

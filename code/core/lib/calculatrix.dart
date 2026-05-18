@@ -1,3 +1,8 @@
+/// Matrix-first computation engine for calculator products.
+///
+/// All values are immutable [Matrix] instances (scalars are 1×1).
+/// Evaluation is available via infix, RPN, stack machine commands, or
+/// interactive session.
 library calculatrix;
 
 export 'src/errors/errors.dart';

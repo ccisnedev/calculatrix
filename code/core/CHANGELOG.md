@@ -4,6 +4,27 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-05-18
+
+### Added
+
+- `example/example.dart` demonstrating matrix creation, operations,
+  decompositions, RPN evaluation, and interactive session usage.
+- Topics `linear-algebra` and `math` added to pubspec for discoverability.
+- Library-level dartdoc documentation.
+
+### Changed
+
+- README fully rewritten: accurate version, complete feature list, quick-start
+  code examples, and correct API surface reference.
+- Dartdoc now generates with zero warnings.
+- `dart analyze` and `dart pub publish --dry-run` both pass cleanly.
+
+### Milestone
+
+Developer-preview release: package passes all pub.dev validation requirements
+and is ready for publication.
+
 ## [0.4.80] - 2026-05-18
 
 ### Added

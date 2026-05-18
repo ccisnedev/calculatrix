@@ -11,7 +11,6 @@
 /// - ‖P·A − L·U‖_F / ‖A‖_F measures LU reconstruction
 /// - ‖Q·R − A‖_F / ‖A‖_F measures QR reconstruction
 /// - ‖A·v − λ·v‖ / (‖A‖·‖v‖) measures eigenpair accuracy
-import 'dart:math' as math;
 
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';

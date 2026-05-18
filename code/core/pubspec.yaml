@@ -1,7 +1,7 @@
 name: calculatrix
 description: >
   Matrix-first and RPN-first computation engine for calculators built with pure Dart.
-version: 0.4.80
+version: 0.5.0
 
 repository: https://github.com/ccisnedev/calculatrix
 homepage: https://github.com/ccisnedev/calculatrix
@@ -22,3 +22,5 @@ topics:
   - calculator
   - matrix
   - rpn
+  - linear-algebra
+  - math
