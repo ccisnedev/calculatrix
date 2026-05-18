@@ -221,6 +221,62 @@ void main() {
       expect(() => value.determinant(), throwsA(isA<MatrixShapeError>()));
     });
 
+    test('computes PLU decomposition for square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[2, 1, 1],
+        <double>[4, -6, 0],
+        <double>[-2, 7, 2],
+      ]);
+
+      final LuDecomposition decomposition = value.luDecomposition();
+
+      expect(
+        (decomposition.permutation * value).almostEquals(
+          decomposition.lower * decomposition.upper,
+        ),
+        isTrue,
+      );
+      expect(decomposition.lower.at(0, 0), 1);
+      expect(decomposition.lower.at(1, 1), 1);
+      expect(decomposition.lower.at(2, 2), 1);
+    });
+
+    test('rejects LU decomposition for non-square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(() => value.luDecomposition(), throwsA(isA<MatrixShapeError>()));
+    });
+
+    test('computes QR decomposition for full-rank matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 1, 0],
+        <double>[1, 0, 1],
+        <double>[0, 1, 1],
+      ]);
+
+      final QrDecomposition decomposition = value.qrDecomposition();
+
+      expect((decomposition.q * decomposition.r).almostEquals(value), isTrue);
+      expect(
+        (decomposition.q.transpose() * decomposition.q).almostEquals(
+          Matrix.identity(3),
+        ),
+        isTrue,
+      );
+    });
+
+    test('rejects QR decomposition for wide matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(() => value.qrDecomposition(), throwsA(isA<MatrixShapeError>()));
+    });
+
     test('appends compatible row and column operands', () {
       final Matrix base = Matrix(<List<double>>[
         <double>[1, 2],

@@ -5,15 +5,18 @@
 
 [![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
 
-## Highlights (v3.1.0)
+## Highlights (v3.2.0)
 
 - `package:calculatrix` es la fuente semántica única para app y CLI.
 - El core público expone `CalculatrixMachine`, comandos tipados, macros
   públicas, programas tipados e `CalculatrixSession`.
 - `Infix` compila al mismo kernel matricial que usan `RPN` y los workflows
   directos por comando.
-- En `v3.1.0`, el core compartido añade determinante como operación pública y
-  lo expone en la máquina tipada, el CLI y la app mediante `DET`.
+- En `v3.2.0`, el core compartido añade LU y QR como descomposiciones públicas
+  y las expone en la máquina tipada, el CLI y la app `RPN`.
+- `DET`, `LU` y `QR` viven sobre el mismo contrato stack-first: una operación
+  simple devuelve una matriz escalar; una descomposición expande varios
+  factores sobre la pila canónica.
 - La línea `v3.0.1` mantiene `√` inmediato y `%` tipo Casio en `Infix`, sin
   alterar los contratos públicos de parser ni `RPN`.
 - La app usa un solo teclado `6x4`: las cuatro filas inferiores permanecen
@@ -24,6 +27,8 @@
   presets, reordenamiento y confirmación canónica del literal final.
 - El CLI soporta modos `infix`, `rpn`, `command` y `macro` sobre la misma
   API pública.
+- En `command`, si una secuencia deja varios resultados, el CLI los imprime
+  como `X0`, `X1`, `X2`, ... siguiendo el orden visible de la pila `RPN`.
 - La política numérica, los errores tipados y la memoria matricial viven en el
   core compartido.
 
@@ -80,6 +85,8 @@ flutter test integration_test/calculator_test.dart -d windows
 dart run code/cli/bin/calculatrix_cli.dart infix "[[1,2],[3,4]] * [[2]]"
 dart run code/cli/bin/calculatrix_cli.dart command "[[1,2],[3,4]]" transpose
 dart run code/cli/bin/calculatrix_cli.dart command "[[4,7],[2,6]]" det
+dart run code/cli/bin/calculatrix_cli.dart command "[[2,1,1],[4,-6,0],[-2,7,2]]" lu
+dart run code/cli/bin/calculatrix_cli.dart command "[[1,0],[0,2]]" qr
 dart run code/cli/bin/calculatrix_cli.dart macro append-zero-row "[[1,2],[3,4]]"
 ```
 
@@ -91,5 +98,6 @@ exitosos.
 ## Roadmap
 
 Ver [docs/roadmap.md](docs/roadmap.md) para el cierre de `v3.0.0`, el parche
-`v3.0.1`, el slice `v3.1.0` de determinante y la continuación de Stage 4. Ver
+`v3.0.1`, los slices `v3.1.0` y `v3.2.0` de Stage 4 y la continuación del
+roadmap. Ver
 también [docs/architecture.md](docs/architecture.md) para el modelo canónico actual.

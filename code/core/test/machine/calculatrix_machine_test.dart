@@ -251,6 +251,47 @@ void main() {
       expect(machine.depth, 1);
     });
 
+    test('expands LU decomposition through a typed matrix command', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final Matrix source = Matrix(<List<double>>[
+        <double>[2, 1, 1],
+        <double>[4, -6, 0],
+        <double>[-2, 7, 2],
+      ]);
+
+      machine.execute(PushMatrixCommand(source));
+      machine.execute(const LuDecompositionCommand());
+
+      expect(machine.depth, 3);
+
+      final List<Matrix> stack = machine.stackSnapshot;
+      final Matrix permutation = stack[0];
+      final Matrix lower = stack[1];
+      final Matrix upper = stack[2];
+
+      expect((permutation * source).almostEquals(lower * upper), isTrue);
+    });
+
+    test('expands QR decomposition through a typed matrix command', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final Matrix source = Matrix(<List<double>>[
+        <double>[1, 1, 0],
+        <double>[1, 0, 1],
+        <double>[0, 1, 1],
+      ]);
+
+      machine.execute(PushMatrixCommand(source));
+      machine.execute(const QrDecompositionCommand());
+
+      expect(machine.depth, 2);
+
+      final List<Matrix> stack = machine.stackSnapshot;
+      final Matrix q = stack[0];
+      final Matrix r = stack[1];
+
+      expect((q * r).almostEquals(source), isTrue);
+    });
+
     test('surfaces typed shape errors for invalid construction commands', () {
       final CalculatrixMachine machine = CalculatrixMachine();
 

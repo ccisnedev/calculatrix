@@ -9,8 +9,8 @@ the same canonical kernel.
 
 ## Status
 
-- Current package version: `3.1.0`
-- Focus: Stage 4 determinant slice over the canonical matrix stack kernel
+- Current package version: `3.2.0`
+- Focus: Stage 4 decomposition slice over the canonical matrix stack kernel
 - Runtime dependencies: none (pure Dart)
 
 ## Features available now
@@ -21,6 +21,8 @@ the same canonical kernel.
 - `Calculatrix.compileInfix`, `evaluateInfix`, and `evaluateRpn`
 - `CalculatrixSession` for interactive shared calculator state and memory
 - Matrix operations: `+`, `-`, `*`, `/`, `sqrt`, `scale`, `transpose`, `inverse`, `determinant`
+- Public decomposition APIs: LU with `P/L/U` factors and thin QR with `Q/R`
+  factors
 - Multiplication treats `1x1` operands as scalar scaling, so both `A * [[s]]`
 	and `[[s]] * A` are valid
 - Division currently supports scalar `1x1` denominators only; general matrix
@@ -29,6 +31,7 @@ the same canonical kernel.
 	domain errors when no real root is available
 - Primitive command families for stack operations, push/construction, unary,
 	binary, and parameterized structural edits
+- Stack-expanding decomposition commands for determinant, LU, and QR workflows
 - Public macros including zeros-like, ones-like, append-zero-row,
 	append-zero-column, and identity creation
 - Unit tests for matrix, RPN, session, and cross-notation evaluation
@@ -38,6 +41,7 @@ the same canonical kernel.
 The main public barrel is `package:calculatrix/calculatrix.dart` and exports:
 
 - `Matrix` and `MatrixDisplayFormatter`
+- `LuDecomposition` and `QrDecomposition`
 - `CalculatrixMachine`
 - `CalculatrixCommand`, `CalculatrixMacro`, `CalculatrixProgram`
 - typed commands from `commands.dart`
@@ -57,6 +61,7 @@ The main public barrel is `package:calculatrix/calculatrix.dart` and exports:
 
 - `v3.0.0` establishes the public matrix stack machine surface.
 - `v3.1.0` starts Stage 4 with determinant as a non-breaking command-surface expansion.
+- `v3.2.0` extends Stage 4 with LU and QR while keeping the same stack-machine contract.
 - RPN stack failures are exposed through the `RpnStackError` hierarchy:
 	- `RpnStackUnderflowError`
 	- `RpnStackRangeError`

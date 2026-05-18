@@ -94,6 +94,43 @@ void main() {
       expect(command.stdout.toString().trim(), '[[10]]');
     });
 
+    test('supports LU decomposition through public command routing', () async {
+      final ProcessResult command = await Process.run(
+        Platform.resolvedExecutable,
+        <String>[
+          'run',
+          'bin/calculatrix_cli.dart',
+          'command',
+          '[[2,1,1],[4,-6,0],[-2,7,2]]',
+          'lu',
+        ],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(command.exitCode, 0);
+      expect(command.stdout.toString(), contains('X0: [[4, -6, 0], [0, 4, 1], [0, 0, 1]]'));
+      expect(command.stdout.toString(), contains('X1: [[1, 0, 0], [0.5, 1, 0], [-0.5, 1, 1]]'));
+      expect(command.stdout.toString(), contains('X2: [[0, 1, 0], [1, 0, 0], [0, 0, 1]]'));
+    });
+
+    test('supports QR decomposition through public command routing', () async {
+      final ProcessResult command = await Process.run(
+        Platform.resolvedExecutable,
+        <String>[
+          'run',
+          'bin/calculatrix_cli.dart',
+          'command',
+          '[[1,0],[0,2],[0,0]]',
+          'qr',
+        ],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(command.exitCode, 0);
+      expect(command.stdout.toString(), contains('X0: [[1, 0], [0, 2]]'));
+      expect(command.stdout.toString(), contains('X1: [[1, 0], [0, 1], [0, 0]]'));
+    });
+
     test('supports public macro workflows', () async {
       final ProcessResult macro = await Process.run(
         Platform.resolvedExecutable,

@@ -175,6 +175,31 @@ final class DeterminantCommand extends CalculatrixCommand {
   }
 }
 
+final class LuDecompositionCommand extends CalculatrixCommand {
+  const LuDecompositionCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    final LuDecomposition decomposition = value.luDecomposition();
+    engine.push(decomposition.permutation);
+    engine.push(decomposition.lower);
+    engine.push(decomposition.upper);
+  }
+}
+
+final class QrDecompositionCommand extends CalculatrixCommand {
+  const QrDecompositionCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    final QrDecomposition decomposition = value.qrDecomposition();
+    engine.push(decomposition.q);
+    engine.push(decomposition.r);
+  }
+}
+
 final class DupCommand extends CalculatrixCommand {
   const DupCommand();
 

@@ -395,8 +395,8 @@ can start on top of the canonical kernel and the validated three-mode shell.
 ### v3.x.x → v4.0.0
 
 - [x] Determinant
-- [ ] LU decomposition
-- [ ] QR decomposition
+- [x] LU decomposition
+- [x] QR decomposition
 - [ ] Extend display and interaction polish for complex advanced matrix workflows
 - [ ] Extended linear algebra tests over the canonical stack kernel
 - [ ] End-to-end workflows combining matrix creation, notation switching, commands, macros, and advanced operations
@@ -415,6 +415,22 @@ can start on top of the canonical kernel and the validated three-mode shell.
 - [x] Step 2: implement the determinant API and command with square-matrix validation and scalar-matrix output
 - [x] Step 3: prove CLI and app consumer routing through focused widget and command tests
 - [x] Step 4: rerun the Windows integration suite with direct `DET` workflows before closing the slice
+
+#### v3.2.0 — LU and QR Decompositions on the Canonical Stack Kernel
+
+- [x] Add public LU decomposition with partial pivoting and explicit `P`, `L`, `U` factors for square matrices
+- [x] Add public QR decomposition with thin `Q` and `R` factors for matrices with `rowCount >= columnCount`
+- [x] Expose LU and QR through typed stack commands so decomposition results expand onto the canonical `RPN` stack instead of requiring consumer-local types
+- [x] Extend CLI command workflows to print `X0`, `X1`, ... when a command sequence leaves multiple matrix results on the stack
+- [x] Add an `RPN` factorization deck in the Flutter app so LU and QR are accessible without breaking the fixed keypad geometry
+- [x] Add focused TDD coverage in core, CLI, widget, and Windows integration suites for LU and QR workflows
+
+##### TDD Execution Order
+
+- [x] Step 1: lock LU and QR factorization contracts in `Matrix` and typed machine command tests
+- [x] Step 2: implement LU with partial pivoting and QR with thin orthogonal/upper outputs in the public core API
+- [x] Step 3: route multi-result factorization commands through CLI `command` mode and the app `RPN` factorization deck
+- [x] Step 4: rerun focused widget and Windows integration validation for stack-expanding LU and QR workflows
 
 ### v4.0.0 — Stable Release
 

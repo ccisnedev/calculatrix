@@ -4,6 +4,28 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.2.0] - 2026-05-18
+
+### Added
+
+- Public `Matrix.luDecomposition()` with explicit permutation, lower, and
+  upper factors.
+- Public `Matrix.qrDecomposition()` with thin `Q` and `R` outputs.
+- `LuDecompositionCommand` and `QrDecompositionCommand` on the public typed
+  command surface.
+- Focused LU and QR contract coverage for core, CLI, app widgets, and Windows
+  integration workflows.
+
+### Changed
+
+- Extended the Stage 4 command vocabulary to support stack-expanding
+  multi-result decompositions without changing the existing `RPN` model.
+
+### Fixed
+
+- Kept decomposition behavior in the public core and stack machine instead of
+  introducing consumer-local factorization logic.
+
 ## [3.1.0] - 2026-05-18
 
 ### Added

@@ -2,6 +2,25 @@ import '../errors/errors.dart';
 import '../numeric/numeric_policy.dart';
 import 'dart:math' as math;
 
+final class LuDecomposition {
+  const LuDecomposition({
+    required this.permutation,
+    required this.lower,
+    required this.upper,
+  });
+
+  final Matrix permutation;
+  final Matrix lower;
+  final Matrix upper;
+}
+
+final class QrDecomposition {
+  const QrDecomposition({required this.q, required this.r});
+
+  final Matrix q;
+  final Matrix r;
+}
+
 class Matrix {
   Matrix(List<List<double>> rows) : _rows = _normalize(rows) {
     _validateRectangular(_rows);
@@ -319,6 +338,173 @@ class Matrix {
     return Matrix.scalar(
       swapCount.isEven ? determinantValue : -determinantValue,
     );
+  }
+
+  LuDecomposition luDecomposition({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    _requireSquare(operation: 'LU decomposition');
+
+    final int size = rowCount;
+    final List<List<double>> permutation = List<List<double>>.generate(
+      size,
+      (int row) => List<double>.generate(
+        size,
+        (int column) => row == column ? 1 : 0,
+        growable: false,
+      ),
+      growable: false,
+    );
+    final List<List<double>> lower = List<List<double>>.generate(
+      size,
+      (int row) => List<double>.generate(
+        size,
+        (int column) => row == column ? 1 : 0,
+        growable: false,
+      ),
+      growable: false,
+    );
+    final List<List<double>> upper = List<List<double>>.generate(
+      size,
+      (int row) => List<double>.from(_rows[row]),
+      growable: false,
+    );
+
+    for (int pivotColumn = 0; pivotColumn < size; pivotColumn++) {
+      int pivotRow = pivotColumn;
+      double pivotMagnitude = upper[pivotRow][pivotColumn].abs();
+
+      for (int row = pivotColumn + 1; row < size; row++) {
+        final double candidateMagnitude = upper[row][pivotColumn].abs();
+        if (candidateMagnitude > pivotMagnitude) {
+          pivotMagnitude = candidateMagnitude;
+          pivotRow = row;
+        }
+      }
+
+      if (pivotRow != pivotColumn) {
+        final List<double> upperTemp = upper[pivotColumn];
+        upper[pivotColumn] = upper[pivotRow];
+        upper[pivotRow] = upperTemp;
+
+        final List<double> permutationTemp = permutation[pivotColumn];
+        permutation[pivotColumn] = permutation[pivotRow];
+        permutation[pivotRow] = permutationTemp;
+
+        for (int column = 0; column < pivotColumn; column++) {
+          final double lowerTemp = lower[pivotColumn][column];
+          lower[pivotColumn][column] = lower[pivotRow][column];
+          lower[pivotRow][column] = lowerTemp;
+        }
+      }
+
+      final double pivot = upper[pivotColumn][pivotColumn];
+      if (pivot.abs() <= absoluteTolerance) {
+        continue;
+      }
+
+      for (int row = pivotColumn + 1; row < size; row++) {
+        final double factor = upper[row][pivotColumn] / pivot;
+        lower[row][pivotColumn] = factor.abs() <= absoluteTolerance
+            ? 0
+            : factor;
+        upper[row][pivotColumn] = 0;
+
+        for (int column = pivotColumn + 1; column < size; column++) {
+          final double nextValue =
+              upper[row][column] - (factor * upper[pivotColumn][column]);
+          upper[row][column] = nextValue.abs() <= absoluteTolerance
+              ? 0
+              : nextValue;
+        }
+      }
+    }
+
+    return LuDecomposition(
+      permutation: Matrix(permutation),
+      lower: Matrix(lower),
+      upper: Matrix(upper),
+    );
+  }
+
+  QrDecomposition qrDecomposition({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    if (rowCount < columnCount) {
+      throw MatrixShapeError(
+        'QR decomposition requires row count >= column count, found '
+        '${rowCount}x${columnCount}.',
+      );
+    }
+
+    double dotProduct(List<double> left, List<double> right) {
+      double sum = 0;
+      for (int index = 0; index < left.length; index++) {
+        sum += left[index] * right[index];
+      }
+      return sum;
+    }
+
+    final int m = rowCount;
+    final int n = columnCount;
+    final List<List<double>> qColumns = List<List<double>>.generate(
+      n,
+      (_) => List<double>.filled(m, 0, growable: false),
+      growable: false,
+    );
+    final List<List<double>> r = List<List<double>>.generate(
+      n,
+      (_) => List<double>.filled(n, 0, growable: false),
+      growable: false,
+    );
+
+    for (int column = 0; column < n; column++) {
+      final List<double> vector = List<double>.generate(
+        m,
+        (int row) => _rows[row][column],
+        growable: false,
+      );
+
+      for (int basis = 0; basis < column; basis++) {
+        final double projection = dotProduct(qColumns[basis], vector);
+        r[basis][column] = projection.abs() <= absoluteTolerance
+            ? 0
+            : projection;
+
+        for (int row = 0; row < m; row++) {
+          final double nextValue =
+              vector[row] - (projection * qColumns[basis][row]);
+          vector[row] = nextValue.abs() <= absoluteTolerance ? 0 : nextValue;
+        }
+      }
+
+      final double norm = math.sqrt(dotProduct(vector, vector));
+      r[column][column] = norm.abs() <= absoluteTolerance ? 0 : norm;
+      if (norm <= absoluteTolerance) {
+        continue;
+      }
+
+      for (int row = 0; row < m; row++) {
+        final double normalized = vector[row] / norm;
+        qColumns[column][row] = normalized.abs() <= absoluteTolerance
+            ? 0
+            : normalized;
+      }
+    }
+
+    final List<List<double>> q = List<List<double>>.generate(
+      m,
+      (int row) => List<double>.generate(
+        n,
+        (int column) => qColumns[column][row],
+        growable: false,
+      ),
+      growable: false,
+    );
+
+    return QrDecomposition(q: Matrix(q), r: Matrix(r));
   }
 
   Matrix sqrt({

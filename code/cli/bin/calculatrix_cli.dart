@@ -32,7 +32,7 @@ void main(List<String> args) {
         }
         final CalculatrixMachine machine = CalculatrixMachine();
         _executeCommandSequence(machine, args.sublist(1));
-        print(MatrixDisplayFormatter.compact(_singleResult(machine)));
+        print(_formatCommandResults(machine));
       case 'macro':
         if (args.length < 2) {
           throw const FormatException('Missing macro workflow.');
@@ -98,6 +98,10 @@ void _executeCommandSequence(
       case 'determinant':
       case 'det':
         machine.execute(const DeterminantCommand());
+      case 'lu':
+        machine.execute(const LuDecompositionCommand());
+      case 'qr':
+        machine.execute(const QrDecompositionCommand());
       case 'append-row':
         machine.execute(const AppendRowCommand());
       case 'append-column':
@@ -266,6 +270,24 @@ Matrix _singleResult(CalculatrixMachine machine) {
   }
 
   return top;
+}
+
+String _formatCommandResults(CalculatrixMachine machine) {
+  final Matrix? top = machine.top;
+  if (machine.depth == 1 && top != null) {
+    return MatrixDisplayFormatter.compact(top);
+  }
+
+  if (machine.depth == 0) {
+    throw const FormatException('Command workflow did not leave any results.');
+  }
+
+  final List<Matrix> stack = machine.stackSnapshot.reversed.toList(growable: false);
+  return List<String>.generate(
+    stack.length,
+    (int index) => 'X$index: ${MatrixDisplayFormatter.compact(stack[index])}',
+    growable: false,
+  ).join('\n');
 }
 
 Matrix _parseOperandLiteral(String token) {

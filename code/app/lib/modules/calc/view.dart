@@ -143,6 +143,16 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('ACOL', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
     ]),
+    _KeypadDeckDef('FACT', <_ButtonDef>[
+      _ButtonDef('LU', _ButtonCategory.function),
+      _ButtonDef('QR', _ButtonCategory.function),
+      _ButtonDef('T', _ButtonCategory.function),
+      _ButtonDef('INV', _ButtonCategory.function),
+      _ButtonDef('DET', _ButtonCategory.function),
+      _ButtonDef('ZEROS', _ButtonCategory.function),
+      _ButtonDef('ONES', _ButtonCategory.function),
+      _ButtonDef('MAT', _ButtonCategory.function),
+    ]),
   ];
 
   static const List<_KeypadDeckDef> _matrixDecks = <_KeypadDeckDef>[
@@ -884,6 +894,10 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.executeRpnCommand(const InverseCommand());
         case 'DET':
           _controller.executeRpnCommand(const DeterminantCommand());
+        case 'LU':
+          _controller.executeRpnCommand(const LuDecompositionCommand());
+        case 'QR':
+          _controller.executeRpnCommand(const QrDecompositionCommand());
         case 'NEG':
           _controller.executeRpnCommand(const NegateCommand());
         case 'ZEROS':
@@ -956,6 +970,8 @@ class _CalculatorViewState extends State<CalculatorView> {
       'T' => 'Transpose top matrix',
       'INV' => 'Invert top matrix',
       'DET' => 'Determinant of top matrix',
+      'LU' => 'LU decomposition of top matrix',
+      'QR' => 'QR decomposition of top matrix',
       'NEG' => 'Negate top matrix',
       'ZEROS' => 'Fill zeros like top matrix',
       'ONES' => 'Fill ones like top matrix',

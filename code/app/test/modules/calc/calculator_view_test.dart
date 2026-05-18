@@ -71,6 +71,7 @@ const List<String> _keypadDeckLabels = <String>[
   'MEM',
   'STACK',
   'MATRIX',
+  'FACT',
   'EDIT',
   'BUILD',
 ];
@@ -1105,6 +1106,20 @@ void main() {
       expect(find.text('ACOL'), findsOneWidget);
     });
 
+    testWidgets('rpn mode exposes factorization actions from the factor deck', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await tester.tap(_keypadDeckSelector('FACT'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('LU'), findsOneWidget);
+      expect(find.text('QR'), findsOneWidget);
+      expect(find.text('DET'), findsOneWidget);
+      expect(find.text('INV'), findsOneWidget);
+    });
+
     testWidgets('rpn mode exposes direct matrix command buttons and applies transpose', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
@@ -1152,6 +1167,69 @@ void main() {
 
       expect(
         find.bySemanticsLabel(RegExp(r'Display: \[\[10\]\]')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('rpn mode applies LU decomposition and expands the stack', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'MAT');
+      await _tapCalculatorButton(tester, '3x3');
+      await _enterMatrixCell(tester, 0, 0, '2');
+      await _enterMatrixCell(tester, 0, 1, '1');
+      await _enterMatrixCell(tester, 0, 2, '1');
+      await _enterMatrixCell(tester, 1, 0, '4');
+      await _enterMatrixCell(tester, 1, 1, '-6');
+      await _enterMatrixCell(tester, 1, 2, '0');
+      await _enterMatrixCell(tester, 2, 0, '-2');
+      await _enterMatrixCell(tester, 2, 1, '7');
+      await _enterMatrixCell(tester, 2, 2, '2');
+      await _tapMatrixAction(tester, 'Push');
+
+      await tester.tap(_keypadDeckSelector('FACT'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('LU'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel(RegExp(r'Stack depth: 3')), findsOneWidget);
+      expect(find.text('Stack 3'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: \[\[4, -6, 0\], \[0, 4, 1\], \[0, 0, 1\]\]')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('rpn mode applies QR decomposition and expands the stack', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'MAT');
+      await _enterMatrixCell(tester, 0, 0, '1');
+      await _enterMatrixCell(tester, 0, 1, '0');
+      await _enterMatrixCell(tester, 1, 0, '0');
+      await _enterMatrixCell(tester, 1, 1, '2');
+      await _activateMatrixControl(tester, _addRowPlaceholder());
+      await _enterMatrixCell(tester, 2, 0, '0');
+      await _enterMatrixCell(tester, 2, 1, '0');
+      await _tapMatrixAction(tester, 'Push');
+
+      await tester.tap(_keypadDeckSelector('FACT'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('QR'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel(RegExp(r'Stack depth: 2')), findsOneWidget);
+      expect(find.text('Stack 2'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: \[\[1, 0\], \[0, 2\]\]')),
         findsOneWidget,
       );
       handle.dispose();

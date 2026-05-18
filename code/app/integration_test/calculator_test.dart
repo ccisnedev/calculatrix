@@ -10,6 +10,7 @@ const List<String> _keypadDeckLabels = <String>[
   'MEM',
   'STACK',
   'MATRIX',
+  'FACT',
   'EDIT',
   'BUILD',
 ];
@@ -881,6 +882,54 @@ void main() {
       expect(_rpnStackCard(0), findsOneWidget);
       expect(_rpnStackText(0, 'X0'), findsOneWidget);
       expect(find.text('Stack 1'), findsOneWidget);
+    });
+
+    testWidgets('rpn mode applies LU decomposition to the committed top matrix', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['2', '1', '1'],
+          <String>['4', '-6', '0'],
+          <String>['-2', '7', '2'],
+        ],
+        actionLabel: 'Push',
+        order: 3,
+      );
+
+      await _tapCalculatorButton(tester, 'LU');
+
+      expect(_displayText('[4 -6 0]\n[0  4 1]\n[0  0 1]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 3'), findsOneWidget);
+    });
+
+    testWidgets('rpn mode applies QR decomposition to the committed top matrix', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '0'],
+          <String>['0', '2'],
+        ],
+        actionLabel: 'Push',
+      );
+
+      await _tapCalculatorButton(tester, 'QR');
+
+      expect(_displayText('[1 0]\n[0 2]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 2'), findsOneWidget);
     });
 
     testWidgets('rpn mode shows the draft in X0 and the committed top in X1', (tester) async {

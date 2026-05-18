@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.2.0] - 2026-05-18
+
+Second Stage 4 slice adding LU and QR decomposition workflows on top of the
+canonical matrix stack kernel.
+
+### Core
+
+- Added public LU decomposition with partial pivoting, returning explicit
+	permutation, lower, and upper factors.
+- Added public QR decomposition with thin `Q` and `R` factors for matrices
+	whose row count is at least their column count.
+- Added typed LU and QR commands that expand decomposition results onto the
+	canonical stack instead of hiding them behind app-local behavior.
+
+### App
+
+- Added an `RPN` factorization deck exposing `LU` and `QR` alongside advanced
+	matrix commands while preserving the fixed keypad layout.
+- Kept decomposition workflows stack-native so users can inspect factors via
+	the existing `RPN` stack display.
+
+### CLI
+
+- Added `lu` and `qr` to `command` mode.
+- Updated `command` output to print `X0`, `X1`, ... when a workflow leaves
+	multiple matrix results on the stack.
+
+### Docs
+
+- Added the `v3.2.0` roadmap slice for LU and QR as the next Stage 4 delivery.
+- Updated repository and package version references for the coordinated `3.2.0`
+	release.
+
+### QA
+
+- Added focused LU and QR coverage in core matrix and machine tests, CLI
+	command tests, app widget tests, and the Windows integration suite.
+
 ## [3.1.0] - 2026-05-18
 
 First Stage 4 slice adding determinant workflows on top of the canonical
