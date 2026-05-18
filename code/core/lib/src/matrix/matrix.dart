@@ -776,6 +776,71 @@ class Matrix {
     return cofactorMatrix().transpose();
   }
 
+  /// Returns the dot product of two column vectors: Aᵀ · B.
+  ///
+  /// Both `this` and [other] must be column vectors (n×1) of the same dimension.
+  /// The result is a 1×1 scalar matrix.
+  Matrix dot(Matrix other) {
+    if (columnCount != 1) {
+      throw MatrixShapeError(
+        'dot product requires a column vector (n×1), '
+        'got ${rowCount}×$columnCount',
+      );
+    }
+    if (other.columnCount != 1) {
+      throw MatrixShapeError(
+        'dot product requires a column vector (n×1), '
+        'got ${other.rowCount}×${other.columnCount}',
+      );
+    }
+    if (rowCount != other.rowCount) {
+      throw MatrixShapeError(
+        'dot product requires vectors of the same dimension, '
+        'got ${rowCount}×1 and ${other.rowCount}×1',
+      );
+    }
+
+    double sum = 0;
+    for (int i = 0; i < rowCount; i++) {
+      sum += _rows[i][0] * other._rows[i][0];
+    }
+    return Matrix.scalar(sum);
+  }
+
+  /// Returns the cross product of two 3×1 column vectors: skew(A) · B.
+  ///
+  /// Both `this` and [other] must be 3×1 column vectors.
+  /// The result is a 3×1 column vector.
+  Matrix cross(Matrix other) {
+    if (columnCount != 1 || rowCount != 3) {
+      throw MatrixShapeError(
+        'cross product requires a 3×1 column vector, '
+        'got ${rowCount}×$columnCount',
+      );
+    }
+    if (other.columnCount != 1 || other.rowCount != 3) {
+      throw MatrixShapeError(
+        'cross product requires a 3×1 column vector, '
+        'got ${other.rowCount}×${other.columnCount}',
+      );
+    }
+
+    final double x = _rows[0][0];
+    final double y = _rows[1][0];
+    final double z = _rows[2][0];
+
+    // skew(A) · B where skew = [[0, -z, y], [z, 0, -x], [-y, x, 0]]
+    final double bx = other._rows[0][0];
+    final double by = other._rows[1][0];
+    final double bz = other._rows[2][0];
+
+    return Matrix(<List<double>>[
+      <double>[-z * by + y * bz],
+      <double>[z * bx - x * bz],
+      <double>[-y * bx + x * by],
+    ]);
+  }
+
   /// Reduces the matrix to upper Hessenberg form using Householder reflections.
   List<List<double>> _toHessenberg(double absoluteTolerance) {
     final int n = rowCount;

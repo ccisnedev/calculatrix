@@ -247,6 +247,28 @@ final class AdjugateCommand extends CalculatrixCommand {
   }
 }
 
+final class DotProductCommand extends CalculatrixCommand {
+  const DotProductCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix b = engine.pop();
+    final Matrix a = engine.pop();
+    engine.push(a.dot(b));
+  }
+}
+
+final class CrossProductCommand extends CalculatrixCommand {
+  const CrossProductCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix b = engine.pop();
+    final Matrix a = engine.pop();
+    engine.push(a.cross(b));
+  }
+}
+
 final class LuDecompositionCommand extends CalculatrixCommand {
   const LuDecompositionCommand();
 

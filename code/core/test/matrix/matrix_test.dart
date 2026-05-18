@@ -979,4 +979,173 @@ void main() {
       expect(CalculatrixNumericPolicy.defaultAbsoluteTolerance, greaterThan(0));
     });
   });
+
+  group('Vector operations', () {
+    test('dot product of two 3x1 vectors', () {
+      // A = [1, 2, 3]ᵀ, B = [4, 5, 6]ᵀ
+      // dot = 1*4 + 2*5 + 3*6 = 32
+      final Matrix a = Matrix(<List<double>>[
+        <double>[1],
+        <double>[2],
+        <double>[3],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[4],
+        <double>[5],
+        <double>[6],
+      ]);
+
+      final Matrix result = a.dot(b);
+      expect(result.isScalar, isTrue);
+      expect(result.scalarValue, 32);
+    });
+
+    test('dot product of two 2x1 vectors', () {
+      // A = [3, 4]ᵀ, B = [1, 2]ᵀ
+      // dot = 3*1 + 4*2 = 11
+      final Matrix a = Matrix(<List<double>>[
+        <double>[3],
+        <double>[4],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[1],
+        <double>[2],
+      ]);
+
+      final Matrix result = a.dot(b);
+      expect(result.isScalar, isTrue);
+      expect(result.scalarValue, 11);
+    });
+
+    test('dot product is commutative', () {
+      final Matrix a = Matrix(<List<double>>[
+        <double>[2],
+        <double>[7],
+        <double>[-1],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[3],
+        <double>[0],
+        <double>[4],
+      ]);
+
+      expect(a.dot(b), equals(b.dot(a)));
+    });
+
+    test('dot product rejects non-column vectors', () {
+      final Matrix row = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+      ]);
+      final Matrix col = Matrix(<List<double>>[
+        <double>[1],
+        <double>[2],
+        <double>[3],
+      ]);
+
+      expect(() => row.dot(col), throwsA(isA<MatrixShapeError>()));
+      expect(() => col.dot(row), throwsA(isA<MatrixShapeError>()));
+    });
+
+    test('dot product rejects mismatched dimensions', () {
+      final Matrix a = Matrix(<List<double>>[
+        <double>[1],
+        <double>[2],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[1],
+        <double>[2],
+        <double>[3],
+      ]);
+
+      expect(() => a.dot(b), throwsA(isA<MatrixShapeError>()));
+    });
+
+    test('cross product of two 3x1 vectors', () {
+      // A = [1, 0, 0]ᵀ, B = [0, 1, 0]ᵀ → [0, 0, 1]ᵀ
+      final Matrix a = Matrix(<List<double>>[
+        <double>[1],
+        <double>[0],
+        <double>[0],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[0],
+        <double>[1],
+        <double>[0],
+      ]);
+
+      final Matrix result = a.cross(b);
+      expect(result.rowCount, 3);
+      expect(result.columnCount, 1);
+      expect(result.at(0, 0), 0);
+      expect(result.at(1, 0), 0);
+      expect(result.at(2, 0), 1);
+    });
+
+    test('cross product general case', () {
+      // A = [2, 3, 4]ᵀ, B = [5, 6, 7]ᵀ
+      // cross = [3*7 - 4*6, 4*5 - 2*7, 2*6 - 3*5] = [-3, 6, -3]
+      final Matrix a = Matrix(<List<double>>[
+        <double>[2],
+        <double>[3],
+        <double>[4],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[5],
+        <double>[6],
+        <double>[7],
+      ]);
+
+      final Matrix result = a.cross(b);
+      expect(result.at(0, 0), -3);
+      expect(result.at(1, 0), 6);
+      expect(result.at(2, 0), -3);
+    });
+
+    test('cross product is anti-commutative', () {
+      final Matrix a = Matrix(<List<double>>[
+        <double>[1],
+        <double>[2],
+        <double>[3],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[4],
+        <double>[5],
+        <double>[6],
+      ]);
+
+      final Matrix axb = a.cross(b);
+      final Matrix bxa = b.cross(a);
+
+      // cross(A,B) = -cross(B,A)
+      expect(axb.at(0, 0), -bxa.at(0, 0));
+      expect(axb.at(1, 0), -bxa.at(1, 0));
+      expect(axb.at(2, 0), -bxa.at(2, 0));
+    });
+
+    test('cross product rejects non-3x1 vectors', () {
+      final Matrix a2 = Matrix(<List<double>>[
+        <double>[1],
+        <double>[2],
+      ]);
+      final Matrix b2 = Matrix(<List<double>>[
+        <double>[3],
+        <double>[4],
+      ]);
+
+      expect(() => a2.cross(b2), throwsA(isA<MatrixShapeError>()));
+    });
+
+    test('cross product rejects non-column vectors', () {
+      final Matrix row = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+      ]);
+      final Matrix col = Matrix(<List<double>>[
+        <double>[1],
+        <double>[2],
+        <double>[3],
+      ]);
+
+      expect(() => row.cross(col), throwsA(isA<MatrixShapeError>()));
+    });
+  });
 }

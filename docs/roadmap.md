@@ -579,6 +579,34 @@ determinant. Expensive for large matrices, but mathematically important.
 - [x] Step 3: add commands, wire through CLI and app
 - [x] Step 4: rerun CLI, widget, and Windows integration suites
 
+#### v0.4.60 — Vector Operations (Dot Product, Cross Product)
+
+A vector is defined as a column matrix (n×1). Two multiplication operations
+are defined for vectors using matrix algebra:
+- Dot product: `dot(A, B) = Aᵀ · B` (result is 1×1 scalar matrix, any dimension)
+- Cross product: `cross(A, B) = skew(A) · B` (only R³)
+
+Where `skew([[x],[y],[z]]) = [[0, -z, y], [z, 0, -x], [-y, x, 0]]`
+
+- [x] Add public `Matrix.dot(Matrix other)` returning Aᵀ·B as a 1×1 scalar matrix
+- [x] Add public `Matrix.cross(Matrix other)` returning skew(A)·B as a 3×1 column matrix
+- [x] Add private `Matrix._skewSymmetric()` building the 3×3 skew-symmetric matrix from a 3×1 vector
+- [x] Throw `MatrixShapeError` if operands are not column vectors (n×1) of matching dimension
+- [x] Throw `MatrixShapeError` if cross product operands are not exactly 3×1
+- [x] Add `DotProductCommand` and `CrossProductCommand` to the typed public command surface
+- [x] Route `DOT` / `dot` and `CROSS` / `cross` through CLI command mode and the app RPN deck
+- [x] Add focused core TDD coverage for dot and cross on 2D/3D vectors with known results
+- [x] Verify dot product identity: `dot(A,B) = dot(B,A)` (commutativity)
+- [x] Verify cross product identity: `cross(A,B) = -cross(B,A)` (anti-commutativity)
+- [x] Rerun CLI, widget, and Windows integration validation for the new commands
+
+##### TDD Execution Order
+
+- [x] Step 1: add failing core tests for dot and cross with known results and error cases
+- [x] Step 2: implement `dot()`, `cross()`, and `_skewSymmetric()` in `Matrix`
+- [x] Step 3: add commands, wire through CLI and app
+- [x] Step 4: rerun CLI, widget, and Windows integration suites
+
 - Additional factorizations beyond LU/QR
 - Sparse matrices
 

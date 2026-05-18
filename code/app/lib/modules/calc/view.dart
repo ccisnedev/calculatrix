@@ -163,6 +163,13 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('ADJ', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
     ]),
+    _KeypadDeckDef('VEC', <_ButtonDef>[
+      _ButtonDef('DOT', _ButtonCategory.function),
+      _ButtonDef('CROSS', _ButtonCategory.function),
+      _ButtonDef('NORM', _ButtonCategory.function),
+      _ButtonDef('TR', _ButtonCategory.function),
+      _ButtonDef('MAT', _ButtonCategory.function),
+    ]),
   ];
 
   static const List<_KeypadDeckDef> _matrixDecks = <_KeypadDeckDef>[
@@ -940,6 +947,10 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.executeRpnCommand(const CofactorMatrixCommand());
         case 'ADJ':
           _controller.executeRpnCommand(const AdjugateCommand());
+        case 'DOT':
+          _controller.executeRpnCommand(const DotProductCommand());
+        case 'CROSS':
+          _controller.executeRpnCommand(const CrossProductCommand());
         case 'LU':
           _controller.executeRpnCommand(const LuDecompositionCommand());
         case 'QR':

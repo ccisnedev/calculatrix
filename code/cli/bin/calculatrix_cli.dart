@@ -117,6 +117,10 @@ void _executeCommandSequence(
       case 'adjugate':
       case 'adj':
         machine.execute(const AdjugateCommand());
+      case 'dot':
+        machine.execute(const DotProductCommand());
+      case 'cross':
+        machine.execute(const CrossProductCommand());
       case 'lu':
         machine.execute(const LuDecompositionCommand());
       case 'qr':
