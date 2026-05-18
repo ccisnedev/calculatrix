@@ -4,6 +4,81 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.1.0] - 2026-05-18
+
+First Stage 4 slice adding determinant workflows on top of the canonical
+matrix stack kernel.
+
+### Core
+
+- Added public `Matrix.determinant()` support using square-matrix elimination
+	with scalar-matrix output so determinant stays inside the matrix-first domain.
+- Added `DeterminantCommand` to the typed command surface used by the stack
+	machine and shared session consumers.
+
+### App
+
+- Added `DET` to the shared matrix command decks so determinant is available in
+	`RPN` workflows and directly inside the Matrix editor without breaking the
+	fixed 6x4 keypad layout.
+
+### CLI
+
+- Added determinant routing to `command` mode through `det` / `determinant`.
+
+### Docs
+
+- Added the `v3.1.0` roadmap slice for determinant as the first Stage 4
+	delivery.
+- Updated repository and package version references for the coordinated `3.1.0`
+	release.
+
+### QA
+
+- Added focused determinant coverage in core matrix and machine tests, CLI
+	command tests, app widget tests, and the Windows integration suite.
+
+## [3.0.1] - 2026-05-17
+
+Patch release correcting calculator-style `Infix` interaction semantics on top
+of the `v3.0.0` foundation.
+
+### Core
+
+- Added immediate `Infix` session handling for square root against the current
+	committed value, a bare operand draft, or the trailing operand of a pending
+	binary expression.
+- Added Casio-style percent handling in `Infix`, including `x%y = x*y/100`,
+	bare-operand percent evaluation on `=`, and pending additive/multiplicative
+	percent translation.
+- Preserved public parser, direct evaluation, and `RPN` semantics while moving
+	the calculator-specific interaction behavior into `CalculatrixSession`.
+
+### App
+
+- Updated the `Infix` button workflow so `√` applies immediately and `%`
+	supports delayed Casio-style evaluation instead of collapsing every case to
+	`x/100` at keypress time.
+- Replaced the paged keypad with one shared calculator keyboard whose bottom
+	four rows remain fixed and whose top two rows switch through mode-specific
+	deck selectors.
+- Kept the shared shell wired through the same core session API.
+
+### Docs
+
+- Added the `v3.0.1` roadmap checklist for the `Infix` calculator interaction
+	patch line and extended it to cover the unified keypad redesign.
+- Updated release-facing version references for the coordinated `3.0.1` cut.
+
+### QA
+
+- Added focused core session and app widget coverage for immediate `Infix`
+	unary behavior and Casio-style percent flows.
+- Updated the app integration suite to use deck selectors and `ENTER` against
+	the unified keypad contract.
+- Revalidated public core evaluation coverage to confirm no regression in
+	parser or `RPN` contracts.
+
 ## [3.0.0] - 2026-05-17
 
 Canonical matrix stack machine foundation release.

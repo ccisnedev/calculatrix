@@ -29,11 +29,11 @@ class _StructuralDragData {
   final int index;
 }
 
-class _KeypadPageDef {
-  final String title;
+class _KeypadDeckDef {
+  final String label;
   final List<_ButtonDef> buttons;
 
-  const _KeypadPageDef(this.title, this.buttons);
+  const _KeypadDeckDef(this.label, this.buttons);
 }
 
 class _RpnStackSlot {
@@ -55,7 +55,6 @@ class CalculatorView extends StatefulWidget {
 
 class _CalculatorViewState extends State<CalculatorView> {
   final _controller = CalculatorController();
-  final PageController _pageController = PageController(keepPage: false);
   final GlobalKey<_MatrixEditorDialogState> _matrixEditorKey =
       GlobalKey<_MatrixEditorDialogState>();
 
@@ -65,138 +64,66 @@ class _CalculatorViewState extends State<CalculatorView> {
   static const double _displayFraction = 0.38196601125;
   static const double _pagePadding = 12;
   static const double _gridSpacing = 8;
-  static const double _pageHeaderHeight = 28;
-  static const double _pageIndicatorHeight = 20;
+  static const double _deckSelectorHeight = 48;
 
-  int _currentPage = 0;
+  String _infixDeckLabel = 'MAIN';
+  String _rpnDeckLabel = 'MAIN';
+  String _matrixDeckLabel = 'EDIT';
 
-  static const _primaryButtons = [
-    // Row 1: memory keys
-    _ButtonDef('MC', _ButtonCategory.function),
-    _ButtonDef('MR', _ButtonCategory.function),
-    _ButtonDef('M-', _ButtonCategory.function),
-    _ButtonDef('M+', _ButtonCategory.function),
-    // Row 2: function keys
-    _ButtonDef('C', _ButtonCategory.function),
-    _ButtonDef('√', _ButtonCategory.function),
-    _ButtonDef('%', _ButtonCategory.function),
-    _ButtonDef('÷', _ButtonCategory.operator),
-    // Row 3
+  static const List<_ButtonDef> _fixedBottomButtons = <_ButtonDef>[
     _ButtonDef('7', _ButtonCategory.number),
     _ButtonDef('8', _ButtonCategory.number),
     _ButtonDef('9', _ButtonCategory.number),
-    _ButtonDef('×', _ButtonCategory.operator),
-    // Row 4
-    _ButtonDef('4', _ButtonCategory.number),
-    _ButtonDef('5', _ButtonCategory.number),
-    _ButtonDef('6', _ButtonCategory.number),
-    _ButtonDef('-', _ButtonCategory.operator),
-    // Row 5
-    _ButtonDef('1', _ButtonCategory.number),
-    _ButtonDef('2', _ButtonCategory.number),
-    _ButtonDef('3', _ButtonCategory.number),
-    _ButtonDef('+', _ButtonCategory.operator),
-    // Row 6
-    _ButtonDef('±', _ButtonCategory.function),
-    _ButtonDef('0', _ButtonCategory.number),
-    _ButtonDef('.', _ButtonCategory.number),
-    _ButtonDef('=', _ButtonCategory.equals),
-  ];
-
-  static const _rpnPrimaryButtons = [
-    _ButtonDef('MC', _ButtonCategory.function),
-    _ButtonDef('MR', _ButtonCategory.function),
-    _ButtonDef('M-', _ButtonCategory.function),
-    _ButtonDef('M+', _ButtonCategory.function),
-    _ButtonDef('C', _ButtonCategory.function),
-    _ButtonDef('√', _ButtonCategory.function),
-    _ButtonDef('%', _ButtonCategory.function),
     _ButtonDef('÷', _ButtonCategory.operator),
-    _ButtonDef('7', _ButtonCategory.number),
-    _ButtonDef('8', _ButtonCategory.number),
-    _ButtonDef('9', _ButtonCategory.number),
-    _ButtonDef('×', _ButtonCategory.operator),
     _ButtonDef('4', _ButtonCategory.number),
     _ButtonDef('5', _ButtonCategory.number),
     _ButtonDef('6', _ButtonCategory.number),
-    _ButtonDef('-', _ButtonCategory.operator),
+    _ButtonDef('×', _ButtonCategory.operator),
     _ButtonDef('1', _ButtonCategory.number),
     _ButtonDef('2', _ButtonCategory.number),
     _ButtonDef('3', _ButtonCategory.number),
-    _ButtonDef('+', _ButtonCategory.operator),
-    _ButtonDef('±', _ButtonCategory.function),
+    _ButtonDef('-', _ButtonCategory.operator),
     _ButtonDef('0', _ButtonCategory.number),
     _ButtonDef('.', _ButtonCategory.number),
     _ButtonDef('ENTER', _ButtonCategory.equals),
-  ];
-
-  static const _editingButtons = [
-    _ButtonDef('MAT', _ButtonCategory.function),
-    _ButtonDef('(', _ButtonCategory.function),
-    _ButtonDef(')', _ButtonCategory.function),
-    _ButtonDef('⌫', _ButtonCategory.function),
-    _ButtonDef('7', _ButtonCategory.number),
-    _ButtonDef('8', _ButtonCategory.number),
-    _ButtonDef('9', _ButtonCategory.number),
-    _ButtonDef('÷', _ButtonCategory.operator),
-    _ButtonDef('4', _ButtonCategory.number),
-    _ButtonDef('5', _ButtonCategory.number),
-    _ButtonDef('6', _ButtonCategory.number),
-    _ButtonDef('×', _ButtonCategory.operator),
-    _ButtonDef('1', _ButtonCategory.number),
-    _ButtonDef('2', _ButtonCategory.number),
-    _ButtonDef('3', _ButtonCategory.number),
-    _ButtonDef('-', _ButtonCategory.operator),
-    _ButtonDef('±', _ButtonCategory.function),
-    _ButtonDef('0', _ButtonCategory.number),
-    _ButtonDef('.', _ButtonCategory.number),
     _ButtonDef('+', _ButtonCategory.operator),
-    _ButtonDef('C', _ButtonCategory.function),
-    _ButtonDef('MC', _ButtonCategory.function),
-    _ButtonDef('MR', _ButtonCategory.function),
-    _ButtonDef('M+', _ButtonCategory.function),
   ];
 
-  static const List<_KeypadPageDef> _infixPages = <_KeypadPageDef>[
-    _KeypadPageDef('Primary', _primaryButtons),
-    _KeypadPageDef('Edit', _editingButtons),
-  ];
-
-  static const List<_KeypadPageDef> _matrixInfixPages = <_KeypadPageDef>[
-    _KeypadPageDef('Primary', _primaryButtons),
-    _KeypadPageDef('Edit', _editingButtons),
-    _KeypadPageDef('Matrix', <_ButtonDef>[
+  static const List<_KeypadDeckDef> _infixDecks = <_KeypadDeckDef>[
+    _KeypadDeckDef('MAIN', <_ButtonDef>[
       _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('2x2', _ButtonCategory.function),
-      _ButtonDef('3x3', _ButtonCategory.function),
-      _ButtonDef('4x4', _ButtonCategory.function),
-      _ButtonDef('ZEROS', _ButtonCategory.function),
-      _ButtonDef('ONES', _ButtonCategory.function),
-      _ButtonDef('ID', _ButtonCategory.function),
-      _ButtonDef('CLR', _ButtonCategory.function),
-      _ButtonDef('AROW', _ButtonCategory.function),
-      _ButtonDef('ACOL', _ButtonCategory.function),
-      _ButtonDef('T', _ButtonCategory.function),
-      _ButtonDef('INV', _ButtonCategory.function),
-      _ButtonDef('7', _ButtonCategory.number),
-      _ButtonDef('8', _ButtonCategory.number),
-      _ButtonDef('9', _ButtonCategory.number),
+      _ButtonDef('C', _ButtonCategory.function),
       _ButtonDef('⌫', _ButtonCategory.function),
-      _ButtonDef('4', _ButtonCategory.number),
-      _ButtonDef('5', _ButtonCategory.number),
-      _ButtonDef('6', _ButtonCategory.number),
-      _ButtonDef('-', _ButtonCategory.operator),
-      _ButtonDef('1', _ButtonCategory.number),
-      _ButtonDef('2', _ButtonCategory.number),
-      _ButtonDef('3', _ButtonCategory.number),
-      _ButtonDef('=', _ButtonCategory.equals),
+      _ButtonDef('±', _ButtonCategory.function),
+      _ButtonDef('√', _ButtonCategory.function),
+      _ButtonDef('%', _ButtonCategory.function),
+      _ButtonDef('(', _ButtonCategory.function),
+      _ButtonDef(')', _ButtonCategory.function),
+    ]),
+    _KeypadDeckDef('MEM', <_ButtonDef>[
+      _ButtonDef('MC', _ButtonCategory.function),
+      _ButtonDef('MR', _ButtonCategory.function),
+      _ButtonDef('M-', _ButtonCategory.function),
+      _ButtonDef('M+', _ButtonCategory.function),
+      _ButtonDef('MAT', _ButtonCategory.function),
+      _ButtonDef('(', _ButtonCategory.function),
+      _ButtonDef(')', _ButtonCategory.function),
+      _ButtonDef('±', _ButtonCategory.function),
     ]),
   ];
 
-  static const List<_KeypadPageDef> _rpnPages = <_KeypadPageDef>[
-    _KeypadPageDef('RPN Entry', _rpnPrimaryButtons),
-    _KeypadPageDef('RPN Stack', <_ButtonDef>[
+  static const List<_KeypadDeckDef> _rpnDecks = <_KeypadDeckDef>[
+    _KeypadDeckDef('MAIN', <_ButtonDef>[
       _ButtonDef('MAT', _ButtonCategory.function),
+      _ButtonDef('C', _ButtonCategory.function),
+      _ButtonDef('⌫', _ButtonCategory.function),
+      _ButtonDef('±', _ButtonCategory.function),
+      _ButtonDef('MC', _ButtonCategory.function),
+      _ButtonDef('MR', _ButtonCategory.function),
+      _ButtonDef('M-', _ButtonCategory.function),
+      _ButtonDef('M+', _ButtonCategory.function),
+    ]),
+    _KeypadDeckDef('STACK', <_ButtonDef>[
       _ButtonDef('DUP', _ButtonCategory.function),
       _ButtonDef('DROP', _ButtonCategory.function),
       _ButtonDef('SWAP', _ButtonCategory.function),
@@ -204,54 +131,55 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('ROT', _ButtonCategory.function),
       _ButtonDef('√', _ButtonCategory.function),
       _ButtonDef('%', _ButtonCategory.function),
-      _ButtonDef('7', _ButtonCategory.number),
-      _ButtonDef('8', _ButtonCategory.number),
-      _ButtonDef('9', _ButtonCategory.number),
-      _ButtonDef('÷', _ButtonCategory.operator),
-      _ButtonDef('4', _ButtonCategory.number),
-      _ButtonDef('5', _ButtonCategory.number),
-      _ButtonDef('6', _ButtonCategory.number),
-      _ButtonDef('×', _ButtonCategory.operator),
-      _ButtonDef('1', _ButtonCategory.number),
-      _ButtonDef('2', _ButtonCategory.number),
-      _ButtonDef('3', _ButtonCategory.number),
-      _ButtonDef('-', _ButtonCategory.operator),
-      _ButtonDef('±', _ButtonCategory.function),
-      _ButtonDef('0', _ButtonCategory.number),
-      _ButtonDef('.', _ButtonCategory.number),
-      _ButtonDef('+', _ButtonCategory.operator),
+      _ButtonDef('NEG', _ButtonCategory.function),
     ]),
-    _KeypadPageDef('RPN Matrix', <_ButtonDef>[
-      _ButtonDef('MAT', _ButtonCategory.function),
+    _KeypadDeckDef('MATRIX', <_ButtonDef>[
       _ButtonDef('T', _ButtonCategory.function),
       _ButtonDef('INV', _ButtonCategory.function),
-      _ButtonDef('NEG', _ButtonCategory.function),
+      _ButtonDef('DET', _ButtonCategory.function),
       _ButtonDef('ZEROS', _ButtonCategory.function),
       _ButtonDef('ONES', _ButtonCategory.function),
       _ButtonDef('AROW', _ButtonCategory.function),
       _ButtonDef('ACOL', _ButtonCategory.function),
-      _ButtonDef('7', _ButtonCategory.number),
-      _ButtonDef('8', _ButtonCategory.number),
-      _ButtonDef('9', _ButtonCategory.number),
-      _ButtonDef('÷', _ButtonCategory.operator),
-      _ButtonDef('4', _ButtonCategory.number),
-      _ButtonDef('5', _ButtonCategory.number),
-      _ButtonDef('6', _ButtonCategory.number),
-      _ButtonDef('×', _ButtonCategory.operator),
-      _ButtonDef('1', _ButtonCategory.number),
-      _ButtonDef('2', _ButtonCategory.number),
-      _ButtonDef('3', _ButtonCategory.number),
-      _ButtonDef('-', _ButtonCategory.operator),
-      _ButtonDef('0', _ButtonCategory.number),
-      _ButtonDef('.', _ButtonCategory.number),
-      _ButtonDef('ENTER', _ButtonCategory.equals),
-      _ButtonDef('+', _ButtonCategory.operator),
+      _ButtonDef('MAT', _ButtonCategory.function),
+    ]),
+  ];
+
+  static const List<_KeypadDeckDef> _matrixDecks = <_KeypadDeckDef>[
+    _KeypadDeckDef('EDIT', <_ButtonDef>[
+      _ButtonDef('MAT', _ButtonCategory.function),
+      _ButtonDef('C', _ButtonCategory.function),
+      _ButtonDef('⌫', _ButtonCategory.function),
+      _ButtonDef('±', _ButtonCategory.function),
+      _ButtonDef('2x2', _ButtonCategory.function),
+      _ButtonDef('3x3', _ButtonCategory.function),
+      _ButtonDef('4x4', _ButtonCategory.function),
+      _ButtonDef('CLR', _ButtonCategory.function),
+    ]),
+    _KeypadDeckDef('BUILD', <_ButtonDef>[
+      _ButtonDef('ZEROS', _ButtonCategory.function),
+      _ButtonDef('ONES', _ButtonCategory.function),
+      _ButtonDef('ID', _ButtonCategory.function),
+      _ButtonDef('T', _ButtonCategory.function),
+      _ButtonDef('AROW', _ButtonCategory.function),
+      _ButtonDef('ACOL', _ButtonCategory.function),
+      _ButtonDef('INV', _ButtonCategory.function),
+      _ButtonDef('DET', _ButtonCategory.function),
+    ]),
+    _KeypadDeckDef('MEM', <_ButtonDef>[
+      _ButtonDef('MC', _ButtonCategory.function),
+      _ButtonDef('MR', _ButtonCategory.function),
+      _ButtonDef('M-', _ButtonCategory.function),
+      _ButtonDef('M+', _ButtonCategory.function),
+      _ButtonDef('MAT', _ButtonCategory.function),
+      _ButtonDef('C', _ButtonCategory.function),
+      _ButtonDef('⌫', _ButtonCategory.function),
+      _ButtonDef('CLR', _ButtonCategory.function),
     ]),
   ];
 
   @override
   void dispose() {
-    _pageController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -579,16 +507,23 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildKeypad() {
-    final List<_KeypadPageDef> pages = _pagesForMode(_controller.mode);
-    final int pageIndex = _currentPage.clamp(0, pages.length - 1);
+    final List<_KeypadDeckDef> decks = _decksForCurrentMode();
+    final String selectedDeckLabel = _selectedDeckLabelForCurrentMode();
+    final _KeypadDeckDef activeDeck = decks.firstWhere(
+      (_KeypadDeckDef deck) => deck.label == selectedDeckLabel,
+      orElse: () => decks.first,
+    );
+    final List<_ButtonDef> buttons = <_ButtonDef>[
+      ...activeDeck.buttons,
+      ..._fixedBottomButtons,
+    ];
 
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final double availableWidth = constraints.maxWidth - (_pagePadding * 2);
         final double availableHeight = constraints.maxHeight -
             (_pagePadding * 2) -
-            _pageHeaderHeight -
-            _pageIndicatorHeight;
+            _deckSelectorHeight;
         final double keyWidth =
             (availableWidth - (_gridSpacing * (_columnCount - 1))) /
                 _columnCount;
@@ -603,56 +538,14 @@ class _CalculatorViewState extends State<CalculatorView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                height: _pageHeaderHeight,
-                child: Center(
-                  child: Text(
-                    pages[pageIndex].title,
-                    style: const TextStyle(
-                      color: Color(0xFF8A8FA3),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ),
+              _buildKeypadDeckSelectorRow(
+                decks: decks,
+                activeDeckLabel: activeDeck.label,
               ),
               Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: pages.length,
-                  onPageChanged: (int page) {
-                    setState(() {
-                      _currentPage = page;
-                    });
-                  },
-                  itemBuilder: (BuildContext context, int index) {
-                    return _buildKeypadPage(
-                      page: pages[index],
-                      keySize: keySize,
-                    );
-                  },
-                ),
-              ),
-              SizedBox(
-                height: _pageIndicatorHeight,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (int i = 0; i < pages.length; i++)
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        width: i == pageIndex ? 20 : 8,
-                        height: 8,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          color: i == pageIndex
-                              ? const Color(0xFF4FC3F7)
-                              : const Color(0xFF2D2D44),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                  ],
+                child: _buildKeypadGrid(
+                  buttons: buttons,
+                  keySize: keySize,
                 ),
               ),
             ],
@@ -662,13 +555,70 @@ class _CalculatorViewState extends State<CalculatorView> {
     );
   }
 
-  Widget _buildKeypadPage({
-    required _KeypadPageDef page,
+  Widget _buildKeypadDeckSelectorRow({
+    required List<_KeypadDeckDef> decks,
+    required String activeDeckLabel,
+  }) {
+    return SizedBox(
+      height: _deckSelectorHeight,
+      child: Row(
+        children: [
+          for (int index = 0; index < decks.length; index++) ...[
+            Expanded(
+              child: Semantics(
+                button: true,
+                selected: decks[index].label == activeDeckLabel,
+                child: GestureDetector(
+                  onTap: () => _selectDeck(decks[index].label),
+                  child: AnimatedContainer(
+                    key: ValueKey<String>(
+                      'calculator-keypad-deck-${decks[index].label}',
+                    ),
+                    duration: const Duration(milliseconds: 180),
+                    margin: EdgeInsets.only(
+                      right: index < decks.length - 1 ? 6 : 0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: decks[index].label == activeDeckLabel
+                          ? const Color(0xFF4FC3F7)
+                          : const Color(0xFF1F2940),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: decks[index].label == activeDeckLabel
+                            ? const Color(0xFF4FC3F7)
+                            : const Color(0xFF2D2D44),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      decks[index].label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: decks[index].label == activeDeckLabel
+                            ? const Color(0xFF16213E)
+                            : const Color(0xFFADB5BD),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKeypadGrid({
+    required List<_ButtonDef> buttons,
     required double keySize,
   }) {
     final List<List<_ButtonDef>> rows = <List<_ButtonDef>>[];
-    for (int i = 0; i < page.buttons.length; i += _columnCount) {
-      rows.add(page.buttons.sublist(i, i + _columnCount));
+    for (int i = 0; i < buttons.length; i += _columnCount) {
+      rows.add(buttons.sublist(i, i + _columnCount));
     }
 
     final double gridWidth =
@@ -747,12 +697,32 @@ class _CalculatorViewState extends State<CalculatorView> {
     };
   }
 
-  List<_KeypadPageDef> _pagesForMode(CalculatorMode mode) {
-    if (mode == CalculatorMode.matrix) {
-      return _controller.isRpnEntryMode ? _rpnPages : _matrixInfixPages;
+  List<_KeypadDeckDef> _decksForCurrentMode() {
+    if (_controller.isMatrixMode) {
+      return _matrixDecks;
     }
 
-    return mode == CalculatorMode.rpn ? _rpnPages : _infixPages;
+    return _controller.isRpnMode ? _rpnDecks : _infixDecks;
+  }
+
+  String _selectedDeckLabelForCurrentMode() {
+    if (_controller.isMatrixMode) {
+      return _matrixDeckLabel;
+    }
+
+    return _controller.isRpnMode ? _rpnDeckLabel : _infixDeckLabel;
+  }
+
+  void _selectDeck(String deckLabel) {
+    setState(() {
+      if (_controller.isMatrixMode) {
+        _matrixDeckLabel = deckLabel;
+      } else if (_controller.isRpnMode) {
+        _rpnDeckLabel = deckLabel;
+      } else {
+        _infixDeckLabel = deckLabel;
+      }
+    });
   }
 
   Widget _buildModeSwitch() {
@@ -820,16 +790,7 @@ class _CalculatorViewState extends State<CalculatorView> {
 
   void _activateMode(CalculatorMode mode) {
     _controller.setMode(mode);
-    if (_pageController.hasClients) {
-      _pageController.animateToPage(
-        0,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-      );
-    }
-    setState(() {
-      _currentPage = 0;
-    });
+    setState(() {});
   }
 
   void _onButtonPressed(String label) {
@@ -869,6 +830,8 @@ class _CalculatorViewState extends State<CalculatorView> {
           editor._transposeThroughCore();
         case 'INV':
           editor._inverseThroughCore();
+        case 'DET':
+          editor._determinantThroughCore();
         case 'MC':
           _controller.memoryClear();
         case 'MR':
@@ -919,6 +882,8 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.executeRpnCommand(const TransposeCommand());
         case 'INV':
           _controller.executeRpnCommand(const InverseCommand());
+        case 'DET':
+          _controller.executeRpnCommand(const DeterminantCommand());
         case 'NEG':
           _controller.executeRpnCommand(const NegateCommand());
         case 'ZEROS':
@@ -952,6 +917,7 @@ class _CalculatorViewState extends State<CalculatorView> {
         _controller.clear();
       case '⌫':
         _controller.backspace();
+      case 'ENTER':
       case '=':
         _controller.evaluate();
       case '±':
@@ -989,6 +955,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       'ROT' => 'Rotate top three',
       'T' => 'Transpose top matrix',
       'INV' => 'Invert top matrix',
+      'DET' => 'Determinant of top matrix',
       'NEG' => 'Negate top matrix',
       'ZEROS' => 'Fill zeros like top matrix',
       'ONES' => 'Fill ones like top matrix',
@@ -1156,6 +1123,12 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
                         ? _inverseThroughCore
                         : null,
                     child: const Text('Inverse'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _draft.rowCount == _draft.columnCount
+                        ? _determinantThroughCore
+                        : null,
+                    child: const Text('Determinant'),
                   ),
                   OutlinedButton(
                     onPressed: _clearVisibleCells,
@@ -2232,6 +2205,29 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     });
   }
 
+  void _determinantThroughCore() {
+    setState(() {
+      _resetEditingState();
+      _closeStructuralActions();
+      final Matrix? matrix = _tryBuildMatrixOrNull();
+      if (matrix == null) {
+        _error =
+            _draft.validationError() ?? 'Determinant requires a valid matrix.';
+        return;
+      }
+
+      try {
+        _replaceDraftWithMatrix(
+          _executeCommandsOnMatrix(matrix, const <CalculatrixCommand>[
+            DeterminantCommand(),
+          ]),
+        );
+      } on CalculatrixError catch (error) {
+        _error = error.message;
+      }
+    });
+  }
+
   Matrix? _tryBuildMatrixOrNull() {
     try {
       _syncDraftFromControllers();
@@ -2331,6 +2327,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       case '8':
       case '9':
       case '.':
+      case '+':
       case '-':
         _appendToSelectedCell(label);
       case '⌫':

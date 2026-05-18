@@ -58,7 +58,6 @@ class CalculatrixSession {
     if (topValue == null) {
       return '';
     }
-
     return _serializeMatrix(topValue);
   }
 
@@ -81,6 +80,10 @@ class CalculatrixSession {
     if (isRpnMode) {
       _clearError();
       _rpnDraft += value;
+      return;
+    }
+
+    if (_handleImmediateInfixInput(value)) {
       return;
     }
 
@@ -355,7 +358,7 @@ class CalculatrixSession {
   }
 
   Matrix _evaluateExpression(String expression) {
-    final String normalized = expression
+    final String normalized = _normalizeSessionPercentExpression(expression)
         .replaceAll('×', '*')
         .replaceAll('÷', '/');
 
@@ -398,7 +401,7 @@ class CalculatrixSession {
   Matrix? _currentMemoryOperand() {
     final String currentExpression = expression;
     if (currentExpression.isNotEmpty) {
-      return _tryParseOperand(currentExpression);
+      return _tryEvaluateExpression(currentExpression);
     }
 
     return _currentValue;
@@ -408,8 +411,191 @@ class CalculatrixSession {
     return !isRpnMode && _infixDraft.isEmpty && _currentValue != null;
   }
 
+  bool _handleImmediateInfixInput(String value) {
+    switch (value) {
+      case '√':
+        return _applyImmediateInfixUnary(_sqrtValue);
+      case '%':
+        return _queueInfixPercent();
+      default:
+        return false;
+    }
+  }
+
+  bool _applyImmediateInfixUnary(Matrix Function(Matrix value) transform) {
+    if (_infixDraft.isNotEmpty) {
+      if (_infixDraft.contains('%')) {
+        final Matrix? resolved = _tryEvaluateExpression(_infixDraft);
+        if (resolved == null) {
+          return false;
+        }
+
+        return _rewriteInfixDraftValue(transform(resolved));
+      }
+
+      return _rewriteInfixDraftUnary(transform);
+    }
+
+    if (_showsCommittedValueInInfix) {
+      return _rewriteCommittedInfixValue(transform);
+    }
+
+    return false;
+  }
+
+  bool _queueInfixPercent() {
+    if (_showsCommittedValueInInfix) {
+      _infixDraft = '${_expressionSeedFromCurrentValue()}%';
+      _clearError();
+      return true;
+    }
+
+    if (_infixDraft.isEmpty) {
+      return false;
+    }
+
+    final String currentOperand = _currentInfixOperandExpression(_infixDraft);
+    if (currentOperand.isEmpty || currentOperand.contains('%')) {
+      return false;
+    }
+
+    if (_tryParseOperand(currentOperand) == null) {
+      return false;
+    }
+
+    _infixDraft += '%';
+    _clearError();
+    return true;
+  }
+
+  bool _rewriteInfixDraftUnary(Matrix Function(Matrix value) transform) {
+    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(
+      _infixDraft,
+    );
+    if (context != null) {
+      final Matrix? rightValue = _tryParseOperand(context.rightExpression);
+      if (rightValue == null) {
+        return false;
+      }
+
+      try {
+        final Matrix transformed = transform(rightValue);
+        _infixDraft =
+            '${context.leftExpression}${context.operator}${_expressionSeedFromValue(transformed)}';
+        _clearError();
+      } on FormatException catch (error) {
+        _lastError = error;
+      } on CalculatrixError catch (error) {
+        _lastError = error;
+      }
+
+      return true;
+    }
+
+    final Matrix? operand = _tryParseOperand(_infixDraft);
+    if (operand != null) {
+      return _rewriteInfixDraftValue(transform(operand));
+    }
+
+    return false;
+  }
+
+  bool _rewriteInfixDraftValue(Matrix value) {
+    _infixDraft = _expressionSeedFromValue(value);
+    _clearError();
+    return true;
+  }
+
+  bool _rewriteCommittedInfixValue(Matrix Function(Matrix value) transform) {
+    final Matrix? currentValue = _currentValue;
+    if (currentValue == null) {
+      return false;
+    }
+
+    try {
+      _updateCommittedValueFromInfix(
+        transform(currentValue),
+        invalidateRepeatEquals: true,
+      );
+      _clearError();
+    } on FormatException catch (error) {
+      _lastError = error;
+    } on CalculatrixError catch (error) {
+      _lastError = error;
+    }
+
+    return true;
+  }
+
   bool _isOperator(String value) {
     return value == '+' || value == '-' || value == '×' || value == '÷';
+  }
+
+  String _currentInfixOperandExpression(String expression) {
+    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(expression);
+    return context?.rightExpression ?? expression;
+  }
+
+  _InfixBinaryContext? _tryParseInfixBinaryContext(String expression) {
+    final int operatorIndex = _findLastTopLevelOperator(expression);
+    if (operatorIndex <= 0 || operatorIndex >= expression.length - 1) {
+      return null;
+    }
+
+    return _InfixBinaryContext(
+      leftExpression: expression.substring(0, operatorIndex),
+      operator: expression[operatorIndex],
+      rightExpression: expression.substring(operatorIndex + 1),
+    );
+  }
+
+  int _findLastTopLevelOperator(String expression) {
+    int parenDepth = 0;
+    int bracketDepth = 0;
+
+    for (int index = expression.length - 1; index >= 0; index--) {
+      final String character = expression[index];
+      switch (character) {
+        case ')':
+          parenDepth++;
+          continue;
+        case '(':
+          parenDepth--;
+          continue;
+        case ']':
+          bracketDepth++;
+          continue;
+        case '[':
+          bracketDepth--;
+          continue;
+      }
+
+      if (parenDepth != 0 || bracketDepth != 0 || !_isOperator(character)) {
+        continue;
+      }
+
+      if ((character == '+' || character == '-') &&
+          _isUnarySignAt(expression, index)) {
+        continue;
+      }
+
+      return index;
+    }
+
+    return -1;
+  }
+
+  bool _isUnarySignAt(String expression, int index) {
+    if (index == 0) {
+      return true;
+    }
+
+    final String previous = expression[index - 1];
+    if (previous == 'e' || previous == 'E') {
+      return true;
+    }
+
+    return _isOperator(previous) || previous == '(';
   }
 
   Matrix _parseDraftOperand(String expression) {
@@ -423,6 +609,16 @@ class CalculatrixSession {
   Matrix? _tryParseOperand(String expression) {
     try {
       return _parseDraftOperand(expression);
+    } on FormatException {
+      return null;
+    } on CalculatrixError {
+      return null;
+    }
+  }
+
+  Matrix? _tryEvaluateExpression(String expression) {
+    try {
+      return _evaluateExpression(expression);
     } on FormatException {
       return null;
     } on CalculatrixError {
@@ -557,6 +753,121 @@ class CalculatrixSession {
     return value.scale(-1);
   }
 
+  Matrix _sqrtValue(Matrix value) {
+    return value.sqrt();
+  }
+
+  String _normalizeSessionPercentExpression(String expression) {
+    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(expression);
+    if (context != null) {
+      final String normalizedLeft = _normalizeSessionPercentExpression(
+        context.leftExpression,
+      );
+      final String normalizedRight = _normalizeRightOperandPercentExpression(
+        operator: context.operator,
+        normalizedLeftExpression: normalizedLeft,
+        rightExpression: context.rightExpression,
+      );
+      return '$normalizedLeft${context.operator}$normalizedRight';
+    }
+
+    return _normalizeStandalonePercentExpression(expression);
+  }
+
+  String _normalizeRightOperandPercentExpression({
+    required String operator,
+    required String normalizedLeftExpression,
+    required String rightExpression,
+  }) {
+    final _InfixPercentContext? percentContext =
+        _tryParseInfixPercentContext(rightExpression);
+    if (percentContext == null) {
+      return _normalizeStandalonePercentExpression(rightExpression);
+    }
+
+    final String normalizedPercentLeft = _normalizeSessionPercentExpression(
+      percentContext.leftExpression,
+    );
+    if (percentContext.rightExpression.isNotEmpty) {
+      final String normalizedPercentRight = _normalizeSessionPercentExpression(
+        percentContext.rightExpression,
+      );
+      return '(($normalizedPercentLeft)*($normalizedPercentRight)/100)';
+    }
+
+    switch (operator) {
+      case '+':
+      case '-':
+        return '(($normalizedLeftExpression)*($normalizedPercentLeft)/100)';
+      case '×':
+      case '÷':
+        return '(($normalizedPercentLeft)/100)';
+      default:
+        return '(($normalizedPercentLeft)/100)';
+    }
+  }
+
+  String _normalizeStandalonePercentExpression(String expression) {
+    final _InfixPercentContext? percentContext =
+        _tryParseInfixPercentContext(expression);
+    if (percentContext == null) {
+      return expression;
+    }
+
+    final String normalizedLeft = _normalizeSessionPercentExpression(
+      percentContext.leftExpression,
+    );
+    if (percentContext.rightExpression.isNotEmpty) {
+      final String normalizedRight = _normalizeSessionPercentExpression(
+        percentContext.rightExpression,
+      );
+      return '(($normalizedLeft)*($normalizedRight)/100)';
+    }
+
+    return '(($normalizedLeft)/100)';
+  }
+
+  _InfixPercentContext? _tryParseInfixPercentContext(String expression) {
+    final int percentIndex = _findFirstTopLevelPercent(expression);
+    if (percentIndex <= 0) {
+      return null;
+    }
+
+    return _InfixPercentContext(
+      leftExpression: expression.substring(0, percentIndex),
+      rightExpression: expression.substring(percentIndex + 1),
+    );
+  }
+
+  int _findFirstTopLevelPercent(String expression) {
+    int parenDepth = 0;
+    int bracketDepth = 0;
+
+    for (int index = 0; index < expression.length; index++) {
+      final String character = expression[index];
+      switch (character) {
+        case '(':
+          parenDepth++;
+          continue;
+        case ')':
+          parenDepth--;
+          continue;
+        case '[':
+          bracketDepth++;
+          continue;
+        case ']':
+          bracketDepth--;
+          continue;
+      }
+
+      if (parenDepth == 0 && bracketDepth == 0 && character == '%') {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
   String _serializeMatrix(Matrix matrix) {
     final StringBuffer buffer = StringBuffer('[');
 
@@ -604,4 +915,26 @@ class CalculatrixSession {
     }
     return text;
   }
+}
+
+class _InfixBinaryContext {
+  const _InfixBinaryContext({
+    required this.leftExpression,
+    required this.operator,
+    required this.rightExpression,
+  });
+
+  final String leftExpression;
+  final String operator;
+  final String rightExpression;
+}
+
+class _InfixPercentContext {
+  const _InfixPercentContext({
+    required this.leftExpression,
+    required this.rightExpression,
+  });
+
+  final String leftExpression;
+  final String rightExpression;
 }

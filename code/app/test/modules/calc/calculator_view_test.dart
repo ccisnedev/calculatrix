@@ -62,6 +62,19 @@ Finder _calculatorButton(String label) {
   return find.byKey(ValueKey<String>('calculator-button-$label'));
 }
 
+Finder _keypadDeckSelector(String label) {
+  return find.byKey(ValueKey<String>('calculator-keypad-deck-$label'));
+}
+
+const List<String> _keypadDeckLabels = <String>[
+  'MAIN',
+  'MEM',
+  'STACK',
+  'MATRIX',
+  'EDIT',
+  'BUILD',
+];
+
 Future<void> _ensureCalculatorButtonVisible(
   WidgetTester tester,
   String label,
@@ -71,16 +84,13 @@ Future<void> _ensureCalculatorButtonVisible(
     return;
   }
 
-  for (int i = 0; i < 4; i++) {
-    await tester.drag(find.byType(PageView), const Offset(-500, 0));
-    await tester.pumpAndSettle();
-    if (button.evaluate().isNotEmpty) {
-      return;
+  for (final String deckLabel in _keypadDeckLabels) {
+    final Finder selector = _keypadDeckSelector(deckLabel);
+    if (selector.evaluate().isEmpty) {
+      continue;
     }
-  }
 
-  for (int i = 0; i < 4; i++) {
-    await tester.drag(find.byType(PageView), const Offset(500, 0));
+    await tester.tap(selector);
     await tester.pumpAndSettle();
     if (button.evaluate().isNotEmpty) {
       return;
@@ -122,10 +132,7 @@ Future<void> _activateMatrixControl(WidgetTester tester, Finder control) async {
 }
 
 Future<void> _openMatrixEditor(WidgetTester tester) async {
-  await tester.drag(find.byType(PageView), const Offset(-500, 0));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('MAT'));
-  await tester.pumpAndSettle();
+  await _tapCalculatorButton(tester, 'MAT');
 }
 
 Future<void> _enterMatrixCell(
@@ -146,29 +153,14 @@ Future<void> _enterMatrixCell(
 Future<void> _tapMatrixAction(WidgetTester tester, String label) async {
   switch (label) {
     case 'Insert':
-      for (int i = 0; i < 4; i++) {
-        if (_calculatorButton('=').evaluate().isNotEmpty) {
-          await tester.tap(_calculatorButton('='));
-          await tester.pumpAndSettle();
-          return;
-        }
-        await tester.drag(find.byType(PageView), const Offset(500, 0));
-        await tester.pumpAndSettle();
-      }
-      expect(_calculatorButton('='), findsOneWidget);
+      await _tapCalculatorButton(tester, 'ENTER');
+      return;
     case 'Push':
-      for (int i = 0; i < 4; i++) {
-        if (_calculatorButton('ENTER').evaluate().isNotEmpty) {
-          await tester.tap(_calculatorButton('ENTER'));
-          await tester.pumpAndSettle();
-          return;
-        }
-        await tester.drag(find.byType(PageView), const Offset(500, 0));
-        await tester.pumpAndSettle();
-      }
-      expect(_calculatorButton('ENTER'), findsOneWidget);
+      await _tapCalculatorButton(tester, 'ENTER');
+      return;
     case 'Cancel':
       await _tapCalculatorButton(tester, 'MAT');
+      return;
     default:
       await _tapCalculatorButton(tester, label);
   }
@@ -199,10 +191,11 @@ void main() {
         '7', '8', '9', '×',
         '4', '5', '6', '-',
         '1', '2', '3', '+',
-        '±', '.', '=',
+        '±', '.', 'ENTER', 'MAT', '(', ')',
       ];
       for (final label in expected) {
-        expect(find.text(label), findsOneWidget,
+        await _ensureCalculatorButtonVisible(tester, label);
+        expect(_calculatorButton(label), findsOneWidget,
             reason: 'Button "$label" not found');
       }
       // '0' appears in both display and button
@@ -221,7 +214,7 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('tap equals evaluates expression', (tester) async {
+    testWidgets('tap enter evaluates expression', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
       await tester.tap(find.text('3'));
@@ -230,7 +223,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('4'));
       await tester.pump();
-      await tester.tap(find.text('='));
+      await tester.tap(find.text('ENTER'));
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 7')),
@@ -253,14 +246,12 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('sqrt button works', (tester) async {
+    testWidgets('sqrt button applies immediately in infix mode', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('√'));
-      await tester.pump();
       await tester.tap(find.text('9'));
       await tester.pump();
-      await tester.tap(find.text('='));
+      await tester.tap(find.text('√'));
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 3')),
@@ -278,7 +269,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('2'));
       await tester.pump();
-      await tester.tap(find.text('='));
+      await tester.tap(find.text('ENTER'));
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 16')),
@@ -287,20 +278,65 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('percent button works', (tester) async {
+    testWidgets('percent button evaluates a bare operand on equals in infix mode', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      // 50% = 0.5
       await tester.tap(find.text('5'));
       await tester.pump();
       await tester.tap(find.text('0'));
       await tester.pump();
       await tester.tap(find.text('%'));
       await tester.pump();
-      await tester.tap(find.text('='));
+      await tester.tap(find.text('ENTER'));
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 0\.5')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('percent button supports casio-style x percent y infix flow', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+      await tester.tap(find.text('1'));
+      await tester.pump();
+      await tester.tap(find.text('2'));
+      await tester.pump();
+      await tester.tap(find.text('%'));
+      await tester.pump();
+      await tester.tap(find.text('5'));
+      await tester.pump();
+      await tester.tap(find.text('0'));
+      await tester.pump();
+      await tester.tap(find.text('ENTER'));
+      await tester.pump();
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: 6')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('percent button supports calculator-style additive infix flow', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+      await tester.tap(find.text('5'));
+      await tester.pump();
+      await tester.tap(find.text('0'));
+      await tester.pump();
+      await tester.tap(find.text('+'));
+      await tester.pump();
+      await tester.tap(find.text('1'));
+      await tester.pump();
+      await tester.tap(find.text('2'));
+      await tester.pump();
+      await tester.tap(find.text('%'));
+      await tester.pump();
+      await tester.tap(find.text('ENTER'));
+      await tester.pump();
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: 56')),
         findsOneWidget,
       );
       handle.dispose();
@@ -332,7 +368,8 @@ void main() {
 
       expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsOneWidget);
       expect(find.text('Matrix editor'), findsNothing);
-      expect(find.byType(PageView), findsOneWidget);
+      expect(_keypadDeckSelector('EDIT'), findsOneWidget);
+      expect(find.byType(PageView), findsNothing);
     });
 
     testWidgets('matrix mode preserves the same display and keypad shell sizes', (tester) async {
@@ -376,33 +413,42 @@ void main() {
       expect(find.text('Infix entry'), findsNothing);
     });
 
-    testWidgets('supports horizontal keypad paging', (tester) async {
+    testWidgets('switches infix keypad decks while keeping the fixed numeric layout', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      expect(find.text('('), findsNothing);
+      expect(_calculatorButton('7'), findsOneWidget);
+      expect(_calculatorButton('ENTER'), findsOneWidget);
 
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.tap(_keypadDeckSelector('MEM'));
       await tester.pumpAndSettle();
 
-      expect(find.text('('), findsOneWidget);
-      expect(find.text('⌫'), findsOneWidget);
+      expect(_calculatorButton('MC'), findsOneWidget);
+      expect(_calculatorButton('MR'), findsOneWidget);
+
+      await tester.tap(_keypadDeckSelector('MAIN'));
+      await tester.pumpAndSettle();
+
+      expect(_calculatorButton('('), findsOneWidget);
+      expect(_calculatorButton('⌫'), findsOneWidget);
+      expect(_calculatorButton('7'), findsOneWidget);
+      expect(_calculatorButton('ENTER'), findsOneWidget);
     });
 
-    testWidgets('supports horizontal keypad paging with mouse drag', (tester) async {
+    testWidgets('rpn mode exposes stack actions from the stack deck', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      expect(find.text('('), findsNothing);
-
-      final TestGesture gesture = await tester.startGesture(
-        tester.getCenter(find.byType(PageView)),
-        kind: PointerDeviceKind.mouse,
-      );
-      await gesture.moveBy(const Offset(-500, 0));
-      await gesture.up();
+      await tester.tap(find.text('RPN'));
       await tester.pumpAndSettle();
 
-      expect(find.text('('), findsOneWidget);
-      expect(find.text('⌫'), findsOneWidget);
+      await tester.tap(_keypadDeckSelector('STACK'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('DUP'), findsOneWidget);
+      expect(find.text('DROP'), findsOneWidget);
+      expect(find.text('SWAP'), findsOneWidget);
+      expect(find.text('ROT'), findsOneWidget);
+      expect(_calculatorButton('7'), findsOneWidget);
+      expect(_calculatorButton('ENTER'), findsOneWidget);
     });
 
     testWidgets('uses square calculator keys', (tester) async {
@@ -424,7 +470,7 @@ void main() {
 
       expect(find.text('Matrix editor'), findsNothing);
       expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsOneWidget);
-      expect(_calculatorButton('='), findsOneWidget);
+      expect(_calculatorButton('ENTER'), findsOneWidget);
       expect(_rowTab(0), findsOneWidget);
       expect(_rowTab(1), findsOneWidget);
       expect(_columnTab(0), findsOneWidget);
@@ -850,6 +896,23 @@ void main() {
       expect(_matrixEditableText(tester, 1, 1).controller.text, startsWith('0.4'));
     });
 
+    testWidgets('matrix editor determinant rewrites a valid draft through the core command path', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+      await _enterMatrixCell(tester, 0, 0, '4');
+      await _enterMatrixCell(tester, 0, 1, '7');
+      await _enterMatrixCell(tester, 1, 0, '2');
+      await _enterMatrixCell(tester, 1, 1, '6');
+
+      await _tapCalculatorButton(tester, 'DET');
+
+      expect(_matrixCell(0, 0), findsOneWidget);
+      expect(_matrixCell(0, 1), findsNothing);
+      expect(_matrixCell(1, 0), findsNothing);
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '10');
+    });
+
     testWidgets('matrix editor disables identity for non-square shapes', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
@@ -921,8 +984,9 @@ void main() {
       await _tapCalculatorButton(tester, 'ZEROS');
       await _enterMatrixCell(tester, 3, 3, '9');
 
+      await _ensureCalculatorButtonVisible(tester, 'MAT');
       expect(_calculatorButton('MAT'), findsWidgets);
-      expect(_calculatorButton('='), findsOneWidget);
+      expect(_calculatorButton('ENTER'), findsOneWidget);
 
       await _tapMatrixAction(tester, 'Insert');
 
@@ -1026,17 +1090,19 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('rpn mode exposes a stack actions page', (tester) async {
+    testWidgets('rpn mode exposes matrix command actions from the matrix deck', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       await tester.tap(find.text('RPN'));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.tap(_keypadDeckSelector('MATRIX'));
       await tester.pumpAndSettle();
 
-      expect(find.text('DUP'), findsOneWidget);
-      expect(find.text('DROP'), findsOneWidget);
-      expect(find.text('SWAP'), findsOneWidget);
+      expect(find.text('T'), findsOneWidget);
+      expect(find.text('INV'), findsOneWidget);
+      expect(find.text('DET'), findsOneWidget);
+      expect(find.text('AROW'), findsOneWidget);
+      expect(find.text('ACOL'), findsOneWidget);
     });
 
     testWidgets('rpn mode exposes direct matrix command buttons and applies transpose', (tester) async {
@@ -1044,22 +1110,15 @@ void main() {
 
       await tester.tap(find.text('RPN'));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('MAT'));
-      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'MAT');
       await _enterMatrixCell(tester, 0, 0, '1');
       await _enterMatrixCell(tester, 0, 1, '2');
       await _enterMatrixCell(tester, 1, 0, '3');
       await _enterMatrixCell(tester, 1, 1, '4');
       await _tapMatrixAction(tester, 'Push');
 
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.tap(_keypadDeckSelector('MATRIX'));
       await tester.pumpAndSettle();
-      if (find.text('T').evaluate().isEmpty) {
-        await tester.drag(find.byType(PageView), const Offset(-500, 0));
-        await tester.pumpAndSettle();
-      }
 
       expect(find.text('T'), findsOneWidget);
       expect(find.text('ZEROS'), findsOneWidget);
@@ -1073,28 +1132,53 @@ void main() {
       );
     });
 
+    testWidgets('rpn mode exposes determinant and applies it to the top matrix', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'MAT');
+      await _enterMatrixCell(tester, 0, 0, '4');
+      await _enterMatrixCell(tester, 0, 1, '7');
+      await _enterMatrixCell(tester, 1, 0, '2');
+      await _enterMatrixCell(tester, 1, 1, '6');
+      await _tapMatrixAction(tester, 'Push');
+
+      await tester.tap(_keypadDeckSelector('MATRIX'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DET'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: \[\[10\]\]')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
     testWidgets('rpn mode reproduces append row and column workflows with direct matrix macros', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
       await tester.tap(find.text('RPN'));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(PageView), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('MAT'));
-      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'MAT');
       await _enterMatrixCell(tester, 0, 0, '1');
       await _enterMatrixCell(tester, 0, 1, '2');
       await _enterMatrixCell(tester, 1, 0, '3');
       await _enterMatrixCell(tester, 1, 1, '4');
       await _tapMatrixAction(tester, 'Push');
 
+      await tester.tap(_keypadDeckSelector('MATRIX'));
+      await tester.pumpAndSettle();
+
       await _ensureCalculatorButtonVisible(tester, 'AROW');
       expect(find.text('AROW'), findsOneWidget);
       expect(find.text('ACOL'), findsOneWidget);
       expect(find.text('T'), findsOneWidget);
       expect(find.text('INV'), findsOneWidget);
-      expect(find.text('NEG'), findsOneWidget);
+      expect(find.text('DET'), findsOneWidget);
       expect(find.text('ZEROS'), findsOneWidget);
       expect(find.text('ONES'), findsOneWidget);
 
@@ -1139,9 +1223,7 @@ void main() {
       await _enterMatrixCell(tester, 1, 1, '6');
       await _tapMatrixAction(tester, 'Insert');
 
-      await tester.drag(find.byType(PageView), const Offset(500, 0));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('='));
+      await tester.tap(find.text('ENTER'));
       await tester.pumpAndSettle();
 
       expect(

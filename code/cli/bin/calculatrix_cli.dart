@@ -95,6 +95,9 @@ void _executeCommandSequence(
         machine.execute(const TransposeCommand());
       case 'inverse':
         machine.execute(const InverseCommand());
+      case 'determinant':
+      case 'det':
+        machine.execute(const DeterminantCommand());
       case 'append-row':
         machine.execute(const AppendRowCommand());
       case 'append-column':

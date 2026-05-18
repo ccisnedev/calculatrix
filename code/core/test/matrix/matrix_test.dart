@@ -203,6 +203,24 @@ void main() {
       );
     });
 
+    test('computes determinant as a scalar matrix through the public API', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[4, 7],
+        <double>[2, 6],
+      ]);
+
+      expect(value.determinant(), Matrix.scalar(10));
+    });
+
+    test('rejects determinant for non-square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(() => value.determinant(), throwsA(isA<MatrixShapeError>()));
+    });
+
     test('appends compatible row and column operands', () {
       final Matrix base = Matrix(<List<double>>[
         <double>[1, 2],

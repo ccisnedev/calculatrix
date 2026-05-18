@@ -165,6 +165,16 @@ final class InverseCommand extends CalculatrixCommand {
   }
 }
 
+final class DeterminantCommand extends CalculatrixCommand {
+  const DeterminantCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    engine.push(value.determinant());
+  }
+}
+
 final class DupCommand extends CalculatrixCommand {
   const DupCommand();
 

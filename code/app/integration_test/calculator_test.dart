@@ -4,7 +4,15 @@ import 'package:integration_test/integration_test.dart';
 import 'package:calculatrix_app/main.dart';
 
 const Duration _uiStep = Duration(milliseconds: 100);
-const double _pageDragDx = 500;
+
+const List<String> _keypadDeckLabels = <String>[
+  'MAIN',
+  'MEM',
+  'STACK',
+  'MATRIX',
+  'EDIT',
+  'BUILD',
+];
 
 Future<void> _pumpForUi(WidgetTester tester, {int steps = 6}) async {
   for (int i = 0; i < steps; i++) {
@@ -66,17 +74,12 @@ Future<void> _pumpApp(WidgetTester tester) async {
 }
 
 Future<void> _tapEquals(WidgetTester tester) async {
-  if (_button('=').evaluate().isEmpty) {
+  if (_button('ENTER').evaluate().isEmpty) {
     await tester.tap(find.text('Infix'));
     await _pumpForUi(tester);
   }
 
-  if (_button('=').evaluate().isEmpty) {
-    await tester.drag(find.byType(PageView), const Offset(1000, 0));
-    await _pumpUntilFound(tester, _button('='));
-  }
-
-  await _tapFinderCenter(tester, _button('='));
+  await _tapCalculatorButton(tester, 'ENTER');
 }
 
 Future<void> _switchMode(WidgetTester tester, String mode) async {
@@ -89,7 +92,7 @@ Future<void> _showInfixEditPage(WidgetTester tester) async {
 }
 
 Future<void> _showInfixPrimaryPage(WidgetTester tester) async {
-  await _ensureButtonVisible(tester, '=');
+  await _ensureButtonVisible(tester, 'ENTER');
 }
 
 Future<void> _showRpnStackPage(WidgetTester tester) async {
@@ -132,17 +135,13 @@ Future<void> _ensureButtonVisible(WidgetTester tester, String label) async {
     return;
   }
 
-  for (int i = 0; i < 3; i++) {
-    await tester.drag(find.byType(PageView), const Offset(-_pageDragDx, 0));
-    await _pumpUntilSettled(tester);
-    if (button.evaluate().isNotEmpty) {
-      return;
+  for (final String deckLabel in _keypadDeckLabels) {
+    final Finder selector = _deckSelector(deckLabel);
+    if (selector.evaluate().isEmpty) {
+      continue;
     }
-  }
 
-  for (int i = 0; i < 3; i++) {
-    await tester.drag(find.byType(PageView), const Offset(_pageDragDx, 0));
-    await _pumpUntilSettled(tester);
+    await _tapFinderCenter(tester, selector);
     if (button.evaluate().isNotEmpty) {
       return;
     }
@@ -199,7 +198,8 @@ String _matrixKeyLabel(String label) {
     'Ones' => 'ONES',
     'Transpose' => 'T',
     'Inverse' => 'INV',
-    'Insert' => '=',
+    'Determinant' => 'DET',
+    'Insert' => 'ENTER',
     'Push' => 'ENTER',
     'Cancel' => 'MAT',
     _ => label,
@@ -269,6 +269,10 @@ Future<void> _confirmMatrixDialog(
 
 Finder _button(String label) {
   return find.byKey(ValueKey<String>('calculator-button-$label')).hitTestable();
+}
+
+Finder _deckSelector(String label) {
+  return find.byKey(ValueKey<String>('calculator-keypad-deck-$label')).hitTestable();
 }
 
 Finder _keyedText(String key, String value) {
@@ -390,8 +394,7 @@ void main() {
     testWidgets('parentheses: (2 + 3) × 4 = 20', (tester) async {
       await _pumpApp(tester);
 
-      await tester.drag(find.byType(PageView), const Offset(-1000, 0));
-      await _pumpUntilSettled(tester);
+      await _showInfixEditPage(tester);
 
       await tester.tap(_button('('));
       await tester.pump();
@@ -656,12 +659,9 @@ void main() {
       await _showInfixPrimaryPage(tester);
       await _tapEquals(tester);
 
-      await tester.tap(_button('M+'));
-      await _pumpForUi(tester);
-      await tester.tap(_button('C'));
-      await _pumpForUi(tester);
-      await tester.tap(_button('MR'));
-      await _pumpForUi(tester);
+      await _tapCalculatorButton(tester, 'M+');
+      await _tapCalculatorButton(tester, 'C');
+      await _tapCalculatorButton(tester, 'MR');
 
       expect(_expressionText('[[1,2],[3,4]]'), findsOneWidget);
     });
@@ -851,15 +851,36 @@ void main() {
 
       await _showRpnPrimaryPage(tester);
 
-      await tester.tap(_button('M+'));
-      await _pumpUntilSettled(tester);
-      await tester.tap(_button('MR'));
-      await _pumpUntilSettled(tester);
+      await _tapCalculatorButton(tester, 'M+');
+      await _tapCalculatorButton(tester, 'MR');
 
       expect(_rpnStackCard(0), findsOneWidget);
       expect(_rpnStackText(0, 'X0'), findsOneWidget);
       expect(_displayText('[1 2]\n[3 4]'), findsOneWidget);
       expect(find.text('Stack 2'), findsOneWidget);
+    });
+
+    testWidgets('rpn mode applies determinant to the committed top matrix', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['4', '7'],
+          <String>['2', '6'],
+        ],
+        actionLabel: 'Push',
+      );
+
+      await _tapCalculatorButton(tester, 'DET');
+
+      expect(_displayText('[[10]]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
     });
 
     testWidgets('rpn mode shows the draft in X0 and the committed top in X1', (tester) async {

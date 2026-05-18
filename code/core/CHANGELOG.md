@@ -4,6 +4,45 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.1.0] - 2026-05-18
+
+### Added
+
+- Public `Matrix.determinant()` support for square matrices with scalar-matrix
+  output.
+- `DeterminantCommand` on the public typed command surface.
+- Focused determinant contract coverage for `Matrix`, `CalculatrixMachine`,
+  CLI command routing, app widgets, and Windows integration workflows.
+
+### Changed
+
+- Expanded the first Stage 4 release slice without changing existing parser,
+  session, or `RPN` contracts.
+
+### Fixed
+
+- Kept determinant available to app and CLI consumers through the same public
+  command barrel instead of consumer-local implementations.
+
+## [3.0.1] - 2026-05-17
+
+### Changed
+
+- `CalculatrixSession` now treats calculator-style `Infix` square root as an
+  immediate action over the committed value, a bare operand draft, or the
+  trailing operand of a pending binary expression.
+- `CalculatrixSession` now supports Casio-style `Infix` percent semantics,
+  including `x%y = x*y/100`, bare-operand percent on evaluation, and pending
+  additive/multiplicative contexts, while keeping public parser and `RPN`
+  semantics unchanged.
+
+### Fixed
+
+- Corrected the interactive `Infix` calculator contract so `√` and `%` no
+  longer collapse every percent use case to `x/100`.
+- Kept public direct-evaluation behavior stable while moving consumer-specific
+  interaction translation into the session layer.
+
 ## [3.0.0] - 2026-05-17
 
 ### Added

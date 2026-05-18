@@ -5,13 +5,20 @@
 
 [![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
 
-## Highlights (v3.0.0)
+## Highlights (v3.1.0)
 
 - `package:calculatrix` es la fuente semántica única para app y CLI.
 - El core público expone `CalculatrixMachine`, comandos tipados, macros
   públicas, programas tipados e `CalculatrixSession`.
 - `Infix` compila al mismo kernel matricial que usan `RPN` y los workflows
   directos por comando.
+- En `v3.1.0`, el core compartido añade determinante como operación pública y
+  lo expone en la máquina tipada, el CLI y la app mediante `DET`.
+- La línea `v3.0.1` mantiene `√` inmediato y `%` tipo Casio en `Infix`, sin
+  alterar los contratos públicos de parser ni `RPN`.
+- La app usa un solo teclado `6x4`: las cuatro filas inferiores permanecen
+  fijas como calculadora clásica y solo las dos filas superiores cambian por
+  deck según el modo activo.
 - La app Flutter ofrece tres modos visibles: `Infix`, `RPN` y `Matrix`.
 - El workstation matricial soporta edición estructural acotada `2x2` a `4x4`,
   presets, reordenamiento y confirmación canónica del literal final.
@@ -72,6 +79,7 @@ flutter test integration_test/calculator_test.dart -d windows
 ```bash
 dart run code/cli/bin/calculatrix_cli.dart infix "[[1,2],[3,4]] * [[2]]"
 dart run code/cli/bin/calculatrix_cli.dart command "[[1,2],[3,4]]" transpose
+dart run code/cli/bin/calculatrix_cli.dart command "[[4,7],[2,6]]" det
 dart run code/cli/bin/calculatrix_cli.dart macro append-zero-row "[[1,2],[3,4]]"
 ```
 
@@ -82,6 +90,6 @@ exitosos.
 
 ## Roadmap
 
-Ver [docs/roadmap.md](docs/roadmap.md) para el cierre de `v3.0.0` y la entrada
-a Stage 4. Ver también [docs/architecture.md](docs/architecture.md) para el
-modelo canónico actual.
+Ver [docs/roadmap.md](docs/roadmap.md) para el cierre de `v3.0.0`, el parche
+`v3.0.1`, el slice `v3.1.0` de determinante y la continuación de Stage 4. Ver
+también [docs/architecture.md](docs/architecture.md) para el modelo canónico actual.

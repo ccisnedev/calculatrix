@@ -76,6 +76,111 @@ void main() {
     });
   });
 
+  group('CalculatrixSession - infix calculator actions', () {
+    test('sqrt rewrites a bare infix operand immediately', () {
+      session.input('9');
+
+      session.input('√');
+
+      expect(session.expression, '3');
+      expect(session.currentValue, isNull);
+    });
+
+    test('sqrt rewrites the trailing operand of an infix expression', () {
+      session.input('9');
+      session.input('+');
+      session.input('1');
+      session.input('6');
+
+      session.input('√');
+
+      expect(session.expression, '9+4');
+
+      session.evaluate();
+
+      expect(session.currentValue, Matrix.scalar(13));
+    });
+
+    test('sqrt applies immediately to the committed infix value', () {
+      session.input('1');
+      session.input('4');
+      session.input('4');
+      session.evaluate();
+
+      session.input('√');
+
+      expect(session.expression, '');
+      expect(session.currentValue, Matrix.scalar(12));
+    });
+
+    test('percent keeps a bare infix operand pending for casio-style flow', () {
+      session.input('5');
+      session.input('0');
+
+      session.input('%');
+
+      expect(session.expression, '50%');
+      expect(session.currentValue, isNull);
+    });
+
+    test('percent evaluates a bare infix operand as a fraction on equals', () {
+      session.input('5');
+      session.input('0');
+      session.input('%');
+
+      session.evaluate();
+
+      expect(session.expression, '');
+      expect(session.currentValue, Matrix.scalar(0.5));
+    });
+
+    test('percent supports casio-style x percent y flow', () {
+      session.input('1');
+      session.input('2');
+      session.input('%');
+      session.input('5');
+      session.input('0');
+
+      expect(session.expression, '12%50');
+
+      session.evaluate();
+
+      expect(session.currentValue, Matrix.scalar(6));
+    });
+
+    test('percent evaluates additive infix context relative to the left operand', () {
+      session.input('5');
+      session.input('0');
+      session.input('+');
+      session.input('1');
+      session.input('2');
+
+      session.input('%');
+
+      expect(session.expression, '50+12%');
+
+      session.evaluate();
+
+      expect(session.currentValue, Matrix.scalar(56));
+    });
+
+    test('percent evaluates multiplicative infix context as a fractional scalar', () {
+      session.input('5');
+      session.input('0');
+      session.input('×');
+      session.input('1');
+      session.input('2');
+
+      session.input('%');
+
+      expect(session.expression, '50×12%');
+
+      session.evaluate();
+
+      expect(session.currentValue, Matrix.scalar(6));
+    });
+  });
+
   group('CalculatrixSession - shared current value', () {
     test('switching to rpn keeps an infix draft private and uncommitted', () {
       session.input('3');

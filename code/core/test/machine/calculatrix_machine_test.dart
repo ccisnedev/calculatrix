@@ -234,6 +234,23 @@ void main() {
       );
     });
 
+    test('applies determinant through a typed matrix command', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+
+      machine.execute(
+        PushMatrixCommand(
+          Matrix(<List<double>>[
+            <double>[4, 7],
+            <double>[2, 6],
+          ]),
+        ),
+      );
+      machine.execute(const DeterminantCommand());
+
+      expect(machine.top, Matrix.scalar(10));
+      expect(machine.depth, 1);
+    });
+
     test('surfaces typed shape errors for invalid construction commands', () {
       final CalculatrixMachine machine = CalculatrixMachine();
 

@@ -77,6 +77,23 @@ void main() {
       expect(command.stdout.toString().trim(), '[[7]]');
     });
 
+    test('supports determinant through public command routing', () async {
+      final ProcessResult command = await Process.run(
+        Platform.resolvedExecutable,
+        <String>[
+          'run',
+          'bin/calculatrix_cli.dart',
+          'command',
+          '[[4,7],[2,6]]',
+          'det',
+        ],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(command.exitCode, 0);
+      expect(command.stdout.toString().trim(), '[[10]]');
+    });
+
     test('supports public macro workflows', () async {
       final ProcessResult macro = await Process.run(
         Platform.resolvedExecutable,

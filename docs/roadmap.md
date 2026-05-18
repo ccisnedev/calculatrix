@@ -364,6 +364,24 @@ Entry criterion: satisfied.
 - Matrix workstation ergonomics and shell polish
 - CLI scripting and programmable-workflow improvements over the same public core command layer
 
+#### v3.0.1 — Calculator Interaction Corrections and Unified Keypad
+
+- [x] Make `√` act immediately in `Infix` when there is a committed value or a parseable active operand
+- [x] Add Casio-style `%` behavior in `Infix`, including `x%y = x*y/100`, bare-operand percent on evaluation, and pending binary percent translation while preserving public core `%` semantics in `RPN` and direct evaluation APIs
+- [x] Replace the horizontally paged calculator keypad with one shared `6x4` keyboard whose bottom four rows stay fixed as `7 8 9 ÷`, `4 5 6 ×`, `1 2 3 -`, and `0 . ENTER +`
+- [x] Expose mode-specific actions through top-deck selectors so `Infix`, `RPN`, and `Matrix` only swap the top two rows instead of the whole keypad surface
+- [x] Keep `package:calculatrix` public parser and `RPN` contracts stable for CLI and API consumers
+- [x] Add TDD coverage in `code/core` session tests plus `code/app` widget and integration tests for the revised `Infix` interaction contract and unified keypad workflow
+- [x] Run focused validation across core and app before closing the patch release slice
+
+##### TDD Execution Order
+
+- [x] Step 1: lock the new `Infix` interaction contract in `CalculatrixSession` tests for immediate `√` and Casio-style `%`
+- [x] Step 2: prove the app button wiring through focused widget tests for immediate unary interaction
+- [x] Step 3: implement the `Infix` session-layer translation without changing public `RPN` execution semantics
+- [x] Step 4: replace keypad paging with deck selectors while preserving the fixed bottom-row calculator layout
+- [x] Step 5: rerun focused core/app validation, including the Windows integration suite, and only then mark the patch checklist progress
+
 ---
 
 ## Stage 4 — "Advanced Linear Algebra on Canonical Stack Kernel" (3.x.x → 4.0.0)
@@ -376,12 +394,27 @@ can start on top of the canonical kernel and the validated three-mode shell.
 
 ### v3.x.x → v4.0.0
 
-- [ ] Determinant
+- [x] Determinant
 - [ ] LU decomposition
 - [ ] QR decomposition
 - [ ] Extend display and interaction polish for complex advanced matrix workflows
 - [ ] Extended linear algebra tests over the canonical stack kernel
 - [ ] End-to-end workflows combining matrix creation, notation switching, commands, macros, and advanced operations
+
+#### v3.1.0 — Determinant on the Canonical Stack Kernel
+
+- [x] Add public determinant support on `Matrix` while preserving the matrix-first scalar contract through `Matrix.scalar(...)` results
+- [x] Expose determinant through the typed command vocabulary so `CalculatrixMachine` and `CalculatrixSession` consumers can invoke it without private hooks
+- [x] Route determinant through CLI command workflows and the Flutter app `RPN` / Matrix decks using the unified keypad model
+- [x] Add focused TDD coverage in core, CLI, widget, and Windows integration suites for determinant workflows
+- [x] Bump coordinated versions and refresh release-facing docs for the first Stage 4 slice
+
+##### TDD Execution Order
+
+- [x] Step 1: lock determinant behavior in `Matrix` and typed machine command tests
+- [x] Step 2: implement the determinant API and command with square-matrix validation and scalar-matrix output
+- [x] Step 3: prove CLI and app consumer routing through focused widget and command tests
+- [x] Step 4: rerun the Windows integration suite with direct `DET` workflows before closing the slice
 
 ### v4.0.0 — Stable Release
 

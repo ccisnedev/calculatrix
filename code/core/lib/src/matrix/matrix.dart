@@ -257,6 +257,70 @@ class Matrix {
     return _inverse(absoluteTolerance: absoluteTolerance);
   }
 
+  Matrix determinant({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    _requireSquare(operation: 'determinant');
+
+    if (isScalar) {
+      return this;
+    }
+
+    final int size = rowCount;
+    final List<List<double>> triangular = List<List<double>>.generate(
+      size,
+      (int row) => List<double>.from(_rows[row]),
+      growable: false,
+    );
+
+    double determinantValue = 1;
+    int swapCount = 0;
+
+    for (int pivotColumn = 0; pivotColumn < size; pivotColumn++) {
+      int pivotRow = pivotColumn;
+      double pivotMagnitude = triangular[pivotRow][pivotColumn].abs();
+
+      for (int row = pivotColumn + 1; row < size; row++) {
+        final double candidateMagnitude = triangular[row][pivotColumn].abs();
+        if (candidateMagnitude > pivotMagnitude) {
+          pivotMagnitude = candidateMagnitude;
+          pivotRow = row;
+        }
+      }
+
+      if (pivotMagnitude <= absoluteTolerance) {
+        return Matrix.scalar(0);
+      }
+
+      if (pivotRow != pivotColumn) {
+        final List<double> temp = triangular[pivotColumn];
+        triangular[pivotColumn] = triangular[pivotRow];
+        triangular[pivotRow] = temp;
+        swapCount += 1;
+      }
+
+      final double pivot = triangular[pivotColumn][pivotColumn];
+      determinantValue *= pivot;
+
+      for (int row = pivotColumn + 1; row < size; row++) {
+        final double factor = triangular[row][pivotColumn] / pivot;
+        if (factor == 0) {
+          continue;
+        }
+
+        triangular[row][pivotColumn] = 0;
+        for (int column = pivotColumn + 1; column < size; column++) {
+          triangular[row][column] -= factor * triangular[pivotColumn][column];
+        }
+      }
+    }
+
+    return Matrix.scalar(
+      swapCount.isEven ? determinantValue : -determinantValue,
+    );
+  }
+
   Matrix sqrt({
     double relativeTolerance =
         CalculatrixNumericPolicy.defaultRelativeTolerance,

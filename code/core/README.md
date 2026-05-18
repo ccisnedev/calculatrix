@@ -9,8 +9,8 @@ the same canonical kernel.
 
 ## Status
 
-- Current package version: `3.0.0`
-- Focus: Stage 3 canonical matrix stack machine foundation
+- Current package version: `3.1.0`
+- Focus: Stage 4 determinant slice over the canonical matrix stack kernel
 - Runtime dependencies: none (pure Dart)
 
 ## Features available now
@@ -20,11 +20,11 @@ the same canonical kernel.
 - Typed public commands, typed public macros, and typed public programs
 - `Calculatrix.compileInfix`, `evaluateInfix`, and `evaluateRpn`
 - `CalculatrixSession` for interactive shared calculator state and memory
-- Matrix operations: `+`, `-`, `*`, `/`, `sqrt`, `scale`, `transpose`, `inverse`
+- Matrix operations: `+`, `-`, `*`, `/`, `sqrt`, `scale`, `transpose`, `inverse`, `determinant`
 - Multiplication treats `1x1` operands as scalar scaling, so both `A * [[s]]`
 	and `[[s]] * A` are valid
 - Division currently supports scalar `1x1` denominators only; general matrix
-	right-division is deferred to the determinant/inverse stage
+	right-division remains deferred to a later linear-system workflow
 - Square root supports square matrices in the real domain and throws typed
 	domain errors when no real root is available
 - Primitive command families for stack operations, push/construction, unary,
@@ -56,6 +56,7 @@ The main public barrel is `package:calculatrix/calculatrix.dart` and exports:
 ## API stability
 
 - `v3.0.0` establishes the public matrix stack machine surface.
+- `v3.1.0` starts Stage 4 with determinant as a non-breaking command-surface expansion.
 - RPN stack failures are exposed through the `RpnStackError` hierarchy:
 	- `RpnStackUnderflowError`
 	- `RpnStackRangeError`
