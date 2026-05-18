@@ -914,6 +914,58 @@ void main() {
       expect(_matrixEditableText(tester, 0, 0).controller.text, '10');
     });
 
+    testWidgets('matrix mode entered from RPN exposes a factorization deck and applies LU to the draft', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+
+      await _openMatrixEditor(tester);
+      expect(_keypadDeckSelector('FACT'), findsOneWidget);
+
+      await _tapCalculatorButton(tester, '3x3');
+      await _enterMatrixCell(tester, 0, 0, '2');
+      await _enterMatrixCell(tester, 0, 1, '1');
+      await _enterMatrixCell(tester, 0, 2, '1');
+      await _enterMatrixCell(tester, 1, 0, '4');
+      await _enterMatrixCell(tester, 1, 1, '-6');
+      await _enterMatrixCell(tester, 1, 2, '0');
+      await _enterMatrixCell(tester, 2, 0, '-2');
+      await _enterMatrixCell(tester, 2, 1, '7');
+      await _enterMatrixCell(tester, 2, 2, '2');
+
+      await tester.tap(_keypadDeckSelector('FACT'));
+      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'LU');
+
+      expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsNothing);
+      expect(find.text('Stack 3'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('rpn-stack-card-0')), findsOneWidget);
+      expect(find.text('[4 -6 0]\n[0  4 1]\n[0  0 1]'), findsOneWidget);
+    });
+
+    testWidgets('matrix mode entered from RPN applies QR to the draft and returns to the stack view', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+
+      await _openMatrixEditor(tester);
+      await _enterMatrixCell(tester, 0, 0, '1');
+      await _enterMatrixCell(tester, 0, 1, '0');
+      await _enterMatrixCell(tester, 1, 0, '0');
+      await _enterMatrixCell(tester, 1, 1, '2');
+
+      await tester.tap(_keypadDeckSelector('FACT'));
+      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'QR');
+
+      expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsNothing);
+      expect(find.text('Stack 2'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('rpn-stack-card-0')), findsOneWidget);
+      expect(find.text('[1 0]\n[0 2]'), findsOneWidget);
+    });
+
     testWidgets('matrix editor disables identity for non-square shapes', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 

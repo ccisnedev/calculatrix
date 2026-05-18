@@ -932,6 +932,72 @@ void main() {
       expect(find.text('Stack 2'), findsOneWidget);
     });
 
+    testWidgets('matrix mode entered from RPN can factorize the draft with LU and return to the stack', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _openMatrixEditorDialog(tester);
+      await _tapCalculatorButton(tester, '3x3');
+
+      await _setMatrixCell(tester, 0, 0, '2');
+      await _setMatrixCell(tester, 0, 1, '1');
+      await _setMatrixCell(tester, 0, 2, '1');
+      await _setMatrixCell(tester, 1, 0, '4');
+      await _setMatrixCell(tester, 1, 1, '-6');
+      await _setMatrixCell(tester, 1, 2, '0');
+      await _setMatrixCell(tester, 2, 0, '-2');
+      await _setMatrixCell(tester, 2, 1, '7');
+      await _setMatrixCell(tester, 2, 2, '2');
+
+      await _tapFinderCenter(tester, _deckSelector('FACT'));
+      await _tapCalculatorButton(tester, 'LU');
+
+      await _pumpUntilGone(
+        tester,
+        find.byKey(const ValueKey<String>('matrix-mode-panel')),
+      );
+
+      expect(_displayText('[4 -6 0]\n[0  4 1]\n[0  0 1]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 3'), findsOneWidget);
+    });
+
+    testWidgets('matrix creation, macro expansion, QR, and notation switching stay coherent end-to-end', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['1', '0'],
+          <String>['0', '2'],
+        ],
+        actionLabel: 'Push',
+      );
+
+      await _tapCalculatorButton(tester, 'AROW');
+
+      expect(_displayText('[1 0]\n[0 2]\n[0 0]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+
+      await _tapCalculatorButton(tester, 'QR');
+
+      expect(_displayText('[1 0]\n[0 2]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 2'), findsOneWidget);
+
+      await _switchMode(tester, 'Infix');
+
+      expect(_displayText('[1 0]\n[0 2]'), findsOneWidget);
+      expect(_expressionText(' '), findsOneWidget);
+    });
+
     testWidgets('rpn mode shows the draft in X0 and the committed top in X1', (tester) async {
       await _pumpApp(tester);
 

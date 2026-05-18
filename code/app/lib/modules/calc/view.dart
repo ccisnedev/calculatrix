@@ -176,6 +176,16 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('INV', _ButtonCategory.function),
       _ButtonDef('DET', _ButtonCategory.function),
     ]),
+    _KeypadDeckDef('FACT', <_ButtonDef>[
+      _ButtonDef('LU', _ButtonCategory.function),
+      _ButtonDef('QR', _ButtonCategory.function),
+      _ButtonDef('T', _ButtonCategory.function),
+      _ButtonDef('INV', _ButtonCategory.function),
+      _ButtonDef('DET', _ButtonCategory.function),
+      _ButtonDef('ZEROS', _ButtonCategory.function),
+      _ButtonDef('ONES', _ButtonCategory.function),
+      _ButtonDef('ID', _ButtonCategory.function),
+    ]),
     _KeypadDeckDef('MEM', <_ButtonDef>[
       _ButtonDef('MC', _ButtonCategory.function),
       _ButtonDef('MR', _ButtonCategory.function),
@@ -709,7 +719,9 @@ class _CalculatorViewState extends State<CalculatorView> {
 
   List<_KeypadDeckDef> _decksForCurrentMode() {
     if (_controller.isMatrixMode) {
-      return _matrixDecks;
+          return _controller.isRpnEntryMode
+              ? _matrixDecks
+              : _matrixDecks.where((_KeypadDeckDef deck) => deck.label != 'FACT').toList(growable: false);
     }
 
     return _controller.isRpnMode ? _rpnDecks : _infixDecks;
@@ -842,6 +854,16 @@ class _CalculatorViewState extends State<CalculatorView> {
           editor._inverseThroughCore();
         case 'DET':
           editor._determinantThroughCore();
+        case 'LU':
+          editor._executeStackExpandingThroughRpn(
+            const LuDecompositionCommand(),
+            actionName: 'LU',
+          );
+        case 'QR':
+          editor._executeStackExpandingThroughRpn(
+            const QrDecompositionCommand(),
+            actionName: 'QR',
+          );
         case 'MC':
           _controller.memoryClear();
         case 'MR':
@@ -1004,6 +1026,14 @@ class _CalculatorViewState extends State<CalculatorView> {
         _controller.insertMatrixLiteral(literal);
         _controller.exitMatrixMode();
       },
+      onStackExpandingCommand:
+          _controller.isRpnEntryMode
+              ? (String literal, CalculatrixCommand command) {
+                  _controller.insertMatrixLiteral(literal);
+                  _controller.executeRpnCommand(command);
+                  _controller.exitMatrixMode();
+                }
+              : null,
     );
   }
 }
@@ -1015,12 +1045,15 @@ class _MatrixEditorDialog extends StatefulWidget {
     this.embedded = false,
     this.onCancel,
     this.onSubmitted,
+    this.onStackExpandingCommand,
   });
 
   final bool isRpnMode;
   final bool embedded;
   final VoidCallback? onCancel;
   final ValueChanged<String>? onSubmitted;
+  final void Function(String literal, CalculatrixCommand command)?
+      onStackExpandingCommand;
 
   @override
   State<_MatrixEditorDialog> createState() => _MatrixEditorDialogState();
@@ -2284,8 +2317,42 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
         _draft.setCell(row, column, _formatMatrixCellValue(matrix.at(row, column)));
       }
     }
+
     _rebuildInputs();
     _error = null;
+  }
+
+  void _executeStackExpandingThroughRpn(
+    CalculatrixCommand command, {
+    required String actionName,
+  }) {
+    String? literal;
+
+    setState(() {
+      _resetEditingState();
+      _closeStructuralActions();
+
+      final Matrix? matrix = _tryBuildMatrixOrNull();
+      if (matrix == null) {
+        _error =
+            _draft.validationError() ?? '$actionName requires a valid matrix.';
+        return;
+      }
+
+      if (!widget.isRpnMode || widget.onStackExpandingCommand == null) {
+        _error = '$actionName requires RPN mode.';
+        return;
+      }
+
+      literal = _draft.buildLiteral();
+      _error = null;
+    });
+
+    if (literal == null) {
+      return;
+    }
+
+    widget.onStackExpandingCommand!(literal!, command);
   }
 
   String _formatMatrixCellValue(double value) {

@@ -272,6 +272,27 @@ void main() {
       expect((permutation * source).almostEquals(lower * upper), isTrue);
     });
 
+    test('expands LU decomposition for singular matrices without losing stack order', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final Matrix source = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[2, 4],
+      ]);
+
+      machine.execute(PushMatrixCommand(source));
+      machine.execute(const LuDecompositionCommand());
+
+      expect(machine.depth, 3);
+
+      final List<Matrix> stack = machine.stackSnapshot;
+      final Matrix permutation = stack[0];
+      final Matrix lower = stack[1];
+      final Matrix upper = stack[2];
+
+      expect((permutation * source).almostEquals(lower * upper), isTrue);
+      expect(upper.at(1, 1), 0);
+    });
+
     test('expands QR decomposition through a typed matrix command', () {
       final CalculatrixMachine machine = CalculatrixMachine();
       final Matrix source = Matrix(<List<double>>[
@@ -290,6 +311,27 @@ void main() {
       final Matrix r = stack[1];
 
       expect((q * r).almostEquals(source), isTrue);
+    });
+
+    test('expands QR decomposition for dependent columns', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final Matrix source = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[2, 4],
+        <double>[3, 6],
+      ]);
+
+      machine.execute(PushMatrixCommand(source));
+      machine.execute(const QrDecompositionCommand());
+
+      expect(machine.depth, 2);
+
+      final List<Matrix> stack = machine.stackSnapshot;
+      final Matrix q = stack[0];
+      final Matrix r = stack[1];
+
+      expect((q * r).almostEquals(source), isTrue);
+      expect(r.at(1, 1), 0);
     });
 
     test('surfaces typed shape errors for invalid construction commands', () {

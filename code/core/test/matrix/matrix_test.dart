@@ -250,6 +250,46 @@ void main() {
       expect(() => value.luDecomposition(), throwsA(isA<MatrixShapeError>()));
     });
 
+    test('LU decomposition pivots when the leading entry is zero', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[0, 2],
+        <double>[3, 4],
+      ]);
+
+      final LuDecomposition decomposition = value.luDecomposition();
+
+      expect(
+        (decomposition.permutation * value).almostEquals(
+          decomposition.lower * decomposition.upper,
+        ),
+        isTrue,
+      );
+      expect(
+        decomposition.permutation,
+        Matrix(<List<double>>[
+          <double>[0, 1],
+          <double>[1, 0],
+        ]),
+      );
+    });
+
+    test('LU decomposition preserves reconstruction for singular matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[2, 4],
+      ]);
+
+      final LuDecomposition decomposition = value.luDecomposition();
+
+      expect(
+        (decomposition.permutation * value).almostEquals(
+          decomposition.lower * decomposition.upper,
+        ),
+        isTrue,
+      );
+      expect(decomposition.upper.at(1, 1), 0);
+    });
+
     test('computes QR decomposition for full-rank matrices', () {
       final Matrix value = Matrix(<List<double>>[
         <double>[1, 1, 0],
@@ -266,6 +306,37 @@ void main() {
         ),
         isTrue,
       );
+    });
+
+    test('computes QR decomposition for tall full-rank matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 0],
+        <double>[0, 2],
+        <double>[0, 0],
+      ]);
+
+      final QrDecomposition decomposition = value.qrDecomposition();
+
+      expect((decomposition.q * decomposition.r).almostEquals(value), isTrue);
+      expect(
+        (decomposition.q.transpose() * decomposition.q).almostEquals(
+          Matrix.identity(2),
+        ),
+        isTrue,
+      );
+    });
+
+    test('QR decomposition preserves reconstruction for dependent columns', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[2, 4],
+        <double>[3, 6],
+      ]);
+
+      final QrDecomposition decomposition = value.qrDecomposition();
+
+      expect((decomposition.q * decomposition.r).almostEquals(value), isTrue);
+      expect(decomposition.r.at(1, 1), 0);
     });
 
     test('rejects QR decomposition for wide matrices', () {
