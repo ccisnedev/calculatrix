@@ -245,17 +245,118 @@ void main() {
       expect(() => value.eigenvalues(), throwsA(isA<MatrixShapeError>()));
     });
 
-    test('rejects eigenvalues for matrices larger than 2x2 in the current slice', () {
+    test('computes real eigenvalues for 3x3 diagonal matrices', () {
       final Matrix value = Matrix(<List<double>>[
-        <double>[1, 0, 0],
-        <double>[0, 2, 0],
-        <double>[0, 0, 3],
+        <double>[5, 0, 0],
+        <double>[0, 3, 0],
+        <double>[0, 0, 1],
       ]);
 
       expect(
-        () => value.eigenvalues(),
-        throwsA(isA<UnsupportedCalculatrixOperationError>()),
+        value.eigenvalues(),
+        Matrix(<List<double>>[
+          <double>[5],
+          <double>[3],
+          <double>[1],
+        ]),
       );
+    });
+
+    test('computes real eigenvalues for 3x3 symmetric matrices', () {
+      // Eigenvalues of [[2,1,0],[1,3,1],[0,1,2]] are 4, 2, 1
+      final Matrix value = Matrix(<List<double>>[
+        <double>[2, 1, 0],
+        <double>[1, 3, 1],
+        <double>[0, 1, 2],
+      ]);
+
+      final Matrix result = value.eigenvalues();
+      expect(result.rowCount, 3);
+      expect(result.columnCount, 1);
+      expect(result.at(0, 0), closeTo(4, 1e-9));
+      expect(result.at(1, 0), closeTo(2, 1e-9));
+      expect(result.at(2, 0), closeTo(1, 1e-9));
+    });
+
+    test('computes real eigenvalues for 4x4 diagonal matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[10, 0, 0, 0],
+        <double>[0, 7, 0, 0],
+        <double>[0, 0, 3, 0],
+        <double>[0, 0, 0, 1],
+      ]);
+
+      expect(
+        value.eigenvalues(),
+        Matrix(<List<double>>[
+          <double>[10],
+          <double>[7],
+          <double>[3],
+          <double>[1],
+        ]),
+      );
+    });
+
+    test('computes real eigenvalues for 3x3 general non-symmetric matrices', () {
+      // A = [[1,2,0],[0,3,0],[2,-4,2]], eigenvalues are 3, 2, 1
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 0],
+        <double>[0, 3, 0],
+        <double>[2, -4, 2],
+      ]);
+
+      final Matrix result = value.eigenvalues();
+      expect(result.rowCount, 3);
+      expect(result.columnCount, 1);
+      expect(result.at(0, 0), closeTo(3, 1e-9));
+      expect(result.at(1, 0), closeTo(2, 1e-9));
+      expect(result.at(2, 0), closeTo(1, 1e-9));
+    });
+
+    test('computes real eigenvalues for 4x4 symmetric matrices', () {
+      // Symmetric: A = [[4,1,0,0],[1,3,1,0],[0,1,2,1],[0,0,1,1]]
+      // Known eigenvalues (approximately): 4.7321, 3.0, 1.2679, 1.0
+      final Matrix value = Matrix(<List<double>>[
+        <double>[4, 1, 0, 0],
+        <double>[1, 3, 1, 0],
+        <double>[0, 1, 2, 1],
+        <double>[0, 0, 1, 1],
+      ]);
+
+      final Matrix result = value.eigenvalues();
+      expect(result.rowCount, 4);
+      expect(result.columnCount, 1);
+      // Verify descending order and known sum (trace = 10)
+      final double sum = result.at(0, 0) + result.at(1, 0) +
+          result.at(2, 0) + result.at(3, 0);
+      expect(sum, closeTo(10, 1e-9));
+      // Verify descending order
+      expect(result.at(0, 0), greaterThan(result.at(1, 0)));
+      expect(result.at(1, 0), greaterThan(result.at(2, 0)));
+      expect(result.at(2, 0), greaterThan(result.at(3, 0)));
+    });
+
+    test('computes repeated eigenvalues correctly', () {
+      // Identity 3x3 has eigenvalue 1 with multiplicity 3
+      final Matrix value = Matrix.identity(3);
+
+      final Matrix result = value.eigenvalues();
+      expect(result.rowCount, 3);
+      expect(result.columnCount, 1);
+      expect(result.at(0, 0), closeTo(1, 1e-9));
+      expect(result.at(1, 0), closeTo(1, 1e-9));
+      expect(result.at(2, 0), closeTo(1, 1e-9));
+    });
+
+    test('rejects eigenvalues when NxN spectrum is complex', () {
+      // 3x3 rotation-like matrix with complex eigenvalues
+      final Matrix value = Matrix(<List<double>>[
+        <double>[0, -1, 0],
+        <double>[1, 0, 0],
+        <double>[0, 0, 1],
+      ]);
+
+      expect(() => value.eigenvalues(), throwsA(isA<MatrixDomainError>()));
     });
 
     test('rejects eigenvalues when the 2x2 spectrum is complex', () {

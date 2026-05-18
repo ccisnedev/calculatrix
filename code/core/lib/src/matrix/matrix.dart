@@ -343,6 +343,7 @@ class Matrix {
   Matrix eigenvalues({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+    int maxIterations = 200,
   }) {
     _requireSquare(operation: 'eigenvalues');
 
@@ -350,12 +351,98 @@ class Matrix {
       return this;
     }
 
-    if (rowCount != 2) {
-      throw UnsupportedCalculatrixOperationError(
-        'Eigenvalues are currently supported only for 1x1 and 2x2 matrices.',
-      );
+    if (rowCount == 2) {
+      return _eigenvalues2x2(absoluteTolerance);
     }
 
+    // General NxN: Hessenberg reduction then QR iteration with Wilkinson shift
+    final int n = rowCount;
+    final List<List<double>> h = _toHessenberg(absoluteTolerance);
+
+    // QR iteration on upper Hessenberg form
+    int size = n;
+    final List<double> eigenvaluesList = <double>[];
+
+    while (size > 2) {
+      int iterations = 0;
+      while (iterations < maxIterations) {
+        // Check for deflation: subdiagonal element small enough
+        if (h[size - 1][size - 2].abs() <= absoluteTolerance) {
+          eigenvaluesList.add(h[size - 1][size - 1]);
+          size--;
+          break;
+        }
+
+        // Check for 2x2 block deflation
+        if (size >= 3 && h[size - 2][size - 3].abs() <= absoluteTolerance) {
+          // Extract 2x2 trailing block
+          final double a = h[size - 2][size - 2];
+          final double b = h[size - 2][size - 1];
+          final double c = h[size - 1][size - 2];
+          final double d = h[size - 1][size - 1];
+          _solve2x2Block(a, b, c, d, eigenvaluesList, absoluteTolerance);
+          size -= 2;
+          break;
+        }
+
+        // Wilkinson shift: eigenvalue of trailing 2x2 block closest to h[n-1][n-1]
+        final double a = h[size - 2][size - 2];
+        final double b = h[size - 2][size - 1];
+        final double c = h[size - 1][size - 2];
+        final double d = h[size - 1][size - 1];
+        final double shift = _wilkinsonShift(a, b, c, d);
+
+        // Apply shift
+        for (int i = 0; i < size; i++) {
+          h[i][i] -= shift;
+        }
+
+        // QR step via Givens rotations on the Hessenberg matrix
+        _qrStepGivens(h, size, absoluteTolerance);
+
+        // Undo shift
+        for (int i = 0; i < size; i++) {
+          h[i][i] += shift;
+        }
+
+        iterations++;
+      }
+
+      if (iterations == maxIterations) {
+        // Failed to converge — check if it might be complex eigenvalues
+        throw MatrixDomainError(
+          'Eigenvalues are undefined in the real domain for this matrix.',
+        );
+      }
+    }
+
+    // Handle remaining 1x1 or 2x2 block
+    if (size == 2) {
+      final double a = h[0][0];
+      final double b = h[0][1];
+      final double c = h[1][0];
+      final double d = h[1][1];
+      _solve2x2Block(a, b, c, d, eigenvaluesList, absoluteTolerance);
+    } else if (size == 1) {
+      eigenvaluesList.add(h[0][0]);
+    }
+
+    // Clean near-zero values and sort descending
+    for (int i = 0; i < eigenvaluesList.length; i++) {
+      if (eigenvaluesList[i].abs() <= absoluteTolerance) {
+        eigenvaluesList[i] = 0;
+      }
+    }
+    eigenvaluesList.sort((double left, double right) => right.compareTo(left));
+
+    return Matrix(
+      eigenvaluesList
+          .map((double value) => <double>[value])
+          .toList(growable: false),
+    );
+  }
+
+  Matrix _eigenvalues2x2(double absoluteTolerance) {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
     final double c = _rows[1][0];
@@ -392,6 +479,195 @@ class Matrix {
           .toList(growable: false),
     );
   }
+
+  /// Reduces the matrix to upper Hessenberg form using Householder reflections.
+  List<List<double>> _toHessenberg(double absoluteTolerance) {
+    final int n = rowCount;
+    final List<List<double>> h = List<List<double>>.generate(
+      n,
+      (int row) => List<double>.from(_rows[row]),
+      growable: false,
+    );
+
+    for (int k = 0; k < n - 2; k++) {
+      // Build Householder vector for column k, rows k+1..n-1
+      final int m = n - k - 1;
+      final List<double> x = List<double>.generate(
+        m,
+        (int i) => h[k + 1 + i][k],
+        growable: false,
+      );
+
+      double norm = 0;
+      for (int i = 0; i < m; i++) {
+        norm += x[i] * x[i];
+      }
+      norm = math.sqrt(norm);
+
+      if (norm <= absoluteTolerance) {
+        continue;
+      }
+
+      final double sign = x[0] >= 0 ? 1 : -1;
+      x[0] += sign * norm;
+
+      // Normalize the Householder vector
+      double vNorm = 0;
+      for (int i = 0; i < m; i++) {
+        vNorm += x[i] * x[i];
+      }
+      vNorm = math.sqrt(vNorm);
+      for (int i = 0; i < m; i++) {
+        x[i] /= vNorm;
+      }
+
+      // Apply H from the left: H[k+1:n, k:n] -= 2*v*(v^T * H[k+1:n, k:n])
+      for (int j = k; j < n; j++) {
+        double dot = 0;
+        for (int i = 0; i < m; i++) {
+          dot += x[i] * h[k + 1 + i][j];
+        }
+        for (int i = 0; i < m; i++) {
+          h[k + 1 + i][j] -= 2 * x[i] * dot;
+        }
+      }
+
+      // Apply H from the right: H[0:n, k+1:n] -= 2*(H[0:n, k+1:n]*v)*v^T
+      for (int i = 0; i < n; i++) {
+        double dot = 0;
+        for (int j = 0; j < m; j++) {
+          dot += h[i][k + 1 + j] * x[j];
+        }
+        for (int j = 0; j < m; j++) {
+          h[i][k + 1 + j] -= 2 * dot * x[j];
+        }
+      }
+    }
+
+    // Clean up sub-subdiagonal entries
+    for (int i = 2; i < n; i++) {
+      for (int j = 0; j < i - 1; j++) {
+        if (h[i][j].abs() <= absoluteTolerance) {
+          h[i][j] = 0;
+        }
+      }
+    }
+
+    return h;
+  }
+
+  /// Solves the eigenvalues of a 2x2 block and adds them to the list.
+  /// Throws MatrixDomainError if the eigenvalues are complex.
+  static void _solve2x2Block(
+    double a,
+    double b,
+    double c,
+    double d,
+    List<double> eigenvaluesList,
+    double absoluteTolerance,
+  ) {
+    final double trace = a + d;
+    final double det = (a * d) - (b * c);
+    double discriminant = (trace * trace) - (4 * det);
+
+    if (discriminant.abs() <= absoluteTolerance) {
+      discriminant = 0;
+    }
+
+    if (discriminant < 0) {
+      throw MatrixDomainError(
+        'Eigenvalues are undefined in the real domain for this matrix.',
+      );
+    }
+
+    final double sqrtD = math.sqrt(discriminant);
+    eigenvaluesList.add((trace + sqrtD) / 2);
+    eigenvaluesList.add((trace - sqrtD) / 2);
+  }
+
+  /// Computes the Wilkinson shift from a trailing 2x2 block.
+  static double _wilkinsonShift(
+    double a,
+    double b,
+    double c,
+    double d,
+  ) {
+    final double trace = a + d;
+    final double det = (a * d) - (b * c);
+    final double discriminant = (trace * trace) - (4 * det);
+
+    if (discriminant < 0) {
+      // Complex eigenvalues in the 2x2 block — use the diagonal entry
+      return d;
+    }
+
+    final double sqrtD = math.sqrt(discriminant);
+    final double lambda1 = (trace + sqrtD) / 2;
+    final double lambda2 = (trace - sqrtD) / 2;
+
+    // Pick the eigenvalue closest to d
+    return (lambda1 - d).abs() < (lambda2 - d).abs() ? lambda1 : lambda2;
+  }
+
+  /// Performs one QR step using Givens rotations on the upper Hessenberg
+  /// matrix h (operating on the top-left size x size submatrix).
+  static void _qrStepGivens(
+    List<List<double>> h,
+    int size,
+    double absoluteTolerance,
+  ) {
+    // Store Givens rotation parameters
+    final List<double> cosines = List<double>.filled(size - 1, 0);
+    final List<double> sines = List<double>.filled(size - 1, 0);
+
+    // Apply Givens rotations from left to zero subdiagonal (Q^T * H = R)
+    for (int i = 0; i < size - 1; i++) {
+      final double x = h[i][i];
+      final double y = h[i + 1][i];
+      final double r = math.sqrt(x * x + y * y);
+
+      if (r <= absoluteTolerance) {
+        cosines[i] = 1;
+        sines[i] = 0;
+        continue;
+      }
+
+      final double cos = x / r;
+      final double sin = y / r;
+      cosines[i] = cos;
+      sines[i] = sin;
+
+      // Apply G(i, i+1, theta)^T to rows i and i+1
+      for (int j = i; j < size; j++) {
+        final double hi = h[i][j];
+        final double hi1 = h[i + 1][j];
+        h[i][j] = cos * hi + sin * hi1;
+        h[i + 1][j] = -sin * hi + cos * hi1;
+      }
+    }
+
+    // Apply Givens rotations from right (R * Q)
+    for (int i = 0; i < size - 1; i++) {
+      final double cos = cosines[i];
+      final double sin = sines[i];
+
+      // Apply G(i, i+1, theta) to columns i and i+1
+      for (int j = 0; j <= math.min(i + 2, size - 1); j++) {
+        final double hj = h[j][i];
+        final double hj1 = h[j][i + 1];
+        h[j][i] = cos * hj + sin * hj1;
+        h[j][i + 1] = -sin * hj + cos * hj1;
+      }
+    }
+
+    // Clean near-zero subdiagonal entries
+    for (int i = 0; i < size - 1; i++) {
+      if (h[i + 1][i].abs() <= absoluteTolerance) {
+        h[i + 1][i] = 0;
+      }
+    }
+  }
+
 
   LuDecomposition luDecomposition({
     double absoluteTolerance =

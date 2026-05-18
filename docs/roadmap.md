@@ -500,6 +500,24 @@ core, CLI, and app.
 - [x] Step 2: route `EigenvaluesCommand` through CLI `command` mode with a stable `eig` alias
 - [x] Step 3: expose `EIG` in the app `RPN` factorization deck and rerun focused widget plus Windows integration validation
 
+#### v0.4.20 — General Real Eigenvalues via QR Iteration
+
+- [x] Generalize `Matrix.eigenvalues()` from 2x2-only to arbitrary square matrices using the iterative QR algorithm
+- [x] Preserve the existing 1x1 identity and 2x2 characteristic polynomial fast paths
+- [x] Implement Hessenberg reduction as a preprocessing step to accelerate convergence
+- [x] Implement implicit QR iteration with Wilkinson shift on the Hessenberg form
+- [x] Detect and report complex eigenvalues (2x2 blocks on the quasi-upper-triangular result) via `MatrixDomainError`
+- [x] Return eigenvalues as a deterministic column matrix sorted in descending order (same contract as v0.4.10)
+- [x] Add focused core TDD coverage for 3x3, 4x4, diagonal, symmetric, and defective matrices
+- [x] Rerun CLI command mode, widget, and Windows integration validation for the generalized path
+
+##### TDD Execution Order
+
+- [x] Step 1: add failing core tests for 3x3 and 4x4 diagonal, symmetric, and general matrices with known eigenvalues
+- [x] Step 2: implement Hessenberg reduction and QR iteration with shift in `Matrix.eigenvalues()`
+- [x] Step 3: add core tests for complex-spectrum detection on 3x3+ matrices
+- [x] Step 4: rerun CLI, widget, and Windows integration suites to confirm the generalized path is transparent to consumers
+
 - Eigenvectors / diagonalization beyond the current small-matrix real-eigenvalue slice
 - Additional factorizations beyond LU/QR
 - Sparse matrices

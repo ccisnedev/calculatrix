@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.20] - 2026-05-18
+
+Generalizes eigenvalue computation from 2x2-only to arbitrary NxN square
+matrices via Hessenberg reduction and implicit QR iteration with Wilkinson
+shift.
+
+### Core
+
+- Generalized `Matrix.eigenvalues()` to support arbitrary square matrices.
+- Added Hessenberg reduction (Householder reflections) as preprocessing step.
+- Added implicit QR iteration with Wilkinson shift and Givens rotations.
+- Preserved 1x1 identity and 2x2 characteristic polynomial fast paths.
+- Added complex-spectrum detection for NxN matrices via `MatrixDomainError`.
+- Removed `UnsupportedCalculatrixOperationError` size restriction.
+
+### QA
+
+- Added TDD coverage for 3x3 diagonal, 3x3 symmetric, 3x3 non-symmetric,
+  4x4 diagonal, 4x4 symmetric, repeated eigenvalues, and NxN complex spectrum.
+- Full regression green across core (151), CLI (12), app widget (130), and
+  Windows integration (38) suites.
+
+### Docs
+
+- Added v0.4.20 roadmap slice with TDD execution order.
+
 ## [0.4.10] - 2026-05-18
 
 First post-Stage-4 slice extending the canonical matrix stack kernel with

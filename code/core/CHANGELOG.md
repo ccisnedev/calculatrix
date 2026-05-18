@@ -4,6 +4,19 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.20] - 2026-05-18
+
+### Added
+
+- Generalized `Matrix.eigenvalues()` to arbitrary NxN square matrices using
+  Hessenberg reduction and implicit QR iteration with Wilkinson shift.
+- Complex-spectrum detection for NxN matrices (throws `MatrixDomainError`).
+
+### Changed
+
+- Removed `UnsupportedCalculatrixOperationError` size restriction on eigenvalues.
+- Preserved 1x1 identity and 2x2 characteristic polynomial as fast paths.
+
 ## [0.4.10] - 2026-05-18
 
 ### Added
