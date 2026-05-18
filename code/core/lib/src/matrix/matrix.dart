@@ -81,6 +81,67 @@ class Matrix {
     );
   }
 
+  /// Hilbert matrix of order [n]: H[i,j] = 1/(i+j+1).
+  /// Canonical ill-conditioned test matrix with κ(H_n) growing exponentially.
+  factory Matrix.hilbert(int n) {
+    if (n < 1) {
+      throw MatrixShapeError('Hilbert matrix size must be at least 1.');
+    }
+    return Matrix(
+      List<List<double>>.generate(
+        n,
+        (int i) => List<double>.generate(
+          n,
+          (int j) => 1.0 / (i + j + 1),
+          growable: false,
+        ),
+        growable: false,
+      ),
+    );
+  }
+
+  /// Pascal matrix of order [n]: P[i,j] = C(i+j, i).
+  /// Symmetric positive definite with det(P) = 1.
+  factory Matrix.pascal(int n) {
+    if (n < 1) {
+      throw MatrixShapeError('Pascal matrix size must be at least 1.');
+    }
+    // Build using the recurrence: P[i,j] = P[i-1,j] + P[i,j-1]
+    final rows = List<List<double>>.generate(n, (int i) {
+      return List<double>.generate(n, (int j) {
+        if (i == 0 || j == 0) return 1.0;
+        return 0.0; // placeholder
+      }, growable: false);
+    }, growable: false);
+
+    // Fill using Pascal's recurrence
+    for (int i = 1; i < n; i++) {
+      for (int j = 1; j < n; j++) {
+        rows[i][j] = rows[i - 1][j] + rows[i][j - 1];
+      }
+    }
+    return Matrix(rows);
+  }
+
+  /// Frank matrix of order [n]: upper-Hessenberg with known eigenvalue structure.
+  /// F[i,j] = n - max(i,j) for j >= i-1, else 0.
+  factory Matrix.frank(int n) {
+    if (n < 1) {
+      throw MatrixShapeError('Frank matrix size must be at least 1.');
+    }
+    return Matrix(
+      List<List<double>>.generate(
+        n,
+        (int i) => List<double>.generate(
+          n,
+          (int j) => j >= i - 1 ? (n - math.max(i, j)).toDouble() : 0.0,
+          growable: false,
+        ),
+        growable: false,
+      ),
+    );
+  }
+
   final List<List<double>> _rows;
 
   int get rowCount => _rows.length;

@@ -634,6 +634,67 @@ Two operations that complete the core linear algebra toolkit:
 - [x] Step 3: add commands, wire through CLI and app
 - [x] Step 4: rerun CLI, widget, and Windows integration suites
 
+#### v0.4.80 — Numerical Robustness: Standard Test Matrices and Residual Assertions
+
+Reference: Higham, *Accuracy and Stability of Numerical Algorithms* (2002);
+MATLAB `gallery()` function; LAPACK test suite methodology.
+
+Standard test matrices from the numerical computing literature are the canonical
+way to validate linear algebra implementations. Each matrix family stresses a
+specific algorithmic weakness: Hilbert matrices have exponentially growing
+condition numbers, Pascal matrices expose pivot precision, Frank matrices test
+eigenvalue algorithms on non-symmetric Hessenberg structure.
+
+Residual-norm assertions (‖A·A⁻¹ − I‖, ‖QR − A‖/‖A‖) test backward stability
+independent of forward error — the gold standard for numerical validation.
+
+- [x] Add `Matrix.hilbert(int n)` factory: `H[i,j] = 1/(i+j+1)` for dimensions 3–6
+- [x] Add `Matrix.pascal(int n)` factory: `P[i,j] = C(i+j, i)` for dimensions 3–5
+- [x] Add `Matrix.frank(int n)` factory: `F[i,j] = min(i,j)+1` for upper-Hessenberg structure
+- [x] Add residual-norm test helpers: `relativeResidual(A, B, expected)` → ‖A·B − expected‖/‖expected‖
+- [x] Test inverse residual: ‖A·A⁻¹ − I‖_F / n < tolerance for Hilbert(3), Pascal(4)
+- [x] Test LU residual: ‖P·A − L·U‖_F / ‖A‖_F < tolerance for all standard matrices
+- [x] Test QR residual: ‖Q·R − A‖_F / ‖A‖_F < tolerance for all standard matrices
+- [x] Test eigenvalue residual: ‖A·v − λ·v‖ / (‖A‖·‖v‖) for diagonalizable standard matrices
+- [x] Test RREF correctness on Hilbert (rank-deficient at tolerance boundary)
+- [x] Add dimension stress tests: eigenvalues, LU, QR, determinant, RREF on 5×5, 6×6, 8×8
+- [x] Document numerical limitations discovered during validation (condition number thresholds)
+- [x] Rerun full core test suite confirming no regressions
+
+##### TDD Execution Order
+
+- [x] Step 1: add `Matrix.hilbert(n)`, `Matrix.pascal(n)`, `Matrix.frank(n)` factories with construction tests
+- [x] Step 2: add residual-norm helper and inverse/LU/QR residual assertions on standard matrices
+- [x] Step 3: add eigenvalue residual assertions and RREF tests on standard matrices
+- [x] Step 4: add dimension stress tests (5×5 through 8×8) for all major operations
+- [x] Step 5: document discovered limitations and rerun full validation
+
+#### v0.4.90 — Package Publication Readiness
+
+Reference: pub.dev scoring criteria (https://pub.dev/help/scoring);
+dart.dev package layout conventions; effective Dart documentation guide.
+
+Before publishing `calculatrix` as a developer preview on pub.dev, the package
+must pass `dart pub publish --dry-run` cleanly, include a working example,
+have complete dartdoc coverage on public members, and present an accurate README.
+
+- [ ] Create `code/core/example/example.dart` demonstrating matrix creation, operations, RPN evaluation, and session usage
+- [ ] Update `code/core/README.md`: fix version references, add complete feature list, add usage examples matching example.dart
+- [ ] Add missing `topics` to pubspec.yaml: include `linear-algebra` and `math`
+- [ ] Run `dart doc` and fix all undocumented public member warnings
+- [ ] Run `dart pub publish --dry-run` and fix all reported issues
+- [ ] Add `funding` and/or `screenshots` metadata if applicable
+- [ ] Verify `dart analyze` reports zero issues on the public API surface
+- [ ] Bump version to `0.5.0` as developer-preview milestone
+
+##### TDD Execution Order
+
+- [ ] Step 1: create `example/example.dart` with representative usage patterns
+- [ ] Step 2: update README with accurate version, features, and code examples
+- [ ] Step 3: add topics and fix pubspec metadata
+- [ ] Step 4: run `dart doc`, fix documentation gaps on public members
+- [ ] Step 5: run `dart pub publish --dry-run` and resolve all blocking issues, then cut `0.5.0`
+
 - Additional factorizations beyond LU/QR
 - Sparse matrices
 

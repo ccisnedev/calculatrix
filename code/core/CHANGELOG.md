@@ -4,6 +4,16 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.80] - 2026-05-18
+
+### Added
+
+- Factory `Matrix.hilbert(n)` for the Hilbert ill-conditioned test matrix.
+- Factory `Matrix.pascal(n)` for the Pascal symmetric positive-definite matrix.
+- Factory `Matrix.frank(n)` for the Frank upper-Hessenberg matrix.
+- 58-test numerical robustness suite validating inverse, LU, QR, eigenvalue,
+  and RREF residuals on standard matrices from the literature (dimensions 3–8).
+
 ## [0.4.70] - 2026-05-18
 
 ### Added
