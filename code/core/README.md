@@ -3,32 +3,47 @@
 # Calculatrix
 
 Calculatrix is a pure Dart computation engine designed for calculator products.
-It is matrix-first and RPN-first by design: scalar values are represented as
-`1x1` matrices, so algebraic and stack-based workflows share the same math core.
+It is matrix-first by design: scalars are represented as `1x1` matrices, so
+algebraic input, direct stack workflows, and calculator session state all share
+the same canonical kernel.
 
 ## Status
 
-- Current package version: `2.11.0`
-- Focus: Stage 2.11.0 core-only matrix semantics
+- Current package version: `3.0.0`
+- Focus: Stage 3 canonical matrix stack machine foundation
 - Runtime dependencies: none (pure Dart)
 
 ## Features available now
 
 - Immutable `Matrix` type with dimension validation
-- Matrix operations: `+`, `-`, `*`, `/`, `sqrt`, `scale`, `transpose`
+- `CalculatrixMachine` as the canonical mutable stack machine
+- Typed public commands, typed public macros, and typed public programs
+- `Calculatrix.compileInfix`, `evaluateInfix`, and `evaluateRpn`
+- `CalculatrixSession` for interactive shared calculator state and memory
+- Matrix operations: `+`, `-`, `*`, `/`, `sqrt`, `scale`, `transpose`, `inverse`
 - Multiplication treats `1x1` operands as scalar scaling, so both `A * [[s]]`
 	and `[[s]] * A` are valid
 - Division currently supports scalar `1x1` denominators only; general matrix
 	right-division is deferred to the determinant/inverse stage
 - Square root supports square matrices in the real domain and throws typed
 	domain errors when no real root is available
-- `RpnEngine` stack with binary operators (`add`, `subtract`, `multiply`, `divide`)
-- `RpnEngine` stack utilities: `dup`, `drop`, `swap`, `over`, `pick`, `roll`, `rot`
-- Unary operators: square root (`sqrt`) and percent (`%`)
-- `CalculatrixSession` for shared calculator state, notation drafts,
-	committed value `X`, matrix memory, and stack mutations
-- `Calculatrix` facade: `evaluateInfix` and `evaluateRpn`
+- Primitive command families for stack operations, push/construction, unary,
+	binary, and parameterized structural edits
+- Public macros including zeros-like, ones-like, append-zero-row,
+	append-zero-column, and identity creation
 - Unit tests for matrix, RPN, session, and cross-notation evaluation
+
+## Public API surface
+
+The main public barrel is `package:calculatrix/calculatrix.dart` and exports:
+
+- `Matrix` and `MatrixDisplayFormatter`
+- `CalculatrixMachine`
+- `CalculatrixCommand`, `CalculatrixMacro`, `CalculatrixProgram`
+- typed commands from `commands.dart`
+- public macros from `macros.dart`
+- `CalculatrixSession`
+- numeric policy and typed error taxonomy
 
 ## Numeric policy
 
@@ -40,7 +55,7 @@ It is matrix-first and RPN-first by design: scalar values are represented as
 
 ## API stability
 
-- The current Stage 2.x API is intended to remain stable as the base for Stage 3 UX work.
+- `v3.0.0` establishes the public matrix stack machine surface.
 - RPN stack failures are exposed through the `RpnStackError` hierarchy:
 	- `RpnStackUnderflowError`
 	- `RpnStackRangeError`
@@ -52,13 +67,16 @@ It is matrix-first and RPN-first by design: scalar values are represented as
 import 'package:calculatrix/calculatrix.dart';
 
 void main() {
-	final CalculatrixSession session = CalculatrixSession();
-	session.insertMatrixLiteral('[[5,4],[4,5]]');
-	session.evaluate();
-	session.memoryAdd();
+	final CalculatrixProgram program = Calculatrix.compileInfix(
+	  '[[1,2],[3,4]] * [[2]]',
+	);
 
-	final Matrix sqrt = session.currentValue!.sqrt();
-	print(sqrt); // Matrix([[2.0, 1.0], [1.0, 2.0]])
+	final CalculatrixMachine machine = CalculatrixMachine();
+	machine.executeProgram(program);
+	machine.executeMacro(const AppendZeroRowMacro());
+
+	print(MatrixDisplayFormatter.compact(machine.top!));
+	// [[2,4],[6,8],[0,0]]
 }
 ```
 

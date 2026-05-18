@@ -99,6 +99,13 @@ Future<void> _tapCalculatorButton(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _tapFinderCenter(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tapAt(tester.getCenter(finder, warnIfMissed: false));
+  await tester.pumpAndSettle();
+}
+
 Future<void> _activateMatrixControl(WidgetTester tester, Finder control) async {
   await tester.ensureVisible(control);
   await tester.pumpAndSettle();
@@ -346,6 +353,29 @@ void main() {
       expect((matrixKeypadSize.height - infixKeypadSize.height).abs(), lessThanOrEqualTo(1.0));
     });
 
+    testWidgets('matrix mode hides stale notation copy and stack depth chrome', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('4'));
+      await tester.pump();
+      await tester.tap(find.text('ENTER'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+
+      await tester.tap(find.text('Matrix'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsNothing);
+      expect(find.text('Stack 1'), findsNothing);
+      expect(find.text('RPN entry'), findsNothing);
+      expect(find.text('Infix entry'), findsNothing);
+    });
+
     testWidgets('supports horizontal keypad paging', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
@@ -427,6 +457,28 @@ void main() {
       expect(addRowButtonSize.height, lessThan(cellSize.height * 0.75));
       expect(addColumnButtonSize.width, lessThan(cellSize.width * 0.45));
       expect(addColumnButtonSize.height, lessThan(cellSize.height * 0.45));
+    });
+
+    testWidgets('matrix editor add placeholders expose larger tap targets than their compact chrome', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+
+      final Size addRowButtonSize = tester.getSize(_addRowButton());
+      final Size addColumnButtonSize = tester.getSize(_addColumnButton());
+      final Size addRowHitTargetSize = tester.getSize(_addRowPlaceholder());
+      final Size addColumnHitTargetSize = tester.getSize(_addColumnPlaceholder());
+
+      expect(addRowHitTargetSize.width, greaterThan(addRowButtonSize.width));
+      expect(addRowHitTargetSize.height, greaterThan(addRowButtonSize.height));
+      expect(addColumnHitTargetSize.width, greaterThan(addColumnButtonSize.width));
+      expect(addColumnHitTargetSize.height, greaterThan(addColumnButtonSize.height));
+
+      await _tapFinderCenter(tester, _addRowPlaceholder());
+      expect(_matrixCell(2, 0), findsOneWidget);
+
+      await _tapFinderCenter(tester, _addColumnPlaceholder());
+      expect(_matrixCell(0, 2), findsOneWidget);
     });
 
     testWidgets('matrix editor drags a full row feedback instead of only the row marker', (tester) async {
@@ -1019,6 +1071,51 @@ void main() {
         find.bySemanticsLabel(RegExp(r'Display: \[\[1, 3\], \[2, 4\]\]')),
         findsOneWidget,
       );
+    });
+
+    testWidgets('rpn mode reproduces append row and column workflows with direct matrix macros', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('MAT'));
+      await tester.pumpAndSettle();
+      await _enterMatrixCell(tester, 0, 0, '1');
+      await _enterMatrixCell(tester, 0, 1, '2');
+      await _enterMatrixCell(tester, 1, 0, '3');
+      await _enterMatrixCell(tester, 1, 1, '4');
+      await _tapMatrixAction(tester, 'Push');
+
+      await _ensureCalculatorButtonVisible(tester, 'AROW');
+      expect(find.text('AROW'), findsOneWidget);
+      expect(find.text('ACOL'), findsOneWidget);
+      expect(find.text('T'), findsOneWidget);
+      expect(find.text('INV'), findsOneWidget);
+      expect(find.text('NEG'), findsOneWidget);
+      expect(find.text('ZEROS'), findsOneWidget);
+      expect(find.text('ONES'), findsOneWidget);
+
+      await _tapCalculatorButton(tester, 'AROW');
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: \[\[1, 2\], \[3, 4\], \[0, 0\]\]')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel(RegExp(r'Stack depth: 1')), findsOneWidget);
+
+      await _tapCalculatorButton(tester, 'ACOL');
+
+      expect(
+        find.bySemanticsLabel(
+          RegExp(r'Display: \[\[1, 2, 0\], \[3, 4, 0\], \[0, 0, 0\]\]'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel(RegExp(r'Stack depth: 1')), findsOneWidget);
+      handle.dispose();
     });
 
     testWidgets('infix mode renders non-scalar matrix results in the display', (tester) async {

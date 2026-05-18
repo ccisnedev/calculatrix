@@ -6,7 +6,6 @@ import '../machine/calculatrix_machine.dart';
 import '../machine/calculatrix_program.dart';
 import '../machine/commands.dart';
 import '../matrix/matrix.dart';
-import '../rpn/rpn_engine.dart';
 
 class Calculatrix {
   static CalculatrixProgram compileInfix(String expression) {
@@ -95,19 +94,6 @@ class Calculatrix {
     }
 
     return top;
-  }
-
-  static Matrix _parseOperandToken(String token) {
-    if (_looksLikeMatrixLiteral(token)) {
-      return _parseMatrixLiteral(token);
-    }
-
-    final double? value = double.tryParse(token);
-    if (value != null) {
-      return Matrix.scalar(value);
-    }
-
-    throw ExpressionSyntaxError('Invalid operand token: $token');
   }
 
   static bool _looksLikeMatrixLiteral(String token) {

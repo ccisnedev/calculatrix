@@ -1,56 +1,78 @@
 # Calculatrix
 
-> Calculadora multiplataforma matrix-first con semántica compartida entre
-> `Infix` y `RPN`.
+> Calculadora multiplataforma matrix-first con un core canónico basado en
+> stack machine y tres superficies visibles: `Infix`, `RPN` y `Matrix`.
 
 [![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
 
-## Features (v2.12.0)
+## Highlights (v3.0.0)
 
-- Motor compartido `package:calculatrix` para app y CLI
-- Editor matricial refinado con selección directa `2x2` a `4x4`, presets
-  `Zeros`/`Identity`, y validación explícita por celda
-- Evaluación `Infix` y `RPN` sobre la misma semántica matricial
-- División matricial por denominadores escalares `1x1`
-- Raíz cuadrada de matrices cuadradas con errores explícitos en dominio real
-- Memoria matricial (`MC`, `MR`, `M+`, `M-`) y cambio de signo (`±`) en el core
-- Valor comprometido compartido entre `Infix` y `RPN`
-- Errores tipados y política numérica determinista
+- `package:calculatrix` es la fuente semántica única para app y CLI.
+- El core público expone `CalculatrixMachine`, comandos tipados, macros
+  públicas, programas tipados e `CalculatrixSession`.
+- `Infix` compila al mismo kernel matricial que usan `RPN` y los workflows
+  directos por comando.
+- La app Flutter ofrece tres modos visibles: `Infix`, `RPN` y `Matrix`.
+- El workstation matricial soporta edición estructural acotada `2x2` a `4x4`,
+  presets, reordenamiento y confirmación canónica del literal final.
+- El CLI soporta modos `infix`, `rpn`, `command` y `macro` sobre la misma
+  API pública.
+- La política numérica, los errores tipados y la memoria matricial viven en el
+  core compartido.
 
-## Architecture
+## Superficies públicas
 
-La lógica matemática y operativa vive en `package:calculatrix`.
-Flutter y CLI son capas de interfaz sobre ese core compartido.
+- `code/core`: paquete Dart público `calculatrix`.
+- `code/app`: shell Flutter sobre el core compartido.
+- `code/cli`: interfaz de línea de comandos sobre el mismo vocabulario público.
+
+## Arquitectura
+
+La lógica matemática y operativa vive en `package:calculatrix`. Flutter y CLI
+son capas consumidoras sobre ese mismo núcleo.
 
 ```
-code/core/lib/src/
-  matrix/       # Matrix, formatting, matrix algebra
-  rpn/          # RPN engine and stack primitives
-  evaluation/   # infix/rpn facade
-  session/      # shared calculator state and matrix memory
+code/core/lib/
+  calculatrix.dart
+  src/
+    machine/      # stack machine, typed commands, macros, programs
+    evaluation/   # compileInfix, evaluateInfix, evaluateRpn
+    matrix/       # Matrix y display formatting
+    session/      # interactive shared session facade
+    errors/       # public typed error taxonomy
 
 code/app/lib/modules/calc/
   controller.dart  # presentation adapter over CalculatrixSession
-  view.dart        # Flutter UI
+  view.dart        # shell Infix/RPN/Matrix y workstation UI
 
 code/cli/bin/
   calculatrix_cli.dart
 ```
 
-## Getting Started
+## Primeros pasos
 
 ```bash
 cd code/core
+dart analyze
 dart test
 
 cd ../cli
+dart analyze
 dart test
 
 cd ../app
 flutter pub get
-flutter test test
 flutter analyze
-flutter run -d chrome
+flutter test
+flutter test integration_test/calculator_test.dart -d windows
+```
+
+## Ejemplos CLI
+
+```bash
+dart run code/cli/bin/calculatrix_cli.dart infix "[[1,2],[3,4]] * [[2]]"
+dart run code/cli/bin/calculatrix_cli.dart command "[[1,2],[3,4]]" transpose
+dart run code/cli/bin/calculatrix_cli.dart macro append-zero-row "[[1,2],[3,4]]"
 ```
 
 ## CI/CD
@@ -60,5 +82,6 @@ exitosos.
 
 ## Roadmap
 
-Ver [docs/roadmap.md](docs/roadmap.md) para la hoja de ruta y la entrada
-v2.12.0 de refinamiento UX del editor matricial.
+Ver [docs/roadmap.md](docs/roadmap.md) para el cierre de `v3.0.0` y la entrada
+a Stage 4. Ver también [docs/architecture.md](docs/architecture.md) para el
+modelo canónico actual.

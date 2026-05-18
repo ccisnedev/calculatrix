@@ -4,6 +4,28 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.0] - 2026-05-17
+
+### Added
+
+- `CalculatrixMachine` as the canonical public stack-machine runtime.
+- Typed public commands, typed public macros, and typed public programs.
+- Public structural command coverage for delete, duplicate, and move row/column.
+- Public macro coverage for zeros-like, ones-like, append-zero-row,
+  append-zero-column, and identity creation.
+
+### Changed
+
+- `Calculatrix.compileInfix` now defines the infix-over-stack contract for the
+  public API surface.
+- `CalculatrixSession` remains above the same canonical kernel instead of
+  introducing a second semantic center.
+
+### Fixed
+
+- Aligned app and CLI consumers on the same public command and macro surface.
+- Closed the remaining late-v2 documentation drift around the public API.
+
 ## [2.11.0] - 2026-05-16
 
 ### Added

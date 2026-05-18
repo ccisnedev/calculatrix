@@ -463,8 +463,8 @@ void main() {
 
       await _showInfixEditPage(tester);
       await _openMatrixEditorDialog(tester);
-      await tester.tap(_matrixAddRowPlaceholder());
-      await _pumpForUi(tester, steps: 2);
+      await tester.ensureVisible(_matrixAddRowPlaceholder());
+      await _tapFinderCenter(tester, _matrixAddRowPlaceholder());
 
       await _setMatrixCell(tester, 0, 0, '1');
       await _setMatrixCell(tester, 0, 1, '2');
@@ -477,6 +477,35 @@ void main() {
       await _pumpUntilGone(tester, find.byKey(const ValueKey<String>('matrix-mode-panel')));
 
       expect(_expressionText('[[1,2],[3,4],[5,6]]'), findsOneWidget);
+    });
+
+    testWidgets('matrix editor confirms a mixed row and column structural flow before insert', (tester) async {
+      await _pumpApp(tester);
+
+      await _showInfixEditPage(tester);
+      await _openMatrixEditorDialog(tester);
+      await tester.ensureVisible(_matrixAddRowPlaceholder());
+      await _tapFinderCenter(tester, _matrixAddRowPlaceholder());
+      await tester.ensureVisible(_matrixAddColumnPlaceholder());
+      await _tapFinderCenter(tester, _matrixAddColumnPlaceholder());
+
+      await _setMatrixCell(tester, 0, 0, '1');
+      await _setMatrixCell(tester, 0, 1, '2');
+      await _setMatrixCell(tester, 0, 2, '3');
+      await _setMatrixCell(tester, 1, 0, '4');
+      await _setMatrixCell(tester, 1, 1, '5');
+      await _setMatrixCell(tester, 1, 2, '6');
+      await _setMatrixCell(tester, 2, 0, '7');
+      await _setMatrixCell(tester, 2, 1, '8');
+      await _setMatrixCell(tester, 2, 2, '9');
+
+      await _confirmMatrixDialog(tester, 'Insert');
+      await _pumpUntilGone(
+        tester,
+        find.byKey(const ValueKey<String>('matrix-mode-panel')),
+      );
+
+      expect(_expressionText('[[1,2,3],[4,5,6],[7,8,9]]'), findsOneWidget);
     });
 
     testWidgets('infix mode displays a non-scalar matrix result', (tester) async {

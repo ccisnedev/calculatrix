@@ -9,9 +9,10 @@ Calculatrix is a shared-core calculator system.
 - `calculatrix_cli` is the command-line consumer.
 
 The current default app experience is an infix calculator oriented to scalar
-and `1x1` workflows, but the runtime semantics are already matrix-first. Late
-v2.x extends the same shell with matrix entry, paged keyboards, and explicit
-`RPN` mode instead of introducing separate calculator products.
+and `1x1` workflows, but the runtime semantics are already matrix-first. The
+current codebase is the `v3.0.0` foundation: the shared shell exposes visible
+`Infix`, `RPN`, and `Matrix` modes, and the core exposes the public
+machine/command/macro layer that all consumers route through.
 
 ## Runtime Truth
 
@@ -19,8 +20,10 @@ Evaluation no longer lives in app-local tokenizer/parser/evaluator code.
 App and CLI delegate computation to the core package.
 
 ```text
-Infix input (String)    -> Calculatrix.evaluateInfix(...) -> Matrix
-RPN input (List<String>) -> Calculatrix.evaluateRpn(...)  -> Matrix
+Infix input (String)     -> Calculatrix.compileInfix(...) -> CalculatrixProgram
+						 -> CalculatrixMachine.executeProgram(...) -> Matrix
+RPN input (List<String>) -> typed commands / evaluateRpn(...)
+						 -> CalculatrixMachine -> Matrix
 ```
 
 All values are matrices. Scalars are represented as `1x1` matrices. Consumer
@@ -31,19 +34,19 @@ change the matrix-first semantics of the core.
 
 | Layer | Responsibility |
 |-------|----------------|
-| `package:calculatrix` | `Matrix`, algebraic parsing/evaluation, `RpnEngine`, numeric policy, error taxonomy |
-| `calculatrix_app` | Mode selection, keypad paging, matrix editor, stack visualization, memory UX, formatting, accessibility |
-| `calculatrix_cli` | Argument parsing, command routing, core invocation, output formatting, exit behavior |
+| `package:calculatrix` | `Matrix`, `CalculatrixMachine`, typed commands/macros/programs, infix compilation/evaluation, session facade, numeric policy, error taxonomy |
+| `calculatrix_app` | Shell mode selection, keypad paging, Matrix shell/workstation drafts, stack visualization, memory UX, formatting, accessibility |
+| `calculatrix_cli` | Argument parsing, infix/RPN/command/macro routing, core invocation, output formatting, exit behavior |
 
-## Consumer Shell Model (Late v2.x)
+## Consumer Shell Model (v3.0.0 Foundation)
 
-The late-v2 application model is a single shell with specialized surfaces, not
+The current application model is a single shell with specialized surfaces, not
 multiple independent calculators.
 
 - One shared calculator shell
-- Explicit notation mode switch: `Infix` / `RPN`
+- Three visible shell modes: `Infix` / `RPN` / `Matrix`
 - Horizontally paged keypads
-- Dedicated `NxM` matrix editor surface
+- Dedicated Matrix shell surface with embedded bounded `NxM` workstation controls
 - Stack visualization in `RPN` mode
 - Square keys across supported screen sizes
 - Display/keypad height guided by a golden-ratio-like split when constraints allow
@@ -55,6 +58,12 @@ multiple independent calculators.
 - In `RPN` mode, confirming the matrix editor pushes the parsed matrix onto the stack.
 - CLI workflows use the same literal format directly on the command line, so copy/paste between app and CLI remains lossless.
 
+### Matrix Shell Contract
+
+- Matrix mode is now part of the visible shell, not a separate calculator product.
+- Matrix-focused keypad pages expose square order shortcuts, shape-aware helpers, and stack-native structural shortcuts.
+- Structural edits remain draft-local in the app until confirmation, but committed structural commands route through public core commands or macros.
+
 ## Testing Policy
 
 - **TDD is mandatory** for all new behavior.
@@ -65,7 +74,7 @@ multiple independent calculators.
 - `code/cli` should add automated unit and smoke/integration coverage for argument parsing, output formatting, and representative commands.
 - Stage completion should include focused validation of core tests/analyze, Flutter tests, app integration flows, and CLI automation/smokes.
 
-## RPN Interaction Contract (Late v2.x)
+## RPN Interaction Contract (v3.0.0)
 
 ### Shared Current Value
 
@@ -87,7 +96,7 @@ multiple independent calculators.
 - In `Infix` mode, the primary action key remains `=`.
 - In `RPN` mode, the same visual position is relabeled to `ENTER`.
 - `ENTER` commits the current operand draft onto the stack.
-- Late v2.x does **not** overload `ENTER` as implicit duplicate; duplication stays explicit via `dup`.
+- `v3.0.0` does **not** overload `ENTER` as implicit duplicate; duplication stays explicit via `dup`.
 
 ### Operator Semantics
 
@@ -105,10 +114,9 @@ multiple independent calculators.
 
 ### Memory Semantics
 
-- Memory remains scalar-only through the initial late-v2 `RPN` rollout.
-- `MR` pushes the recalled scalar as a `1x1` operand in `RPN` mode.
-- `M+` and `M-` read from the active scalar draft when present; otherwise they read from the top of stack when that value is scalar.
-- Non-scalar matrix values are rejected for memory accumulation in both `Infix` and `RPN` consumer flows until matrix memory semantics are explicitly broadened.
+- Memory is matrix-first in the core session model.
+- `MR` recalls the committed matrix value into the active consumer flow.
+- `M+` and `M-` operate through the same shared core matrix rules instead of scalar-only consumer special cases.
 - `MC` clears the memory register in both notation modes.
 
 ### Display Semantics
@@ -118,25 +126,30 @@ multiple independent calculators.
 - A dedicated stack surface shows recent stack levels and current depth.
 - Matrix rendering policy belongs to the consumer shell, while matrix computation remains in the core package.
 
-## Stage 3 Direction
+## Stage 3 Status and Stage 4 Gate
 
-Stage 3 is now defined as an architectural reset around one canonical matrix
-stack machine instead of as a narrow advanced-linear-algebra pass over the
-late-v2 shell.
+Stage 3 is complete in the current `v3.0.0` line.
 
-- package:calculatrix becomes the public matrix stack machine kernel.
-- Public primitive commands and public macros become part of the supported core API.
-- Infix remains supported as a convenience frontend that compiles or translates into the same stack execution model.
-- The app shell grows three complementary surfaces: Infix, RPN, and Matrix.
-- The modal matrix editor is replaced by a dedicated Matrix workstation surface.
-- Advanced linear algebra beyond inverse is deferred to the next major stage after the kernel reset.
+The stabilized foundation now includes:
 
-See docs/spec/stage_3_matrix_stack_machine.md for the Stage 3 contract.
+- `package:calculatrix` exports a public matrix stack machine, typed commands, typed macros, and typed programs.
+- Infix compiles to typed programs executed by the same machine layer.
+- The app shell already exposes `Infix`, `RPN`, and `Matrix` modes with Matrix-focused keypad pages.
+- The CLI already routes infix, RPN, public commands, and public macros through the shared core.
+- Public docs, versioning, and changelog entries are aligned with the canonical core model.
+- Core, CLI, Flutter tests, and the Windows app integration suite are green.
+
+The project is ready for Stage 4.
+
+Stage 4 can now focus on advanced linear algebra on top of the stable canonical
+kernel instead of carrying unresolved Stage 3 release debt.
+
+See [docs/spec/stage_3_matrix_stack_machine.md](docs/spec/stage_3_matrix_stack_machine.md) for the Stage 3 contract.
 
 ## Cleanup Status
 
 The historical app-side tokenizer/parser/evaluator pipeline has been removed
-from `calculatrix_app`. Late-v2 consumers now rely exclusively on the shared
-core package for evaluation semantics.
+from `calculatrix_app`. Current consumers rely exclusively on the shared core
+package for evaluation semantics.
 Only shell concerns remain in the app: mode switching, matrix entry, display,
 stack presentation, memory UX, and accessibility.

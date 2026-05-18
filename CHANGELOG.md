@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.0] - 2026-05-17
+
+Canonical matrix stack machine foundation release.
+
+### Core
+
+- Promoted `package:calculatrix` to the public semantic center of the product.
+- Added a public matrix stack machine with typed commands, typed macros, and
+	typed programs.
+- Kept infix as a frontend over the same kernel via public compilation and
+	evaluation APIs.
+- Exposed structural matrix commands and public workflow macros for zeros,
+	ones, identity, append-row, and append-column workflows.
+
+### App
+
+- Finalized the three-mode shell: `Infix`, `RPN`, and `Matrix`.
+- Replaced the old modal editing mental model with an embedded Matrix
+	workstation surface.
+- Added bounded structural row/column editing, compact structural affordances,
+	mode-accurate shell copy, and direct RPN matrix workflow parity.
+
+### CLI
+
+- Added public `command` and `macro` workflows on top of the same core API.
+- Added parameterized structural command routing for delete, duplicate, and
+	move row/column operations.
+
+### Docs
+
+- Refreshed roadmap, architecture, and package README content around the
+	canonical stack-machine model.
+- Updated public usage docs for core, app, and CLI consumers.
+
 ## [2.12.0] - 2026-05-17
 
 App-only matrix editor UX refinement release for late v2.

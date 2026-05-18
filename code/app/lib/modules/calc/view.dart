@@ -303,6 +303,8 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildDisplay() {
+    final bool showDisplayStatus = _controller.hasMemory || _controller.isRpnMode;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
@@ -318,46 +320,39 @@ class _CalculatorViewState extends State<CalculatorView> {
         children: [
           _buildModeSwitch(),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              if (_controller.hasMemory)
-                Semantics(
-                  label: 'Memory indicator',
-                  child: const Text(
-                    'M',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF4FC3F7),
-                      fontWeight: FontWeight.bold,
+          if (showDisplayStatus) ...[
+            Row(
+              children: [
+                if (_controller.hasMemory)
+                  Semantics(
+                    label: 'Memory indicator',
+                    child: const Text(
+                      'M',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF4FC3F7),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-              const Spacer(),
-              if (_controller.isMatrixMode)
-                Text(
-                  _controller.isRpnEntryMode ? 'RPN entry' : 'Infix entry',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF4FC3F7),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              if (_controller.isRpnMode)
-                Semantics(
-                  label: 'Stack depth: ${_controller.rpnStackDepth}',
-                  child: Text(
-                    key: const ValueKey<String>('calculator-stack-depth'),
-                    'Stack ${_controller.rpnStackDepth}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF4FC3F7),
-                      fontWeight: FontWeight.w600,
+                const Spacer(),
+                if (_controller.isRpnMode)
+                  Semantics(
+                    label: 'Stack depth: ${_controller.rpnStackDepth}',
+                    child: Text(
+                      key: const ValueKey<String>('calculator-stack-depth'),
+                      'Stack ${_controller.rpnStackDepth}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF4FC3F7),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
           Expanded(
             child: _controller.isMatrixMode
                 ? _buildMatrixModeBody()
@@ -1017,18 +1012,15 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildMatrixModeBody() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
-      child: _MatrixEditorDialog(
-        key: _matrixEditorKey,
-        isRpnMode: _controller.isRpnEntryMode,
-        embedded: true,
-        onCancel: _controller.exitMatrixMode,
-        onSubmitted: (String literal) {
-          _controller.insertMatrixLiteral(literal);
-          _controller.exitMatrixMode();
-        },
-      ),
+    return _MatrixEditorDialog(
+      key: _matrixEditorKey,
+      isRpnMode: _controller.isRpnEntryMode,
+      embedded: true,
+      onCancel: _controller.exitMatrixMode,
+      onSubmitted: (String literal) {
+        _controller.insertMatrixLiteral(literal);
+        _controller.exitMatrixMode();
+      },
     );
   }
 }
@@ -1216,7 +1208,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
         borderRadius: BorderRadius.circular(24),
         child: Container(
           constraints: const BoxConstraints(maxWidth: 720),
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -1638,31 +1630,41 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     );
   }
 
+  Widget _buildAddPlaceholderChrome(Key key) {
+    return SizedBox(
+      key: key,
+      width: _matrixAddButtonSize,
+      height: _matrixAddButtonSize,
+      child: DecoratedBox(
+        decoration: ShapeDecoration(
+          color: const Color(0xFF151C2F),
+          shape: CircleBorder(
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+        ),
+        child: const Center(
+          child: Icon(Icons.add, size: 14, color: Colors.white70),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAddRowPlaceholder() {
     return SizedBox(
       height: _matrixCellHeight,
-      child: Center(
-        child: SizedBox(
-          key: const ValueKey<String>('matrix-add-row-button'),
-          width: _matrixAddButtonSize,
-          height: _matrixAddButtonSize,
-          child: IconButton(
-            key: const ValueKey<String>('matrix-add-row-placeholder'),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.expand(),
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFF151C2F),
-              foregroundColor: Colors.white70,
-              side: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-              shape: const CircleBorder(),
-            ),
-            onPressed: _appendRow,
-            icon: const Icon(Icons.add, size: 14),
+      child: IconButton(
+          key: const ValueKey<String>('matrix-add-row-placeholder'),
+          onPressed: _appendRow,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.expand(),
+          splashRadius: _matrixCellHeight / 2,
+          visualDensity: VisualDensity.compact,
+          icon: _buildAddPlaceholderChrome(
+            const ValueKey<String>('matrix-add-row-button'),
           ),
         ),
-      ),
     );
   }
 
@@ -1670,28 +1672,17 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     return SizedBox(
       width: _matrixColumnHandleWidth,
       height: _matrixColumnHeaderHeight,
-      child: Center(
-        child: SizedBox(
-          key: const ValueKey<String>('matrix-add-column-button'),
-          width: _matrixAddButtonSize,
-          height: _matrixAddButtonSize,
-          child: IconButton(
-            key: const ValueKey<String>('matrix-add-column-placeholder'),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.expand(),
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFF151C2F),
-              foregroundColor: Colors.white70,
-              side: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-              shape: const CircleBorder(),
-            ),
-            onPressed: _appendColumn,
-            icon: const Icon(Icons.add, size: 14),
+      child: IconButton(
+          key: const ValueKey<String>('matrix-add-column-placeholder'),
+          onPressed: _appendColumn,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.expand(),
+          splashRadius: _matrixColumnHandleWidth / 2,
+          visualDensity: VisualDensity.compact,
+          icon: _buildAddPlaceholderChrome(
+            const ValueKey<String>('matrix-add-column-button'),
           ),
         ),
-      ),
     );
   }
 
