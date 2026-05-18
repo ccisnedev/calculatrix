@@ -167,7 +167,10 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('DOT', _ButtonCategory.function),
       _ButtonDef('CROSS', _ButtonCategory.function),
       _ButtonDef('NORM', _ButtonCategory.function),
-      _ButtonDef('TR', _ButtonCategory.function),
+      _ButtonDef('T', _ButtonCategory.function),
+      _ButtonDef('DUP', _ButtonCategory.function),
+      _ButtonDef('SWAP', _ButtonCategory.function),
+      _ButtonDef('NEG', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
     ]),
   ];
