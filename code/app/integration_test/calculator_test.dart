@@ -932,6 +932,29 @@ void main() {
       expect(find.text('Stack 2'), findsOneWidget);
     });
 
+    testWidgets('rpn mode applies eigenvalues to the committed top matrix', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+
+      await _submitMatrix(
+        tester,
+        <List<String>>[
+          <String>['2', '0'],
+          <String>['0', '3'],
+        ],
+        actionLabel: 'Push',
+      );
+
+      await _tapCalculatorButton(tester, 'EIG');
+
+      expect(_displayText('[3]\n[2]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+    });
+
     testWidgets('matrix mode entered from RPN can factorize the draft with LU and return to the stack', (tester) async {
       await _pumpApp(tester);
 

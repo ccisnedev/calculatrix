@@ -150,7 +150,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('INV', _ButtonCategory.function),
       _ButtonDef('DET', _ButtonCategory.function),
       _ButtonDef('ZEROS', _ButtonCategory.function),
-      _ButtonDef('ONES', _ButtonCategory.function),
+      _ButtonDef('EIG', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
     ]),
   ];
@@ -916,6 +916,8 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.executeRpnCommand(const InverseCommand());
         case 'DET':
           _controller.executeRpnCommand(const DeterminantCommand());
+        case 'EIG':
+          _controller.executeRpnCommand(const EigenvaluesCommand());
         case 'LU':
           _controller.executeRpnCommand(const LuDecompositionCommand());
         case 'QR':
@@ -992,6 +994,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       'T' => 'Transpose top matrix',
       'INV' => 'Invert top matrix',
       'DET' => 'Determinant of top matrix',
+      'EIG' => 'Eigenvalues of top matrix',
       'LU' => 'LU decomposition of top matrix',
       'QR' => 'QR decomposition of top matrix',
       'NEG' => 'Negate top matrix',

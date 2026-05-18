@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.10] - 2026-05-18
+
+First post-Stage-4 slice extending the canonical matrix stack kernel with
+small-matrix real eigenvalue workflows.
+
+### Core
+
+- Added public `Matrix.eigenvalues()` support for `1x1` matrices and `2x2`
+	real-spectrum matrices.
+- Added `EigenvaluesCommand` to the public typed command surface.
+- Added typed failure coverage for non-square, complex-spectrum, and out-of-slice
+	eigenvalue requests.
+
+### App
+
+- Added `EIG` to the `RPN` `FACT` deck so committed top-of-stack matrices can
+	route through the shared eigenvalue command path.
+
+### CLI
+
+- Added `eig` / `eigenvalues` to `command` mode over the same public core
+	vocabulary.
+
+### QA
+
+- Added focused matrix, machine, CLI, widget, and Windows integration coverage
+	for the new eigenvalue workflow.
+
+### Docs
+
+- Added the first `0.4.x` roadmap slice and refreshed release-facing version
+	references to `0.4.10`.
+
 ## [0.4.0] - 2026-05-18
 
 Stable release closing Stage 4 around advanced linear algebra on the canonical

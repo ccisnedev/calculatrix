@@ -221,6 +221,52 @@ void main() {
       expect(() => value.determinant(), throwsA(isA<MatrixShapeError>()));
     });
 
+    test('computes real eigenvalues for 2x2 matrices as a column matrix', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[2, 0],
+        <double>[0, 3],
+      ]);
+
+      expect(
+        value.eigenvalues(),
+        Matrix(<List<double>>[
+          <double>[3],
+          <double>[2],
+        ]),
+      );
+    });
+
+    test('rejects eigenvalues for non-square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(() => value.eigenvalues(), throwsA(isA<MatrixShapeError>()));
+    });
+
+    test('rejects eigenvalues for matrices larger than 2x2 in the current slice', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 0, 0],
+        <double>[0, 2, 0],
+        <double>[0, 0, 3],
+      ]);
+
+      expect(
+        () => value.eigenvalues(),
+        throwsA(isA<UnsupportedCalculatrixOperationError>()),
+      );
+    });
+
+    test('rejects eigenvalues when the 2x2 spectrum is complex', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[0, -1],
+        <double>[1, 0],
+      ]);
+
+      expect(() => value.eigenvalues(), throwsA(isA<MatrixDomainError>()));
+    });
+
     test('computes PLU decomposition for square matrices', () {
       final Matrix value = Matrix(<List<double>>[
         <double>[2, 1, 1],

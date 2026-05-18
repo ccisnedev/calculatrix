@@ -340,6 +340,59 @@ class Matrix {
     );
   }
 
+  Matrix eigenvalues({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    _requireSquare(operation: 'eigenvalues');
+
+    if (isScalar) {
+      return this;
+    }
+
+    if (rowCount != 2) {
+      throw UnsupportedCalculatrixOperationError(
+        'Eigenvalues are currently supported only for 1x1 and 2x2 matrices.',
+      );
+    }
+
+    final double a = _rows[0][0];
+    final double b = _rows[0][1];
+    final double c = _rows[1][0];
+    final double d = _rows[1][1];
+    final double trace = a + d;
+    final double determinantValue = (a * d) - (b * c);
+
+    double discriminant = (trace * trace) - (4 * determinantValue);
+    if (discriminant.abs() <= absoluteTolerance) {
+      discriminant = 0;
+    }
+
+    if (discriminant < 0) {
+      throw MatrixDomainError(
+        'Eigenvalues are undefined in the real domain for this matrix.',
+      );
+    }
+
+    final double sqrtDiscriminant = math.sqrt(discriminant);
+    final List<double> values = <double>[
+      (trace + sqrtDiscriminant) / 2,
+      (trace - sqrtDiscriminant) / 2,
+    ];
+
+    values.sort((double left, double right) => right.compareTo(left));
+
+    return Matrix(
+      values
+          .map(
+            (double value) => <double>[
+              value.abs() <= absoluteTolerance ? 0 : value,
+            ],
+          )
+          .toList(growable: false),
+    );
+  }
+
   LuDecomposition luDecomposition({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,

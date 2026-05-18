@@ -9,8 +9,8 @@ the same canonical kernel.
 
 ## Status
 
-- Current package version: `0.4.0`
-- Focus: Stage 4 stable release over the canonical matrix stack kernel
+- Current package version: `0.4.10`
+- Focus: first post-Stage-4 linear-algebra slice over the canonical matrix stack kernel
 - Runtime dependencies: none (pure Dart)
 
 ## Features available now
@@ -20,7 +20,7 @@ the same canonical kernel.
 - Typed public commands, typed public macros, and typed public programs
 - `Calculatrix.compileInfix`, `evaluateInfix`, and `evaluateRpn`
 - `CalculatrixSession` for interactive shared calculator state and memory
-- Matrix operations: `+`, `-`, `*`, `/`, `sqrt`, `scale`, `transpose`, `inverse`, `determinant`
+- Matrix operations: `+`, `-`, `*`, `/`, `sqrt`, `scale`, `transpose`, `inverse`, `determinant`, `eigenvalues` for `1x1` and real `2x2` matrices
 - Public decomposition APIs: LU with `P/L/U` factors and thin QR with `Q/R`
   factors
 - Multiplication treats `1x1` operands as scalar scaling, so both `A * [[s]]`
@@ -66,6 +66,7 @@ The main public barrel is `package:calculatrix/calculatrix.dart` and exports:
 - `v0.3.30` keeps the public core API stable while the app shell extends Matrix-mode factorization workflows on top of it.
 - `v0.3.31` keeps the public core API stable while Stage 4 closes its end-to-end shell coverage over the same kernel.
 - `v0.4.0` closes Stage 4 as the stable advanced-linear-algebra release over the same public matrix stack machine.
+- `v0.4.10` adds real eigenvalue workflows for `1x1` and `2x2` matrices through the same typed command barrel.
 - RPN stack failures are exposed through the `RpnStackError` hierarchy:
 	- `RpnStackUnderflowError`
 	- `RpnStackRangeError`

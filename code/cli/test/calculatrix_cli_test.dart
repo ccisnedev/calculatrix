@@ -94,6 +94,23 @@ void main() {
       expect(command.stdout.toString().trim(), '[[10]]');
     });
 
+    test('supports eigenvalues through public command routing', () async {
+      final ProcessResult command = await Process.run(
+        Platform.resolvedExecutable,
+        <String>[
+          'run',
+          'bin/calculatrix_cli.dart',
+          'command',
+          '[[2,0],[0,3]]',
+          'eig',
+        ],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(command.exitCode, 0);
+      expect(command.stdout.toString().trim(), '[[3], [2]]');
+    });
+
     test('supports LU decomposition through public command routing', () async {
       final ProcessResult command = await Process.run(
         Platform.resolvedExecutable,

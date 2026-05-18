@@ -1287,6 +1287,33 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('rpn mode applies eigenvalues to the committed top matrix', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(find.text('RPN'));
+      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'MAT');
+      await _enterMatrixCell(tester, 0, 0, '2');
+      await _enterMatrixCell(tester, 0, 1, '0');
+      await _enterMatrixCell(tester, 1, 0, '0');
+      await _enterMatrixCell(tester, 1, 1, '3');
+      await _tapMatrixAction(tester, 'Push');
+
+      await tester.tap(_keypadDeckSelector('FACT'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('EIG'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel(RegExp(r'Stack depth: 1')), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp(r'Display: \[\[3\], \[2\]\]')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
     testWidgets('rpn mode reproduces append row and column workflows with direct matrix macros', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());

@@ -251,6 +251,29 @@ void main() {
       expect(machine.depth, 1);
     });
 
+    test('applies eigenvalues through a typed matrix command', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+
+      machine.execute(
+        PushMatrixCommand(
+          Matrix(<List<double>>[
+            <double>[2, 0],
+            <double>[0, 3],
+          ]),
+        ),
+      );
+      machine.execute(const EigenvaluesCommand());
+
+      expect(
+        machine.top,
+        Matrix(<List<double>>[
+          <double>[3],
+          <double>[2],
+        ]),
+      );
+      expect(machine.depth, 1);
+    });
+
     test('expands LU decomposition through a typed matrix command', () {
       final CalculatrixMachine machine = CalculatrixMachine();
       final Matrix source = Matrix(<List<double>>[

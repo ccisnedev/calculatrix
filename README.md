@@ -5,7 +5,7 @@
 
 [![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
 
-## Highlights (v0.4.0)
+## Highlights (v0.4.10)
 
 - `package:calculatrix` es la fuente semántica única para app y CLI.
 - El core público expone `CalculatrixMachine`, comandos tipados, macros
@@ -25,6 +25,9 @@
   mezcla creación matricial, macro en `RPN`, QR y retorno a `Infix`.
 - `v0.4.0` cierra Stage 4 como release estable: determinante, LU, QR y sus
   workflows visibles quedan alineados entre core, app y CLI.
+- En `v0.4.10`, el core añade eigenvalues reales para matrices `1x1` y `2x2`,
+  el CLI los expone como `eig` y la app `RPN` los publica con `EIG` en el deck
+  `FACT`.
 - La línea `v0.3.1` mantiene `√` inmediato y `%` tipo Casio en `Infix`, sin
   alterar los contratos públicos de parser ni `RPN`.
 - La app usa un solo teclado `6x4`: las cuatro filas inferiores permanecen
@@ -95,6 +98,7 @@ dart run code/cli/bin/calculatrix_cli.dart command "[[1,2],[3,4]]" transpose
 dart run code/cli/bin/calculatrix_cli.dart command "[[4,7],[2,6]]" det
 dart run code/cli/bin/calculatrix_cli.dart command "[[2,1,1],[4,-6,0],[-2,7,2]]" lu
 dart run code/cli/bin/calculatrix_cli.dart command "[[1,0],[0,2]]" qr
+dart run code/cli/bin/calculatrix_cli.dart command "[[2,0],[0,3]]" eig
 dart run code/cli/bin/calculatrix_cli.dart macro append-zero-row "[[1,2],[3,4]]"
 ```
 
@@ -106,7 +110,7 @@ exitosos.
 ## Roadmap
 
 Ver [docs/roadmap.md](docs/roadmap.md) para el cierre de `v0.3.0`, el parche
-`v0.3.1`, los slices `v0.3.10`, `v0.3.20`, `v0.3.21`, `v0.3.30`, `v0.3.31` y el
-corte estable `v0.4.0` de Stage 4, y la
+`v0.3.1`, los slices `v0.3.10`, `v0.3.20`, `v0.3.21`, `v0.3.30`, `v0.3.31`, el
+corte estable `v0.4.0` de Stage 4 y el primer slice `v0.4.10` posterior, y la
 continuación del roadmap. Ver
 también [docs/architecture.md](docs/architecture.md) para el modelo canónico actual.

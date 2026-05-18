@@ -486,7 +486,21 @@ core, CLI, and app.
 
 ### v0.4.x — Improvements and fixes on top of v0.4
 
-- Eigenvalues / eigenvectors (backlog)
+#### v0.4.10 — Small-Matrix Real Eigenvalues
+
+- [x] Add public `Matrix.eigenvalues()` support for `1x1` matrices and `2x2` matrices with a real spectrum
+- [x] Return eigenvalues as a deterministic column matrix sorted in descending order
+- [x] Surface `MatrixShapeError`, `MatrixDomainError`, and `UnsupportedCalculatrixOperationError` for non-square, non-real, and out-of-slice requests
+- [x] Expose `EIG` / `eig` through the shared typed command path in app `RPN` and CLI `command` mode
+- [x] Add focused core, CLI, widget, and Windows integration coverage for the new workflow
+
+##### TDD Execution Order
+
+- [x] Step 1: lock real eigenvalue behavior and failure modes in core matrix and machine tests
+- [x] Step 2: route `EigenvaluesCommand` through CLI `command` mode with a stable `eig` alias
+- [x] Step 3: expose `EIG` in the app `RPN` factorization deck and rerun focused widget plus Windows integration validation
+
+- Eigenvectors / diagonalization beyond the current small-matrix real-eigenvalue slice
 - Additional factorizations beyond LU/QR
 - Sparse matrices
 

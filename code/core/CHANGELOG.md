@@ -4,6 +4,24 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.10] - 2026-05-18
+
+### Added
+
+- Public `Matrix.eigenvalues()` support for `1x1` matrices and `2x2` matrices
+  with a real spectrum.
+- `EigenvaluesCommand` on the public typed command surface.
+
+### Changed
+
+- Extended the post-Stage-4 linear-algebra command vocabulary with a
+  deterministic column-matrix eigenvalue workflow.
+
+### Fixed
+
+- Kept invalid eigenvalue requests on typed shape/domain/unsupported errors
+  instead of introducing consumer-local fallbacks.
+
 ## [0.4.0] - 2026-05-18
 
 ### Added

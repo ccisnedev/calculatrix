@@ -175,6 +175,16 @@ final class DeterminantCommand extends CalculatrixCommand {
   }
 }
 
+final class EigenvaluesCommand extends CalculatrixCommand {
+  const EigenvaluesCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    engine.push(value.eigenvalues());
+  }
+}
+
 final class LuDecompositionCommand extends CalculatrixCommand {
   const LuDecompositionCommand();
 

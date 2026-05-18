@@ -98,6 +98,9 @@ void _executeCommandSequence(
       case 'determinant':
       case 'det':
         machine.execute(const DeterminantCommand());
+      case 'eigenvalues':
+      case 'eig':
+        machine.execute(const EigenvaluesCommand());
       case 'lu':
         machine.execute(const LuDecompositionCommand());
       case 'qr':
