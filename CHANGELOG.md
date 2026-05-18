@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.40] - 2026-05-18
+
+Adds trace, Frobenius norm, and numerical rank as lightweight matrix
+properties on the public API.
+
+### Core
+
+- Added `Matrix.trace()` returning the sum of diagonal entries (scalar matrix).
+- Added `Matrix.frobeniusNorm()` returning the Frobenius norm (scalar matrix).
+- Added `Matrix.rank()` returning the numerical rank via row reduction (scalar matrix).
+- Added `TraceCommand`, `NormCommand`, and `RankCommand` to the public typed command surface.
+
+### App
+
+- Reorganized `FACT` deck: `LU`, `QR`, `EIG`, `DIAG`, `TR`, `NORM`, `RANK`, `MAT`.
+
+### CLI
+
+- Added `tr` / `trace`, `norm`, `rank` to `command` mode.
+
+### QA
+
+- TDD coverage for trace, norm, rank on square, non-square, rank-deficient matrices.
+- Full regression green: core 166, CLI 12, widget 130, integration 38.
+
 ## [0.4.30] - 2026-05-18
 
 Adds eigenvector computation and matrix diagonalization as public APIs,

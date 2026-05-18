@@ -537,6 +537,23 @@ core, CLI, and app.
 - [x] Step 3: add `DiagonalizationCommand`, wire through CLI and app
 - [x] Step 4: rerun CLI, widget, and Windows integration suites for the new command paths
 
+#### v0.4.40 — Trace, Frobenius Norm, and Rank
+
+- [x] Add public `Matrix.trace()` returning the sum of diagonal entries as a scalar matrix; throw `MatrixShapeError` for non-square inputs
+- [x] Add public `Matrix.frobeniusNorm()` returning the Frobenius norm as a scalar matrix (valid for any shape)
+- [x] Add public `Matrix.rank()` returning the numerical rank as a scalar matrix (count of non-negligible pivots from row reduction)
+- [x] Add `TraceCommand`, `NormCommand`, and `RankCommand` to the typed public command surface
+- [x] Route `TR` / `trace`, `NORM` / `norm`, and `RANK` / `rank` through CLI `command` mode and the app `RPN` factorization deck
+- [x] Add focused core TDD coverage for trace, norm, and rank on scalar, square, non-square, and zero matrices
+- [x] Rerun CLI, widget, and Windows integration validation for the new commands
+
+##### TDD Execution Order
+
+- [x] Step 1: add failing core tests for trace, Frobenius norm, and rank on representative matrices
+- [x] Step 2: implement `trace()`, `frobeniusNorm()`, and `rank()` in `Matrix`
+- [x] Step 3: add commands, wire through CLI and app
+- [x] Step 4: rerun CLI, widget, and Windows integration suites
+
 - Additional factorizations beyond LU/QR
 - Sparse matrices
 

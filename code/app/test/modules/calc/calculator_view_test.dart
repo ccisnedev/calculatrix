@@ -1168,8 +1168,11 @@ void main() {
 
       expect(find.text('LU'), findsOneWidget);
       expect(find.text('QR'), findsOneWidget);
-      expect(find.text('DET'), findsOneWidget);
-      expect(find.text('INV'), findsOneWidget);
+      expect(find.text('EIG'), findsOneWidget);
+      expect(find.text('DIAG'), findsOneWidget);
+      expect(find.text('TR'), findsOneWidget);
+      expect(find.text('NORM'), findsOneWidget);
+      expect(find.text('RANK'), findsOneWidget);
     });
 
     testWidgets('rpn mode exposes direct matrix command buttons and applies transpose', (tester) async {

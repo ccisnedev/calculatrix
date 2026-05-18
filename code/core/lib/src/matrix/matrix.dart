@@ -641,6 +641,79 @@ class Matrix {
     return Diagonalization(p: Matrix(pRows), d: Matrix(dRows));
   }
 
+  Matrix trace() {
+    _requireSquare(operation: 'trace');
+
+    double sum = 0;
+    for (int i = 0; i < rowCount; i++) {
+      sum += _rows[i][i];
+    }
+    return Matrix.scalar(sum);
+  }
+
+  Matrix frobeniusNorm() {
+    double sum = 0;
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = 0; c < columnCount; c++) {
+        sum += _rows[r][c] * _rows[r][c];
+      }
+    }
+    return Matrix.scalar(math.sqrt(sum));
+  }
+
+  Matrix rank({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    final int m = rowCount;
+    final int n = columnCount;
+
+    // Row reduce a copy with partial pivoting
+    final List<List<double>> work = List<List<double>>.generate(
+      m,
+      (int r) => List<double>.from(_rows[r]),
+      growable: false,
+    );
+
+    int pivotRow = 0;
+    for (int col = 0; col < n && pivotRow < m; col++) {
+      // Find pivot
+      int maxRow = pivotRow;
+      double maxVal = work[pivotRow][col].abs();
+      for (int r = pivotRow + 1; r < m; r++) {
+        if (work[r][col].abs() > maxVal) {
+          maxVal = work[r][col].abs();
+          maxRow = r;
+        }
+      }
+
+      if (maxVal <= absoluteTolerance) {
+        continue;
+      }
+
+      // Swap
+      if (maxRow != pivotRow) {
+        final List<double> temp = work[pivotRow];
+        work[pivotRow] = work[maxRow];
+        work[maxRow] = temp;
+      }
+
+      // Eliminate below
+      final double pivot = work[pivotRow][col];
+      for (int r = pivotRow + 1; r < m; r++) {
+        final double factor = work[r][col] / pivot;
+        if (factor.abs() <= absoluteTolerance) continue;
+        for (int c = col; c < n; c++) {
+          work[r][c] -= factor * work[pivotRow][c];
+        }
+      }
+
+      pivotRow++;
+    }
+
+    return Matrix.scalar(pivotRow.toDouble());
+  }
+
   /// Reduces the matrix to upper Hessenberg form using Householder reflections.
   List<List<double>> _toHessenberg(double absoluteTolerance) {
     final int n = rowCount;

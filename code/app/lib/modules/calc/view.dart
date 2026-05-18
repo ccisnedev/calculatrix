@@ -146,11 +146,11 @@ class _CalculatorViewState extends State<CalculatorView> {
     _KeypadDeckDef('FACT', <_ButtonDef>[
       _ButtonDef('LU', _ButtonCategory.function),
       _ButtonDef('QR', _ButtonCategory.function),
-      _ButtonDef('T', _ButtonCategory.function),
-      _ButtonDef('INV', _ButtonCategory.function),
-      _ButtonDef('DET', _ButtonCategory.function),
-      _ButtonDef('DIAG', _ButtonCategory.function),
       _ButtonDef('EIG', _ButtonCategory.function),
+      _ButtonDef('DIAG', _ButtonCategory.function),
+      _ButtonDef('TR', _ButtonCategory.function),
+      _ButtonDef('NORM', _ButtonCategory.function),
+      _ButtonDef('RANK', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
     ]),
   ];
@@ -920,6 +920,12 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.executeRpnCommand(const EigenvaluesCommand());
         case 'DIAG':
           _controller.executeRpnCommand(const DiagonalizationCommand());
+        case 'TR':
+          _controller.executeRpnCommand(const TraceCommand());
+        case 'NORM':
+          _controller.executeRpnCommand(const NormCommand());
+        case 'RANK':
+          _controller.executeRpnCommand(const RankCommand());
         case 'LU':
           _controller.executeRpnCommand(const LuDecompositionCommand());
         case 'QR':

@@ -477,6 +477,81 @@ void main() {
       );
     });
 
+    test('computes trace for square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+        <double>[7, 8, 9],
+      ]);
+
+      expect(value.trace(), Matrix.scalar(15));
+    });
+
+    test('computes trace for 1x1 matrices', () {
+      expect(Matrix.scalar(7).trace(), Matrix.scalar(7));
+    });
+
+    test('rejects trace for non-square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(() => value.trace(), throwsA(isA<MatrixShapeError>()));
+    });
+
+    test('computes Frobenius norm for any matrix', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[3, 4],
+      ]);
+
+      // sqrt(1 + 4 + 9 + 16) = sqrt(30)
+      final Matrix result = value.frobeniusNorm();
+      expect(result.isScalar, isTrue);
+      expect(result.scalarValue, closeTo(5.477225575, 1e-6));
+    });
+
+    test('computes Frobenius norm for vectors', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[3],
+        <double>[4],
+      ]);
+
+      // sqrt(9 + 16) = 5
+      expect(value.frobeniusNorm(), Matrix.scalar(5));
+    });
+
+    test('computes rank for full-rank square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 0, 0],
+        <double>[0, 1, 0],
+        <double>[0, 0, 1],
+      ]);
+
+      expect(value.rank(), Matrix.scalar(3));
+    });
+
+    test('computes rank for rank-deficient matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+        <double>[7, 8, 9],
+      ]);
+
+      // This matrix has rank 2 (third row is sum of first two)
+      expect(value.rank(), Matrix.scalar(2));
+    });
+
+    test('computes rank for non-square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 0, 0],
+        <double>[0, 1, 0],
+      ]);
+
+      expect(value.rank(), Matrix.scalar(2));
+    });
+
     test('computes PLU decomposition for square matrices', () {
       final Matrix value = Matrix(<List<double>>[
         <double>[2, 1, 1],

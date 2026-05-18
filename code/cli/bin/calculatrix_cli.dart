@@ -104,6 +104,13 @@ void _executeCommandSequence(
       case 'diagonalization':
       case 'diag':
         machine.execute(const DiagonalizationCommand());
+      case 'trace':
+      case 'tr':
+        machine.execute(const TraceCommand());
+      case 'norm':
+        machine.execute(const NormCommand());
+      case 'rank':
+        machine.execute(const RankCommand());
       case 'lu':
         machine.execute(const LuDecompositionCommand());
       case 'qr':

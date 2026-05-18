@@ -4,6 +4,13 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.40] - 2026-05-18
+
+### Added
+
+- Public `Matrix.trace()`, `Matrix.frobeniusNorm()`, and `Matrix.rank()`.
+- `TraceCommand`, `NormCommand`, `RankCommand` on the public typed command surface.
+
 ## [0.4.30] - 2026-05-18
 
 ### Added

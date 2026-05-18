@@ -197,6 +197,36 @@ final class DiagonalizationCommand extends CalculatrixCommand {
   }
 }
 
+final class TraceCommand extends CalculatrixCommand {
+  const TraceCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    engine.push(value.trace());
+  }
+}
+
+final class NormCommand extends CalculatrixCommand {
+  const NormCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    engine.push(value.frobeniusNorm());
+  }
+}
+
+final class RankCommand extends CalculatrixCommand {
+  const RankCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    engine.push(value.rank());
+  }
+}
+
 final class LuDecompositionCommand extends CalculatrixCommand {
   const LuDecompositionCommand();
 
