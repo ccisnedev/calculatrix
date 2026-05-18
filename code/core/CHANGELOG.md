@@ -4,6 +4,19 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.30] - 2026-05-18
+
+### Added
+
+- Public `Matrix.diagonalization()` returning eigenvector matrix P and
+  diagonal eigenvalue matrix D.
+- `DiagonalizationCommand` on the public typed command surface.
+- Null-space eigenvector extraction via Gaussian elimination.
+
+### Changed
+
+- `FACT` deck in the app now shows `DIAG` instead of `ZEROS`.
+
 ## [0.4.20] - 2026-05-18
 
 ### Added

@@ -149,7 +149,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('T', _ButtonCategory.function),
       _ButtonDef('INV', _ButtonCategory.function),
       _ButtonDef('DET', _ButtonCategory.function),
-      _ButtonDef('ZEROS', _ButtonCategory.function),
+      _ButtonDef('DIAG', _ButtonCategory.function),
       _ButtonDef('EIG', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
     ]),
@@ -918,6 +918,8 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.executeRpnCommand(const DeterminantCommand());
         case 'EIG':
           _controller.executeRpnCommand(const EigenvaluesCommand());
+        case 'DIAG':
+          _controller.executeRpnCommand(const DiagonalizationCommand());
         case 'LU':
           _controller.executeRpnCommand(const LuDecompositionCommand());
         case 'QR':

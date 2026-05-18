@@ -21,6 +21,13 @@ final class QrDecomposition {
   final Matrix r;
 }
 
+final class Diagonalization {
+  const Diagonalization({required this.p, required this.d});
+
+  final Matrix p;
+  final Matrix d;
+}
+
 class Matrix {
   Matrix(List<List<double>> rows) : _rows = _normalize(rows) {
     _validateRectangular(_rows);
@@ -478,6 +485,160 @@ class Matrix {
           )
           .toList(growable: false),
     );
+  }
+
+  Diagonalization diagonalization({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    _requireSquare(operation: 'diagonalization');
+
+    final Matrix eigenvalueColumn = eigenvalues(
+      absoluteTolerance: absoluteTolerance,
+    );
+
+    final int n = rowCount;
+    final List<double> lambdas = List<double>.generate(
+      n,
+      (int i) => eigenvalueColumn.at(i, 0),
+      growable: false,
+    );
+
+    // Build D as a diagonal matrix
+    final List<List<double>> dRows = List<List<double>>.generate(
+      n,
+      (int r) => List<double>.generate(
+        n,
+        (int c) => r == c ? lambdas[r] : 0,
+        growable: false,
+      ),
+      growable: false,
+    );
+
+    // Build P: for each eigenvalue, solve (A - λI)x = 0 via row reduction
+    final List<List<double>> pColumns = <List<double>>[];
+
+    for (int k = 0; k < n; k++) {
+      final double lambda = lambdas[k];
+
+      // Form A - λI
+      final List<List<double>> augmented = List<List<double>>.generate(
+        n,
+        (int r) => List<double>.generate(
+          n,
+          (int c) => _rows[r][c] - (r == c ? lambda : 0),
+          growable: false,
+        ),
+        growable: false,
+      );
+
+      // Gaussian elimination with partial pivoting (forward reduction)
+      final List<int> pivotColumns = <int>[];
+      int pivotRow = 0;
+      for (int col = 0; col < n && pivotRow < n; col++) {
+        // Find pivot
+        int maxRow = pivotRow;
+        double maxVal = augmented[pivotRow][col].abs();
+        for (int r = pivotRow + 1; r < n; r++) {
+          if (augmented[r][col].abs() > maxVal) {
+            maxVal = augmented[r][col].abs();
+            maxRow = r;
+          }
+        }
+
+        if (maxVal <= absoluteTolerance) {
+          continue;
+        }
+
+        // Swap rows
+        if (maxRow != pivotRow) {
+          final List<double> temp = augmented[pivotRow];
+          augmented[pivotRow] = augmented[maxRow];
+          augmented[maxRow] = temp;
+        }
+
+        pivotColumns.add(col);
+
+        // Scale pivot row
+        final double pivotVal = augmented[pivotRow][col];
+        for (int c = col; c < n; c++) {
+          augmented[pivotRow][c] /= pivotVal;
+        }
+
+        // Eliminate below and above
+        for (int r = 0; r < n; r++) {
+          if (r == pivotRow) continue;
+          final double factor = augmented[r][col];
+          if (factor.abs() <= absoluteTolerance) continue;
+          for (int c = col; c < n; c++) {
+            augmented[r][c] -= factor * augmented[pivotRow][c];
+          }
+        }
+
+        pivotRow++;
+      }
+
+      // Find a free variable column (not a pivot column)
+      // Build the null space vector
+      final List<double> eigenvector = List<double>.filled(n, 0);
+      final Set<int> pivotSet = pivotColumns.toSet();
+
+      // Find the first free column
+      int freeCol = -1;
+      for (int c = 0; c < n; c++) {
+        if (!pivotSet.contains(c)) {
+          freeCol = c;
+          break;
+        }
+      }
+
+      if (freeCol == -1) {
+        // Numerically rank n: shouldn't happen for a true eigenvalue.
+        // Fall back to the last column direction.
+        eigenvector[n - 1] = 1;
+      } else {
+        eigenvector[freeCol] = 1;
+        // Back-substitute: for each pivot row i with pivot column p[i],
+        // x[p[i]] = -augmented[i][freeCol]
+        for (int i = 0; i < pivotColumns.length; i++) {
+          eigenvector[pivotColumns[i]] = -augmented[i][freeCol];
+        }
+      }
+
+      // Normalize the eigenvector
+      double norm = 0;
+      for (int i = 0; i < n; i++) {
+        norm += eigenvector[i] * eigenvector[i];
+      }
+      norm = math.sqrt(norm);
+      if (norm > absoluteTolerance) {
+        for (int i = 0; i < n; i++) {
+          eigenvector[i] /= norm;
+        }
+      }
+
+      // Clean near-zero entries
+      for (int i = 0; i < n; i++) {
+        if (eigenvector[i].abs() <= absoluteTolerance) {
+          eigenvector[i] = 0;
+        }
+      }
+
+      pColumns.add(eigenvector);
+    }
+
+    // Build P matrix (columns are eigenvectors)
+    final List<List<double>> pRows = List<List<double>>.generate(
+      n,
+      (int r) => List<double>.generate(
+        n,
+        (int c) => pColumns[c][r],
+        growable: false,
+      ),
+      growable: false,
+    );
+
+    return Diagonalization(p: Matrix(pRows), d: Matrix(dRows));
   }
 
   /// Reduces the matrix to upper Hessenberg form using Householder reflections.

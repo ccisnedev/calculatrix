@@ -274,6 +274,23 @@ void main() {
       expect(machine.depth, 1);
     });
 
+    test('expands diagonalization through a typed matrix command', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final Matrix source = Matrix(<List<double>>[
+        <double>[3, 0],
+        <double>[0, 5],
+      ]);
+
+      machine.execute(PushMatrixCommand(source));
+      machine.execute(const DiagonalizationCommand());
+
+      // Diagonalization pushes P then D (D on top)
+      expect(machine.depth, 2);
+      // Top is D (diagonal eigenvalue matrix)
+      expect(machine.top!.at(0, 0), closeTo(5, 1e-9));
+      expect(machine.top!.at(1, 1), closeTo(3, 1e-9));
+    });
+
     test('expands LU decomposition through a typed matrix command', () {
       final CalculatrixMachine machine = CalculatrixMachine();
       final Matrix source = Matrix(<List<double>>[

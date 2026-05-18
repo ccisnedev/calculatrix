@@ -518,7 +518,25 @@ core, CLI, and app.
 - [x] Step 3: add core tests for complex-spectrum detection on 3x3+ matrices
 - [x] Step 4: rerun CLI, widget, and Windows integration suites to confirm the generalized path is transparent to consumers
 
-- Eigenvectors / diagonalization beyond the current small-matrix real-eigenvalue slice
+#### v0.4.30 — Eigenvectors and Diagonalization
+
+- [x] Add public `Matrix.diagonalization()` returning a `Diagonalization` type whose `p` holds eigenvector columns and `d` is the diagonal eigenvalue matrix
+- [x] Compute eigenvectors by solving `(A - λI)x = 0` via Gaussian elimination with partial pivoting for each real eigenvalue
+- [x] Add public `Diagonalization` type with `p` (eigenvector columns) and `d` (diagonal eigenvalue matrix) such that `A ≈ P * D * P⁻¹`
+- [x] Add `DiagonalizationCommand` to the typed public command surface
+- [x] Route `DIAG` / `diag` through CLI `command` mode and the app `RPN` factorization deck
+- [x] Throw `MatrixDomainError` when the eigenvalue spectrum is complex (delegates to `eigenvalues()` detection)
+- [x] Throw `MatrixShapeError` for non-square inputs
+- [x] Add focused core TDD coverage for 2x2, 3x3, and 4x4 eigenvector and diagonalization workflows
+- [x] Rerun CLI, widget, and Windows integration validation for the new commands
+
+##### TDD Execution Order
+
+- [x] Step 1: add failing core tests for eigenvectors and diagonalization on 2x2, 3x3 diagonal, and 3x3 symmetric matrices
+- [x] Step 2: implement `Matrix.diagonalization()` and `Diagonalization` in core
+- [x] Step 3: add `DiagonalizationCommand`, wire through CLI and app
+- [x] Step 4: rerun CLI, widget, and Windows integration suites for the new command paths
+
 - Additional factorizations beyond LU/QR
 - Sparse matrices
 

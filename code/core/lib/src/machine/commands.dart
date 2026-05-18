@@ -185,6 +185,18 @@ final class EigenvaluesCommand extends CalculatrixCommand {
   }
 }
 
+final class DiagonalizationCommand extends CalculatrixCommand {
+  const DiagonalizationCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    final Diagonalization result = value.diagonalization();
+    engine.push(result.p);
+    engine.push(result.d);
+  }
+}
+
 final class LuDecompositionCommand extends CalculatrixCommand {
   const LuDecompositionCommand();
 

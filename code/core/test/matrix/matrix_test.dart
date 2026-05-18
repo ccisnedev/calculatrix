@@ -368,6 +368,115 @@ void main() {
       expect(() => value.eigenvalues(), throwsA(isA<MatrixDomainError>()));
     });
 
+    test('computes eigenvectors for 2x2 diagonal matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[3, 0],
+        <double>[0, 5],
+      ]);
+
+      final Diagonalization result = value.diagonalization();
+      // D should contain eigenvalues on diagonal (sorted descending)
+      expect(result.d.at(0, 0), closeTo(5, 1e-9));
+      expect(result.d.at(1, 1), closeTo(3, 1e-9));
+      expect(result.d.at(0, 1), closeTo(0, 1e-9));
+      expect(result.d.at(1, 0), closeTo(0, 1e-9));
+      // P columns are eigenvectors: A*P ≈ P*D
+      final Matrix ap = value * result.p;
+      final Matrix pd = result.p * result.d;
+      for (int r = 0; r < 2; r++) {
+        for (int c = 0; c < 2; c++) {
+          expect(ap.at(r, c), closeTo(pd.at(r, c), 1e-9));
+        }
+      }
+    });
+
+    test('computes eigenvectors for 3x3 diagonal matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[5, 0, 0],
+        <double>[0, 3, 0],
+        <double>[0, 0, 1],
+      ]);
+
+      final Diagonalization result = value.diagonalization();
+      expect(result.d.at(0, 0), closeTo(5, 1e-9));
+      expect(result.d.at(1, 1), closeTo(3, 1e-9));
+      expect(result.d.at(2, 2), closeTo(1, 1e-9));
+      // Verify A*P = P*D
+      final Matrix ap = value * result.p;
+      final Matrix pd = result.p * result.d;
+      for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+          expect(ap.at(r, c), closeTo(pd.at(r, c), 1e-9));
+        }
+      }
+    });
+
+    test('computes eigenvectors for 3x3 symmetric matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[2, 1, 0],
+        <double>[1, 3, 1],
+        <double>[0, 1, 2],
+      ]);
+
+      final Diagonalization result = value.diagonalization();
+      // Eigenvalues are 4, 2, 1 (descending)
+      expect(result.d.at(0, 0), closeTo(4, 1e-9));
+      expect(result.d.at(1, 1), closeTo(2, 1e-9));
+      expect(result.d.at(2, 2), closeTo(1, 1e-9));
+      // Verify A*P = P*D
+      final Matrix ap = value * result.p;
+      final Matrix pd = result.p * result.d;
+      for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+          expect(ap.at(r, c), closeTo(pd.at(r, c), 1e-9));
+        }
+      }
+    });
+
+    test('computes eigenvectors for 2x2 non-diagonal matrices', () {
+      // A = [[2, 1], [0, 3]], eigenvalues 3, 2
+      final Matrix value = Matrix(<List<double>>[
+        <double>[2, 1],
+        <double>[0, 3],
+      ]);
+
+      final Diagonalization result = value.diagonalization();
+      expect(result.d.at(0, 0), closeTo(3, 1e-9));
+      expect(result.d.at(1, 1), closeTo(2, 1e-9));
+      // Verify A*P = P*D
+      final Matrix ap = value * result.p;
+      final Matrix pd = result.p * result.d;
+      for (int r = 0; r < 2; r++) {
+        for (int c = 0; c < 2; c++) {
+          expect(ap.at(r, c), closeTo(pd.at(r, c), 1e-9));
+        }
+      }
+    });
+
+    test('rejects diagonalization for non-square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(
+        () => value.diagonalization(),
+        throwsA(isA<MatrixShapeError>()),
+      );
+    });
+
+    test('rejects diagonalization when spectrum is complex', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[0, -1],
+        <double>[1, 0],
+      ]);
+
+      expect(
+        () => value.diagonalization(),
+        throwsA(isA<MatrixDomainError>()),
+      );
+    });
+
     test('computes PLU decomposition for square matrices', () {
       final Matrix value = Matrix(<List<double>>[
         <double>[2, 1, 1],

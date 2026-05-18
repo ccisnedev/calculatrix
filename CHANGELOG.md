@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.30] - 2026-05-18
+
+Adds eigenvector computation and matrix diagonalization as public APIs,
+completing the eigendecomposition workflow.
+
+### Core
+
+- Added `Matrix.diagonalization()` returning `Diagonalization(p, d)` where
+  P holds eigenvector columns and D is the diagonal eigenvalue matrix.
+- Eigenvectors computed via null-space extraction (Gaussian elimination with
+  partial pivoting on A - λI).
+- Added `DiagonalizationCommand` to the public typed command surface.
+
+### App
+
+- Added `DIAG` to the `RPN` `FACT` deck (replaced `ZEROS`).
+
+### CLI
+
+- Added `diag` / `diagonalization` to `command` mode.
+
+### QA
+
+- Added TDD coverage for 2x2 diagonal, 2x2 non-diagonal, 3x3 diagonal,
+  3x3 symmetric eigenvectors; complex-spectrum and non-square rejection.
+- Full regression green: core 158, CLI 12, widget 130, integration 38.
+
+### Docs
+
+- Added v0.4.30 roadmap slice with TDD execution order.
+
 ## [0.4.20] - 2026-05-18
 
 Generalizes eigenvalue computation from 2x2-only to arbitrary NxN square

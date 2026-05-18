@@ -101,6 +101,9 @@ void _executeCommandSequence(
       case 'eigenvalues':
       case 'eig':
         machine.execute(const EigenvaluesCommand());
+      case 'diagonalization':
+      case 'diag':
+        machine.execute(const DiagonalizationCommand());
       case 'lu':
         machine.execute(const LuDecompositionCommand());
       case 'qr':
