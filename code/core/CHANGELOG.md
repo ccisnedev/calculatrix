@@ -4,6 +4,18 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.70] - 2026-05-18
+
+### Added
+
+- Public `Matrix.rref()` for Reduced Row Echelon Form via Gaussian elimination
+  with partial pivoting.
+- Public `Matrix.spectralNorm()` returning the induced 2-norm (largest singular
+  value) as a scalar matrix.
+- `RrefCommand` and `SpectralNormCommand` on the public typed command surface.
+- RREF button in app FACT deck, SNORM button in PROP deck.
+- Reorganized FACT/PROP decks for clarity: FACT=transforms, PROP=scalar queries.
+
 ## [0.4.60] - 2026-05-18
 
 ### Added

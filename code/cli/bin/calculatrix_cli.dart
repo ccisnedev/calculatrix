@@ -121,6 +121,10 @@ void _executeCommandSequence(
         machine.execute(const DotProductCommand());
       case 'cross':
         machine.execute(const CrossProductCommand());
+      case 'rref':
+        machine.execute(const RrefCommand());
+      case 'snorm':
+        machine.execute(const SpectralNormCommand());
       case 'lu':
         machine.execute(const LuDecompositionCommand());
       case 'qr':

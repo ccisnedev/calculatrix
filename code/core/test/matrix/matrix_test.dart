@@ -980,6 +980,114 @@ void main() {
     });
   });
 
+  group('RREF (Reduced Row Echelon Form)', () {
+    test('rref of identity is identity', () {
+      final id = Matrix.identity(3);
+      expect(id.rref(), id);
+    });
+
+    test('rref of 2x3 augmented system', () {
+      // System: 2x + y = 5, x - y = 1 → x=2, y=1
+      // Augmented: [[2, 1, 5], [1, -1, 1]]
+      final aug = Matrix(<List<double>>[
+        [2, 1, 5],
+        [1, -1, 1],
+      ]);
+      final result = aug.rref();
+      // RREF: [[1, 0, 2], [0, 1, 1]]
+      expect(result.almostEquals(Matrix(<List<double>>[
+        [1, 0, 2],
+        [0, 1, 1],
+      ])), isTrue);
+    });
+
+    test('rref of 3x4 augmented system', () {
+      // x + y + z = 6, 2y + 5z = -4, 2x + 5y - z = 27
+      final aug = Matrix(<List<double>>[
+        [1, 1, 1, 6],
+        [0, 2, 5, -4],
+        [2, 5, -1, 27],
+      ]);
+      final result = aug.rref();
+      // Solution: x=5, y=3, z=-2
+      expect(result.almostEquals(Matrix(<List<double>>[
+        [1, 0, 0, 5],
+        [0, 1, 0, 3],
+        [0, 0, 1, -2],
+      ])), isTrue);
+    });
+
+    test('rref of rank-deficient matrix has zero rows at bottom', () {
+      // Row 3 = Row 1 + Row 2
+      final a = Matrix(<List<double>>[
+        [1, 2, 3],
+        [4, 5, 6],
+        [5, 7, 9],
+      ]);
+      final result = a.rref();
+      // Last row should be all zeros
+      expect(result.at(2, 0), closeTo(0, 1e-10));
+      expect(result.at(2, 1), closeTo(0, 1e-10));
+      expect(result.at(2, 2), closeTo(0, 1e-10));
+      // First two rows are pivots
+      expect(result.at(0, 0), closeTo(1, 1e-10));
+      expect(result.at(1, 1), closeTo(1, 1e-10));
+    });
+
+    test('rref of single row normalizes the leading entry', () {
+      final a = Matrix(<List<double>>[[4, 8, 12]]);
+      final result = a.rref();
+      expect(result.almostEquals(Matrix(<List<double>>[[1, 2, 3]])), isTrue);
+    });
+
+    test('rref of zero matrix is zero matrix', () {
+      final z = Matrix.zeros(2, 3);
+      expect(z.rref(), z);
+    });
+  });
+
+  group('Spectral norm', () {
+    test('spectral norm of identity is 1', () {
+      final id = Matrix.identity(3);
+      final norm = id.spectralNorm();
+      expect(norm.isScalar, isTrue);
+      expect(norm.scalarValue, closeTo(1, 1e-10));
+    });
+
+    test('spectral norm of scalar matrix is |scalar|', () {
+      final a = Matrix.scalar(-5);
+      expect(a.spectralNorm().scalarValue, closeTo(5, 1e-10));
+    });
+
+    test('spectral norm of diagonal matrix is max |diagonal entry|', () {
+      final d = Matrix(<List<double>>[[3, 0], [0, -7]]);
+      expect(d.spectralNorm().scalarValue, closeTo(7, 1e-10));
+    });
+
+    test('spectral norm is submultiplicative: ‖AB‖₂ ≤ ‖A‖₂ · ‖B‖₂', () {
+      final a = Matrix(<List<double>>[[1, 2], [3, 4]]);
+      final b = Matrix(<List<double>>[[5, 6], [7, 8]]);
+      final normAB = (a * b).spectralNorm().scalarValue;
+      final normA = a.spectralNorm().scalarValue;
+      final normB = b.spectralNorm().scalarValue;
+      expect(normAB, lessThanOrEqualTo(normA * normB + 1e-8));
+    });
+
+    test('spectral norm of orthogonal matrix is 1', () {
+      // 2D rotation by 30°
+      final c = 0.8660254037844387; // cos(30°)
+      final s = 0.5; // sin(30°)
+      final q = Matrix(<List<double>>[[c, -s], [s, c]]);
+      expect(q.spectralNorm().scalarValue, closeTo(1, 1e-10));
+    });
+
+    test('spectral norm works for non-square matrices', () {
+      final a = Matrix(<List<double>>[[1, 0], [0, 2], [0, 0]]);
+      // Singular values are 1 and 2 → spectral norm = 2
+      expect(a.spectralNorm().scalarValue, closeTo(2, 1e-10));
+    });
+  });
+
   group('Vector operations', () {
     test('dot product of two 3x1 vectors', () {
       // A = [1, 2, 3]ᵀ, B = [4, 5, 6]ᵀ

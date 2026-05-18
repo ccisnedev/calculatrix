@@ -146,22 +146,22 @@ class _CalculatorViewState extends State<CalculatorView> {
     _KeypadDeckDef('FACT', <_ButtonDef>[
       _ButtonDef('LU', _ButtonCategory.function),
       _ButtonDef('QR', _ButtonCategory.function),
+      _ButtonDef('RREF', _ButtonCategory.function),
       _ButtonDef('EIG', _ButtonCategory.function),
       _ButtonDef('DIAG', _ButtonCategory.function),
       _ButtonDef('COF', _ButtonCategory.function),
       _ButtonDef('ADJ', _ButtonCategory.function),
       _ButtonDef('TR', _ButtonCategory.function),
-      _ButtonDef('NORM', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('PROP', <_ButtonDef>[
       _ButtonDef('DET', _ButtonCategory.function),
       _ButtonDef('RANK', _ButtonCategory.function),
-      _ButtonDef('TR', _ButtonCategory.function),
       _ButtonDef('NORM', _ButtonCategory.function),
+      _ButtonDef('SNORM', _ButtonCategory.function),
+      _ButtonDef('TR', _ButtonCategory.function),
       _ButtonDef('EIG', _ButtonCategory.function),
       _ButtonDef('COF', _ButtonCategory.function),
       _ButtonDef('ADJ', _ButtonCategory.function),
-      _ButtonDef('MAT', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('VEC', <_ButtonDef>[
       _ButtonDef('DOT', _ButtonCategory.function),
@@ -954,6 +954,10 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.executeRpnCommand(const DotProductCommand());
         case 'CROSS':
           _controller.executeRpnCommand(const CrossProductCommand());
+        case 'RREF':
+          _controller.executeRpnCommand(const RrefCommand());
+        case 'SNORM':
+          _controller.executeRpnCommand(const SpectralNormCommand());
         case 'LU':
           _controller.executeRpnCommand(const LuDecompositionCommand());
         case 'QR':

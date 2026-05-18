@@ -841,6 +841,91 @@ class Matrix {
     ]);
   }
 
+  /// Returns the Reduced Row Echelon Form (RREF) of this matrix using
+  /// Gaussian elimination with partial pivoting and back-substitution.
+  ///
+  /// Works for any m×n matrix. Pivot columns get leading 1s with zeros
+  /// above and below.
+  Matrix rref({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    final int m = rowCount;
+    final int n = columnCount;
+    // Mutable working copy.
+    final List<List<double>> rows = <List<double>>[
+      for (final List<double> r in _rows) List<double>.of(r),
+    ];
+
+    int pivotRow = 0;
+    for (int col = 0; col < n && pivotRow < m; col++) {
+      // Partial pivot: find row with largest absolute value in this column.
+      int maxRow = pivotRow;
+      double maxVal = rows[pivotRow][col].abs();
+      for (int r = pivotRow + 1; r < m; r++) {
+        final double val = rows[r][col].abs();
+        if (val > maxVal) {
+          maxVal = val;
+          maxRow = r;
+        }
+      }
+
+      if (maxVal < absoluteTolerance) continue; // Skip zero column.
+
+      // Swap rows.
+      if (maxRow != pivotRow) {
+        final List<double> temp = rows[pivotRow];
+        rows[pivotRow] = rows[maxRow];
+        rows[maxRow] = temp;
+      }
+
+      // Scale pivot row so leading entry is 1.
+      final double pivot = rows[pivotRow][col];
+      for (int j = 0; j < n; j++) {
+        rows[pivotRow][j] /= pivot;
+      }
+
+      // Eliminate all other entries in this column.
+      for (int r = 0; r < m; r++) {
+        if (r == pivotRow) continue;
+        final double factor = rows[r][col];
+        if (factor.abs() < absoluteTolerance) continue;
+        for (int j = 0; j < n; j++) {
+          rows[r][j] -= factor * rows[pivotRow][j];
+        }
+      }
+
+      pivotRow++;
+    }
+
+    // Clean near-zero entries.
+    for (int r = 0; r < m; r++) {
+      for (int c = 0; c < n; c++) {
+        if (rows[r][c].abs() < absoluteTolerance) rows[r][c] = 0;
+      }
+    }
+
+    return Matrix(rows);
+  }
+
+  /// Returns the spectral norm (induced 2-norm) of this matrix: ‖A‖₂ = σ_max.
+  ///
+  /// Computed as sqrt of the largest eigenvalue of AᵀA. Works for any m×n
+  /// matrix.
+  Matrix spectralNorm({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    final Matrix ata = transpose() * this;
+    final Matrix eigs = ata.eigenvalues(absoluteTolerance: absoluteTolerance);
+    double maxEig = 0;
+    for (int i = 0; i < eigs.rowCount; i++) {
+      final double val = eigs.at(i, 0).abs();
+      if (val > maxEig) maxEig = val;
+    }
+    return Matrix.scalar(math.sqrt(maxEig));
+  }
+
   /// Reduces the matrix to upper Hessenberg form using Householder reflections.
   List<List<double>> _toHessenberg(double absoluteTolerance) {
     final int n = rowCount;

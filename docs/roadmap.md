@@ -607,6 +607,33 @@ Where `skew([[x],[y],[z]]) = [[0, -z, y], [z, 0, -x], [-y, x, 0]]`
 - [x] Step 3: add commands, wire through CLI and app
 - [x] Step 4: rerun CLI, widget, and Windows integration suites
 
+#### v0.4.70 — RREF and Spectral Norm
+
+Two operations that complete the core linear algebra toolkit:
+- RREF (Reduced Row Echelon Form): Gaussian elimination with partial pivoting,
+  essential for students studying systems of equations and rank visually.
+- Spectral norm (‖A‖₂): the largest singular value, computed as
+  sqrt(λ_max(AᵀA)). Complements Frobenius norm for operator-norm reasoning.
+
+- [x] Add public `Matrix.rref()` returning the reduced row echelon form
+- [x] Implement Gaussian elimination with partial pivoting and back-substitution
+- [x] Handle non-square matrices (m×n) correctly in RREF
+- [x] Add public `Matrix.spectralNorm()` returning ‖A‖₂ as a 1×1 scalar matrix
+- [x] Compute spectral norm as sqrt of largest eigenvalue of AᵀA
+- [x] Add `RrefCommand` and `SpectralNormCommand` to the typed public command surface
+- [x] Route `RREF` / `rref` and `SNORM` / `snorm` through CLI command mode and the app
+- [x] Add focused core TDD coverage for RREF on augmented systems and rank-deficient matrices
+- [x] Verify RREF identity: rref(I) = I, rref of rank-r matrix has exactly r pivot rows
+- [x] Verify spectral norm properties: ‖I‖₂ = 1, submultiplicativity
+- [x] Rerun CLI, widget, and Windows integration validation
+
+##### TDD Execution Order
+
+- [x] Step 1: add failing core tests for rref and spectralNorm with known results
+- [x] Step 2: implement `rref()` and `spectralNorm()` in `Matrix`
+- [x] Step 3: add commands, wire through CLI and app
+- [x] Step 4: rerun CLI, widget, and Windows integration suites
+
 - Additional factorizations beyond LU/QR
 - Sparse matrices
 

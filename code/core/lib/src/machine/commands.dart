@@ -269,6 +269,26 @@ final class CrossProductCommand extends CalculatrixCommand {
   }
 }
 
+final class RrefCommand extends CalculatrixCommand {
+  const RrefCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    engine.push(value.rref());
+  }
+}
+
+final class SpectralNormCommand extends CalculatrixCommand {
+  const SpectralNormCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    engine.push(value.spectralNorm());
+  }
+}
+
 final class LuDecompositionCommand extends CalculatrixCommand {
   const LuDecompositionCommand();
 
