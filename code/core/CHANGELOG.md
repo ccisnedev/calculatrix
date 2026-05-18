@@ -4,6 +4,14 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.50] - 2026-05-18
+
+### Added
+
+- Public `Matrix.minor()`, `Matrix.cofactor()`, `Matrix.cofactorMatrix()`,
+  and `Matrix.adjugate()` following textbook definitions.
+- `CofactorMatrixCommand` and `AdjugateCommand` on the public typed command surface.
+
 ## [0.4.40] - 2026-05-18
 
 ### Added

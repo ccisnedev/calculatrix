@@ -554,6 +554,31 @@ core, CLI, and app.
 - [x] Step 3: add commands, wire through CLI and app
 - [x] Step 4: rerun CLI, widget, and Windows integration suites
 
+#### v0.4.50 — Formal Definitional Operations (Minor, Cofactor, Adjugate)
+
+These operations follow textbook definitions rather than efficient numerical
+algorithms. They enable step-by-step reasoning: inverse = adjugate / determinant,
+where adjugate = transpose of cofactor matrix, and each cofactor = signed minor
+determinant. Expensive for large matrices, but mathematically important.
+
+- [x] Add public `Matrix.minor(int row, int column)` returning the (n-1)×(n-1) submatrix with the specified row and column removed
+- [x] Add public `Matrix.cofactor(int row, int column)` returning `(-1)^(i+j) * det(minor(i,j))` as a scalar matrix
+- [x] Add public `Matrix.cofactorMatrix()` returning the full NxN matrix of cofactors
+- [x] Add public `Matrix.adjugate()` returning the transpose of the cofactor matrix (classical adjoint)
+- [x] Add `CofactorMatrixCommand` and `AdjugateCommand` to the typed public command surface
+- [x] Route `COF` / `cof` and `ADJ` / `adj` through CLI `command` mode and the app `RPN` factorization deck
+- [x] Throw `MatrixShapeError` for non-square inputs on cofactor/adjugate operations
+- [x] Add focused core TDD coverage for minor, cofactor, cofactor matrix, and adjugate on 2x2, 3x3, and 4x4 matrices
+- [x] Verify the definitional identity: `adjugate(A) = det(A) * inverse(A)` in tests
+- [x] Rerun CLI, widget, and Windows integration validation for the new commands
+
+##### TDD Execution Order
+
+- [x] Step 1: add failing core tests for minor, cofactor, cofactorMatrix, and adjugate with known results
+- [x] Step 2: implement `minor()`, `cofactor()`, `cofactorMatrix()`, and `adjugate()` in `Matrix`
+- [x] Step 3: add commands, wire through CLI and app
+- [x] Step 4: rerun CLI, widget, and Windows integration suites
+
 - Additional factorizations beyond LU/QR
 - Sparse matrices
 

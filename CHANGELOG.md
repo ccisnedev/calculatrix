@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.50] - 2026-05-18
+
+Adds formal definitional operations: minor, cofactor matrix, and adjugate
+(classical adjoint). These follow textbook definitions and enable step-by-step
+reasoning such as: inverse = adjugate / determinant.
+
+### Core
+
+- Added `Matrix.minor(row, column)` returning the (n-1)×(n-1) submatrix.
+- Added `Matrix.cofactor(row, column)` returning (-1)^(i+j) * det(minor).
+- Added `Matrix.cofactorMatrix()` returning the full NxN cofactor matrix.
+- Added `Matrix.adjugate()` returning the transpose of the cofactor matrix.
+- Added `CofactorMatrixCommand` and `AdjugateCommand` to the typed command surface.
+
+### App
+
+- Added `COF` and `ADJ` to the `RPN` `FACT` deck.
+- Added new `PROP` deck grouping property queries (DET, RANK, TR, NORM, etc.).
+
+### CLI
+
+- Added `cof` / `cofactor-matrix` and `adj` / `adjugate` to `command` mode.
+
+### QA
+
+- TDD coverage for minor, cofactor, cofactorMatrix, adjugate on 2x2/3x3.
+- Verified definitional identity: A·adj(A) = det(A)·I.
+- Full regression green: core 174, CLI 12, widget 130, integration 38.
+
 ## [0.4.40] - 2026-05-18
 
 Adds trace, Frobenius norm, and numerical rank as lightweight matrix

@@ -148,9 +148,19 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('QR', _ButtonCategory.function),
       _ButtonDef('EIG', _ButtonCategory.function),
       _ButtonDef('DIAG', _ButtonCategory.function),
+      _ButtonDef('COF', _ButtonCategory.function),
+      _ButtonDef('ADJ', _ButtonCategory.function),
       _ButtonDef('TR', _ButtonCategory.function),
       _ButtonDef('NORM', _ButtonCategory.function),
+    ]),
+    _KeypadDeckDef('PROP', <_ButtonDef>[
+      _ButtonDef('DET', _ButtonCategory.function),
       _ButtonDef('RANK', _ButtonCategory.function),
+      _ButtonDef('TR', _ButtonCategory.function),
+      _ButtonDef('NORM', _ButtonCategory.function),
+      _ButtonDef('EIG', _ButtonCategory.function),
+      _ButtonDef('COF', _ButtonCategory.function),
+      _ButtonDef('ADJ', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
     ]),
   ];
@@ -926,6 +936,10 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.executeRpnCommand(const NormCommand());
         case 'RANK':
           _controller.executeRpnCommand(const RankCommand());
+        case 'COF':
+          _controller.executeRpnCommand(const CofactorMatrixCommand());
+        case 'ADJ':
+          _controller.executeRpnCommand(const AdjugateCommand());
         case 'LU':
           _controller.executeRpnCommand(const LuDecompositionCommand());
         case 'QR':

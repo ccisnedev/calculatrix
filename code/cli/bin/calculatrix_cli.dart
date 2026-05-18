@@ -111,6 +111,12 @@ void _executeCommandSequence(
         machine.execute(const NormCommand());
       case 'rank':
         machine.execute(const RankCommand());
+      case 'cofactor-matrix':
+      case 'cof':
+        machine.execute(const CofactorMatrixCommand());
+      case 'adjugate':
+      case 'adj':
+        machine.execute(const AdjugateCommand());
       case 'lu':
         machine.execute(const LuDecompositionCommand());
       case 'qr':

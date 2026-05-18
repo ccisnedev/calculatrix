@@ -552,6 +552,130 @@ void main() {
       expect(value.rank(), Matrix.scalar(2));
     });
 
+    test('computes minor by removing specified row and column', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+        <double>[7, 8, 9],
+      ]);
+
+      // Remove row 0, col 0 → [[5,6],[8,9]]
+      expect(
+        value.minor(0, 0),
+        Matrix(<List<double>>[
+          <double>[5, 6],
+          <double>[8, 9],
+        ]),
+      );
+
+      // Remove row 1, col 2 → [[1,2],[7,8]]
+      expect(
+        value.minor(1, 2),
+        Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[7, 8],
+        ]),
+      );
+    });
+
+    test('computes minor for 2x2 matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[3, 7],
+        <double>[1, 4],
+      ]);
+
+      // Remove row 0, col 0 → [[4]]
+      expect(value.minor(0, 0), Matrix.scalar(4));
+      // Remove row 0, col 1 → [[1]]
+      expect(value.minor(0, 1), Matrix.scalar(1));
+    });
+
+    test('computes cofactor as signed minor determinant', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[0, 4, 5],
+        <double>[1, 0, 6],
+      ]);
+
+      // cofactor(0,0) = (+1) * det([[4,5],[0,6]]) = 24
+      expect(value.cofactor(0, 0), Matrix.scalar(24));
+      // cofactor(0,1) = (-1) * det([[0,5],[1,6]]) = -(0-5) = 5
+      expect(value.cofactor(0, 1), Matrix.scalar(5));
+      // cofactor(0,2) = (+1) * det([[0,4],[1,0]]) = -4
+      expect(value.cofactor(0, 2), Matrix.scalar(-4));
+    });
+
+    test('computes cofactor matrix for 3x3', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[0, 4, 5],
+        <double>[1, 0, 6],
+      ]);
+
+      final Matrix cof = value.cofactorMatrix();
+      expect(cof.rowCount, 3);
+      expect(cof.columnCount, 3);
+      // First row of cofactor matrix
+      expect(cof.at(0, 0), closeTo(24, 1e-9));
+      expect(cof.at(0, 1), closeTo(5, 1e-9));
+      expect(cof.at(0, 2), closeTo(-4, 1e-9));
+    });
+
+    test('computes adjugate as transpose of cofactor matrix', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[0, 4, 5],
+        <double>[1, 0, 6],
+      ]);
+
+      final Matrix adj = value.adjugate();
+      final Matrix cof = value.cofactorMatrix();
+      // adjugate = transpose of cofactor matrix
+      for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+          expect(adj.at(r, c), closeTo(cof.at(c, r), 1e-9));
+        }
+      }
+    });
+
+    test('verifies adjugate identity: adj(A) = det(A) * inv(A)', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[2, 1, 3],
+        <double>[0, 1, 2],
+        <double>[1, 0, 1],
+      ]);
+
+      final Matrix adj = value.adjugate();
+      final double det = value.determinant().scalarValue;
+      // inv(A) * det(A) should equal adj(A)
+      // We already have inverse from LU, so verify: A * adj(A) = det(A) * I
+      final Matrix product = value * adj;
+      final Matrix expected = Matrix.identity(3).scale(det);
+      for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+          expect(product.at(r, c), closeTo(expected.at(r, c), 1e-9));
+        }
+      }
+    });
+
+    test('rejects minor for non-square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(() => value.minor(0, 0), throwsA(isA<MatrixShapeError>()));
+    });
+
+    test('rejects cofactorMatrix for non-square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(() => value.cofactorMatrix(), throwsA(isA<MatrixShapeError>()));
+    });
+
     test('computes PLU decomposition for square matrices', () {
       final Matrix value = Matrix(<List<double>>[
         <double>[2, 1, 1],

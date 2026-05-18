@@ -714,6 +714,68 @@ class Matrix {
     return Matrix.scalar(pivotRow.toDouble());
   }
 
+  Matrix minor(int row, int column) {
+    _requireSquare(operation: 'minor');
+
+    if (rowCount < 2) {
+      throw MatrixShapeError(
+        'Minor requires at least a 2x2 matrix.',
+      );
+    }
+
+    final int n = rowCount;
+    final List<List<double>> result = <List<double>>[];
+
+    for (int r = 0; r < n; r++) {
+      if (r == row) continue;
+      final List<double> newRow = <double>[];
+      for (int c = 0; c < n; c++) {
+        if (c == column) continue;
+        newRow.add(_rows[r][c]);
+      }
+      result.add(newRow);
+    }
+
+    return Matrix(result);
+  }
+
+  Matrix cofactor(int row, int column) {
+    _requireSquare(operation: 'cofactor');
+
+    final Matrix minorMatrix = minor(row, column);
+    final double det = minorMatrix.determinant().scalarValue;
+    final double sign = (row + column).isEven ? 1 : -1;
+    return Matrix.scalar(sign * det);
+  }
+
+  Matrix cofactorMatrix() {
+    _requireSquare(operation: 'cofactor matrix');
+
+    final int n = rowCount;
+    final List<List<double>> result = List<List<double>>.generate(
+      n,
+      (int r) => List<double>.generate(
+        n,
+        (int c) {
+          final Matrix minorMatrix = minor(r, c);
+          final double det = minorMatrix.determinant().scalarValue;
+          final double sign = (r + c).isEven ? 1 : -1;
+          return sign * det;
+        },
+        growable: false,
+      ),
+      growable: false,
+    );
+
+    return Matrix(result);
+  }
+
+  Matrix adjugate() {
+    _requireSquare(operation: 'adjugate');
+
+    return cofactorMatrix().transpose();
+  }
+
   /// Reduces the matrix to upper Hessenberg form using Householder reflections.
   List<List<double>> _toHessenberg(double absoluteTolerance) {
     final int n = rowCount;

@@ -227,6 +227,26 @@ final class RankCommand extends CalculatrixCommand {
   }
 }
 
+final class CofactorMatrixCommand extends CalculatrixCommand {
+  const CofactorMatrixCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    engine.push(value.cofactorMatrix());
+  }
+}
+
+final class AdjugateCommand extends CalculatrixCommand {
+  const AdjugateCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    engine.push(value.adjugate());
+  }
+}
+
 final class LuDecompositionCommand extends CalculatrixCommand {
   const LuDecompositionCommand();
 

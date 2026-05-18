@@ -1,6 +1,6 @@
 name: calculatrix_cli
 description: Command-line interface for Calculatrix.
-version: 0.4.40
+version: 0.4.50
 publish_to: 'none'
 
 environment:
