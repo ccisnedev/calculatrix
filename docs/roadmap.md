@@ -281,30 +281,82 @@ explicit notation modes, and richer display contracts.
 - [ ] Step 4: lock widget contracts for order controls, validation, quick actions, and keyboard edit/navigation behavior
 - [x] Step 5: add narrow emulator coverage for one `Infix` insert flow, one `RPN` push flow, and one invalid-cell recovery flow
 
+#### v2.13.0 — Matrix Row/Column List Editor UX
+
+- [ ] Add row-list and column-list editing affordances on top of the existing grid so structural edits remain visible as matrix operations, not hidden form state
+- [ ] Support bounded `NxM` editing up to `4x4`, including add/remove row and add/remove column operations without breaking canonical literal serialization
+- [ ] Keep the current square quick workflow (`2x2`, `3x3`, `4x4`) as the fast path, while allowing structural list edits to diverge into non-square shapes when the user intentionally changes rows or columns
+- [ ] Support desktop-first row reordering with pointer drag handles and provide an explicit fallback affordance when drag is unavailable or imprecise
+- [ ] Keep row/column list order, visible grid cells, preview text, and final `Infix`/`RPN` confirmation output in strict sync after every structural edit
+- [ ] Restrict square-only helpers like `Identity` to square shapes while keeping shape-agnostic helpers like `Zeros` and `Clear`
+- [ ] Add focused TDD coverage for draft insert/delete/reorder semantics, widget drag-and-drop contracts, and canonical end-to-end confirmation flows
+
+##### TDD Execution Order
+
+- [ ] Step 1: lock draft-state contracts for row/column insertion, deletion, reordering, and value preservation within the bounded `4x4` backing store
+- [ ] Step 2: prove controller parity for non-square and reordered literals so `Infix` insert and `RPN` push keep using the exact serialized matrix
+- [ ] Step 3: lock widget contracts for row/column list affordances, add/remove controls, drag handles, and square-only helper availability
+- [ ] Step 4: add desktop-focused interaction coverage for pointer-driven row reorder plus non-drag fallbacks
+- [ ] Step 5: add integration coverage for one add-row flow, one reorder-row flow, and one mixed row/column structural edit followed by successful confirmation
+
 ---
 
-## Stage 3 — "Advanced Linear Algebra on Mature Matrix UX" (2.x.x → 3.0.0)
+## Stage 3 — "Canonical Matrix Stack Machine" (2.x.x → 3.0.0)
 
-Advanced linear algebra and release-grade matrix workflows on top of the
-stabilized multi-page shell, matrix editor, and RPN UX delivered in late v2.x.
+Stage 3 is an architectural reset, not only an advanced-linear-algebra pass.
+The product is redefined around one canonical matrix stack machine in
+package:calculatrix, with infix treated as a convenience frontend and Matrix as
+an app shell mode instead of a modal editor.
+
+Companion specification: docs/spec/stage_3_matrix_stack_machine.md
 
 ### v2.x.x → v3.0.0
 
-- [ ] Determinant
-- [ ] Matrix inverse
-- [ ] LU decomposition
-- [ ] QR decomposition
-- [ ] Promote late-v2 matrix workflows to major-release quality across app and CLI
-- [ ] Extend display and interaction polish for complex matrix workflows
-- [ ] Extended linear algebra tests (advanced ops)
-- [ ] End-to-end workflows combining matrix input, notation switching, and advanced operations
+- [ ] Reframe package:calculatrix around a public matrix stack machine kernel
+- [ ] Expose typed public APIs for primitive commands and public macros
+- [ ] Keep all committed runtime values matrix-first and execute all committed operations through stack semantics
+- [ ] Treat infix as translation or convenience evaluation over the same stack kernel instead of as a separate semantic engine
+- [ ] Expose public matrix creation, structural editing, transpose, inverse, zeros, ones, and stack-native workflow commands in the core package
+- [ ] Replace the app-side modal matrix editor with a dedicated Matrix shell mode and matrix-focused keyboard pages
+- [ ] Keep advanced users able to access the same command vocabulary directly from RPN mode
+- [ ] Add CLI parity for public commands, public macros, and infix convenience execution
+- [ ] Refresh architecture, docs, and QA around the new canonical core model
 
 ### v3.0.0 — Stable Release
 
-- [ ] Calculator UX with matrix editing, notation switching, and determinant/inverse/LU/QR over shared core
-- [ ] Advanced matrix operations documentation
+- [ ] One canonical matrix stack machine core with public command and macro APIs
+- [ ] Three complementary app shell modes: Infix, RPN, Matrix
+- [ ] Matrix workstation replaces the modal editor and delegates real operations to public core commands or macros
+- [ ] Public documentation for commands, macros, and the infix-over-stack contract
 
 ### v3.x.x — Improvements and fixes on top of v3
+
+- Additional command packs and workflow macros
+- Matrix workstation ergonomics and shell polish
+- CLI scripting and programmable-workflow improvements over the same public core command layer
+
+---
+
+## Stage 4 — "Advanced Linear Algebra on Canonical Stack Kernel" (3.x.x → 4.0.0)
+
+Stage 4 builds advanced linear algebra on top of the already-stable matrix
+stack machine and the Stage 3 shell/workstation architecture.
+
+### v3.x.x → v4.0.0
+
+- [ ] Determinant
+- [ ] LU decomposition
+- [ ] QR decomposition
+- [ ] Extend display and interaction polish for complex advanced matrix workflows
+- [ ] Extended linear algebra tests over the canonical stack kernel
+- [ ] End-to-end workflows combining matrix creation, notation switching, commands, macros, and advanced operations
+
+### v4.0.0 — Stable Release
+
+- [ ] Calculator UX with canonical matrix shell modes and advanced linear algebra over the shared core
+- [ ] Advanced matrix operations documentation
+
+### v4.x.x — Improvements and fixes on top of v4
 
 - Eigenvalues / eigenvectors (backlog)
 - Additional factorizations beyond LU/QR

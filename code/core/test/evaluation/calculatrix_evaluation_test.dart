@@ -3,6 +3,31 @@ import 'package:test/test.dart';
 
 void main() {
   group('Calculatrix facade', () {
+    test('compiles infix to a deterministic typed program', () {
+      final CalculatrixProgram program = Calculatrix.compileInfix('3 + 4 * 5');
+
+      expect(
+        program.commands.map((CalculatrixCommand command) => command.runtimeType),
+        orderedEquals(<Type>[
+          PushScalarCommand,
+          PushScalarCommand,
+          PushScalarCommand,
+          MultiplyCommand,
+          AddCommand,
+        ]),
+      );
+    });
+
+    test('compiled infix programs execute to the same result as evaluateInfix', () {
+      final String expression = '[[1,2]] * [[3],[4]]';
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final CalculatrixProgram program = Calculatrix.compileInfix(expression);
+
+      machine.executeProgram(program);
+
+      expect(machine.top, Calculatrix.evaluateInfix(expression));
+    });
+
     test('evaluates scalar infix expression with precedence', () {
       final Matrix result = Calculatrix.evaluateInfix('3 + 4 * 5');
       expect(result, Matrix.scalar(23));
@@ -57,6 +82,16 @@ void main() {
     test('evaluates scalar rpn expression', () {
       final Matrix result = Calculatrix.evaluateRpn(<String>['3', '4', '+']);
       expect(result, Matrix.scalar(7));
+    });
+
+    test('preserves matrix literals as typed push commands during infix compilation', () {
+      final CalculatrixProgram program = Calculatrix.compileInfix(
+        '[[1,2],[3,4]] * [[5],[6]]',
+      );
+
+      expect(program.commands.first, isA<PushMatrixCommand>());
+      expect(program.commands[1], isA<PushMatrixCommand>());
+      expect(program.commands.last, isA<MultiplyCommand>());
     });
 
     test('evaluates scalar division in rpn mode', () {

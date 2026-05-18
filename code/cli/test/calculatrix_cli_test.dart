@@ -13,6 +13,8 @@ void main() {
 
       expect(help.exitCode, 0);
       expect(help.stdout.toString(), contains('calculatrix_cli usage:'));
+      expect(help.stdout.toString(), contains('command 3 4 add'));
+      expect(help.stdout.toString(), contains('macro append-zero-row'));
     });
 
     test('keeps matrix literal parity between infix and rpn modes', () async {
@@ -62,6 +64,34 @@ void main() {
       expect(rpn.exitCode, 0);
       expect(infix.stdout.toString().trim(), '[[3, 0], [0, 3]]');
       expect(rpn.stdout.toString().trim(), infix.stdout.toString().trim());
+    });
+
+    test('supports primitive command workflows through public command routing', () async {
+      final ProcessResult command = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', 'command', '3', '4', 'add'],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(command.exitCode, 0);
+      expect(command.stdout.toString().trim(), '[[7]]');
+    });
+
+    test('supports public macro workflows', () async {
+      final ProcessResult macro = await Process.run(
+        Platform.resolvedExecutable,
+        <String>[
+          'run',
+          'bin/calculatrix_cli.dart',
+          'macro',
+          'append-zero-row',
+          '[[1,2],[3,4]]',
+        ],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(macro.exitCode, 0);
+      expect(macro.stdout.toString().trim(), '[[1, 2], [3, 4], [0, 0]]');
     });
 
     test('returns non-zero for unknown commands and prints usage', () async {

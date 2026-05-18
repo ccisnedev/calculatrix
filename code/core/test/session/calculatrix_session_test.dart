@@ -136,5 +136,41 @@ void main() {
 
       expect(session.expression, '9+');
     });
+
+    test('rpn binary actions commit the draft and execute through the machine', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('3');
+      session.enter();
+      session.input('4');
+
+      session.applyRpnBinary(RpnBinaryOperator.add);
+
+      expect(session.rpnDraft, '');
+      expect(session.rpnStackDepth, 1);
+      expect(session.rpnTopValue, Matrix.scalar(7));
+      expect(session.currentValue, Matrix.scalar(7));
+    });
+
+    test('rpn stack commands keep the stack synchronized through the machine', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('1');
+      session.enter();
+      session.input('2');
+      session.enter();
+      session.input('3');
+      session.enter();
+
+      session.rotRpn();
+
+      expect(
+        session.rpnStack,
+        orderedEquals(<Matrix>[
+          Matrix.scalar(2),
+          Matrix.scalar(3),
+          Matrix.scalar(1),
+        ]),
+      );
+      expect(session.currentValue, Matrix.scalar(1));
+    });
   });
 }

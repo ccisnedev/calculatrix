@@ -40,6 +40,144 @@ class MatrixEditorDraft {
     this.columnCount = columnCount;
   }
 
+  bool appendRow() {
+    if (rowCount >= _maxDimension) {
+      return false;
+    }
+
+    _clearRow(rowCount);
+    rowCount += 1;
+    return true;
+  }
+
+  bool appendColumn() {
+    if (columnCount >= _maxDimension) {
+      return false;
+    }
+
+    _clearColumn(columnCount);
+    columnCount += 1;
+    return true;
+  }
+
+  bool deleteRow(int rowIndex) {
+    _validateRowIndex(rowIndex);
+    if (rowCount == 1) {
+      return false;
+    }
+
+    for (int row = rowIndex; row < _maxDimension - 1; row++) {
+      _copyRow(from: row + 1, to: row);
+    }
+    _clearRow(_maxDimension - 1);
+    rowCount -= 1;
+    return true;
+  }
+
+  bool deleteColumn(int columnIndex) {
+    _validateColumnIndex(columnIndex);
+    if (columnCount == 1) {
+      return false;
+    }
+
+    for (int column = columnIndex; column < _maxDimension - 1; column++) {
+      _copyColumn(from: column + 1, to: column);
+    }
+    _clearColumn(_maxDimension - 1);
+    columnCount -= 1;
+    return true;
+  }
+
+  bool duplicateRow(int rowIndex) {
+    _validateRowIndex(rowIndex);
+    if (rowCount >= _maxDimension) {
+      return false;
+    }
+
+    final List<String> rowCopy = List<String>.from(_cells[rowIndex]);
+    final int insertIndex = rowIndex + 1;
+    for (int row = _maxDimension - 1; row > insertIndex; row--) {
+      _copyRow(from: row - 1, to: row);
+    }
+    for (int column = 0; column < _maxDimension; column++) {
+      _cells[insertIndex][column] = rowCopy[column];
+    }
+    rowCount += 1;
+    return true;
+  }
+
+  bool duplicateColumn(int columnIndex) {
+    _validateColumnIndex(columnIndex);
+    if (columnCount >= _maxDimension) {
+      return false;
+    }
+
+    final List<String> columnCopy = List<String>.generate(
+      _maxDimension,
+      (int row) => _cells[row][columnIndex],
+      growable: false,
+    );
+    final int insertIndex = columnIndex + 1;
+    for (int column = _maxDimension - 1; column > insertIndex; column--) {
+      _copyColumn(from: column - 1, to: column);
+    }
+    for (int row = 0; row < _maxDimension; row++) {
+      _cells[row][insertIndex] = columnCopy[row];
+    }
+    columnCount += 1;
+    return true;
+  }
+
+  bool moveRow(int fromIndex, int toIndex) {
+    _validateRowIndex(fromIndex);
+    _validateRowIndex(toIndex);
+    if (fromIndex == toIndex) {
+      return false;
+    }
+
+    final List<String> rowCopy = List<String>.from(_cells[fromIndex]);
+    if (fromIndex < toIndex) {
+      for (int row = fromIndex; row < toIndex; row++) {
+        _copyRow(from: row + 1, to: row);
+      }
+    } else {
+      for (int row = fromIndex; row > toIndex; row--) {
+        _copyRow(from: row - 1, to: row);
+      }
+    }
+    for (int column = 0; column < _maxDimension; column++) {
+      _cells[toIndex][column] = rowCopy[column];
+    }
+    return true;
+  }
+
+  bool moveColumn(int fromIndex, int toIndex) {
+    _validateColumnIndex(fromIndex);
+    _validateColumnIndex(toIndex);
+    if (fromIndex == toIndex) {
+      return false;
+    }
+
+    final List<String> columnCopy = List<String>.generate(
+      _maxDimension,
+      (int row) => _cells[row][fromIndex],
+      growable: false,
+    );
+    if (fromIndex < toIndex) {
+      for (int column = fromIndex; column < toIndex; column++) {
+        _copyColumn(from: column + 1, to: column);
+      }
+    } else {
+      for (int column = fromIndex; column > toIndex; column--) {
+        _copyColumn(from: column - 1, to: column);
+      }
+    }
+    for (int row = 0; row < _maxDimension; row++) {
+      _cells[row][toIndex] = columnCopy[row];
+    }
+    return true;
+  }
+
   void fillZeros() {
     for (int row = 0; row < rowCount; row++) {
       for (int column = 0; column < columnCount; column++) {
@@ -135,5 +273,42 @@ class MatrixEditorDraft {
     }
 
     return normalized.toString();
+  }
+
+  void _validateRowIndex(int rowIndex) {
+    RangeError.checkValidIndex(rowIndex, _cells, 'rowIndex', rowCount);
+  }
+
+  void _validateColumnIndex(int columnIndex) {
+    RangeError.checkValidIndex(
+      columnIndex,
+      _cells.first,
+      'columnIndex',
+      columnCount,
+    );
+  }
+
+  void _copyRow({required int from, required int to}) {
+    for (int column = 0; column < _maxDimension; column++) {
+      _cells[to][column] = _cells[from][column];
+    }
+  }
+
+  void _copyColumn({required int from, required int to}) {
+    for (int row = 0; row < _maxDimension; row++) {
+      _cells[row][to] = _cells[row][from];
+    }
+  }
+
+  void _clearRow(int rowIndex) {
+    for (int column = 0; column < _maxDimension; column++) {
+      _cells[rowIndex][column] = '';
+    }
+  }
+
+  void _clearColumn(int columnIndex) {
+    for (int row = 0; row < _maxDimension; row++) {
+      _cells[row][columnIndex] = '';
+    }
   }
 }

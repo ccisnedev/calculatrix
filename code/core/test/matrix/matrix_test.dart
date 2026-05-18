@@ -12,6 +12,35 @@ void main() {
       expect(scalar.columnCount, 1);
     });
 
+    test('creates zero and one matrices with explicit shape', () {
+      expect(
+        Matrix.zeros(2, 3),
+        Matrix(<List<double>>[
+          <double>[0, 0, 0],
+          <double>[0, 0, 0],
+        ]),
+      );
+
+      expect(
+        Matrix.ones(2, 2),
+        Matrix(<List<double>>[
+          <double>[1, 1],
+          <double>[1, 1],
+        ]),
+      );
+    });
+
+    test('creates identity matrix', () {
+      expect(
+        Matrix.identity(3),
+        Matrix(<List<double>>[
+          <double>[1, 0, 0],
+          <double>[0, 1, 0],
+          <double>[0, 0, 1],
+        ]),
+      );
+    });
+
     test('throws for empty matrix', () {
       expect(() => Matrix(<List<double>>[]), throwsA(isA<MatrixShapeError>()));
     });
@@ -24,6 +53,12 @@ void main() {
         ]),
         throwsA(isA<MatrixShapeError>()),
       );
+    });
+
+    test('throws for invalid explicit constructor shapes', () {
+      expect(() => Matrix.zeros(0, 1), throwsA(isA<MatrixShapeError>()));
+      expect(() => Matrix.ones(1, 0), throwsA(isA<MatrixShapeError>()));
+      expect(() => Matrix.identity(0), throwsA(isA<MatrixShapeError>()));
     });
   });
 
@@ -132,6 +167,166 @@ void main() {
           ]),
         ),
         isTrue,
+      );
+    });
+
+    test('transposes non-square matrices', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(
+        value.transpose(),
+        Matrix(<List<double>>[
+          <double>[1, 4],
+          <double>[2, 5],
+          <double>[3, 6],
+        ]),
+      );
+    });
+
+    test('inverts supported square matrices through the public API', () {
+      final Matrix value = Matrix(<List<double>>[
+        <double>[4, 7],
+        <double>[2, 6],
+      ]);
+
+      expect(
+        value.inverse().almostEquals(
+          Matrix(<List<double>>[
+            <double>[0.6, -0.7],
+            <double>[-0.2, 0.4],
+          ]),
+        ),
+        isTrue,
+      );
+    });
+
+    test('appends compatible row and column operands', () {
+      final Matrix base = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[3, 4],
+      ]);
+
+      expect(
+        base.appendRow(Matrix(<List<double>>[<double>[5, 6]])),
+        Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[3, 4],
+          <double>[5, 6],
+        ]),
+      );
+
+      expect(
+        base.appendColumn(Matrix(<List<double>>[
+          <double>[5],
+          <double>[6],
+        ])),
+        Matrix(<List<double>>[
+          <double>[1, 2, 5],
+          <double>[3, 4, 6],
+        ]),
+      );
+    });
+
+    test('deletes duplicates and moves rows immutably', () {
+      final Matrix base = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[3, 4],
+        <double>[5, 6],
+      ]);
+
+      expect(
+        base.deleteRow(1),
+        Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[5, 6],
+        ]),
+      );
+
+      expect(
+        base.duplicateRow(1),
+        Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[3, 4],
+          <double>[3, 4],
+          <double>[5, 6],
+        ]),
+      );
+
+      expect(
+        base.moveRow(0, 2),
+        Matrix(<List<double>>[
+          <double>[3, 4],
+          <double>[5, 6],
+          <double>[1, 2],
+        ]),
+      );
+    });
+
+    test('deletes duplicates and moves columns immutably', () {
+      final Matrix base = Matrix(<List<double>>[
+        <double>[1, 2, 3],
+        <double>[4, 5, 6],
+      ]);
+
+      expect(
+        base.deleteColumn(1),
+        Matrix(<List<double>>[
+          <double>[1, 3],
+          <double>[4, 6],
+        ]),
+      );
+
+      expect(
+        base.duplicateColumn(1),
+        Matrix(<List<double>>[
+          <double>[1, 2, 2, 3],
+          <double>[4, 5, 5, 6],
+        ]),
+      );
+
+      expect(
+        base.moveColumn(2, 0),
+        Matrix(<List<double>>[
+          <double>[3, 1, 2],
+          <double>[6, 4, 5],
+        ]),
+      );
+    });
+
+    test('throws typed structural errors for invalid shapes and indices', () {
+      final Matrix base = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[3, 4],
+      ]);
+
+      expect(
+        () => base.appendRow(
+          Matrix(<List<double>>[
+            <double>[5],
+            <double>[6],
+          ]),
+        ),
+        throwsA(isA<MatrixShapeError>()),
+      );
+      expect(
+        () => base.appendColumn(Matrix(<List<double>>[<double>[5, 6]])),
+        throwsA(isA<MatrixShapeError>()),
+      );
+      expect(() => base.deleteRow(2), throwsA(isA<MatrixIndexError>()));
+      expect(() => base.deleteColumn(2), throwsA(isA<MatrixIndexError>()));
+      expect(
+        () => Matrix(<List<double>>[<double>[1, 2]]).deleteRow(0),
+        throwsA(isA<MatrixShapeError>()),
+      );
+      expect(
+        () => Matrix(<List<double>>[
+          <double>[1],
+          <double>[2],
+        ]).deleteColumn(0),
+        throwsA(isA<MatrixShapeError>()),
       );
     });
   });

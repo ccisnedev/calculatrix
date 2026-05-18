@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:calculatrix/calculatrix.dart';
 
-enum CalculatorMode { infix, rpn }
+enum CalculatorMode { infix, rpn, matrix }
 
 /// Controller for the calculator.
 ///
@@ -14,15 +14,13 @@ class CalculatorController extends ChangeNotifier {
   }
 
   final CalculatrixSession _session;
+  CalculatorMode _mode = CalculatorMode.infix;
+  CalculatorMode _lastNonMatrixMode = CalculatorMode.infix;
   String _result = '';
   String _error = '';
   Matrix? _displayMatrix;
 
-  CalculatorMode get mode {
-    return _session.mode == CalculatrixMode.rpn
-        ? CalculatorMode.rpn
-        : CalculatorMode.infix;
-  }
+  CalculatorMode get mode => _mode;
 
   /// The current expression being composed.
   String get expression => _session.expression;
@@ -40,6 +38,10 @@ class CalculatorController extends ChangeNotifier {
 
   bool get isRpnMode => mode == CalculatorMode.rpn;
 
+  bool get isMatrixMode => mode == CalculatorMode.matrix;
+
+  bool get isRpnEntryMode => _session.mode == CalculatrixMode.rpn;
+
   int get rpnStackDepth => _session.rpnStackDepth;
 
   List<String> get rpnStackLiterals => _session.rpnStackLiterals;
@@ -55,13 +57,31 @@ class CalculatorController extends ChangeNotifier {
   }
 
   void setMode(CalculatorMode mode) {
+    if (_mode == mode) {
+      return;
+    }
+
     _mutate(() {
+      _mode = mode;
+      if (mode == CalculatorMode.matrix) {
+        return;
+      }
+
+      _lastNonMatrixMode = mode;
       _session.setMode(
         mode == CalculatorMode.rpn
             ? CalculatrixMode.rpn
             : CalculatrixMode.infix,
       );
     });
+  }
+
+  void exitMatrixMode() {
+    if (_mode != CalculatorMode.matrix) {
+      return;
+    }
+
+    setMode(_lastNonMatrixMode);
   }
 
   void insertMatrixLiteral(String literal) {
@@ -143,6 +163,14 @@ class CalculatorController extends ChangeNotifier {
 
   void rotRpn() {
     _mutate(_session.rotRpn);
+  }
+
+  void executeRpnCommand(CalculatrixCommand command) {
+    _mutate(() => _session.executeCommand(command));
+  }
+
+  void executeRpnMacro(CalculatrixMacro macro) {
+    _mutate(() => _session.executeMacro(macro));
   }
 
   String _formatResult(double value) {

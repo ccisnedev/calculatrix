@@ -1,5 +1,9 @@
 import '../errors/errors.dart';
 import '../evaluation/calculatrix.dart';
+import '../machine/calculatrix_command.dart';
+import '../machine/calculatrix_machine.dart';
+import '../machine/calculatrix_macro.dart';
+import '../machine/commands.dart';
 import '../matrix/matrix.dart';
 import '../rpn/rpn_engine.dart';
 
@@ -11,7 +15,7 @@ class CalculatrixSession {
   String _lastOperator = '';
   String _lastOperand = '';
   CalculatrixMode _mode = CalculatrixMode.infix;
-  final RpnEngine _rpnEngine = RpnEngine();
+  final CalculatrixMachine _machine = CalculatrixMachine();
   Matrix? _currentValue;
   Matrix? _memoryValue;
   Object? _lastError;
@@ -36,20 +40,14 @@ class CalculatrixSession {
 
   bool get hasError => _lastError != null;
 
-  int get rpnStackDepth => _rpnEngine.depth;
+  int get rpnStackDepth => _machine.depth;
 
-  List<Matrix> get rpnStack => _rpnEngine.stack;
+  List<Matrix> get rpnStack => _machine.stackSnapshot;
 
-  Matrix? get rpnTopValue {
-    if (_rpnEngine.depth == 0) {
-      return null;
-    }
-
-    return _rpnEngine.peek();
-  }
+  Matrix? get rpnTopValue => _machine.top;
 
   List<String> get rpnStackLiterals {
-    return _rpnEngine.stack
+    return _machine.stackSnapshot
         .reversed
         .map(_serializeMatrix)
         .toList(growable: false);
@@ -113,7 +111,7 @@ class CalculatrixSession {
       return;
     }
 
-    _rpnEngine.push(matrix);
+    _machine.execute(PushMatrixCommand(matrix));
     _rpnDraft = '';
     _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
   }
@@ -231,7 +229,7 @@ class CalculatrixSession {
     }
 
     if (isRpnMode) {
-      _rpnEngine.push(memory);
+      _machine.execute(PushMatrixCommand(memory));
       _rpnDraft = '';
       _clearError();
       _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
@@ -281,7 +279,7 @@ class CalculatrixSession {
     }
 
     try {
-      _rpnEngine.push(_parseDraftOperand(_rpnDraft));
+      _machine.execute(PushMatrixCommand(_parseDraftOperand(_rpnDraft)));
       _rpnDraft = '';
       _clearError();
       _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
@@ -299,7 +297,7 @@ class CalculatrixSession {
 
     _runRpnAction(() {
       _commitDraftIfNeeded();
-      _rpnEngine.applyBinary(operator);
+      _machine.execute(_binaryCommand(operator));
     });
   }
 
@@ -310,28 +308,50 @@ class CalculatrixSession {
 
     _runRpnAction(() {
       _commitDraftIfNeeded();
-      _rpnEngine.applyUnary(operator);
+      _machine.execute(_unaryCommand(operator));
     });
   }
 
   void dupRpn() {
-    _runRpnAction(_rpnEngine.dup);
+    _runRpnAction(() => _machine.execute(const DupCommand()));
   }
 
   void dropRpn() {
-    _runRpnAction(_rpnEngine.drop);
+    _runRpnAction(() => _machine.execute(const DropCommand()));
   }
 
   void swapRpn() {
-    _runRpnAction(_rpnEngine.swap);
+    _runRpnAction(() => _machine.execute(const SwapCommand()));
   }
 
   void overRpn() {
-    _runRpnAction(_rpnEngine.over);
+    _runRpnAction(() => _machine.execute(const OverCommand()));
   }
 
   void rotRpn() {
-    _runRpnAction(_rpnEngine.rot);
+    _runRpnAction(() => _machine.execute(const RotCommand()));
+  }
+
+  void executeCommand(CalculatrixCommand command) {
+    if (!isRpnMode) {
+      return;
+    }
+
+    _runRpnAction(() {
+      _commitDraftIfNeeded();
+      _machine.execute(command);
+    });
+  }
+
+  void executeMacro(CalculatrixMacro macro) {
+    if (!isRpnMode) {
+      return;
+    }
+
+    _runRpnAction(() {
+      _commitDraftIfNeeded();
+      _machine.executeMacro(macro);
+    });
   }
 
   Matrix _evaluateExpression(String expression) {
@@ -415,7 +435,7 @@ class CalculatrixSession {
       return;
     }
 
-    _rpnEngine.push(_parseDraftOperand(_rpnDraft));
+    _machine.execute(PushMatrixCommand(_parseDraftOperand(_rpnDraft)));
     _rpnDraft = '';
   }
 
@@ -451,7 +471,7 @@ class CalculatrixSession {
   void _syncCommittedValueFromRpnStack({
     bool invalidateRepeatEquals = false,
   }) {
-    _currentValue = _rpnEngine.depth > 0 ? _rpnEngine.peek() : null;
+    _currentValue = _machine.top;
     if (invalidateRepeatEquals) {
       _clearRepeatState();
     }
@@ -467,13 +487,13 @@ class CalculatrixSession {
   }
 
   void _replaceRpnTopWith(Matrix value) {
-    if (_rpnEngine.depth == 0) {
-      _rpnEngine.push(value);
+    if (_machine.depth == 0) {
+      _machine.execute(PushMatrixCommand(value));
       return;
     }
 
-    _rpnEngine.pop();
-    _rpnEngine.push(value);
+    _machine.execute(const DropCommand());
+    _machine.execute(PushMatrixCommand(value));
   }
 
   void _clearAllState() {
@@ -481,8 +501,30 @@ class CalculatrixSession {
     _rpnDraft = '';
     _currentValue = null;
     _lastError = null;
-    _rpnEngine.clear();
+    _machine.clear();
     _clearRepeatState();
+  }
+
+  CalculatrixCommand _binaryCommand(RpnBinaryOperator operator) {
+    switch (operator) {
+      case RpnBinaryOperator.add:
+        return const AddCommand();
+      case RpnBinaryOperator.subtract:
+        return const SubtractCommand();
+      case RpnBinaryOperator.multiply:
+        return const MultiplyCommand();
+      case RpnBinaryOperator.divide:
+        return const DivideCommand();
+    }
+  }
+
+  CalculatrixCommand _unaryCommand(RpnUnaryOperator operator) {
+    switch (operator) {
+      case RpnUnaryOperator.sqrt:
+        return const SqrtCommand();
+      case RpnUnaryOperator.percent:
+        return const PercentCommand();
+    }
   }
 
   void _clearRepeatState() {

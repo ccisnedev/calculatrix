@@ -15,6 +15,10 @@ class MatrixDomainError extends CalculatrixError {
   MatrixDomainError(super.message);
 }
 
+class MatrixIndexError extends CalculatrixError {
+  MatrixIndexError(super.message);
+}
+
 class RpnStackError extends CalculatrixError {
   RpnStackError(super.message);
 }

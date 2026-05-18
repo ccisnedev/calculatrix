@@ -31,6 +31,30 @@ class Matrix {
     );
   }
 
+  factory Matrix.zeros(int rowCount, int columnCount) {
+    _validateShape(rowCount, columnCount, label: 'Zero');
+
+    return Matrix(
+      List<List<double>>.generate(
+        rowCount,
+        (_) => List<double>.filled(columnCount, 0, growable: false),
+        growable: false,
+      ),
+    );
+  }
+
+  factory Matrix.ones(int rowCount, int columnCount) {
+    _validateShape(rowCount, columnCount, label: 'One');
+
+    return Matrix(
+      List<List<double>>.generate(
+        rowCount,
+        (_) => List<double>.filled(columnCount, 1, growable: false),
+        growable: false,
+      ),
+    );
+  }
+
   final List<List<double>> _rows;
 
   int get rowCount => _rows.length;
@@ -226,6 +250,13 @@ class Matrix {
     );
   }
 
+  Matrix inverse({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    return _inverse(absoluteTolerance: absoluteTolerance);
+  }
+
   Matrix sqrt({
     double relativeTolerance =
         CalculatrixNumericPolicy.defaultRelativeTolerance,
@@ -313,6 +344,146 @@ class Matrix {
     return Matrix(result);
   }
 
+  Matrix appendRow(Matrix row) {
+    if (row.rowCount != 1 || row.columnCount != columnCount) {
+      throw MatrixShapeError(
+        'Cannot append ${row.rowCount}x${row.columnCount} row operand to '
+        '${rowCount}x${columnCount} matrix.',
+      );
+    }
+
+    return Matrix(<List<double>>[
+      ..._rows.map((List<double> source) => List<double>.from(source)),
+      List<double>.from(row._rows.first),
+    ]);
+  }
+
+  Matrix appendColumn(Matrix column) {
+    if (column.columnCount != 1 || column.rowCount != rowCount) {
+      throw MatrixShapeError(
+        'Cannot append ${column.rowCount}x${column.columnCount} column operand '
+        'to ${rowCount}x${columnCount} matrix.',
+      );
+    }
+
+    return Matrix(
+      List<List<double>>.generate(
+        rowCount,
+        (int rowIndex) => <double>[
+          ..._rows[rowIndex],
+          column._rows[rowIndex].first,
+        ],
+        growable: false,
+      ),
+    );
+  }
+
+  Matrix deleteRow(int rowIndex) {
+    _requireRowIndex(rowIndex);
+    if (rowCount == 1) {
+      throw MatrixShapeError('Cannot delete the only row in a matrix.');
+    }
+
+    return Matrix(
+      List<List<double>>.generate(
+        rowCount - 1,
+        (int targetIndex) {
+          final int sourceIndex = targetIndex < rowIndex
+              ? targetIndex
+              : targetIndex + 1;
+          return List<double>.from(_rows[sourceIndex]);
+        },
+        growable: false,
+      ),
+    );
+  }
+
+  Matrix deleteColumn(int columnIndex) {
+    _requireColumnIndex(columnIndex);
+    if (columnCount == 1) {
+      throw MatrixShapeError('Cannot delete the only column in a matrix.');
+    }
+
+    return Matrix(
+      List<List<double>>.generate(
+        rowCount,
+        (int rowIndex) => List<double>.generate(
+          columnCount - 1,
+          (int targetIndex) {
+            final int sourceIndex = targetIndex < columnIndex
+                ? targetIndex
+                : targetIndex + 1;
+            return _rows[rowIndex][sourceIndex];
+          },
+          growable: false,
+        ),
+        growable: false,
+      ),
+    );
+  }
+
+  Matrix duplicateRow(int rowIndex) {
+    _requireRowIndex(rowIndex);
+
+    final List<List<double>> rows = _rows
+        .map((List<double> row) => List<double>.from(row))
+        .toList(growable: true);
+    rows.insert(rowIndex + 1, List<double>.from(_rows[rowIndex]));
+    return Matrix(rows);
+  }
+
+  Matrix duplicateColumn(int columnIndex) {
+    _requireColumnIndex(columnIndex);
+
+    return Matrix(
+      List<List<double>>.generate(
+        rowCount,
+        (int rowIndex) {
+          final List<double> row = List<double>.from(_rows[rowIndex]);
+          row.insert(columnIndex + 1, _rows[rowIndex][columnIndex]);
+          return row;
+        },
+        growable: false,
+      ),
+    );
+  }
+
+  Matrix moveRow(int fromIndex, int toIndex) {
+    _requireRowIndex(fromIndex);
+    _requireRowIndex(toIndex);
+    if (fromIndex == toIndex) {
+      return this;
+    }
+
+    final List<List<double>> rows = _rows
+        .map((List<double> row) => List<double>.from(row))
+        .toList(growable: true);
+    final List<double> moved = rows.removeAt(fromIndex);
+    rows.insert(toIndex, moved);
+    return Matrix(rows);
+  }
+
+  Matrix moveColumn(int fromIndex, int toIndex) {
+    _requireColumnIndex(fromIndex);
+    _requireColumnIndex(toIndex);
+    if (fromIndex == toIndex) {
+      return this;
+    }
+
+    return Matrix(
+      List<List<double>>.generate(
+        rowCount,
+        (int rowIndex) {
+          final List<double> row = List<double>.from(_rows[rowIndex]);
+          final double moved = row.removeAt(fromIndex);
+          row.insert(toIndex, moved);
+          return row;
+        },
+        growable: false,
+      ),
+    );
+  }
+
   bool almostEquals(
     Matrix other, {
     double relativeTolerance =
@@ -368,6 +539,14 @@ class Matrix {
     }
   }
 
+  static void _validateShape(int rowCount, int columnCount, {required String label}) {
+    if (rowCount < 1 || columnCount < 1) {
+      throw MatrixShapeError(
+        '$label matrix dimensions must be greater than zero.',
+      );
+    }
+  }
+
   void _requireSameDimensions(Matrix other, {required String operation}) {
     if (rowCount != other.rowCount || columnCount != other.columnCount) {
       throw MatrixShapeError(
@@ -382,6 +561,22 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot perform $operation for non-square '
         '${rowCount}x${columnCount} matrix.',
+      );
+    }
+  }
+
+  void _requireRowIndex(int rowIndex) {
+    if (rowIndex < 0 || rowIndex >= rowCount) {
+      throw MatrixIndexError(
+        'Row index $rowIndex is out of range for $rowCount rows.',
+      );
+    }
+  }
+
+  void _requireColumnIndex(int columnIndex) {
+    if (columnIndex < 0 || columnIndex >= columnCount) {
+      throw MatrixIndexError(
+        'Column index $columnIndex is out of range for $columnCount columns.',
       );
     }
   }

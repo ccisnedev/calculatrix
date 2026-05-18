@@ -25,6 +25,28 @@ void main() {
       expect(controller.mode, CalculatorMode.rpn);
     });
 
+    test('can switch to matrix mode and exit back to the previous mode', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.setMode(CalculatorMode.matrix);
+
+      expect(controller.mode, CalculatorMode.matrix);
+      expect(controller.isMatrixMode, isTrue);
+
+      controller.exitMatrixMode();
+
+      expect(controller.mode, CalculatorMode.rpn);
+    });
+
+    test('can execute public matrix commands and macros in rpn mode', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.insertMatrixLiteral('[[1,2],[3,4]]');
+
+      controller.executeRpnCommand(const TransposeCommand());
+      controller.executeRpnMacro(const AppendZeroColumnMacro());
+
+      expect(controller.rpnTopLiteral, '[[1,3,0],[2,4,0]]');
+    });
+
     test('initial display is "0"', () {
       expect(controller.display, '0');
       expect(controller.expression, '');
@@ -445,6 +467,23 @@ void main() {
       expect(controller.display, '[[1,2],[3,4]]');
     });
 
+    test('inserts a non-square literal produced by structural draft edits', () {
+      final MatrixEditorDraft draft = _seededMatrixDraft(
+        rowCount: 2,
+        columnCount: 2,
+      );
+
+      expect(draft.appendColumn(), isTrue);
+      draft.setCell(0, 2, '5');
+      draft.setCell(1, 2, '6');
+      final String literal = draft.buildLiteral();
+
+      controller.insertMatrixLiteral(literal);
+
+      expect(controller.expression, '[[1,2,5],[3,4,6]]');
+      expect(controller.display, '[[1,2,5],[3,4,6]]');
+    });
+
     test('pushes matrix literal onto RPN stack in rpn mode', () {
       controller.setMode(CalculatorMode.rpn);
 
@@ -452,6 +491,21 @@ void main() {
 
       expect(controller.rpnStackDepth, 1);
       expect(controller.rpnTopLiteral, '[[1,2],[3,4]]');
+    });
+
+    test('pushes a reordered literal produced by structural draft edits in rpn mode', () {
+      final MatrixEditorDraft draft = _seededMatrixDraft(
+        rowCount: 2,
+        columnCount: 3,
+      );
+
+      expect(draft.moveColumn(0, 2), isTrue);
+
+      controller.setMode(CalculatorMode.rpn);
+      controller.insertMatrixLiteral(draft.buildLiteral());
+
+      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnTopLiteral, '[[2,3,1],[5,6,4]]');
     });
   });
 
@@ -614,5 +668,24 @@ void main() {
       );
     });
   });
+}
+
+MatrixEditorDraft _seededMatrixDraft({
+  required int rowCount,
+  required int columnCount,
+}) {
+  final MatrixEditorDraft draft = MatrixEditorDraft(
+    rowCount: rowCount,
+    columnCount: columnCount,
+  );
+
+  int nextValue = 1;
+  for (int row = 0; row < rowCount; row++) {
+    for (int column = 0; column < columnCount; column++) {
+      draft.setCell(row, column, '${nextValue++}');
+    }
+  }
+
+  return draft;
 }
 

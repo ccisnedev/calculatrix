@@ -4,6 +4,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:calculatrix_app/main.dart';
 
 const Duration _uiStep = Duration(milliseconds: 100);
+const double _pageDragDx = 500;
 
 Future<void> _pumpForUi(WidgetTester tester, {int steps = 6}) async {
   for (int i = 0; i < steps; i++) {
@@ -75,8 +76,7 @@ Future<void> _tapEquals(WidgetTester tester) async {
     await _pumpUntilFound(tester, _button('='));
   }
 
-  await tester.tap(_button('='));
-  await _pumpForUi(tester, steps: 2);
+  await _tapFinderCenter(tester, _button('='));
 }
 
 Future<void> _switchMode(WidgetTester tester, String mode) async {
@@ -85,39 +85,19 @@ Future<void> _switchMode(WidgetTester tester, String mode) async {
 }
 
 Future<void> _showInfixEditPage(WidgetTester tester) async {
-  if (_button('MAT').evaluate().isNotEmpty) {
-    return;
-  }
-
-  await tester.drag(find.byType(PageView), const Offset(-1000, 0));
-  await _pumpUntilFound(tester, _button('MAT'));
+  await _ensureButtonVisible(tester, 'MAT');
 }
 
 Future<void> _showInfixPrimaryPage(WidgetTester tester) async {
-  if (_button('=').evaluate().isNotEmpty) {
-    return;
-  }
-
-  await tester.drag(find.byType(PageView), const Offset(1000, 0));
-  await _pumpUntilFound(tester, _button('='));
+  await _ensureButtonVisible(tester, '=');
 }
 
 Future<void> _showRpnStackPage(WidgetTester tester) async {
-  if (_button('SWAP').evaluate().isNotEmpty) {
-    return;
-  }
-
-  await tester.drag(find.byType(PageView), const Offset(-1000, 0));
-  await _pumpUntilFound(tester, _button('SWAP'));
+  await _ensureButtonVisible(tester, 'SWAP');
 }
 
 Future<void> _showRpnPrimaryPage(WidgetTester tester) async {
-  if (_button('ENTER').evaluate().isNotEmpty) {
-    return;
-  }
-
-  await tester.drag(find.byType(PageView), const Offset(1000, 0));
-  await _pumpUntilFound(tester, _button('ENTER'));
+  await _ensureButtonVisible(tester, 'M+');
 }
 
 Future<void> _submitMatrix(
@@ -141,13 +121,40 @@ Future<void> _submitMatrix(
   await _confirmMatrixDialog(tester, actionLabel);
   await _pumpUntilGone(
     tester,
-    find.widgetWithText(FilledButton, actionLabel),
+    find.byKey(const ValueKey<String>('matrix-mode-panel')),
   );
   await _pumpForUi(tester, steps: 2);
 }
 
+Future<void> _ensureButtonVisible(WidgetTester tester, String label) async {
+  final Finder button = _button(label);
+  if (button.evaluate().isNotEmpty) {
+    return;
+  }
+
+  for (int i = 0; i < 3; i++) {
+    await tester.drag(find.byType(PageView), const Offset(-_pageDragDx, 0));
+    await _pumpUntilSettled(tester);
+    if (button.evaluate().isNotEmpty) {
+      return;
+    }
+  }
+
+  for (int i = 0; i < 3; i++) {
+    await tester.drag(find.byType(PageView), const Offset(_pageDragDx, 0));
+    await _pumpUntilSettled(tester);
+    if (button.evaluate().isNotEmpty) {
+      return;
+    }
+  }
+
+  expect(button, findsOneWidget);
+}
+
 Future<void> _openMatrixEditorDialog(WidgetTester tester) async {
-  await tester.tap(_button('MAT'));
+  await _ensureButtonVisible(tester, 'MAT');
+  await tester.ensureVisible(_button('MAT'));
+  await _tapFinderCenter(tester, _button('MAT'));
   await _pumpUntilFound(
     tester,
     find.byKey(const ValueKey<String>('matrix-cell-0-0')),
@@ -169,31 +176,99 @@ Future<void> _setMatrixCell(
   await tester.pump();
 }
 
-Future<void> _selectMatrixOrder(WidgetTester tester, int order) async {
-  await tester.tap(find.text('${order}x$order'));
+Finder _matrixRowTab(int row) {
+  return find.byKey(ValueKey<String>('matrix-row-tab-$row'));
+}
+
+Finder _matrixColumnTab(int column) {
+  return find.byKey(ValueKey<String>('matrix-column-tab-$column'));
+}
+
+Finder _matrixAddRowPlaceholder() {
+  return find.byKey(const ValueKey<String>('matrix-add-row-placeholder'));
+}
+
+Finder _matrixAddColumnPlaceholder() {
+  return find.byKey(const ValueKey<String>('matrix-add-column-placeholder'));
+}
+
+String _matrixKeyLabel(String label) {
+  return switch (label) {
+    'Identity' => 'ID',
+    'Zeros' => 'ZEROS',
+    'Ones' => 'ONES',
+    'Transpose' => 'T',
+    'Inverse' => 'INV',
+    'Insert' => '=',
+    'Push' => 'ENTER',
+    'Cancel' => 'MAT',
+    _ => label,
+  };
+}
+
+Future<void> _tapFinderCenter(WidgetTester tester, Finder finder) async {
+  await tester.tapAt(tester.getCenter(finder, warnIfMissed: false));
   await _pumpForUi(tester, steps: 2);
 }
 
-Future<void> _tapMatrixQuickAction(WidgetTester tester, String label) async {
-  await tester.tap(find.text(label));
+Future<void> _tapCalculatorButton(WidgetTester tester, String label) async {
+  await _ensureButtonVisible(tester, label);
+  await tester.ensureVisible(_button(label));
+  await _tapFinderCenter(tester, _button(label));
+}
+
+Future<void> _tapMatrixStructuralControl(
+  WidgetTester tester,
+  String tooltip,
+) async {
+  final Finder control = find.byTooltip(tooltip);
+  await tester.ensureVisible(control);
+  await tester.tap(control);
   await _pumpForUi(tester, steps: 2);
+}
+
+Future<void> _reorderMatrixRow(
+  WidgetTester tester,
+  int from,
+  int to,
+) async {
+  final TestGesture gesture = await tester.startGesture(
+    tester.getCenter(_matrixRowTab(from)),
+  );
+  await gesture.moveTo(tester.getCenter(_matrixRowTab(to)));
+  await gesture.up();
+  await _pumpForUi(tester, steps: 2);
+}
+
+Future<void> _selectMatrixOrder(WidgetTester tester, int order) async {
+  final String orderLabel = '${order}x$order';
+  if (_button(orderLabel).evaluate().isNotEmpty) {
+    await _tapCalculatorButton(tester, orderLabel);
+    return;
+  }
+
+  for (int size = 2; size < order; size++) {
+    await tester.ensureVisible(_matrixAddRowPlaceholder());
+    await _tapFinderCenter(tester, _matrixAddRowPlaceholder());
+    await tester.ensureVisible(_matrixAddColumnPlaceholder());
+    await _tapFinderCenter(tester, _matrixAddColumnPlaceholder());
+  }
+}
+
+Future<void> _tapMatrixQuickAction(WidgetTester tester, String label) async {
+  await _tapCalculatorButton(tester, _matrixKeyLabel(label));
 }
 
 Future<void> _confirmMatrixDialog(
   WidgetTester tester,
   String actionLabel,
 ) async {
-  final Finder actionButton = find.widgetWithText(FilledButton, actionLabel);
-  await tester.tap(actionButton);
-  await _pumpForUi(tester, steps: 2);
+  final String keypadLabel = _matrixKeyLabel(actionLabel);
+  await _tapCalculatorButton(tester, keypadLabel);
 }
 
 Finder _button(String label) {
-  if (label == '=') {
-    return find.text('=');
-  }
-
-  return find.byKey(ValueKey<String>('calculator-button-$label'));
+  return find.byKey(ValueKey<String>('calculator-button-$label')).hitTestable();
 }
 
 Finder _keyedText(String key, String value) {
@@ -375,12 +450,33 @@ void main() {
       await _selectMatrixOrder(tester, 4);
       await _tapMatrixQuickAction(tester, 'Identity');
       await _confirmMatrixDialog(tester, 'Insert');
-      await _pumpUntilGone(tester, find.widgetWithText(FilledButton, 'Insert'));
+      await _pumpUntilGone(tester, find.byKey(const ValueKey<String>('matrix-mode-panel')));
 
       expect(
         _expressionText('[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('matrix editor inserts a 3x2 literal after adding a row', (tester) async {
+      await _pumpApp(tester);
+
+      await _showInfixEditPage(tester);
+      await _openMatrixEditorDialog(tester);
+      await tester.tap(_matrixAddRowPlaceholder());
+      await _pumpForUi(tester, steps: 2);
+
+      await _setMatrixCell(tester, 0, 0, '1');
+      await _setMatrixCell(tester, 0, 1, '2');
+      await _setMatrixCell(tester, 1, 0, '3');
+      await _setMatrixCell(tester, 1, 1, '4');
+      await _setMatrixCell(tester, 2, 0, '5');
+      await _setMatrixCell(tester, 2, 1, '6');
+
+      await _confirmMatrixDialog(tester, 'Insert');
+      await _pumpUntilGone(tester, find.byKey(const ValueKey<String>('matrix-mode-panel')));
+
+      expect(_expressionText('[[1,2],[3,4],[5,6]]'), findsOneWidget);
     });
 
     testWidgets('infix mode displays a non-scalar matrix result', (tester) async {
@@ -617,6 +713,28 @@ void main() {
       expect(find.text('Stack 1'), findsOneWidget);
     });
 
+    testWidgets('rpn mode pushes a reordered 2x2 matrix from the structural tabs', (tester) async {
+      await _pumpApp(tester);
+
+      await _switchMode(tester, 'RPN');
+      await _showRpnStackPage(tester);
+      await _openMatrixEditorDialog(tester);
+
+      await _setMatrixCell(tester, 0, 0, '1');
+      await _setMatrixCell(tester, 0, 1, '2');
+      await _setMatrixCell(tester, 1, 0, '3');
+      await _setMatrixCell(tester, 1, 1, '4');
+      await _reorderMatrixRow(tester, 0, 1);
+
+      await _confirmMatrixDialog(tester, 'Push');
+      await _pumpUntilGone(tester, find.byKey(const ValueKey<String>('matrix-mode-panel')));
+
+      expect(_displayText('[3 4]\n[1 2]'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(_rpnStackText(0, 'X0'), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+    });
+
     testWidgets('matrix editor keeps the dialog open until an invalid cell is corrected', (tester) async {
       await _pumpApp(tester);
 
@@ -627,15 +745,40 @@ void main() {
       await _confirmMatrixDialog(tester, 'Insert');
 
       expect(find.text('Enter a value for r1 c2'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Insert'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsOneWidget);
 
       await _setMatrixCell(tester, 0, 1, '2');
       await _setMatrixCell(tester, 1, 0, '3');
       await _setMatrixCell(tester, 1, 1, '4');
       await _confirmMatrixDialog(tester, 'Insert');
-      await _pumpUntilGone(tester, find.widgetWithText(FilledButton, 'Insert'));
+      await _pumpUntilGone(tester, find.byKey(const ValueKey<String>('matrix-mode-panel')));
 
       expect(_expressionText('[[1,2],[3,4]]'), findsOneWidget);
+    });
+
+    testWidgets('matrix editor deletes a column before insert and confirms the reduced literal', (tester) async {
+      await _pumpApp(tester);
+
+      await _showInfixEditPage(tester);
+      await _openMatrixEditorDialog(tester);
+      await tester.tap(_matrixAddColumnPlaceholder());
+      await _pumpForUi(tester, steps: 2);
+
+      await _setMatrixCell(tester, 0, 0, '1');
+      await _setMatrixCell(tester, 0, 1, '2');
+      await _setMatrixCell(tester, 0, 2, '3');
+      await _setMatrixCell(tester, 1, 0, '4');
+      await _setMatrixCell(tester, 1, 1, '5');
+      await _setMatrixCell(tester, 1, 2, '6');
+
+      await tester.tap(_matrixColumnTab(1));
+      await _pumpForUi(tester, steps: 2);
+      await _tapMatrixStructuralControl(tester, 'Delete column');
+
+      await _confirmMatrixDialog(tester, 'Insert');
+      await _pumpUntilGone(tester, find.byKey(const ValueKey<String>('matrix-mode-panel')));
+
+      expect(_expressionText('[[1,3],[4,6]]'), findsOneWidget);
     });
 
     testWidgets('rpn mode toggles the sign of the committed top matrix', (tester) async {
@@ -806,6 +949,7 @@ void main() {
       await _pumpUntilSettled(tester);
 
       await _showRpnStackPage(tester);
+      await tester.ensureVisible(_button('SWAP'));
       await tester.tap(_button('SWAP'));
       await _pumpUntilSettled(tester);
 

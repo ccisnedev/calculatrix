@@ -118,15 +118,20 @@ multiple independent calculators.
 - A dedicated stack surface shows recent stack levels and current depth.
 - Matrix rendering policy belongs to the consumer shell, while matrix computation remains in the core package.
 
-## Stage 3 Readiness
+## Stage 3 Direction
 
-Stage 3 advanced linear algebra can extend the current consumers without
-breaking the late-v2 UX contract.
+Stage 3 is now defined as an architectural reset around one canonical matrix
+stack machine instead of as a narrow advanced-linear-algebra pass over the
+late-v2 shell.
 
-- App and CLI already accept full-matrix results from the shared core.
-- Matrix literal entry remains the stable interchange format across app and CLI.
-- The notation switch, paged keypad shell, matrix editor, and `RPN` stack surface do not need structural changes to host determinant, inverse, or decomposition actions.
-- New advanced operations can be added as core semantics plus consumer controls/output affordances, without reintroducing app-local evaluation pipelines.
+- package:calculatrix becomes the public matrix stack machine kernel.
+- Public primitive commands and public macros become part of the supported core API.
+- Infix remains supported as a convenience frontend that compiles or translates into the same stack execution model.
+- The app shell grows three complementary surfaces: Infix, RPN, and Matrix.
+- The modal matrix editor is replaced by a dedicated Matrix workstation surface.
+- Advanced linear algebra beyond inverse is deferred to the next major stage after the kernel reset.
+
+See docs/spec/stage_3_matrix_stack_machine.md for the Stage 3 contract.
 
 ## Cleanup Status
 

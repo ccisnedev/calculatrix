@@ -1,11 +1,15 @@
 import 'dart:convert';
 
 import '../errors/errors.dart';
+import '../machine/calculatrix_command.dart';
+import '../machine/calculatrix_machine.dart';
+import '../machine/calculatrix_program.dart';
+import '../machine/commands.dart';
 import '../matrix/matrix.dart';
 import '../rpn/rpn_engine.dart';
 
 class Calculatrix {
-  static Matrix evaluateInfix(String expression) {
+  static CalculatrixProgram compileInfix(String expression) {
     final String source = expression.trim();
     if (source.isEmpty) {
       throw ExpressionSyntaxError('Expression cannot be empty.');
@@ -13,57 +17,84 @@ class Calculatrix {
 
     final List<String> infixTokens = _tokenizeInfix(source);
     final List<String> rpnTokens = _toRpn(infixTokens);
+    return _compileRpnTokens(rpnTokens);
+  }
+
+  static Matrix evaluateInfix(String expression) {
     try {
-      return evaluateRpn(rpnTokens);
+      final CalculatrixMachine machine = CalculatrixMachine();
+      machine.executeProgram(compileInfix(expression));
+      return _singleResult(machine, expression: expression, notation: 'infix');
     } on RpnStackUnderflowError catch (_) {
       throw ExpressionSyntaxError('Invalid infix expression: $expression');
     }
   }
 
   static Matrix evaluateRpn(List<String> tokens) {
+    final CalculatrixMachine machine = CalculatrixMachine();
+    machine.executeProgram(_compileRpnTokens(tokens));
+    return _singleResult(machine, expression: tokens.join(' '), notation: 'RPN');
+  }
+
+  static CalculatrixProgram _compileRpnTokens(List<String> tokens) {
     if (tokens.isEmpty) {
       throw ExpressionSyntaxError('RPN token list cannot be empty.');
     }
 
-    final RpnEngine engine = RpnEngine();
-
+    final List<CalculatrixCommand> commands = <CalculatrixCommand>[];
     for (final String rawToken in tokens) {
       final String token = rawToken.trim();
       if (token.isEmpty) {
         continue;
       }
 
-      switch (token) {
-        case '+':
-          engine.applyBinary(RpnBinaryOperator.add);
-          continue;
-        case '-':
-          engine.applyBinary(RpnBinaryOperator.subtract);
-          continue;
-        case '*':
-          engine.applyBinary(RpnBinaryOperator.multiply);
-          continue;
-        case '/':
-          engine.applyBinary(RpnBinaryOperator.divide);
-          continue;
-        case '√':
-          engine.applyUnary(RpnUnaryOperator.sqrt);
-          continue;
-        case '%':
-          engine.applyUnary(RpnUnaryOperator.percent);
-          continue;
-        default:
-          engine.push(_parseOperandToken(token));
-      }
+      commands.add(_compileRpnToken(token));
     }
 
-    if (engine.depth != 1) {
+    return CalculatrixProgram(commands);
+  }
+
+  static CalculatrixCommand _compileRpnToken(String token) {
+    switch (token) {
+      case '+':
+        return const AddCommand();
+      case '-':
+        return const SubtractCommand();
+      case '*':
+        return const MultiplyCommand();
+      case '/':
+        return const DivideCommand();
+      case '√':
+        return const SqrtCommand();
+      case '%':
+        return const PercentCommand();
+      default:
+        if (_looksLikeMatrixLiteral(token)) {
+          return PushMatrixCommand(_parseMatrixLiteral(token));
+        }
+
+        final double? value = double.tryParse(token);
+        if (value != null) {
+          return PushScalarCommand(value);
+        }
+
+        throw ExpressionSyntaxError('Invalid operand token: $token');
+    }
+  }
+
+  static Matrix _singleResult(
+    CalculatrixMachine machine, {
+    required String expression,
+    required String notation,
+  }) {
+    final Matrix? top = machine.top;
+    if (machine.depth != 1 || top == null) {
       throw ExpressionSyntaxError(
-        'Invalid RPN expression: expected single result, found ${engine.depth}.',
+        'Invalid $notation expression: expected single result, found ${machine.depth}.',
       );
     }
 
-    return engine.pop();
+    return top;
   }
 
   static Matrix _parseOperandToken(String token) {
