@@ -634,7 +634,7 @@ Two operations that complete the core linear algebra toolkit:
 - [x] Step 3: add commands, wire through CLI and app
 - [x] Step 4: rerun CLI, widget, and Windows integration suites
 
-#### v0.4.80 — Numerical Robustness: Standard Test Matrices and Residual Assertions
+#### v0.4.8 — Numerical Robustness: Standard Test Matrices and Residual Assertions
 
 Reference: Higham, *Accuracy and Stability of Numerical Algorithms* (2002);
 MATLAB `gallery()` function; LAPACK test suite methodology.
@@ -669,7 +669,7 @@ independent of forward error — the gold standard for numerical validation.
 - [x] Step 4: add dimension stress tests (5×5 through 8×8) for all major operations
 - [x] Step 5: document discovered limitations and rerun full validation
 
-#### v0.4.90 — Package Publication Readiness
+#### v0.4.9 — Package Publication Readiness
 
 Reference: pub.dev scoring criteria (https://pub.dev/help/scoring);
 dart.dev package layout conventions; effective Dart documentation guide.
@@ -694,6 +694,37 @@ have complete dartdoc coverage on public members, and present an accurate README
 - [x] Step 3: add topics and fix pubspec metadata
 - [x] Step 4: run `dart doc`, fix documentation gaps on public members
 - [x] Step 5: run `dart pub publish --dry-run` and resolve all blocking issues, then cut `0.5.0`
+
+#### v0.5.1 — Accessibility Audit and Semantic Corrections
+
+Reference: WCAG 2.1 AA; Flutter Semantics API; Android TalkBack / iOS VoiceOver
+accessibility testing guidelines; Material Design accessibility checklist.
+
+A granular audit of all app views using Flutter's `Semantics` widget tree
+to ensure screen readers can fully convey calculator state and interaction
+affordances. Each mode (Infix, RPN, Matrix) and the matrix editor are
+inspected independently for label clarity, role correctness, and navigation order.
+
+- [x] Audit Infix mode: display area semantics, button labels, deck selector, mode indicator
+- [x] Audit RPN mode: stack display semantics, entry area, operation buttons, deck selector
+- [x] Audit Matrix mode: matrix grid semantics, structural edit buttons, deck selector
+- [x] Audit Matrix editor: cell semantics, order selector, quick actions, navigation mode
+- [x] Fix redundant or missing `Semantics` labels on keypad buttons (e.g., "RR" → "Reduced Row Echelon Form")
+- [x] Add `Semantics` labels to display areas describing current value and state
+- [x] Add `Semantics` labels to deck selector tabs with descriptive names
+- [x] Fix button roles: ensure all interactive elements have `button` role, not generic
+- [x] Verify focus order matches visual layout (top-to-bottom, left-to-right)
+- [x] Add live region semantics to result display so screen readers announce changes
+- [x] Rerun widget tests confirming Semantics nodes exist for all interactive elements
+- [x] Rerun Windows integration suite confirming no regressions
+
+##### TDD Execution Order
+
+- [x] Step 1: audit all views via browser accessibility tree and source code; document findings
+- [x] Step 2: add widget tests asserting expected Semantics labels for all buttons and display areas
+- [x] Step 3: implement Semantics corrections in view code to pass the new tests
+- [x] Step 4: rerun widget and Windows integration suites confirming accessibility + no regressions
+- [x] Step 5: bump version and update changelog
 
 - Additional factorizations beyond LU/QR
 - Sparse matrices

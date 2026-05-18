@@ -4,6 +4,31 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-05-18
+
+### Fixed
+
+- Keypad buttons no longer double-announce (added `excludeSemantics` to
+  `Semantics` wrapper, preventing both tooltip and text from being read).
+- Mode buttons no longer redundantly announce label twice ("Infix mode Infix"
+  → "Infix mode").
+- Deck selector tabs now provide descriptive labels (e.g., "Main operations"
+  instead of just "MAIN").
+- All function buttons (RREF, DIAG, COF, ADJ, TR, RANK, NORM, SNORM, DOT,
+  CROSS) have explicit semantic labels for screen readers.
+- Matrix editor row/column drag handles now have descriptive tooltips.
+- Add-row and add-column buttons now have tooltips.
+- Matrix cell labels expanded from abbreviated "r1c1" to "Row 1, Column 1".
+- RPN X0 register wrapped in descriptive Semantics container.
+
+### Added
+
+- Live region semantics on expression, display value, and RPN entry register
+  so screen readers automatically announce value changes.
+- Dedicated accessibility widget test suite (`accessibility_semantics_test.dart`)
+  with 8 assertions covering display, expression, buttons, mode switch, deck
+  selectors, function labels, matrix cells, and editor handle tooltips.
+
 ## [0.5.0] - 2026-05-18
 
 ### Added
@@ -25,7 +50,7 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 Developer-preview release: package passes all pub.dev validation requirements
 and is ready for publication.
 
-## [0.4.80] - 2026-05-18
+## [0.4.8] - 2026-05-18
 
 ### Added
 

@@ -338,6 +338,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Semantics(
+          liveRegion: true,
           label: 'Expression: ${_controller.expression}',
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -423,21 +424,28 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildPrimaryRpnStackCard() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'X0',
-          style: TextStyle(
-            color: Color(0xFF4FC3F7),
-            fontWeight: FontWeight.w700,
-            fontFamily: 'monospace',
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Entry register X0',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcludeSemantics(
+            child: Text(
+              'X0',
+              style: const TextStyle(
+                color: Color(0xFF4FC3F7),
+                fontWeight: FontWeight.w700,
+                fontFamily: 'monospace',
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        _buildDisplayValue(fontSize: 28),
-      ],
+          const SizedBox(height: 8),
+          _buildDisplayValue(fontSize: 28),
+        ],
+      ),
     );
   }
 
@@ -488,6 +496,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       return Align(
         alignment: Alignment.centerRight,
         child: Semantics(
+          liveRegion: true,
           label: 'Display: ${_controller.display}',
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -520,6 +529,7 @@ class _CalculatorViewState extends State<CalculatorView> {
         return Align(
           alignment: Alignment.centerRight,
           child: Semantics(
+            liveRegion: true,
             label:
                 'Display: $semanticValue. Matrix ${matrix.rowCount} by ${matrix.columnCount}',
             child: SingleChildScrollView(
@@ -608,6 +618,8 @@ class _CalculatorViewState extends State<CalculatorView> {
               child: Semantics(
                 button: true,
                 selected: decks[index].label == activeDeckLabel,
+                label: '${_deckDescription(decks[index].label)} deck',
+                excludeSemantics: true,
                 child: GestureDetector(
                   onTap: () => _selectDeck(decks[index].label),
                   child: AnimatedContainer(
@@ -697,27 +709,32 @@ class _CalculatorViewState extends State<CalculatorView> {
   Widget _buildButton(_ButtonDef btn, double keySize) {
     final colors = _getButtonColors(btn.category);
     final semanticName = _semanticLabel(btn.label);
-    return SizedBox.square(
-      dimension: keySize,
-      child: Tooltip(
-        message: semanticName,
-        child: Material(
-          key: ValueKey<String>('calculator-button-${btn.label}'),
-          color: colors.$1,
-          borderRadius: BorderRadius.circular(16),
-          elevation: 2,
-          child: InkWell(
+    return Semantics(
+      button: true,
+      label: semanticName,
+      excludeSemantics: true,
+      child: SizedBox.square(
+        dimension: keySize,
+        child: Tooltip(
+          message: semanticName,
+          child: Material(
+            key: ValueKey<String>('calculator-button-${btn.label}'),
+            color: colors.$1,
             borderRadius: BorderRadius.circular(16),
-            splashColor: colors.$2.withAlpha(50),
-            highlightColor: colors.$2.withAlpha(30),
-            onTap: () => _onButtonPressed(btn.label),
-            child: Center(
-              child: Text(
-                btn.label,
-                style: TextStyle(
-                  fontSize: btn.label.length > 1 ? 18 : 28,
-                  fontWeight: FontWeight.w500,
-                  color: colors.$2,
+            elevation: 2,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              splashColor: colors.$2.withAlpha(50),
+              highlightColor: colors.$2.withAlpha(30),
+              onTap: () => _onButtonPressed(btn.label),
+              child: Center(
+                child: Text(
+                  btn.label,
+                  style: TextStyle(
+                    fontSize: btn.label.length > 1 ? 18 : 28,
+                    fontWeight: FontWeight.w500,
+                    color: colors.$2,
+                  ),
                 ),
               ),
             ),
@@ -808,6 +825,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       label: '$label mode',
       button: true,
       selected: selected,
+      excludeSemantics: true,
       child: GestureDetector(
         onTap: () => _activateMode(mode),
         child: AnimatedContainer(
@@ -1035,8 +1053,18 @@ class _CalculatorViewState extends State<CalculatorView> {
       'INV' => 'Invert top matrix',
       'DET' => 'Determinant of top matrix',
       'EIG' => 'Eigenvalues of top matrix',
+      'DIAG' => 'Diagonalize top matrix',
       'LU' => 'LU decomposition of top matrix',
       'QR' => 'QR decomposition of top matrix',
+      'RREF' => 'Reduced Row Echelon Form',
+      'SNORM' => 'Spectral norm of top matrix',
+      'TR' => 'Trace of top matrix',
+      'RANK' => 'Rank of top matrix',
+      'NORM' => 'Frobenius norm of top matrix',
+      'COF' => 'Cofactor matrix of top matrix',
+      'ADJ' => 'Adjugate of top matrix',
+      'DOT' => 'Dot product of top two vectors',
+      'CROSS' => 'Cross product of top two vectors',
       'NEG' => 'Negate top matrix',
       'ZEROS' => 'Fill zeros like top matrix',
       'ONES' => 'Fill ones like top matrix',
@@ -1055,6 +1083,21 @@ class _CalculatorViewState extends State<CalculatorView> {
       'MR' => 'Memory recall',
       'M+' => 'Memory add',
       'M-' => 'Memory subtract',
+      _ => label,
+    };
+  }
+
+  String _deckDescription(String label) {
+    return switch (label) {
+      'MAIN' => 'Main functions',
+      'MEM' => 'Memory operations',
+      'STACK' => 'Stack operations',
+      'MATRIX' => 'Matrix operations',
+      'FACT' => 'Factorizations',
+      'PROP' => 'Properties',
+      'VEC' => 'Vector operations',
+      'EDIT' => 'Edit matrix',
+      'BUILD' => 'Build matrix',
       _ => label,
     };
   }
@@ -1557,6 +1600,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
               height: _matrixRowHandleHeight,
               child: IconButton(
                 key: ValueKey<String>('matrix-row-tab-$row'),
+                tooltip: 'Row ${row + 1}, drag to reorder',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.expand(),
                 style: IconButton.styleFrom(
@@ -1603,6 +1647,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
               height: _matrixColumnHandleHeight,
               child: IconButton(
                 key: ValueKey<String>('matrix-column-tab-$column'),
+                tooltip: 'Column ${column + 1}, drag to reorder',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.expand(),
                 style: IconButton.styleFrom(
@@ -1664,7 +1709,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
           borderRadius: BorderRadius.all(Radius.circular(10)),
           borderSide: BorderSide(color: Color(0xFF4FC3F7), width: 1.4),
         ),
-        labelText: 'r${row + 1}c${column + 1}',
+        labelText: 'Row ${row + 1}, Column ${column + 1}',
         labelStyle: const TextStyle(fontSize: 11),
       ),
       onTap: () {
@@ -1721,6 +1766,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       height: _matrixCellHeight,
       child: IconButton(
           key: const ValueKey<String>('matrix-add-row-placeholder'),
+          tooltip: 'Add row',
           onPressed: _appendRow,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints.expand(),
@@ -1739,6 +1785,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       height: _matrixColumnHeaderHeight,
       child: IconButton(
           key: const ValueKey<String>('matrix-add-column-placeholder'),
+          tooltip: 'Add column',
           onPressed: _appendColumn,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints.expand(),
