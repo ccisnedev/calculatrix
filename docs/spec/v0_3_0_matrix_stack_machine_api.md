@@ -1,21 +1,21 @@
-# v3.0.0 Matrix Stack Machine Public API Specification
+# v0.3.0 Matrix Stack Machine Public API Specification
 
 Status: Draft
 Owner: Calculatrix maintainers
-Target release: v3.0.0
+Target release: v0.3.0
 Primary package: calculatrix
 Primary path: code/core
-Companion release specification: docs/spec/v3_0_0_matrix_stack_machine.md
+Companion release specification: docs/spec/v0_3_0_matrix_stack_machine.md
 Companion stage specification: docs/spec/stage_3_matrix_stack_machine.md
 
 ## 1. Purpose
 
-This document defines the intended public API for v3.0.0.
+This document defines the intended public API for v0.3.0.
 
 The goal is to make package:calculatrix a public matrix stack machine instead of
 only a collection of matrix helpers plus a notation-specific session model.
 
-After v3.0.0:
+After v0.3.0:
 
 1. Public primitive commands are first-class API.
 2. Public macros are first-class API.
@@ -48,7 +48,7 @@ design guide, not a package rename requirement.
 ## 4. Public Package Surface
 
 The root library should continue exporting Matrix and compatibility facades,
-but v3.0.0 adds an explicit machine-and-command layer.
+but v0.3.0 adds an explicit machine-and-command layer.
 
 Planned public roles:
 
@@ -95,7 +95,7 @@ Contract:
 4. Construction, arithmetic, transpose, inverse, and structural operations are
    part of the matrix-first domain model.
 
-v3.0.0 must expose public matrix helpers equivalent to:
+v0.3.0 must expose public matrix helpers equivalent to:
 
 1. Matrix.scalar
 2. Matrix.identity
@@ -185,7 +185,7 @@ abstract interface class CalculatrixMacro {
 
 ### 5.5 CalculatrixProgram
 
-v3.0.0 should expose a typed immutable program container.
+v0.3.0 should expose a typed immutable program container.
 
 Purpose:
 
@@ -207,7 +207,7 @@ final class CalculatrixProgram {
 
 Infix is a convenience frontend over the canonical stack machine.
 
-v3.0.0 should expose a typed compiler-equivalent surface.
+v0.3.0 should expose a typed compiler-equivalent surface.
 
 Required capabilities:
 
@@ -247,7 +247,7 @@ Rules:
 
 ### 5.8 CalculatrixEntryMode
 
-If the session facade keeps an input-surface mode enum, the preferred v3.0.0
+If the session facade keeps an input-surface mode enum, the preferred v0.3.0
 name is CalculatrixEntryMode rather than CalculatrixMode.
 
 Contract:
@@ -263,12 +263,12 @@ enum CalculatrixEntryMode { infix, rpn }
 ```
 
 Keeping the old CalculatrixMode name is acceptable only if migration cost or
-compatibility concerns are intentionally prioritized. For new v3.0.0 APIs,
+compatibility concerns are intentionally prioritized. For new v0.3.0 APIs,
 CalculatrixEntryMode is the preferred name.
 
 ## 6. Required Primitive Command Catalog
 
-The following public command types are the default v3.0.0 API anchors.
+The following public command types are the default v0.3.0 API anchors.
 
 ### 6.1 Stack commands
 
@@ -354,7 +354,7 @@ These commands operate on the top matrix and do not infer hidden selection.
 
 ## 7. Required Public Macro Catalog
 
-The following public macros are required by the v3.0.0 product contract.
+The following public macros are required by the v0.3.0 product contract.
 
 ### 7.1 Shape-derived macros
 
@@ -389,7 +389,7 @@ public workflows and parameter contracts are part of the release API.
 The public API should continue using typed errors and extend them where the new
 command surface requires more precision.
 
-Required error families for v3.0.0:
+Required error families for v0.3.0:
 
 1. MatrixShapeError
 2. MatrixDomainError
@@ -410,7 +410,7 @@ Notes:
 
 ### 9.1 Compatibility conveniences to preserve
 
-v3.0.0 should keep these convenience surfaces when practical:
+v0.3.0 should keep these convenience surfaces when practical:
 
 1. Calculatrix.evaluateInfix
 2. Calculatrix.evaluateRpn
@@ -418,7 +418,7 @@ v3.0.0 should keep these convenience surfaces when practical:
 
 ### 9.2 Preferred migration direction
 
-The preferred consumer path after v3.0.0 is:
+The preferred consumer path after v0.3.0 is:
 
 1. Use typed commands for deterministic workflows.
 2. Use public macros for shipping product shortcuts.
@@ -442,7 +442,7 @@ The CLI should migrate from mode-name plus loose evaluation calls toward:
 
 ## 10. Acceptance Criteria for API Readiness
 
-The public API is ready for v3.0.0 TDD when all of the following are true.
+The public API is ready for v0.3.0 TDD when all of the following are true.
 
 1. The core command layer is named and grouped.
 2. The macro catalog is named and grouped.

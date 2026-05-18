@@ -10,7 +10,7 @@ Calculatrix is a shared-core calculator system.
 
 The current default app experience is an infix calculator oriented to scalar
 and `1x1` workflows, but the runtime semantics are already matrix-first. The
-current codebase is the `v3.0.0` foundation: the shared shell exposes visible
+current codebase is the `v0.3.0` foundation: the shared shell exposes visible
 `Infix`, `RPN`, and `Matrix` modes, and the core exposes the public
 machine/command/macro layer that all consumers route through.
 
@@ -38,7 +38,7 @@ change the matrix-first semantics of the core.
 | `calculatrix_app` | Shell mode selection, keypad paging, Matrix shell/workstation drafts, stack visualization, memory UX, formatting, accessibility |
 | `calculatrix_cli` | Argument parsing, infix/RPN/command/macro routing, core invocation, output formatting, exit behavior |
 
-## Consumer Shell Model (v3.0.0 Foundation)
+## Consumer Shell Model (v0.3.0 Foundation)
 
 The current application model is a single shell with specialized surfaces, not
 multiple independent calculators.
@@ -74,7 +74,7 @@ multiple independent calculators.
 - `code/cli` should add automated unit and smoke/integration coverage for argument parsing, output formatting, and representative commands.
 - Stage completion should include focused validation of core tests/analyze, Flutter tests, app integration flows, and CLI automation/smokes.
 
-## RPN Interaction Contract (v3.0.0)
+## RPN Interaction Contract (v0.3.0)
 
 ### Shared Current Value
 
@@ -96,7 +96,7 @@ multiple independent calculators.
 - In `Infix` mode, the primary action key remains `=`.
 - In `RPN` mode, the same visual position is relabeled to `ENTER`.
 - `ENTER` commits the current operand draft onto the stack.
-- `v3.0.0` does **not** overload `ENTER` as implicit duplicate; duplication stays explicit via `dup`.
+- `v0.3.0` does **not** overload `ENTER` as implicit duplicate; duplication stays explicit via `dup`.
 
 ### Operator Semantics
 
@@ -128,7 +128,7 @@ multiple independent calculators.
 
 ## Stage 3 Status and Stage 4 Gate
 
-Stage 3 is complete in the current `v3.0.0` line.
+Stage 3 is complete in the current `v0.3.0` line.
 
 The stabilized foundation now includes:
 

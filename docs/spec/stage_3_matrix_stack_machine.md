@@ -2,21 +2,21 @@
 
 Status: Draft
 Owner: Calculatrix maintainers
-Target release series: v3.0.0 foundation plus v3.x.x improvements
+Target release series: v0.3.0 foundation plus v0.3.x improvements
 Primary package: calculatrix
 Primary surfaces: code/core, code/app, code/cli
 Companion roadmap entry: docs/roadmap.md Stage 3
 Companion architecture note: docs/architecture.md
-Companion release specification: docs/spec/v3_0_0_matrix_stack_machine.md
-Companion API specification: docs/spec/v3_0_0_matrix_stack_machine_api.md
-Companion TDD plan: docs/spec/v3_0_0_matrix_stack_machine_tdd.md
+Companion release specification: docs/spec/v0_3_0_matrix_stack_machine.md
+Companion API specification: docs/spec/v0_3_0_matrix_stack_machine_api.md
+Companion TDD plan: docs/spec/v0_3_0_matrix_stack_machine_tdd.md
 
 ## 1. Purpose
 
 This document defines the Stage 3 architectural reset for Calculatrix.
 
 Stage 3 no longer assumes that advanced linear algebra is the next isolated
-increment over a finished late-v2 shell. Instead, Stage 3 redefines the core
+increment over a finished late-v0.2 shell. Instead, Stage 3 redefines the core
 product around one canonical execution model:
 
 1. All runtime values are matrices.
@@ -63,7 +63,7 @@ The end state is one coherent product where:
 
 ## 3. Baseline Product Contract
 
-Stage 3 supersedes the late-v2 assumption that the app owns a dedicated modal
+Stage 3 supersedes the late-v0.2 assumption that the app owns a dedicated modal
 matrix editor while the core owns only infix and RPN semantics.
 
 After Stage 3:
@@ -355,7 +355,7 @@ Examples:
 ### 8.5 Bounded GUI scope
 
 The Stage 3 app workstation may remain visually optimized for the bounded
-educational matrix scope used in late v2.x.
+educational matrix scope used in late v0.2.x.
 
 Rules:
 
@@ -417,9 +417,9 @@ Contract notes:
 
 ## 11. Release Partition Inside Stage 3
 
-### 11.1 v3.0.0 baseline
+### 11.1 v0.3.0 baseline
 
-v3.0.0 establishes the new canonical architecture.
+v0.3.0 establishes the new canonical architecture.
 
 It must include:
 
@@ -430,9 +430,9 @@ It must include:
 5. Direct RPN access to the same command vocabulary.
 6. Core-backed inverse and transpose in the shipping workflow.
 
-### 11.2 v3.x.x improvements
+### 11.2 v0.3.x improvements
 
-Post-3.0 releases may add:
+Post-0.3 releases may add:
 
 1. Additional command packs and workflow macros.
 2. Matrix workstation ergonomics and polish.

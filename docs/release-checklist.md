@@ -6,7 +6,7 @@ Checklist for coordinated Calculatrix releases under ADR 0002.
 
 - [ ] Confirm release scope: coordinated product release, core-only, app-only, or CLI-only.
 - [ ] Confirm whether version synchronization is mandatory for this release.
-- [ ] Confirm Stage 3 work is excluded until manual late-v2 validation is complete.
+- [ ] Confirm the target version fits the active pre-`1.0.0` scheme (`0.N.P` slices, `0.N.0` stage closures).
 
 ## 2. Versioning
 
@@ -14,6 +14,8 @@ Checklist for coordinated Calculatrix releases under ADR 0002.
 - [ ] For coordinated releases, set `code/cli/pubspec.yaml` to the same `X.Y.Z`.
 - [ ] For coordinated releases, set `code/app/pubspec.yaml` to `X.Y.Z+N`.
 - [ ] Verify app, CLI, and core visible versions match when the release is coordinated.
+- [ ] If this closes a roadmap stage before `1.0.0`, use the next stable `0.N.0` version.
+- [ ] Do not create or retain git release tags for internal `0.x` releases.
 
 ## 3. Changelogs
 
@@ -49,3 +51,4 @@ Checklist for coordinated Calculatrix releases under ADR 0002.
 - [ ] Commit version, changelog, docs, and validation-related changes together.
 - [ ] Keep Android wrapper files versioned and local machine files untracked.
 - [ ] Move repetitive checklist items into CI or release scripts when stable.
+- [ ] If obsolete prerelease tags exist locally after a history cleanup, delete them before closing the release work.

@@ -33,9 +33,17 @@ the published core package usable on its own.
 `calculatrix` in `code/core` is the canonical semantic version for the project.
 
 - Public compatibility decisions are anchored to the core package.
-- Breaking API or semantic changes in the core require a SemVer-major bump.
+- Until the first public `1.0.0` product release, coordinated stage milestones
+  use the pre-`1.0.0` line: each stage closes on a stable `0.N.0` release.
+- Before `1.0.0`, incompatible architectural resets may advance to the next
+  stable `0.N.0` stage release instead of introducing artificial `1.x`, `2.x`,
+  or `3.x` lines.
+- After the first public `1.0.0`, breaking API or semantic changes in the core
+  require a SemVer-major bump.
 - Backward-compatible feature additions in the core require a SemVer-minor bump.
 - Backward-compatible fixes in the core require a SemVer-patch bump.
+- Until `1.0.0`, the repository may rewrite internal prerelease history,
+  documentation, and local tags to keep the `0.x` line coherent.
 
 When the repository communicates a coordinated release, the release number is
 the core version.
@@ -50,11 +58,11 @@ CLI and app should align their visible version with the core version.
 - `code/app/pubspec.yaml` should use the same visible `X.Y.Z`, while keeping an
   independent Flutter build suffix `+N`.
 
-Example:
+Example for the current pre-`1.0.0` line:
 
-- Core: `3.2.0`
-- CLI: `3.2.0`
-- App: `3.2.0+7`
+- Core: `0.4.0`
+- CLI: `0.4.0`
+- App: `0.4.0+8`
 
 This preserves a single external release number while still allowing platform
 build iteration for the app.
@@ -80,11 +88,12 @@ In those cases:
 ### 4. Coordinated stage completions should use synchronized visible versions
 
 When a roadmap stage is treated as a repository-wide release milestone, all
-three components should be brought to the same visible `X.Y.Z` version before
-release completion.
+three components should be brought to the same visible version before release
+completion.
 
-This applies in particular to major milestones such as `v2.0.0`, `v3.0.0`, and
-other stage-closing releases.
+Before the first public `1.0.0`, this means each completed stage lands on a
+stable `0.N.0` release with synchronized visible versions across core, CLI,
+and app.
 
 ### 5. Changelog ownership is split by audience
 
@@ -127,24 +136,39 @@ Each release entry should make clear whether it is:
 Release communication must avoid implying a new core semantic contract when the
 change only affects a consumer shell.
 
+### 8. Git tags start at the first public 1.0.0 release
+
+Pre-`1.0.0` coordinated milestones should not create or preserve git release
+tags.
+
+- The repository may keep the `0.x` line tag-free while scope, numbering, and
+  historical grouping are still being refined.
+- If prerelease tags become misleading after history cleanup, delete them
+  instead of treating them as immutable release markers.
+- Begin git release tags with the first public `v1.0.0` release and continue
+  from there under normal SemVer expectations.
+
 ## Consequences
 
 - The project gets one authoritative release number without forcing fake core
   bumps for shell-only changes.
 - Coordinated milestones remain easy to communicate because app, CLI, and core
-  can share the same visible `X.Y.Z` when released together.
+  can share the same visible version when released together.
+- The pre-`1.0.0` line stays clean: stage closures advance through `0.N.0`
+  instead of implying already-public major lines.
 - The Flutter app keeps a proper independent build suffix for store/distribution
   needs.
 - The root changelog and core changelog serve different audiences cleanly.
 - Future automation can validate that stage-closing releases keep app/CLI/core
   versions synchronized when required.
-- Release discipline becomes stricter: every release must declare its scope and
-  update the appropriate changelog(s).
+- Release discipline becomes stricter: every release must declare its scope,
+  update the appropriate changelog(s), and avoid premature git tags.
 
 ## Follow-up Guidance
 
 - Keep `code/core/CHANGELOG.md` in sync with package-facing releases.
 - Keep the root `CHANGELOG.md` in sync with coordinated repository releases.
 - Use `docs/release-checklist.md` for release execution and automation targets.
+- Do not create repository release tags before the first public `v1.0.0`.
 - If the repository adopts CI release automation, encode this ADR's rules in the
   workflow rather than relying on convention alone.

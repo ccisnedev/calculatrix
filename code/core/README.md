@@ -9,8 +9,8 @@ the same canonical kernel.
 
 ## Status
 
-- Current package version: `3.2.0`
-- Focus: Stage 4 decomposition slice over the canonical matrix stack kernel
+- Current package version: `0.4.0`
+- Focus: Stage 4 stable release over the canonical matrix stack kernel
 - Runtime dependencies: none (pure Dart)
 
 ## Features available now
@@ -59,9 +59,13 @@ The main public barrel is `package:calculatrix/calculatrix.dart` and exports:
 
 ## API stability
 
-- `v3.0.0` establishes the public matrix stack machine surface.
-- `v3.1.0` starts Stage 4 with determinant as a non-breaking command-surface expansion.
-- `v3.2.0` extends Stage 4 with LU and QR while keeping the same stack-machine contract.
+- `v0.3.0` establishes the public matrix stack machine surface.
+- `v0.3.10` starts Stage 4 with determinant as a non-breaking command-surface expansion.
+- `v0.3.20` extends Stage 4 with LU and QR while keeping the same stack-machine contract.
+- `v0.3.21` hardens LU and QR edge-case coverage without changing the public API.
+- `v0.3.30` keeps the public core API stable while the app shell extends Matrix-mode factorization workflows on top of it.
+- `v0.3.31` keeps the public core API stable while Stage 4 closes its end-to-end shell coverage over the same kernel.
+- `v0.4.0` closes Stage 4 as the stable advanced-linear-algebra release over the same public matrix stack machine.
 - RPN stack failures are exposed through the `RpnStackError` hierarchy:
 	- `RpnStackUnderflowError`
 	- `RpnStackRangeError`

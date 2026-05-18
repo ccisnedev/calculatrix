@@ -4,7 +4,47 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
-## [3.2.0] - 2026-05-18
+## [0.4.0] - 2026-05-18
+
+### Added
+
+- Stable Stage 4 public support for determinant, LU decomposition, and QR
+  decomposition on the canonical matrix stack kernel.
+
+### Changed
+
+- Closed Stage 4 with release-grade validation across core, CLI, and app while
+  keeping the public matrix-first stack contract intact.
+
+## [0.3.31] - 2026-05-18
+
+### Changed
+
+- No public core API changes; the package version is aligned with the Stage 4
+  end-to-end workflow coverage release built on top of the same canonical
+  kernel.
+
+## [0.3.30] - 2026-05-18
+
+### Changed
+
+- No public core API changes; the package version is aligned with the Stage 4
+  Matrix-workstation factorization workflow release built on top of the same
+  canonical kernel.
+
+## [0.3.21] - 2026-05-18
+
+### Added
+
+- Focused LU coverage for partial pivoting and singular square matrices.
+- Focused QR coverage for tall full-rank matrices and dependent columns.
+
+### Changed
+
+- Strengthened typed machine coverage for stack-expanding LU and QR commands in
+  canonical-kernel edge cases.
+
+## [0.3.20] - 2026-05-18
 
 ### Added
 
@@ -26,7 +66,7 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 - Kept decomposition behavior in the public core and stack machine instead of
   introducing consumer-local factorization logic.
 
-## [3.1.0] - 2026-05-18
+## [0.3.10] - 2026-05-18
 
 ### Added
 
@@ -46,7 +86,7 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 - Kept determinant available to app and CLI consumers through the same public
   command barrel instead of consumer-local implementations.
 
-## [3.0.1] - 2026-05-17
+## [0.3.1] - 2026-05-17
 
 ### Changed
 
@@ -65,7 +105,7 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 - Kept public direct-evaluation behavior stable while moving consumer-specific
   interaction translation into the session layer.
 
-## [3.0.0] - 2026-05-17
+## [0.3.0] - 2026-05-17
 
 ### Added
 
@@ -85,9 +125,9 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - Aligned app and CLI consumers on the same public command and macro surface.
-- Closed the remaining late-v2 documentation drift around the public API.
+- Closed the remaining late-v0.2 documentation drift around the public API.
 
-## [2.11.0] - 2026-05-16
+## [0.2.110] - 2026-05-16
 
 ### Added
 
@@ -110,7 +150,7 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 - Moved interactive calculator behavior out of the Flutter controller and into
   the core package contract.
 
-## [2.9.0] - 2026-05-16
+## [0.2.90] - 2026-05-16
 
 First SemVer-aligned package release recorded under the accepted repository
 versioning policy.

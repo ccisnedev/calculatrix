@@ -2,17 +2,17 @@
 
 Status: Draft
 Owner: Calculatrix maintainers
-Target release: v2.13.0
+Target release: v0.2.130
 Target surface: calculatrix_app matrix editor
 Target path in monorepo: code/app
 Companion baseline: docs/spec/matrix_editor_ui.md
-Companion roadmap entry: docs/roadmap.md v2.13.0
+Companion roadmap entry: docs/roadmap.md v0.2.130
 Supported visible shapes: bounded NxM up to 4x4
 
 ## 1. Purpose
 
 This document defines the UI, interaction, and accessibility contract for the
-next matrix editor evolution after the v2.12.0 square-order workflow.
+next matrix editor evolution after the v0.2.120 square-order workflow.
 
 The new editor must let users think in ordered row lists and column lists,
 while still preserving the matrix-as-one-object mental model.
@@ -55,7 +55,7 @@ The editor must be:
 
 ## 3. Baseline Product Contract
 
-This specification extends the v2.12.0 editor contract instead of replacing it.
+This specification extends the v0.2.120 editor contract instead of replacing it.
 
 1. Confirming the editor still serializes to the canonical bracket literal,
    for example [[1,2],[3,4]].
@@ -78,9 +78,9 @@ All references in this section were checked on 2026-05-17.
 | W3C WAI-ARIA APG Rearrangeable Listbox Example | Reorderable structural lists need explicit action fallback, keyboard shortcuts, and live confirmation of movement |
 | Material 3 Tabs overview | Tabs are appropriate for organizing peer categories and can scale horizontally when the count is bounded but visible |
 
-### 4.2 Continued references from v2.12.0
+### 4.2 Continued references from v0.2.120
 
-The following v2.12.0 references remain applicable and are inherited by this
+The following v0.2.120 references remain applicable and are inherited by this
 specification:
 
 1. GOV.UK text-input guidance
@@ -260,7 +260,7 @@ Rules:
 
 ### 6.10 Validation and preview behavior
 
-Validation rules from v2.12.0 still apply, but structural edits change which
+Validation rules from v0.2.120 still apply, but structural edits change which
 cells are visible and therefore validated.
 
 Rules:

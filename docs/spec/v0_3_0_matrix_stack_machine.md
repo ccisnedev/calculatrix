@@ -1,21 +1,21 @@
-# v3.0.0 Matrix Stack Machine Release Specification
+# v0.3.0 Matrix Stack Machine Release Specification
 
 Status: Draft
 Owner: Calculatrix maintainers
-Target release: v3.0.0
+Target release: v0.3.0
 Primary package: calculatrix
 Primary surfaces: code/core, code/app, code/cli
 Companion stage specification: docs/spec/stage_3_matrix_stack_machine.md
 Companion roadmap entry: docs/roadmap.md Stage 3
 Companion architecture note: docs/architecture.md
-Companion API specification: docs/spec/v3_0_0_matrix_stack_machine_api.md
-Companion TDD plan: docs/spec/v3_0_0_matrix_stack_machine_tdd.md
+Companion API specification: docs/spec/v0_3_0_matrix_stack_machine_api.md
+Companion TDD plan: docs/spec/v0_3_0_matrix_stack_machine_tdd.md
 
 ## 1. Purpose
 
-This document defines the release-grade specification for v3.0.0.
+This document defines the release-grade specification for v0.3.0.
 
-v3.0.0 establishes Calculatrix around one canonical semantic center:
+v0.3.0 establishes Calculatrix around one canonical semantic center:
 
 1. The core package is a matrix-first stack machine.
 2. All committed runtime values are matrices.
@@ -23,13 +23,13 @@ v3.0.0 establishes Calculatrix around one canonical semantic center:
 4. Infix is a convenience frontend over that same kernel.
 5. The app shell exposes three complementary product modes: Infix, RPN, Matrix.
 
-This release is not a minor UX refinement of the late-v2 matrix editor.
+This release is not a minor UX refinement of the late-v0.2 matrix editor.
 It is the major reset that makes the shared core, the app shell, and the CLI
 all describe the same product model.
 
 ## 2. Release Goals
 
-v3.0.0 must achieve all of the following.
+v0.3.0 must achieve all of the following.
 
 1. Remove the semantic split between interactive matrix editing and committed
    matrix commands.
@@ -43,7 +43,7 @@ v3.0.0 must achieve all of the following.
 
 ## 3. Non-Goals
 
-The following are explicitly outside v3.0.0.
+The following are explicitly outside v0.3.0.
 
 1. Determinant.
 2. LU decomposition.
@@ -54,7 +54,7 @@ The following are explicitly outside v3.0.0.
 
 ## 4. Core Product Statement
 
-The canonical product model for v3.0.0 is:
+The canonical product model for v0.3.0 is:
 
 1. One matrix stack machine kernel in package:calculatrix.
 2. One public vocabulary of primitive commands.
@@ -110,7 +110,7 @@ Rules:
 
 #### 5.3.1 Required stack commands
 
-v3.0.0 must keep or expose direct public equivalents for:
+v0.3.0 must keep or expose direct public equivalents for:
 
 1. dup
 2. drop
@@ -122,7 +122,7 @@ v3.0.0 must keep or expose direct public equivalents for:
 
 #### 5.3.2 Required construction commands
 
-v3.0.0 must expose direct public equivalents for:
+v0.3.0 must expose direct public equivalents for:
 
 1. push scalar literal
 2. push matrix literal
@@ -132,7 +132,7 @@ v3.0.0 must expose direct public equivalents for:
 
 #### 5.3.3 Required unary matrix commands
 
-v3.0.0 must expose direct public equivalents for:
+v0.3.0 must expose direct public equivalents for:
 
 1. negate
 2. percent
@@ -142,7 +142,7 @@ v3.0.0 must expose direct public equivalents for:
 
 #### 5.3.4 Required binary matrix commands
 
-v3.0.0 must expose direct public equivalents for:
+v0.3.0 must expose direct public equivalents for:
 
 1. add
 2. subtract
@@ -153,7 +153,7 @@ v3.0.0 must expose direct public equivalents for:
 
 #### 5.3.5 Required parameterized structural commands
 
-v3.0.0 must expose direct public equivalents for:
+v0.3.0 must expose direct public equivalents for:
 
 1. delete row by index
 2. delete column by index
@@ -176,7 +176,7 @@ Rules:
 
 #### 5.4.1 Required shipping macros
 
-v3.0.0 must ship public equivalents for at least these workflows:
+v0.3.0 must ship public equivalents for at least these workflows:
 
 1. Replace current work matrix with same-shape zeros.
 2. Replace current work matrix with same-shape ones.
@@ -202,7 +202,7 @@ Rules:
 
 ### 5.6 Session-facade contract
 
-If a session facade remains public in v3.0.0, it must be an adapter over the
+If a session facade remains public in v0.3.0, it must be an adapter over the
 canonical kernel, not a second center of truth.
 
 Rules:
@@ -216,7 +216,7 @@ Rules:
 
 ## 6. Public API Expectations
 
-v3.0.0 does not freeze exact class names in this specification, but it does
+v0.3.0 does not freeze exact class names in this specification, but it does
 freeze the capability level required from the public API.
 
 ### 6.1 Required API roles
@@ -365,7 +365,7 @@ Examples:
 ### 8.5 Bounded GUI scope
 
 The app workstation may remain optimized for the bounded educational editing
-surface established in late v2.x.
+surface established in late v0.2.x.
 
 Rules:
 
@@ -376,7 +376,7 @@ Rules:
 
 ## 9. CLI Contract
 
-v3.0.0 CLI must remain a thin adapter over the same public core APIs.
+v0.3.0 CLI must remain a thin adapter over the same public core APIs.
 
 Rules:
 
@@ -385,7 +385,7 @@ Rules:
 3. The CLI may expose infix convenience entry through the core infix contract.
 4. The CLI must not contain private math semantics absent from the core.
 
-## 10. Migration Contract from Late v2.x
+## 10. Migration Contract from Late v0.2.x
 
 ### 10.1 Preserved truths
 
@@ -401,9 +401,9 @@ Rules:
 3. The core is no longer described as merely Infix plus RPN semantics; it is
    now a matrix stack machine with convenience frontends.
 
-## 11. Acceptance Criteria for v3.0.0
+## 11. Acceptance Criteria for v0.3.0
 
-v3.0.0 is complete only when all of the following are true.
+v0.3.0 is complete only when all of the following are true.
 
 1. package:calculatrix exposes a public matrix stack machine kernel.
 2. package:calculatrix exposes typed primitive commands.
@@ -418,7 +418,7 @@ v3.0.0 is complete only when all of the following are true.
 
 ## 12. TDD Readiness Gate
 
-The project is considered ready to start TDD for v3.0.0 when all of the
+The project is considered ready to start TDD for v0.3.0 when all of the
 following are true.
 
 1. The semantic center is agreed: matrix stack machine core.
@@ -435,7 +435,7 @@ Assessment: ready to start TDD.
 Reasoning:
 
 1. The semantic model is now explicit in docs/spec/stage_3_matrix_stack_machine.md.
-2. The release contract is now explicit in this v3.0.0 specification.
+2. The release contract is now explicit in this v0.3.0 specification.
 3. The roadmap and architecture documents are aligned with the same model.
 
 ### 12.2 Recommended first TDD slice

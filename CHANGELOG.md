@@ -4,7 +4,95 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [3.2.0] - 2026-05-18
+## [0.4.0] - 2026-05-18
+
+Stable release closing Stage 4 around advanced linear algebra on the canonical
+matrix stack kernel.
+
+### Core
+
+- Stage 4 now ships determinant plus public LU and QR decompositions on the
+	shared matrix-first kernel.
+- Locked edge-case coverage for pivots, singular LU inputs, tall QR inputs,
+	and dependent QR columns before the stable stage cut.
+
+### App
+
+- The Flutter shell now exposes determinant, LU, and QR through `RPN`, and the
+	Matrix workstation can dispatch factorization workflows directly back onto the
+	canonical stack.
+- Stage 4 workflows are covered by widget and Windows integration tests,
+	including a full Matrix -> macro -> QR -> Infix round trip.
+
+### CLI
+
+- `command` mode exposes determinant, LU, and QR over the same public core
+	vocabulary and prints multi-result stack outputs as `X0`, `X1`, ... when
+	required.
+
+### Docs
+
+- Closed the Stage 4 roadmap and refreshed release-facing documentation for the
+	stable release.
+
+## [0.3.31] - 2026-05-18
+
+Patch release closing the remaining Stage 4 end-to-end workflow coverage gap.
+
+### QA
+
+- Added a focused Windows integration workflow that combines Matrix creation,
+	`RPN` macro expansion, QR factorization, and a return to `Infix`.
+- Locked the visible `Infix` empty-expression chrome after returning from the
+	advanced `RPN` workflow so the shared current value contract stays explicit.
+
+### Docs
+
+- Marked the remaining Stage 4 end-to-end workflow checklist item as complete.
+- Updated coordinated version references to the `0.3.31` patch line.
+
+## [0.3.30] - 2026-05-18
+
+Stage 4 shell-polish slice extending advanced factorization workflows inside the
+Matrix workstation.
+
+### App
+
+- Added a Matrix-mode `FACT` deck for `RPN`-backed workstation sessions so LU
+	and QR are available without leaving the editor manually.
+- Allowed valid Matrix drafts to submit directly into the canonical stack,
+	execute LU or QR, and return to the `RPN` shell with the resulting factors
+	visible on the stack.
+
+### Docs
+
+- Marked the Stage 4 advanced-workflow polish slice as complete in the roadmap.
+- Updated release-facing version references to the coordinated `0.3.30` line.
+
+### QA
+
+- Added focused widget coverage for Matrix-mode LU and QR dispatch into the
+	stack.
+- Added focused Windows integration coverage for the Matrix-to-LU workflow.
+
+## [0.3.21] - 2026-05-18
+
+Patch release hardening LU and QR coverage on top of the `0.3.20`
+factorization slice.
+
+### Core
+
+- Added focused LU coverage for zero-leading pivots and singular square
+	matrices.
+- Added focused QR coverage for tall full-rank matrices and dependent columns.
+
+### QA
+
+- Extended typed machine tests so stack-expanding LU and QR commands keep their
+	reconstruction and stack-order contracts in edge cases.
+- Revalidated the focused linear-algebra core suite after hardening coverage.
+
+## [0.3.20] - 2026-05-18
 
 Second Stage 4 slice adding LU and QR decomposition workflows on top of the
 canonical matrix stack kernel.
@@ -33,8 +121,8 @@ canonical matrix stack kernel.
 
 ### Docs
 
-- Added the `v3.2.0` roadmap slice for LU and QR as the next Stage 4 delivery.
-- Updated repository and package version references for the coordinated `3.2.0`
+- Added the `v0.3.20` roadmap slice for LU and QR as the next Stage 4 delivery.
+- Updated repository and package version references for the coordinated `0.3.20`
 	release.
 
 ### QA
@@ -42,7 +130,7 @@ canonical matrix stack kernel.
 - Added focused LU and QR coverage in core matrix and machine tests, CLI
 	command tests, app widget tests, and the Windows integration suite.
 
-## [3.1.0] - 2026-05-18
+## [0.3.10] - 2026-05-18
 
 First Stage 4 slice adding determinant workflows on top of the canonical
 matrix stack kernel.
@@ -66,9 +154,9 @@ matrix stack kernel.
 
 ### Docs
 
-- Added the `v3.1.0` roadmap slice for determinant as the first Stage 4
+- Added the `v0.3.10` roadmap slice for determinant as the first Stage 4
 	delivery.
-- Updated repository and package version references for the coordinated `3.1.0`
+- Updated repository and package version references for the coordinated `0.3.10`
 	release.
 
 ### QA
@@ -76,10 +164,10 @@ matrix stack kernel.
 - Added focused determinant coverage in core matrix and machine tests, CLI
 	command tests, app widget tests, and the Windows integration suite.
 
-## [3.0.1] - 2026-05-17
+## [0.3.1] - 2026-05-17
 
 Patch release correcting calculator-style `Infix` interaction semantics on top
-of the `v3.0.0` foundation.
+of the `v0.3.0` foundation.
 
 ### Core
 
@@ -104,9 +192,9 @@ of the `v3.0.0` foundation.
 
 ### Docs
 
-- Added the `v3.0.1` roadmap checklist for the `Infix` calculator interaction
+- Added the `v0.3.1` roadmap checklist for the `Infix` calculator interaction
 	patch line and extended it to cover the unified keypad redesign.
-- Updated release-facing version references for the coordinated `3.0.1` cut.
+- Updated release-facing version references for the coordinated `0.3.1` cut.
 
 ### QA
 
@@ -117,7 +205,7 @@ of the `v3.0.0` foundation.
 - Revalidated public core evaluation coverage to confirm no regression in
 	parser or `RPN` contracts.
 
-## [3.0.0] - 2026-05-17
+## [0.3.0] - 2026-05-17
 
 Canonical matrix stack machine foundation release.
 
@@ -151,9 +239,9 @@ Canonical matrix stack machine foundation release.
 	canonical stack-machine model.
 - Updated public usage docs for core, app, and CLI consumers.
 
-## [2.12.0] - 2026-05-17
+## [0.2.120] - 2026-05-17
 
-App-only matrix editor UX refinement release for late v2.
+App-only matrix editor UX refinement release for late v0.2.
 
 ### App
 
@@ -168,7 +256,7 @@ App-only matrix editor UX refinement release for late v2.
 
 - Added a matrix editor UX specification with verified references, wireframes,
 	and implementation checklist.
-- Added the matrix editor TDD plan and updated the roadmap with v2.12.0
+- Added the matrix editor TDD plan and updated the roadmap with v0.2.120
 	execution progress.
 
 ### QA
@@ -179,9 +267,9 @@ App-only matrix editor UX refinement release for late v2.
 	integration coverage for `code/app`, using `flutter drive` for the complete
 	emulator suite.
 
-## [2.11.0] - 2026-05-16
+## [0.2.110] - 2026-05-16
 
-Core-only matrix semantics release for late v2.
+Core-only matrix semantics release for late v0.2.
 
 ### Core
 
@@ -206,7 +294,7 @@ Core-only matrix semantics release for late v2.
 
 ### Docs
 
-- Added and completed the v2.11.0 roadmap checklist and TDD execution record.
+- Added and completed the v0.2.110 roadmap checklist and TDD execution record.
 - Refreshed repository and package README content to reflect the current
 	shared-core architecture.
 
@@ -215,9 +303,9 @@ Core-only matrix semantics release for late v2.
 - Completed green regression runs for `code/core`, `code/app`, and `code/cli`
 	automated test suites.
 
-## [2.9.0] - 2026-05-16
+## [0.2.90] - 2026-05-16
 
-First coordinated late-v2 release recorded under the accepted repository
+First coordinated late-v0.2 release recorded under the accepted repository
 versioning policy.
 
 ### Core
@@ -249,7 +337,7 @@ versioning policy.
 - Added ADR 0002 defining the repository versioning and changelog policy.
 - Added a release checklist to standardize version sync, changelog updates,
 	QA gates, and automation targets.
-- Updated the roadmap and architecture documents to reflect the late-v2 freeze
+- Updated the roadmap and architecture documents to reflect the late-v0.2 freeze
 	and Stage 3 readiness.
 
 ### QA

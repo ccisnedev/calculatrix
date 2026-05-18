@@ -5,19 +5,27 @@
 
 [![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
 
-## Highlights (v3.2.0)
+## Highlights (v0.4.0)
 
 - `package:calculatrix` es la fuente semántica única para app y CLI.
 - El core público expone `CalculatrixMachine`, comandos tipados, macros
   públicas, programas tipados e `CalculatrixSession`.
 - `Infix` compila al mismo kernel matricial que usan `RPN` y los workflows
   directos por comando.
-- En `v3.2.0`, el core compartido añade LU y QR como descomposiciones públicas
+- En `v0.3.20`, el core compartido añade LU y QR como descomposiciones públicas
   y las expone en la máquina tipada, el CLI y la app `RPN`.
 - `DET`, `LU` y `QR` viven sobre el mismo contrato stack-first: una operación
   simple devuelve una matriz escalar; una descomposición expande varios
   factores sobre la pila canónica.
-- La línea `v3.0.1` mantiene `√` inmediato y `%` tipo Casio en `Infix`, sin
+- En `v0.3.21`, LU y QR quedan endurecidos con cobertura explícita para pivoteo,
+  singularidad, matrices altas y columnas linealmente dependientes.
+- En `v0.3.30`, el workstation `Matrix` puede lanzar LU y QR directamente hacia
+  la pila canónica cuando entras desde `RPN`, sin perder el flujo de edición.
+- En `v0.3.31`, Stage 4 queda cubierto también por un workflow end-to-end que
+  mezcla creación matricial, macro en `RPN`, QR y retorno a `Infix`.
+- `v0.4.0` cierra Stage 4 como release estable: determinante, LU, QR y sus
+  workflows visibles quedan alineados entre core, app y CLI.
+- La línea `v0.3.1` mantiene `√` inmediato y `%` tipo Casio en `Infix`, sin
   alterar los contratos públicos de parser ni `RPN`.
 - La app usa un solo teclado `6x4`: las cuatro filas inferiores permanecen
   fijas como calculadora clásica y solo las dos filas superiores cambian por
@@ -97,7 +105,8 @@ exitosos.
 
 ## Roadmap
 
-Ver [docs/roadmap.md](docs/roadmap.md) para el cierre de `v3.0.0`, el parche
-`v3.0.1`, los slices `v3.1.0` y `v3.2.0` de Stage 4 y la continuación del
-roadmap. Ver
+Ver [docs/roadmap.md](docs/roadmap.md) para el cierre de `v0.3.0`, el parche
+`v0.3.1`, los slices `v0.3.10`, `v0.3.20`, `v0.3.21`, `v0.3.30`, `v0.3.31` y el
+corte estable `v0.4.0` de Stage 4, y la
+continuación del roadmap. Ver
 también [docs/architecture.md](docs/architecture.md) para el modelo canónico actual.

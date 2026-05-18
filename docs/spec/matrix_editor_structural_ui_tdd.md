@@ -3,12 +3,12 @@
 Status: Draft
 Owner: Calculatrix maintainers
 Companion specification: docs/spec/matrix_editor_structural_ui.md
-Target release: v2.13.0
+Target release: v0.2.130
 Target app path: code/app
 
 ## 1. Purpose
 
-This document translates the v2.13.0 structural matrix editor specification
+This document translates the v0.2.130 structural matrix editor specification
 into a narrow implementation plan.
 
 The goal is to add bounded structural editing for rows and columns without

@@ -1,7 +1,9 @@
 # Roadmap
 
-> **Versioning philosophy**: each stage ends with a stable major release.
-> Versions `X.y.z` after each `.0` are improvements and fixes on top of that base.
+> **Versioning philosophy**: before the first public `1.0.0`, each stage ends
+> with a stable `0.N.0` release.
+> Versions `0.N.z` after each `.0` are improvements and fixes on top of that
+> base.
 
 - **Core package**: `calculatrix`
 - **Flutter consumer**: `calculatrix_app`
@@ -22,12 +24,12 @@
 
 ---
 
-## Stage 1 — "Casio Skin, Google Brain" (0.x.x → 1.0.0)
+## Stage 1 — "Casio Skin, Google Brain" (0.0.x → 0.1.0)
 
 Basic calculator with a Casio HL-820LV-inspired layout and an evaluation engine
 with Google Calculator-style operator precedence.
 
-### v0.1.0 — Foundation ✅
+### v0.0.10 — Foundation ✅
 
 - [x] Flutter project scaffolded (`dev.ccisne.calculatrix`)
 - [x] MVVM structure: `lib/{models,controllers,views,widgets}`
@@ -36,7 +38,7 @@ with Google Calculator-style operator precedence.
 - [x] Tokenizer unit tests (TDD)
 - [x] Basic widget test: app starts without crash
 
-### v0.2.0 — Parser & Evaluator ✅
+### v0.0.20 — Parser & Evaluator ✅
 
 - [x] `Parser`: List\<Token\> → expression tree (AST)
 - [x] Recursive descent with PEMDAS precedence
@@ -46,7 +48,7 @@ with Google Calculator-style operator precedence.
 - [x] Exhaustive unit tests (TDD): normal cases + edge cases
 - [x] `CalculatorController` (ChangeNotifier) connects input → evaluation
 
-### v0.3.0 — Casio UI Layout ✅
+### v0.0.30 — Casio UI Layout ✅
 
 - [x] 4-column button grid (HL-820LV layout)
 - [x] All widgets with `Semantics` labels
@@ -55,7 +57,7 @@ with Google Calculator-style operator precedence.
 - [x] Widget tests: every button has semantics, display updates
 - [x] Integration test: complete flow `3 + 4 = 7`
 
-### v0.4.0 — Casio Features ✅
+### v0.0.40 — Casio Features ✅
 
 - [x] Square root (`√`)
 - [x] Percentage (`%`)
@@ -65,7 +67,7 @@ with Google Calculator-style operator precedence.
 - [x] Unit tests for each feature
 - [x] Integration test: memory workflow
 
-### v0.5.0 — Polish & Hardening ✅
+### v0.0.50 — Polish & Hardening ✅
 
 - [x] Error handling (÷0, overflow, negative √)
 - [x] Numeric precision with smart rounding (12 significant digits)
@@ -73,14 +75,14 @@ with Google Calculator-style operator precedence.
 - [x] Haptic/visual feedback on buttons
 - [x] Integration test: all error flows
 
-### v1.0.0 — Stable Release ✅
+### v0.1.0 — Stable Release ✅
 
 - [x] Feature-complete basic calculator with operator precedence
 - [x] User documentation
 - [x] CI/CD pipeline (GitHub Actions: test + build web)
 - [x] Full regression test suite passing
 
-### v1.x.x — Improvements and fixes on top of v1
+### v0.1.x — Improvements and fixes on top of v0.1
 
 - Bug fixes
 - UX/performance improvements
@@ -88,13 +90,13 @@ with Google Calculator-style operator precedence.
 
 ---
 
-## Stage 2 — "Core Engine Package" (1.x.x → 2.0.0)
+## Stage 2 — "Core Engine Package" (0.1.x → 0.2.0)
 
 Implementation of `package:calculatrix` as a pure Dart computation core,
 reusable from Flutter, CLI, and other consumers. This stage establishes the
 core package as the single source of truth for all calculator semantics.
 
-### v1.x.x → v2.0.0
+### v0.1.x → v0.2.0
 
 - [x] Create and stabilize `package:calculatrix` (pure Dart, no Flutter dependency)
 - [x] Define matrix-first domain model for all arithmetic (`1x1`, vectors, square, non-square)
@@ -108,20 +110,20 @@ core package as the single source of truth for all calculator semantics.
 - [x] Scaffold CLI commands consuming the same core APIs (no duplicated algorithms in CLI)
 - [x] Document package integration contracts for Flutter app and CLI
 
-### v2.0.0 — Stable Release
+### v0.2.0 — Stable Release
 
 - [x] `package:calculatrix` published as the official computation engine
 - [x] Flutter app and CLI both running against shared core semantics
 - [x] Updated architecture documentation (shared core: app + CLI + backend)
 
-### v2.x.x — Improvements and fixes on top of v2
+### v0.2.x — Improvements and fixes on top of v0.2
 
-Late v2.x focuses on consumer UX expansion over the already-stable core
+Late v0.2.x focuses on consumer UX expansion over the already-stable core
 semantics. The default experience remains the current scalar/`1x1`
 calculator shell, while app and CLI progressively expose arbitrary matrices,
 explicit notation modes, and richer display contracts.
 
-#### v2.1.0 — Advanced RPN Stack Utilities
+#### v0.2.10 — Advanced RPN Stack Utilities
 
 - [x] Define and document stack semantics for `pick(n)`, `roll(n)`, and `rot`
 - [x] Implement `pick(n)` with 1-based indexing from the top of the stack
@@ -130,28 +132,28 @@ explicit notation modes, and richer display contracts.
 - [x] Add typed range/underflow errors for advanced stack utilities
 - [x] Add TDD coverage for invariants and edge cases of all advanced stack ops
 
-#### v2.2.0 — Numeric Policy and Determinism
+#### v0.2.20 — Numeric Policy and Determinism
 
 - [x] Define formal tolerance policy for floating-point comparison
 - [x] Implement approximate matrix comparison helpers in core
 - [x] Add tests for floating-point determinism and tolerance boundaries
 - [x] Document numeric comparison policy in README and tests
 
-#### v2.3.0 — Parser and Evaluation Performance Baseline
+#### v0.2.30 — Parser and Evaluation Performance Baseline
 
 - [x] Optimize tokenization/evaluation hot paths without changing semantics
 - [x] Add TDD coverage for scientific notation and signed numeric edge cases
 - [x] Capture baseline benchmark/smoke measurements for supported workloads
 - [x] Verify no regressions in core, app, and CLI behaviors
 
-#### v2.4.0 — Hardening and API Freeze Before Stage 3
+#### v0.2.40 — Hardening and API Freeze Before Stage 3
 
 - [x] Expand contract tests for vectors, non-square matrices, and parser failures
 - [x] Harden public error taxonomy for stack range/domain failures
 - [x] Review API stability and update docs for app/CLI consumers
 - [x] Confirm Stage 3 can build on the current core without breaking changes
 
-#### v2.5.0 — Multi-Page Shell and Layout Geometry
+#### v0.2.50 — Multi-Page Shell and Layout Geometry
 
 - [x] Add an explicit notation mode switch (`Infix` / `RPN`) in the shared calculator shell
 - [x] Preserve the current scalar / `1x1` workflow as the default keypad page
@@ -160,7 +162,7 @@ explicit notation modes, and richer display contracts.
 - [x] Target a display/keypad vertical proportion near the golden ratio when screen constraints allow
 - [x] Add controller/layout unit coverage plus widget and integration tests for keypad paging, mode visibility, and key geometry invariants
 
-#### v2.6.0 — Generic Matrix Entry
+#### v0.2.60 — Generic Matrix Entry
 
 - [x] Add a dedicated `NxM` matrix editor surface with row/column selection
 - [x] Validate cell editing and serialize matrices using the core literal contract
@@ -169,7 +171,7 @@ explicit notation modes, and richer display contracts.
 - [x] Define copy/paste and confirmation flows for matrix literals across app and CLI
 - [x] Add TDD coverage for matrix editor state, cancellation, validation, insertion/push flows, and CLI literal parity
 
-#### v2.7.0 — RPN Mode UX
+#### v0.2.70 — RPN Mode UX
 
 - [x] Make notation mode persistent and visible in app state
 - [x] Add an `RPN`-focused keypad page for stack actions and operand entry
@@ -181,7 +183,7 @@ explicit notation modes, and richer display contracts.
 - [x] Support switching between `Infix` and `RPN` without ambiguous display state
 - [x] Add controller, widget, integration, and CLI smoke tests for stack workflows, notation switching, and error presentation
 
-#### v2.8.0 — Matrix Display and Formatting
+#### v0.2.80 — Matrix Display and Formatting
 
  [x] Display non-scalar matrix results in the app without collapsing them to `scalarValue`
  [x] Define compact and expanded matrix render policies for small and large screens
@@ -190,7 +192,7 @@ explicit notation modes, and richer display contracts.
  [x] Add accessibility semantics for matrix structures and stack previews
  [x] Add regression coverage for matrix render, formatting, and cross-consumer parity
 
-#### v2.9.0 — Consumer Cleanup and Freeze Before Stage 3
+#### v0.2.90 — Consumer Cleanup and Freeze Before Stage 3
 
 - [x] Remove legacy app-side parser/tokenizer/evaluator artifacts no longer used at runtime
 - [x] Generalize controller/view-model state from scalar-only display to scalar-or-matrix display
@@ -199,9 +201,9 @@ explicit notation modes, and richer display contracts.
 - [x] Run full regression QA across multi-page keypad, matrix editor, and `RPN` mode
 - [x] Add or complete automated CLI tests before the Stage 3 handoff
 - [x] Confirm advanced linear algebra work can build on the consumer UX without breaking changes
-- [x] Refresh architecture and integration docs for the late-v2 app/CLI experience
+- [x] Refresh architecture and integration docs for the late-v0.2 app/CLI experience
 
-#### v2.10.0 — Shared Current Value Across Infix and RPN
+#### v0.2.100 — Shared Current Value Across Infix and RPN
 
 - [x] Define the shell as one calculator with two notation modes operating over the same committed current value (`X`)
 - [x] Preserve the committed current value across `Infix` ↔ `RPN` mode switches
@@ -243,7 +245,7 @@ explicit notation modes, and richer display contracts.
 - Reject any design where mode switching makes the app feel like two independent calculators.
 - Add regression tests for examples such as `3+3= -> 6`, repeated `= -> 9`, then `RPN` top mutation invalidating a stale `+3` repetition before returning to `Infix`.
 
-#### v2.11.0 — Core-Only Matrix Semantics
+#### v0.2.110 — Core-Only Matrix Semantics
 
 - [x] Define `package:calculatrix` as the only owner of calculator semantics for memory, unary operators, binary operators, stack mutations, and committed-value transitions
 - [x] Introduce a core session/state API for interactive consumers while keeping CLI behavior on public core APIs only
@@ -262,7 +264,7 @@ explicit notation modes, and richer display contracts.
 - [x] Step 4: migrate Flutter app to that core session/state API and keep CLI on public core APIs only
 - [x] Step 5: refresh roadmap/docs/changelog/versioning only after executable validation is green
 
-#### v2.12.0 — Matrix Editor UX Refinement
+#### v0.2.120 — Matrix Editor UX Refinement
 
 - [x] Restrict the matrix editor order selector to direct `2x2`, `3x3`, and `4x4` choices for the supported educational workflow
 - [x] Preserve overlapping top-left cell values when switching order within the same draft session
@@ -281,7 +283,7 @@ explicit notation modes, and richer display contracts.
 - [x] Step 4: lock widget contracts for order controls, validation, quick actions, and keyboard edit/navigation behavior
 - [x] Step 5: add narrow emulator coverage for one `Infix` insert flow, one `RPN` push flow, and one invalid-cell recovery flow
 
-#### v2.13.0 — Matrix Row/Column List Editor UX
+#### v0.2.130 — Matrix Row/Column List Editor UX
 
 - [x] Add row-list and column-list editing affordances on top of the existing grid so structural edits remain visible as matrix operations, not hidden form state
 - [x] Support bounded `NxM` editing up to `4x4`, including add/remove row and add/remove column operations without breaking canonical literal serialization
@@ -301,20 +303,20 @@ explicit notation modes, and richer display contracts.
 
 ---
 
-## Stage 3 — "Canonical Matrix Stack Machine" (2.x.x → 3.0.0)
+## Stage 3 — "Canonical Matrix Stack Machine" (0.2.x → 0.3.0)
 
 Stage 3 is an architectural reset, not only an advanced-linear-algebra pass.
 The product is redefined around one canonical matrix stack machine in
 package:calculatrix, with infix treated as a convenience frontend and Matrix as
 an app shell mode instead of a modal editor.
 
-Current status: most kernel-level Stage 3 work is already merged on the `v2.x`
-line and the release gate is now closed: `v3.0.0` has aligned public docs,
+Current status: most kernel-level Stage 3 work is already merged on the `v0.2.x`
+line and the release gate is now closed: `v0.3.0` has aligned public docs,
 versioning, changelog entries, and green validation across core, app, and CLI.
 
 Companion specification: docs/spec/stage_3_matrix_stack_machine.md
 
-### v2.x.x → v3.0.0
+### v0.2.x → v0.3.0
 
 - [x] Reframe package:calculatrix around a public matrix stack machine kernel
 - [x] Expose typed public APIs for primitive commands and public macros
@@ -326,15 +328,15 @@ Companion specification: docs/spec/stage_3_matrix_stack_machine.md
 - [x] Add CLI parity for public commands, public macros, and infix convenience execution
 - [x] Refresh architecture, docs, and QA around the new canonical core model
 
-#### v2.14.0 — Stage 3 Closure and Release Hardening
+#### v0.2.140 — Stage 3 Closure and Release Hardening
 
 - [x] Fix the failing Matrix structural add-row interaction so compact affordances remain usable on the canonical integration target
 - [x] Complete end-to-end coverage for add-row, reorder-row, and one mixed row+column structural confirmation flow
 - [x] Resolve remaining Matrix shell release-polish regressions, including mode-accurate copy and shell-state feedback
 - [x] Keep direct RPN workflows aligned with the same public command vocabulary already exposed by core and CLI
 - [x] Refresh top-level docs and user guides around the matrix stack machine, public commands/macros, and the infix-over-stack contract
-- [x] Define and run the release-grade validation matrix for core, app, and CLI before the major-version cut
-- [x] Prepare `v3.0.0` release inputs only after executable validation is green: version bumps, changelog, and stable release notes
+- [x] Define and run the release-grade validation matrix for core, app, and CLI before the stage-closing stable cut
+- [x] Prepare `v0.3.0` release inputs only after executable validation is green: version bumps, changelog, and stable release notes
 
 ##### Execution Order
 
@@ -342,11 +344,11 @@ Companion specification: docs/spec/stage_3_matrix_stack_machine.md
 - [x] Step 2: repair Matrix structural hit-target/state issues and prove add-row plus reorder flows on the release target
 - [x] Step 3: add the missing mixed row+column structural confirmation flow and close remaining unstable app checks where practical
 - [x] Step 4: finish shell parity for RPN/Matrix command access and mode-accurate UI copy
-- [x] Step 5: refresh README/public docs, run release validation across core/app/cli, and then cut the `v3.0.0` release artifacts
+- [x] Step 5: refresh README/public docs, run release validation across core/app/cli, and then cut the `v0.3.0` release artifacts
 
-### v3.0.0 — Stable Release
+### v0.3.0 — Stable Release
 
-Release gate note: closed. The project now ships with aligned `v3.0.0`
+Release gate note: closed. The project now ships with aligned `v0.3.0`
 versioning, updated public docs, current changelog entries, and green
 validation across `code/core`, `code/cli`, and `code/app` including the
 Windows integration suite.
@@ -358,13 +360,13 @@ Entry criterion: satisfied.
 - [x] Matrix workstation replaces the modal editor and delegates real operations to public core commands or macros
 - [x] Public documentation for commands, macros, and the infix-over-stack contract
 
-### v3.x.x — Improvements and fixes on top of v3
+### v0.3.x — Improvements and fixes on top of v0.3
 
 - Additional command packs and workflow macros
 - Matrix workstation ergonomics and shell polish
 - CLI scripting and programmable-workflow improvements over the same public core command layer
 
-#### v3.0.1 — Calculator Interaction Corrections and Unified Keypad
+#### v0.3.1 — Calculator Interaction Corrections and Unified Keypad
 
 - [x] Make `√` act immediately in `Infix` when there is a committed value or a parseable active operand
 - [x] Add Casio-style `%` behavior in `Infix`, including `x%y = x*y/100`, bare-operand percent on evaluation, and pending binary percent translation while preserving public core `%` semantics in `RPN` and direct evaluation APIs
@@ -384,24 +386,24 @@ Entry criterion: satisfied.
 
 ---
 
-## Stage 4 — "Advanced Linear Algebra on Canonical Stack Kernel" (3.x.x → 4.0.0)
+## Stage 4 — "Advanced Linear Algebra on Canonical Stack Kernel" (0.3.x → 0.4.0)
 
 Stage 4 builds advanced linear algebra on top of the already-stable matrix
 stack machine and the Stage 3 shell/workstation architecture.
 
-Readiness gate: ready. Stage 3 is now declared stable at `v3.0.0`, so Stage 4
+Readiness gate: ready. Stage 3 is now declared stable at `v0.3.0`, so Stage 4
 can start on top of the canonical kernel and the validated three-mode shell.
 
-### v3.x.x → v4.0.0
+### v0.3.x → v0.4.0
 
 - [x] Determinant
 - [x] LU decomposition
 - [x] QR decomposition
-- [ ] Extend display and interaction polish for complex advanced matrix workflows
-- [ ] Extended linear algebra tests over the canonical stack kernel
-- [ ] End-to-end workflows combining matrix creation, notation switching, commands, macros, and advanced operations
+- [x] Extend display and interaction polish for complex advanced matrix workflows
+- [x] Extended linear algebra tests over the canonical stack kernel
+- [x] End-to-end workflows combining matrix creation, notation switching, commands, macros, and advanced operations
 
-#### v3.1.0 — Determinant on the Canonical Stack Kernel
+#### v0.3.10 — Determinant on the Canonical Stack Kernel
 
 - [x] Add public determinant support on `Matrix` while preserving the matrix-first scalar contract through `Matrix.scalar(...)` results
 - [x] Expose determinant through the typed command vocabulary so `CalculatrixMachine` and `CalculatrixSession` consumers can invoke it without private hooks
@@ -416,7 +418,7 @@ can start on top of the canonical kernel and the validated three-mode shell.
 - [x] Step 3: prove CLI and app consumer routing through focused widget and command tests
 - [x] Step 4: rerun the Windows integration suite with direct `DET` workflows before closing the slice
 
-#### v3.2.0 — LU and QR Decompositions on the Canonical Stack Kernel
+#### v0.3.20 — LU and QR Decompositions on the Canonical Stack Kernel
 
 - [x] Add public LU decomposition with partial pivoting and explicit `P`, `L`, `U` factors for square matrices
 - [x] Add public QR decomposition with thin `Q` and `R` factors for matrices with `rowCount >= columnCount`
@@ -432,12 +434,57 @@ can start on top of the canonical kernel and the validated three-mode shell.
 - [x] Step 3: route multi-result factorization commands through CLI `command` mode and the app `RPN` factorization deck
 - [x] Step 4: rerun focused widget and Windows integration validation for stack-expanding LU and QR workflows
 
-### v4.0.0 — Stable Release
+#### v0.3.21 — LU and QR Edge-Case Hardening
 
-- [ ] Calculator UX with canonical matrix shell modes and advanced linear algebra over the shared core
-- [ ] Advanced matrix operations documentation
+- [x] Lock LU reconstruction for zero-leading pivots so partial pivoting remains covered by tests
+- [x] Lock LU reconstruction for singular square matrices without changing stack result ordering
+- [x] Lock QR behavior for tall full-rank matrices and dependent columns under the public matrix-first contract
+- [x] Extend typed machine command tests for stack-expanding LU and QR edge cases
+- [x] Rerun focused core validation after the new linear-algebra hardening coverage
 
-### v4.x.x — Improvements and fixes on top of v4
+##### TDD Execution Order
+
+- [x] Step 1: add failing LU and QR tests for pivots, singular matrices, tall matrices, and dependent columns
+- [x] Step 2: rerun focused core validation to confirm whether implementation changes are required
+- [x] Step 3: close the slice as a patch release once the canonical kernel remains green
+
+#### v0.3.30 — Matrix Workstation Factorization Workflow Polish
+
+- [x] Expose a Matrix-mode factorization deck when the workstation is entered from `RPN`
+- [x] Allow valid Matrix drafts to dispatch LU and QR directly onto the canonical stack and return to the `RPN` shell
+- [x] Keep Matrix deck availability mode-aware so stack-expanding workflows only appear when the underlying entry mode can represent them
+- [x] Add focused widget and Windows integration coverage for Matrix-to-factorization workflows
+- [x] Bump coordinated versions and refresh release-facing docs for the Stage 4 shell-polish slice
+
+##### TDD Execution Order
+
+- [x] Step 1: lock Matrix-mode `RPN` workflows in app widget and integration tests before wiring the new factorization path
+- [x] Step 2: route LU and QR from the embedded Matrix workstation back into the canonical stack shell without changing core semantics
+- [x] Step 3: rerun focused widget and Windows integration validation before closing the slice
+
+#### v0.3.31 — Stage 4 End-to-End Workflow Coverage
+
+- [x] Lock a full Stage 4 shell workflow that combines Matrix creation, an `RPN` macro, QR factorization, and notation switching
+- [x] Prove that the canonical current value remains coherent when returning from advanced `RPN` workflows to `Infix`
+- [x] Close the remaining Stage 4 end-to-end workflow checklist item with focused Windows integration coverage
+- [x] Bump coordinated versions and refresh release-facing docs for the patch slice
+
+##### TDD Execution Order
+
+- [x] Step 1: add a failing Windows integration test for a combined Matrix -> macro -> QR -> Infix workflow
+- [x] Step 2: align the assertion with the existing empty-expression chrome once the behavior is confirmed end-to-end
+- [x] Step 3: rerun the focused integration path and only then close the Stage 4 checklist item
+
+### v0.4.0 — Stable Release
+
+- [x] Calculator UX with canonical matrix shell modes and advanced linear algebra over the shared core
+- [x] Advanced matrix operations documentation
+
+Release gate note: closed. Stage 4 now ships with determinant, LU, QR,
+Matrix-workstation factorization workflows, and end-to-end validation across
+core, CLI, and app.
+
+### v0.4.x — Improvements and fixes on top of v0.4
 
 - Eigenvalues / eigenvectors (backlog)
 - Additional factorizations beyond LU/QR

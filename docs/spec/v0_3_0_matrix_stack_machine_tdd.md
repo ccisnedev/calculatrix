@@ -1,17 +1,17 @@
-# v3.0.0 Matrix Stack Machine TDD Plan
+# v0.3.0 Matrix Stack Machine TDD Plan
 
 Status: Draft
 Owner: Calculatrix maintainers
-Target release: v3.0.0
+Target release: v0.3.0
 Primary package: calculatrix
 Primary surfaces: code/core, code/app, code/cli
-Companion release specification: docs/spec/v3_0_0_matrix_stack_machine.md
-Companion API specification: docs/spec/v3_0_0_matrix_stack_machine_api.md
+Companion release specification: docs/spec/v0_3_0_matrix_stack_machine.md
+Companion API specification: docs/spec/v0_3_0_matrix_stack_machine_api.md
 Companion stage specification: docs/spec/stage_3_matrix_stack_machine.md
 
 ## 1. Purpose
 
-This document translates the v3.0.0 release specification into an executable
+This document translates the v0.3.0 release specification into an executable
 TDD plan.
 
 The goal is to land the matrix stack machine architecture without drifting into
@@ -19,7 +19,7 @@ UI-first implementation or app-local semantics.
 
 ## 2. Current Implementation Anchors
 
-The current code already contains useful seams, but they represent the late-v2
+The current code already contains useful seams, but they represent the late-v0.2
 model and must be treated as starting points rather than final architecture.
 
 ### 2.1 Core anchors
@@ -459,9 +459,9 @@ Expected implementation impact:
 2. CLI smoke tests
 3. final release QA script updates if needed
 
-## 6. Definition of Done for v3.0.0 TDD
+## 6. Definition of Done for v0.3.0 TDD
 
-v3.0.0 is not done until all of the following are green.
+v0.3.0 is not done until all of the following are green.
 
 1. Core command and macro contracts.
 2. Infix compilation parity.
@@ -488,7 +488,7 @@ Assessment: ready to begin TDD.
 
 Why:
 
-1. The v3 release contract is explicit.
+1. The v0.3 release contract is explicit.
 2. The public API target is explicit.
 3. The slice order is explicit.
 4. The Stage 4 boundary is explicit.
