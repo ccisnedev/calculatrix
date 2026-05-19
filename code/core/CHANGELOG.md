@@ -4,6 +4,26 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.6] - 2026-05-19
+
+### Added
+
+- **Formal mathematical specification** (`docs/spec/calculatrix_mathematics.md`)
+  covering the normative model of the engine:
+  - scalar-as-`1x1` embedding
+  - complex-as-`2x2` embedding
+  - matrix-first operator semantics and scalar promotion law
+  - numerical policy and determinism criteria
+  - formal contracts/limits for `sqrt`, `exp`, `log`, `svd`, eigen and
+    decomposition workflows
+  - proof-oriented worked examples (Euler identity, conjugation, spectral
+    invariant behind SVD)
+
+### Documentation
+
+- Establishes a concrete and complete mathematical baseline for pre-publication
+  validation in subsequent release gates.
+
 ## [0.6.5] - 2026-05-19
 
 ### Added

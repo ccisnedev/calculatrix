@@ -936,14 +936,18 @@ New layout:
 
 ### v0.6.6 — Concrete mathematical documentation (complete, no fluff)
 
-- [ ] Publish full mathematical specification of the engine:
+- [x] Publish full mathematical specification of the engine:
   scalar-as-`1x1`, complex-as-`2x2`, matrix-first operator semantics
-- [ ] Document numerical policy (absolute/relative tolerance, convergence
+- [x] Document numerical policy (absolute/relative tolerance, convergence
   criteria, determinism expectations)
-- [ ] Document formal contracts and limits for `sqrt`, `exp`, `log`, `svd`,
+- [x] Document formal contracts and limits for `sqrt`, `exp`, `log`, `svd`,
   eigen workflows, and decomposition APIs
-- [ ] Add proof-oriented worked examples (Euler identity, conjugation,
+- [x] Add proof-oriented worked examples (Euler identity, conjugation,
   spectral decomposition invariants)
+
+Reference artifact:
+
+- [x] `docs/spec/calculatrix_mathematics.md`
 
 Release gate before publication planning:
 
