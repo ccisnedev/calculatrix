@@ -28,6 +28,14 @@ final class Diagonalization {
   final Matrix d;
 }
 
+final class SvdDecomposition {
+  const SvdDecomposition({required this.u, required this.s, required this.vT});
+
+  final Matrix u;
+  final Matrix s;
+  final Matrix vT;
+}
+
 class Matrix {
   Matrix(List<List<double>> rows) : _rows = _normalize(rows) {
     _validateRectangular(_rows);
@@ -1506,6 +1514,151 @@ class Matrix {
     }
 
     return result;
+  }
+
+  /// Computes the principal matrix logarithm.
+  ///
+  /// Scalar domain:
+  /// - log(x) for x > 0 returns scalar ln(x)
+  /// - log(x) for x < 0 returns the complex-form matrix ln(|x|) + π·i
+  /// - log(0) is undefined
+  ///
+  /// Complex-form 2x2 matrices use the principal branch:
+  /// log(a + bi) = ln(r) + θ·i, where r = sqrt(a² + b²), θ = atan2(b, a)
+  Matrix log({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    _requireSquare(operation: 'logarithm');
+
+    if (isScalar) {
+      final double source = scalarValue;
+      if (source == 0) {
+        throw MatrixDomainError(
+          'Logarithm is undefined for zero in the real domain.',
+        );
+      }
+      if (source > 0) {
+        return Matrix.scalar(math.log(source));
+      }
+      return Matrix.complex(math.log(-source), math.pi);
+    }
+
+    if (isComplexForm) {
+      final double a = realPart;
+      final double b = imagPart;
+      final double radius = math.sqrt((a * a) + (b * b));
+
+      if (radius <= absoluteTolerance) {
+        throw MatrixDomainError(
+          'Logarithm is undefined for zero magnitude in the complex domain.',
+        );
+      }
+
+      final double angle = math.atan2(b, a);
+      return Matrix.complex(math.log(radius), angle);
+    }
+
+    final Diagonalization decomposition = diagonalization(
+      absoluteTolerance: absoluteTolerance,
+    );
+
+    final List<List<double>> logDiagonal = List<List<double>>.generate(
+      rowCount,
+      (int row) => List<double>.filled(rowCount, 0, growable: false),
+      growable: false,
+    );
+
+    for (int index = 0; index < rowCount; index++) {
+      final double eigenvalue = decomposition.d.at(index, index);
+      if (eigenvalue <= absoluteTolerance) {
+        throw MatrixDomainError(
+          'Logarithm is undefined for matrices with non-positive eigenvalues '
+          'in the real domain.',
+        );
+      }
+      logDiagonal[index][index] = math.log(eigenvalue);
+    }
+
+    final Matrix p = decomposition.p;
+    return p * Matrix(logDiagonal) * p.inverse();
+  }
+
+  /// Computes a matrix-first singular value decomposition.
+  ///
+  /// Returns matrices (U, S, Vᵀ) such that A ≈ U·S·Vᵀ, where S is diagonal
+  /// with non-negative singular values sorted in descending order.
+  SvdDecomposition svd({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    final Matrix ata = transpose() * this;
+    final Diagonalization decomposition = ata.diagonalization(
+      absoluteTolerance: absoluteTolerance,
+    );
+
+    final Matrix v = decomposition.p;
+    final Matrix vT = v.transpose();
+    final int n = columnCount;
+
+    final List<double> singularValues = List<double>.generate(
+      n,
+      (int index) {
+        final double lambda = decomposition.d.at(index, index);
+        if (lambda <= absoluteTolerance) {
+          return 0;
+        }
+        return math.sqrt(lambda);
+      },
+      growable: false,
+    );
+
+    final List<List<double>> sRows = List<List<double>>.generate(
+      n,
+      (int row) => List<double>.generate(
+        n,
+        (int column) => row == column ? singularValues[row] : 0,
+        growable: false,
+      ),
+      growable: false,
+    );
+
+    final List<List<double>> uRows = List<List<double>>.generate(
+      rowCount,
+      (_) => List<double>.filled(n, 0, growable: false),
+      growable: false,
+    );
+
+    for (int column = 0; column < n; column++) {
+      final List<double> vColumn = List<double>.generate(
+        n,
+        (int row) => v.at(row, column),
+        growable: false,
+      );
+
+      if (singularValues[column] <= absoluteTolerance) {
+        continue;
+      }
+
+      final Matrix projected = this * Matrix(
+        vColumn
+            .map((double value) => <double>[value])
+            .toList(growable: false),
+      );
+      final double sigma = singularValues[column];
+      for (int row = 0; row < rowCount; row++) {
+        final double normalized = projected.at(row, 0) / sigma;
+        uRows[row][column] = normalized.abs() <= absoluteTolerance
+            ? 0
+            : normalized;
+      }
+    }
+
+    return SvdDecomposition(
+      u: Matrix(uRows),
+      s: Matrix(sRows),
+      vT: vT,
+    );
   }
 
   Matrix transpose() {

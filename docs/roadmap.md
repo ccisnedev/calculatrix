@@ -857,6 +857,11 @@ A complex number $a + bi$ is the matrix $aI + bJ = [[a, -b], [b, a]]$. All exist
 (multiplication, inverse, determinant, transpose) naturally yield correct complex
 arithmetic without a separate Complex type.
 
+Design position for this stage: representing scalars as `1x1` matrices is a
+conscious decision to preserve a native matrix engine and support pedagogical,
+formal mathematical rigor. For this product line, rigor and coherence have
+priority over micro-performance.
+
 ### v0.6.0 — Imaginary unit constant and algebraic verification
 
 - [x] Add `Matrix.i` static constant: `[[0, -1], [1, 0]]`
@@ -920,6 +925,30 @@ New layout:
 - [x] Verify Euler's formula: `e^(πi) + I = 0` (comprehensive test suite)
 - [ ] Polar form display: for complex `a + bi`, show as `r∠θ` (deferred)
 - [ ] Complex logarithm button (deferred)
+
+### v0.6.5 — Missing mathematical features (formal core first)
+
+- [x] Implement `Matrix.log()` (principal matrix logarithm)
+- [x] Implement `Matrix.svd()` (singular value decomposition)
+- [x] Add exhaustive TDD for `log` and `svd` contracts, numerical edge cases,
+  and regression coverage across existing matrix operations
+- [x] Validate app/CLI parity for new core operations (no consumer-side math forks)
+
+### v0.6.6 — Concrete mathematical documentation (complete, no fluff)
+
+- [ ] Publish full mathematical specification of the engine:
+  scalar-as-`1x1`, complex-as-`2x2`, matrix-first operator semantics
+- [ ] Document numerical policy (absolute/relative tolerance, convergence
+  criteria, determinism expectations)
+- [ ] Document formal contracts and limits for `sqrt`, `exp`, `log`, `svd`,
+  eigen workflows, and decomposition APIs
+- [ ] Add proof-oriented worked examples (Euler identity, conjugation,
+  spectral decomposition invariants)
+
+Release gate before publication planning:
+
+- [ ] Complete full pre-publication validation suite (core + app + cli tests,
+  analyze/lint, integration/smoke) and only then evaluate publication readiness
 
 ---
 

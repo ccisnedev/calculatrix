@@ -4,6 +4,25 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.5] - 2026-05-19
+
+### Added
+
+- **`Matrix.log()` method**: principal matrix logarithm with matrix-first
+  semantics. Supports:
+  - positive scalars: `log(x) = ln(x)`
+  - negative scalars: complex principal value as `ln(|x|) + π·i`
+  - complex-form matrices `[[a,-b],[b,a]]`: principal branch
+    `log(a+bi) = ln(r) + θ·i`
+  - diagonalizable real-domain square matrices with positive spectrum
+- **`Matrix.svd()` method** returning `SvdDecomposition(u, s, vT)` with
+  reconstruction contract `A ≈ U·S·Vᵀ` and non-negative descending singular
+  values in `S`.
+- **New v0.6.5 test suite** (`matrix_log_svd_test.dart`): 10 tests covering
+  logarithm domain/branch behavior, `exp(log(A))` round-trip on positive
+  diagonal matrices, SVD reconstruction for square/rectangular matrices,
+  singular value ordering, and zero-matrix behavior.
+
 ## [0.6.4] - 2026-05-19
 
 ### Added

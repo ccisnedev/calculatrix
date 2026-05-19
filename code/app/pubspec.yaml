@@ -1,7 +1,7 @@
 name: calculatrix_app
 description: "RPN Matrix calculator app"
 publish_to: 'none'
-version: 0.6.4+26
+version: 0.6.5+27
 
 environment:
   sdk: ^3.11.5
