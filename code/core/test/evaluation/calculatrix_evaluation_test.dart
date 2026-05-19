@@ -294,11 +294,14 @@ void main() {
       );
     });
 
-    test('throws matrix domain error for sqrt of negative scalar', () {
-      expect(
-        () => Calculatrix.evaluateInfix('√(-4)'),
-        throwsA(isA<MatrixDomainError>()),
-      );
+    test('sqrt of negative scalar returns scaled imaginary unit', () {
+      final result = Calculatrix.evaluateInfix('√(-4)');
+      expect(result, Matrix.i.scale(2));
+    });
+
+    test('sqrt of -1 returns imaginary unit J', () {
+      final result = Calculatrix.evaluateInfix('√(-1)');
+      expect(result, Matrix.i);
     });
   });
 }

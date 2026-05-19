@@ -357,14 +357,15 @@ void main() {
       expect(controller.result, '0.5');
     });
 
-    test('sqrt of negative shows Error', () {
+    test('sqrt of negative returns scaled imaginary unit', () {
       controller.input('√');
       controller.input('(');
       controller.input('-');
       controller.input('4');
       controller.input(')');
       controller.evaluate();
-      expect(controller.display, 'Error');
+      // sqrt(-4) = 2i — displayed in complex notation, not raw matrix literal
+      expect(controller.result, '2i');
     });
   });
 

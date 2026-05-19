@@ -415,6 +415,8 @@ class CalculatrixSession {
     switch (value) {
       case '√':
         return _applyImmediateInfixUnary(_sqrtValue);
+      case 'INV':
+        return _applyImmediateInfixUnary(_invertValue);
       case '%':
         return _queueInfixPercent();
       default:
@@ -494,7 +496,14 @@ class CalculatrixSession {
 
     final Matrix? operand = _tryParseOperand(_infixDraft);
     if (operand != null) {
-      return _rewriteInfixDraftValue(transform(operand));
+      try {
+        return _rewriteInfixDraftValue(transform(operand));
+      } on FormatException catch (error) {
+        _lastError = error;
+      } on CalculatrixError catch (error) {
+        _lastError = error;
+      }
+      return true;
     }
 
     return false;
@@ -755,6 +764,10 @@ class CalculatrixSession {
 
   Matrix _sqrtValue(Matrix value) {
     return value.sqrt();
+  }
+
+  Matrix _invertValue(Matrix value) {
+    return value.inverse();
   }
 
   String _normalizeSessionPercentExpression(String expression) {

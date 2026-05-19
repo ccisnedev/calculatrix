@@ -223,13 +223,17 @@ class CalculatorController extends ChangeNotifier {
 
     if (_session.mode == CalculatrixMode.rpn) {
       _displayMatrix = currentValue;
-      _result = _session.rpnTopLiteral;
+      _result = currentValue.isComplexForm
+          ? MatrixDisplayFormatter.complex(currentValue)
+          : _session.rpnTopLiteral;
       return;
     }
 
-    _displayMatrix = currentValue.isScalar ? null : currentValue;
+    _displayMatrix = (currentValue.isScalar || currentValue.isComplexForm) ? null : currentValue;
     _result = currentValue.isScalar
         ? _formatResult(currentValue.scalarValue)
-        : MatrixDisplayFormatter.compact(currentValue);
+        : currentValue.isComplexForm
+            ? MatrixDisplayFormatter.complex(currentValue)
+            : MatrixDisplayFormatter.compact(currentValue);
   }
 }

@@ -81,6 +81,26 @@ class Matrix {
     );
   }
 
+  /// The imaginary unit as a 2×2 real matrix: `[[0, -1], [1, 0]]`.
+  ///
+  /// Satisfies `i² = -I`, providing a faithful matrix representation of
+  /// complex numbers within real linear algebra (Gauss's "lateral unit").
+  static final Matrix i = Matrix(<List<double>>[
+    <double>[0, -1],
+    <double>[1, 0],
+  ]);
+
+  /// Creates the complex number `re + im·i` as a 2×2 matrix `re·I₂ + im·J`.
+  ///
+  /// The result has the form `[[re, -im], [im, re]]`, which is the standard
+  /// matrix representation of complex numbers in the subalgebra `{aI + bJ}`.
+  factory Matrix.complex(double re, double im) {
+    return Matrix(<List<double>>[
+      <double>[re, -im],
+      <double>[im, re],
+    ]);
+  }
+
   /// Hilbert matrix of order [n]: `H(i,j) = 1/(i+j+1)`.
   /// Canonical ill-conditioned test matrix with κ(H_n) growing exponentially.
   factory Matrix.hilbert(int n) {
@@ -151,6 +171,38 @@ class Matrix {
   bool get isSquare => rowCount == columnCount;
 
   bool get isScalar => rowCount == 1 && columnCount == 1;
+
+  /// Whether this matrix is in complex form: `[[a, -b], [b, a]]`.
+  ///
+  /// A 2×2 matrix is in complex form iff `M[0,0] == M[1,1]` and
+  /// `M[0,1] == -M[1,0]`, which is necessary and sufficient for the matrix
+  /// to belong to the subalgebra `{aI + bJ}` isomorphic to ℂ.
+  bool get isComplexForm {
+    if (rowCount != 2 || columnCount != 2) return false;
+    final double tol = CalculatrixNumericPolicy.defaultAbsoluteTolerance;
+    return (_rows[0][0] - _rows[1][1]).abs() < tol &&
+        (_rows[0][1] + _rows[1][0]).abs() < tol;
+  }
+
+  /// The real part of a complex-form matrix: the `a` in `aI + bJ`.
+  ///
+  /// Throws [MatrixDomainError] if [isComplexForm] is false.
+  double get realPart {
+    if (!isComplexForm) {
+      throw MatrixDomainError('Matrix is not in complex form [[a,-b],[b,a]].');
+    }
+    return _rows[0][0];
+  }
+
+  /// The imaginary part of a complex-form matrix: the `b` in `aI + bJ`.
+  ///
+  /// Throws [MatrixDomainError] if [isComplexForm] is false.
+  double get imagPart {
+    if (!isComplexForm) {
+      throw MatrixDomainError('Matrix is not in complex form [[a,-b],[b,a]].');
+    }
+    return _rows[1][0];
+  }
 
   double get scalarValue {
     if (!isScalar) {
@@ -1355,7 +1407,7 @@ class Matrix {
     if (isScalar) {
       final double source = scalarValue;
       if (source < 0) {
-        throw MatrixDomainError('Square root of negative scalar is undefined.');
+        return Matrix.i.scale(math.sqrt(-source));
       }
       return Matrix.scalar(math.sqrt(source));
     }

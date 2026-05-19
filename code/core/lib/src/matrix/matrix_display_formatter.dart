@@ -72,4 +72,30 @@ class MatrixDisplayFormatter {
     }
     return text;
   }
+
+  /// Formats a complex-form matrix as `a + bi` or `a - bi`.
+  ///
+  /// Requires [matrix] to satisfy [Matrix.isComplexForm].
+  /// Returns the standard mathematical notation for complex numbers,
+  /// using Gauss's "lateral unit" terminology when displayed.
+  static String complex(Matrix matrix) {
+    final double re = matrix.realPart;
+    final double im = matrix.imagPart;
+
+    final String reStr = _formatNumber(re);
+
+    if (im == 0) {
+      return reStr;
+    }
+
+    final String imAbs = _formatNumber(im.abs());
+    final String sign = im < 0 ? ' - ' : ' + ';
+    final String imStr = imAbs == '1' ? 'i' : '${imAbs}i';
+
+    if (re == 0) {
+      return im < 0 ? '-$imStr' : imStr;
+    }
+
+    return '$reStr$sign$imStr';
+  }
 }

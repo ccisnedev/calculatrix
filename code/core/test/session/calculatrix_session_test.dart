@@ -101,6 +101,19 @@ void main() {
       expect(session.currentValue, Matrix.scalar(13));
     });
 
+    test('sqrt of negative bare operand returns imaginary unit', () {
+      session.input('1');
+      session.toggleSign();
+
+      session.input('√');
+
+      expect(session.hasError, isFalse);
+      expect(session.expression, '[[0,-1],[1,0]]');
+
+      session.evaluate();
+      expect(session.currentValue, Matrix.i);
+    });
+
     test('sqrt applies immediately to the committed infix value', () {
       session.input('1');
       session.input('4');

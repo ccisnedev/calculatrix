@@ -839,6 +839,86 @@ Scope:
 - [x] Add hover/focus feedback to deck selector tabs
 - [x] Run widget tests and integration tests confirming no regressions
 
+#### v0.5.6 — Infix sqrt error handling and RPN keypad fix
+
+- [x] Fix uncaught `MatrixDomainError` in `_rewriteInfixDraftUnary` when applying
+  √ to a negative bare operand in Infix mode (now shows "Error")
+- [x] Move √ and % to RPN MAIN deck for immediate access (were in STACK deck)
+- [x] Add core test: `sqrt of negative bare operand sets error instead of throwing`
+- [x] Update widget test to cover direct sqrt(-1) without ENTER
+
+---
+
+## Stage 6 — "Lateral Numbers" (0.6.x)
+
+Complex number support via Gauss's matrix representation. The imaginary unit $i$
+is encoded as the 2×2 real matrix $J = [[0, -1], [1, 0]]$ satisfying $J^2 = -I$.
+A complex number $a + bi$ is the matrix $aI + bJ = [[a, -b], [b, a]]$. All existing matrix operations
+(multiplication, inverse, determinant, transpose) naturally yield correct complex
+arithmetic without a separate Complex type.
+
+### v0.6.0 — Imaginary unit constant and algebraic verification
+
+- [x] Add `Matrix.i` static constant: `[[0, -1], [1, 0]]`
+- [x] Test suite verifying all imaginary unit axioms:
+  - $i^2 = -I$, $i^3 = -i$, $i^4 = I$ (periodicity)
+  - $\det(i) = 1$ (unit norm)
+  - $i^{-1} = -i$, $i^T = -i$
+  - Complex multiplication: $(aI + bi)(cI + di) = (ac-bd)I + (ad+bc)i$
+  - Commutativity, distributivity
+  - Conjugate via transpose: $(aI + bJ)^T = aI - bJ$
+  - Modulus: $z \cdot z^* = |z|^2 I$
+  - Matrix form: $aI + bJ = [[a, -b], [b, a]]$
+
+### v0.6.1 — 5-column keypad layout
+
+Restructure the fixed button grid from 4 to 5 columns, integrating essential
+operations (√, INV, ⌫, ENTER) into the permanent grid instead of requiring
+deck navigation.
+
+New layout:
+```
+ 7   8   9   ÷   INV
+ 4   5   6   ×    √
+ 1   2   3   -    ⌫
+ 0   .   ±   +  ENTER
+```
+
+- [x] Change `_columnCount` from 4 to 5
+- [x] Update `_fixedBottomButtons` to include 5th column (INV, √, ⌫, ENTER)
+- [x] Move ± into fixed grid (row 4, col 3); remove from deck
+- [x] Move ENTER to 5th column (row 4, col 5)
+- [x] Adjust `_shellMaxWidth` for wider grid
+- [x] Update deck definitions (remove buttons now in fixed grid)
+- [x] Add INV as immediate unary operation in Infix mode
+- [x] Label button as `=` in Infix and `ENTER` in RPN
+- [x] Update widget tests for new button positions
+
+### v0.6.2 — sqrt(-1) returns Matrix.i
+
+- [x] Change `Matrix.squareRoot()` to return `Matrix.i` for scalar -1
+- [x] Generalize: sqrt of negative scalar $-k$ returns $\sqrt{k} \cdot i$
+- [x] Add I and J preset buttons in matrix editor EDIT deck
+- [x] Add `Matrix.isComplexForm` getter (detects $[[a,-b],[b,a]]$ pattern)
+- [x] Add `Matrix.realPart` / `Matrix.imagPart` extraction
+- [x] Add `Matrix.complex(double re, double im)` factory
+- [x] Update display formatting: show `a + bi` when matrix matches complex form
+
+### v0.6.3 — Complex arithmetic in calculator
+
+- [ ] Add `i` button to keypad (Infix and RPN)
+- [ ] Scalar promotion: when adding 1×1 to 2×2, promote scalar to $k \cdot I_2$
+- [ ] Input `3+2i` parsed as `3I + 2J` internally
+- [ ] Display complex results in `a + bi` notation
+- [ ] Complex conjugate operation (via transpose)
+
+### v0.6.4 — Complex functions (planned)
+
+- [ ] Complex exponential via matrix exponential: $e^{θi}$
+- [ ] Euler's formula verification: $e^{πi} + I = 0$
+- [ ] Complex logarithm
+- [ ] Polar form display: $r∠θ$
+
 ---
 
 ## General Backlog

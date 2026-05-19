@@ -154,7 +154,7 @@ Future<void> _enterMatrixCell(
 Future<void> _tapMatrixAction(WidgetTester tester, String label) async {
   switch (label) {
     case 'Insert':
-      await _tapCalculatorButton(tester, 'ENTER');
+      await _tapCalculatorButton(tester, '=');
       return;
     case 'Push':
       await _tapCalculatorButton(tester, 'ENTER');
@@ -192,7 +192,7 @@ void main() {
         '7', '8', '9', '×',
         '4', '5', '6', '-',
         '1', '2', '3', '+',
-        '±', '.', 'ENTER', 'MAT', '(', ')',
+        '±', '.', '=', 'MAT', '(', ')', 'INV', '⌫', 'ID',
       ];
       for (final label in expected) {
         await _ensureCalculatorButtonVisible(tester, label);
@@ -224,7 +224,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('4'));
       await tester.pump();
-      await tester.tap(find.text('ENTER'));
+      await tester.tap(find.text('='));
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 7')),
@@ -261,6 +261,24 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('sqrt of negative number returns imaginary unit', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+      // Enter 1, negate it to -1, apply sqrt directly (no =)
+      await tester.tap(find.text('1'));
+      await tester.pump();
+      await _tapCalculatorButton(tester, '±');
+      await tester.pump();
+      await _tapCalculatorButton(tester, '√');
+      await tester.pump();
+      // Should show the matrix literal in expression
+      expect(
+        find.bySemanticsLabel(RegExp(r'Expression: \[\[0,-1\],\[1,0\]\]')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
     testWidgets('operator buttons work', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
@@ -270,7 +288,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('2'));
       await tester.pump();
-      await tester.tap(find.text('ENTER'));
+      await tester.tap(find.text('='));
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 16')),
@@ -288,7 +306,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('%'));
       await tester.pump();
-      await tester.tap(find.text('ENTER'));
+      await tester.tap(find.text('='));
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 0\.5')),
@@ -310,7 +328,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('0'));
       await tester.pump();
-      await tester.tap(find.text('ENTER'));
+      await tester.tap(find.text('='));
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 6')),
@@ -334,7 +352,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('%'));
       await tester.pump();
-      await tester.tap(find.text('ENTER'));
+      await tester.tap(find.text('='));
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 56')),
@@ -414,25 +432,16 @@ void main() {
       expect(find.text('Infix entry'), findsNothing);
     });
 
-    testWidgets('switches infix keypad decks while keeping the fixed numeric layout', (tester) async {
+    testWidgets('infix keypad exposes all controls in a single deck', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       expect(_calculatorButton('7'), findsOneWidget);
-      expect(_calculatorButton('ENTER'), findsOneWidget);
-
-      await tester.tap(_keypadDeckSelector('MEM'));
-      await tester.pumpAndSettle();
-
+      expect(_calculatorButton('='), findsOneWidget);
       expect(_calculatorButton('MC'), findsOneWidget);
       expect(_calculatorButton('MR'), findsOneWidget);
-
-      await tester.tap(_keypadDeckSelector('MAIN'));
-      await tester.pumpAndSettle();
-
       expect(_calculatorButton('('), findsOneWidget);
       expect(_calculatorButton('⌫'), findsOneWidget);
-      expect(_calculatorButton('7'), findsOneWidget);
-      expect(_calculatorButton('ENTER'), findsOneWidget);
+      expect(_calculatorButton('INV'), findsOneWidget);
     });
 
     testWidgets('rpn mode exposes stack actions from the stack deck', (tester) async {
@@ -471,7 +480,7 @@ void main() {
 
       expect(find.text('Matrix editor'), findsNothing);
       expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsOneWidget);
-      expect(_calculatorButton('ENTER'), findsOneWidget);
+      expect(_calculatorButton('='), findsOneWidget);
       expect(_rowTab(0), findsOneWidget);
       expect(_rowTab(1), findsOneWidget);
       expect(_columnTab(0), findsOneWidget);
@@ -1039,7 +1048,7 @@ void main() {
 
       await _ensureCalculatorButtonVisible(tester, 'MAT');
       expect(_calculatorButton('MAT'), findsWidgets);
-      expect(_calculatorButton('ENTER'), findsOneWidget);
+      expect(_calculatorButton('='), findsOneWidget);
 
       await _tapMatrixAction(tester, 'Insert');
 
@@ -1382,7 +1391,7 @@ void main() {
       await _enterMatrixCell(tester, 1, 1, '6');
       await _tapMatrixAction(tester, 'Insert');
 
-      await tester.tap(find.text('ENTER'));
+      await tester.tap(find.text('='));
       await tester.pumpAndSettle();
 
       expect(

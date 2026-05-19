@@ -58,9 +58,9 @@ class _CalculatorViewState extends State<CalculatorView> {
   final GlobalKey<_MatrixEditorDialogState> _matrixEditorKey =
       GlobalKey<_MatrixEditorDialogState>();
 
-  static const int _columnCount = 4;
+  static const int _columnCount = 5;
   static const int _rowCount = 6;
-  static const double _shellMaxWidth = 420;
+  static const double _shellMaxWidth = 480;
   static const double _displayFraction = 0.38196601125;
   static const double _pagePadding = 12;
   static const double _gridSpacing = 8;
@@ -75,40 +75,36 @@ class _CalculatorViewState extends State<CalculatorView> {
     _ButtonDef('8', _ButtonCategory.number),
     _ButtonDef('9', _ButtonCategory.number),
     _ButtonDef('÷', _ButtonCategory.operator),
+    _ButtonDef('INV', _ButtonCategory.function),
     _ButtonDef('4', _ButtonCategory.number),
     _ButtonDef('5', _ButtonCategory.number),
     _ButtonDef('6', _ButtonCategory.number),
     _ButtonDef('×', _ButtonCategory.operator),
+    _ButtonDef('√', _ButtonCategory.function),
     _ButtonDef('1', _ButtonCategory.number),
     _ButtonDef('2', _ButtonCategory.number),
     _ButtonDef('3', _ButtonCategory.number),
     _ButtonDef('-', _ButtonCategory.operator),
+    _ButtonDef('⌫', _ButtonCategory.function),
     _ButtonDef('0', _ButtonCategory.number),
     _ButtonDef('.', _ButtonCategory.number),
-    _ButtonDef('ENTER', _ButtonCategory.equals),
+    _ButtonDef('±', _ButtonCategory.function),
     _ButtonDef('+', _ButtonCategory.operator),
+    _ButtonDef('ENTER', _ButtonCategory.equals),
   ];
 
   static const List<_KeypadDeckDef> _infixDecks = <_KeypadDeckDef>[
     _KeypadDeckDef('MAIN', <_ButtonDef>[
       _ButtonDef('MAT', _ButtonCategory.function),
       _ButtonDef('C', _ButtonCategory.function),
-      _ButtonDef('⌫', _ButtonCategory.function),
-      _ButtonDef('±', _ButtonCategory.function),
-      _ButtonDef('√', _ButtonCategory.function),
       _ButtonDef('%', _ButtonCategory.function),
       _ButtonDef('(', _ButtonCategory.function),
       _ButtonDef(')', _ButtonCategory.function),
-    ]),
-    _KeypadDeckDef('MEM', <_ButtonDef>[
       _ButtonDef('MC', _ButtonCategory.function),
       _ButtonDef('MR', _ButtonCategory.function),
       _ButtonDef('M-', _ButtonCategory.function),
       _ButtonDef('M+', _ButtonCategory.function),
-      _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('(', _ButtonCategory.function),
-      _ButtonDef(')', _ButtonCategory.function),
-      _ButtonDef('±', _ButtonCategory.function),
+      _ButtonDef('ID', _ButtonCategory.function),
     ]),
   ];
 
@@ -116,12 +112,14 @@ class _CalculatorViewState extends State<CalculatorView> {
     _KeypadDeckDef('MAIN', <_ButtonDef>[
       _ButtonDef('MAT', _ButtonCategory.function),
       _ButtonDef('C', _ButtonCategory.function),
-      _ButtonDef('⌫', _ButtonCategory.function),
-      _ButtonDef('±', _ButtonCategory.function),
-      _ButtonDef('MC', _ButtonCategory.function),
+      _ButtonDef('%', _ButtonCategory.function),
       _ButtonDef('MR', _ButtonCategory.function),
-      _ButtonDef('M-', _ButtonCategory.function),
       _ButtonDef('M+', _ButtonCategory.function),
+      _ButtonDef('DUP', _ButtonCategory.function),
+      _ButtonDef('DROP', _ButtonCategory.function),
+      _ButtonDef('SWAP', _ButtonCategory.function),
+      _ButtonDef('OVER', _ButtonCategory.function),
+      _ButtonDef('ROT', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('STACK', <_ButtonDef>[
       _ButtonDef('DUP', _ButtonCategory.function),
@@ -129,19 +127,23 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('SWAP', _ButtonCategory.function),
       _ButtonDef('OVER', _ButtonCategory.function),
       _ButtonDef('ROT', _ButtonCategory.function),
-      _ButtonDef('√', _ButtonCategory.function),
-      _ButtonDef('%', _ButtonCategory.function),
       _ButtonDef('NEG', _ButtonCategory.function),
+      _ButtonDef('MC', _ButtonCategory.function),
+      _ButtonDef('M-', _ButtonCategory.function),
+      _ButtonDef('M+', _ButtonCategory.function),
+      _ButtonDef('MR', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('MATRIX', <_ButtonDef>[
       _ButtonDef('T', _ButtonCategory.function),
-      _ButtonDef('INV', _ButtonCategory.function),
       _ButtonDef('DET', _ButtonCategory.function),
       _ButtonDef('ZEROS', _ButtonCategory.function),
       _ButtonDef('ONES', _ButtonCategory.function),
       _ButtonDef('AROW', _ButtonCategory.function),
       _ButtonDef('ACOL', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
+      _ButtonDef('NEG', _ButtonCategory.function),
+      _ButtonDef('MC', _ButtonCategory.function),
+      _ButtonDef('M-', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('FACT', <_ButtonDef>[
       _ButtonDef('LU', _ButtonCategory.function),
@@ -152,6 +154,8 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('COF', _ButtonCategory.function),
       _ButtonDef('ADJ', _ButtonCategory.function),
       _ButtonDef('TR', _ButtonCategory.function),
+      _ButtonDef('NORM', _ButtonCategory.function),
+      _ButtonDef('SNORM', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('PROP', <_ButtonDef>[
       _ButtonDef('DET', _ButtonCategory.function),
@@ -162,6 +166,8 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('EIG', _ButtonCategory.function),
       _ButtonDef('COF', _ButtonCategory.function),
       _ButtonDef('ADJ', _ButtonCategory.function),
+      _ButtonDef('DOT', _ButtonCategory.function),
+      _ButtonDef('CROSS', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('VEC', <_ButtonDef>[
       _ButtonDef('DOT', _ButtonCategory.function),
@@ -172,6 +178,8 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('SWAP', _ButtonCategory.function),
       _ButtonDef('NEG', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
+      _ButtonDef('RANK', _ButtonCategory.function),
+      _ButtonDef('DET', _ButtonCategory.function),
     ]),
   ];
 
@@ -179,32 +187,38 @@ class _CalculatorViewState extends State<CalculatorView> {
     _KeypadDeckDef('EDIT', <_ButtonDef>[
       _ButtonDef('MAT', _ButtonCategory.function),
       _ButtonDef('C', _ButtonCategory.function),
-      _ButtonDef('⌫', _ButtonCategory.function),
-      _ButtonDef('±', _ButtonCategory.function),
       _ButtonDef('2x2', _ButtonCategory.function),
       _ButtonDef('3x3', _ButtonCategory.function),
       _ButtonDef('4x4', _ButtonCategory.function),
       _ButtonDef('CLR', _ButtonCategory.function),
+      _ButtonDef('AROW', _ButtonCategory.function),
+      _ButtonDef('ACOL', _ButtonCategory.function),
+      _ButtonDef('I', _ButtonCategory.function),
+      _ButtonDef('J', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('BUILD', <_ButtonDef>[
       _ButtonDef('ZEROS', _ButtonCategory.function),
       _ButtonDef('ONES', _ButtonCategory.function),
       _ButtonDef('ID', _ButtonCategory.function),
       _ButtonDef('T', _ButtonCategory.function),
+      _ButtonDef('DET', _ButtonCategory.function),
       _ButtonDef('AROW', _ButtonCategory.function),
       _ButtonDef('ACOL', _ButtonCategory.function),
-      _ButtonDef('INV', _ButtonCategory.function),
-      _ButtonDef('DET', _ButtonCategory.function),
+      _ButtonDef('NEG', _ButtonCategory.function),
+      _ButtonDef('MAT', _ButtonCategory.function),
+      _ButtonDef('CLR', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('FACT', <_ButtonDef>[
       _ButtonDef('LU', _ButtonCategory.function),
       _ButtonDef('QR', _ButtonCategory.function),
       _ButtonDef('T', _ButtonCategory.function),
-      _ButtonDef('INV', _ButtonCategory.function),
+      _ButtonDef('EIG', _ButtonCategory.function),
       _ButtonDef('DET', _ButtonCategory.function),
       _ButtonDef('ZEROS', _ButtonCategory.function),
       _ButtonDef('ONES', _ButtonCategory.function),
       _ButtonDef('ID', _ButtonCategory.function),
+      _ButtonDef('MAT', _ButtonCategory.function),
+      _ButtonDef('CLR', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('MEM', <_ButtonDef>[
       _ButtonDef('MC', _ButtonCategory.function),
@@ -213,8 +227,10 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('M+', _ButtonCategory.function),
       _ButtonDef('MAT', _ButtonCategory.function),
       _ButtonDef('C', _ButtonCategory.function),
-      _ButtonDef('⌫', _ButtonCategory.function),
       _ButtonDef('CLR', _ButtonCategory.function),
+      _ButtonDef('2x2', _ButtonCategory.function),
+      _ButtonDef('3x3', _ButtonCategory.function),
+      _ButtonDef('4x4', _ButtonCategory.function),
     ]),
   ];
 
@@ -567,9 +583,11 @@ class _CalculatorViewState extends State<CalculatorView> {
       (_KeypadDeckDef deck) => deck.label == selectedDeckLabel,
       orElse: () => decks.first,
     );
+    final String enterLabel = _controller.isRpnEntryMode ? 'ENTER' : '=';
     final List<_ButtonDef> buttons = <_ButtonDef>[
       ...activeDeck.buttons,
-      ..._fixedBottomButtons,
+      ..._fixedBottomButtons.map((_ButtonDef b) =>
+          b.label == 'ENTER' ? _ButtonDef(enterLabel, b.category) : b),
     ];
 
     return LayoutBuilder(
@@ -909,6 +927,10 @@ class _CalculatorViewState extends State<CalculatorView> {
           editor._selectOrder(3);
         case '4x4':
           editor._selectOrder(4);
+        case 'I':
+          editor._fillSpecialMatrix(Matrix.identity(2));
+        case 'J':
+          editor._fillSpecialMatrix(Matrix.i);
         case 'ZEROS':
           editor._fillZerosThroughCore();
         case 'ONES':
@@ -1106,6 +1128,8 @@ class _CalculatorViewState extends State<CalculatorView> {
       'ZEROS' => 'Fill zeros like top matrix',
       'ONES' => 'Fill ones like top matrix',
       'ID' => 'Create identity matrix',
+      'I' => 'Identity matrix 2 by 2',
+      'J' => 'Imaginary unit matrix',
       'CLR' => 'Clear visible matrix cells',
       '2x2' => 'Set matrix order to 2 by 2',
       '3x3' => 'Set matrix order to 3 by 3',
@@ -2337,6 +2361,14 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       _replaceDraftWithMatrix(
         _executeMacroWithSeed(CreateIdentityMacro(_draft.rowCount)),
       );
+    });
+  }
+
+  void _fillSpecialMatrix(Matrix matrix) {
+    setState(() {
+      _resetEditingState();
+      _closeStructuralActions();
+      _replaceDraftWithMatrix(matrix);
     });
   }
 

@@ -4,6 +4,49 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.2] - 2026-05-27
+
+### Added
+
+- `Matrix.complex(double re, double im)` factory: creates `re·I₂ + im·J` as
+  `[[re, -im], [im, re]]`, the canonical 2×2 matrix representation of a
+  complex number in the subalgebra isomorphic to ℂ.
+- `Matrix.isComplexForm` getter: returns true for 2×2 matrices matching the
+  pattern `[[a, -b], [b, a]]` (i.e., members of the complex subalgebra).
+- `Matrix.realPart` / `Matrix.imagPart` getters: extract the real and
+  imaginary components from a complex-form matrix; throw `MatrixDomainError`
+  otherwise.
+- `MatrixDisplayFormatter.complex(Matrix)`: formats a complex-form matrix as
+  `a + bi` or `a - bi` with canonical edge-case handling (pure real, pure
+  imaginary, coefficient ±1 shown as `±i` without digit prefix).
+
+### Changed
+
+- `Matrix.squareRoot()` for negative scalars now returns `√|k|·J` (a
+  complex-form matrix) instead of throwing `MatrixDomainError`. For example,
+  `sqrt(-4)` returns `[[0, -2], [2, 0]]` (i.e., `2i`).
+
+## [0.6.1] - 2026-05-27
+
+### Added
+
+- INV (matrix inverse) is now an immediate unary operation in Infix mode,
+  consistent with how √ is handled.
+- I and J preset buttons in the matrix editor EDIT deck; pressing I fills the
+  editor with the 2×2 identity matrix, J with `Matrix.i` (the imaginary unit).
+
+## [0.5.6] - 2026-05-19
+
+### Fixed
+
+- Sqrt of negative number in Infix mode now shows Error instead of silently
+  failing (uncaught `MatrixDomainError` in `_rewriteInfixDraftUnary`).
+
+### Changed
+
+- RPN keypad: moved √ and % to MAIN deck for immediate access; MC and M−
+  moved to STACK deck.
+
 ## [0.5.5] - 2026-05-19
 
 ### Changed
