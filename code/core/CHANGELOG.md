@@ -4,6 +4,20 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.5] - 2026-05-19
+
+### Changed
+
+- Fixed all off-grid spacing values (10dp → 8dp) for strict 4dp grid
+  compliance: matrix cell padding, RPN register card spacing, mode button
+  vertical padding.
+- Added hover and focus state overlays to calculator buttons (hoverColor 8%,
+  focusColor 10% of foreground color) for desktop interaction feedback.
+- Replaced `GestureDetector` with `Material` + `InkWell` on mode switch pills
+  and deck selector tabs to support hover/focus/splash states on desktop.
+- All interactive elements now provide visible feedback on mouse hover and
+  keyboard focus (H7 Flexibility & Efficiency, Fitts's Law feedback).
+
 ## [0.5.4] - 2026-05-19
 
 ### Changed

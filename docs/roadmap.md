@@ -815,6 +815,30 @@ Scope:
 - [x] Replace drag feedback BoxShadow with Material elevation widget
 - [x] Run widget tests and integration tests confirming no regressions
 
+#### v0.5.5 — Spacing Grid Compliance and Desktop Interaction States
+
+HDCD Intent: Complete M3 spatial compliance by fixing all off-grid spacing
+values (10dp → 8dp) and add visible hover/focus state overlays on interactive
+elements for desktop users. This improves keyboard accessibility (H7 Flexibility),
+consistency (H4), and desktop usability (Fitts's Law feedback).
+
+HDCD Acceptance Criteria:
+- All spacing values on strict 4dp grid (no 10dp values remain)
+- Interactive buttons show visible hover state on desktop (mouse over)
+- Mode switch pills show hover feedback
+- Deck selector tabs show hover feedback
+- Keyboard focus visible on all interactive elements
+
+Scope:
+- [x] Fix contentPadding 10 → 8 in matrix cell inputs
+- [x] Fix SizedBox(width: 10) → 8 in RPN secondary card
+- [x] Fix mode button vertical padding 10 → 8
+- [x] Add hoverColor overlay to calculator buttons (M3: 8% on-color)
+- [x] Add focusColor overlay to calculator buttons
+- [x] Add hover/focus feedback to mode switch pills
+- [x] Add hover/focus feedback to deck selector tabs
+- [x] Run widget tests and integration tests confirming no regressions
+
 ---
 
 ## General Backlog

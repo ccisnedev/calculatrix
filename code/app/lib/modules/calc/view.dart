@@ -469,7 +469,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                 fontFamily: 'monospace',
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 literal,
@@ -623,37 +623,50 @@ class _CalculatorViewState extends State<CalculatorView> {
                 selected: decks[index].label == activeDeckLabel,
                 label: '${_deckDescription(decks[index].label)} deck',
                 excludeSemantics: true,
-                child: GestureDetector(
-                  onTap: () => _selectDeck(decks[index].label),
-                  child: AnimatedContainer(
-                    key: ValueKey<String>(
-                      'calculator-keypad-deck-${decks[index].label}',
-                    ),
-                    duration: const Duration(milliseconds: 180),
-                    margin: EdgeInsets.only(
-                      right: index < decks.length - 1 ? 8 : 0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: decks[index].label == activeDeckLabel
-                          ? cs.secondaryContainer
-                          : cs.surfaceContainer,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: decks[index].label == activeDeckLabel
-                            ? cs.secondary
-                            : cs.outlineVariant,
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      decks[index].label,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.labelMedium!.copyWith(
-                        color: decks[index].label == activeDeckLabel
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => _selectDeck(decks[index].label),
+                    hoverColor: (decks[index].label == activeDeckLabel
                             ? cs.onSecondaryContainer
-                            : cs.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.4,
+                            : cs.onSurfaceVariant)
+                        .withAlpha(20),
+                    focusColor: (decks[index].label == activeDeckLabel
+                            ? cs.onSecondaryContainer
+                            : cs.onSurfaceVariant)
+                        .withAlpha(25),
+                    child: AnimatedContainer(
+                      key: ValueKey<String>(
+                        'calculator-keypad-deck-${decks[index].label}',
+                      ),
+                      duration: const Duration(milliseconds: 180),
+                      margin: EdgeInsets.only(
+                        right: index < decks.length - 1 ? 8 : 0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: decks[index].label == activeDeckLabel
+                            ? cs.secondaryContainer
+                            : cs.surfaceContainer,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: decks[index].label == activeDeckLabel
+                              ? cs.secondary
+                              : cs.outlineVariant,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        decks[index].label,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.labelMedium!.copyWith(
+                          color: decks[index].label == activeDeckLabel
+                              ? cs.onSecondaryContainer
+                              : cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
+                        ),
                       ),
                     ),
                   ),
@@ -728,6 +741,8 @@ class _CalculatorViewState extends State<CalculatorView> {
               borderRadius: BorderRadius.circular(16),
               splashColor: colors.$2.withAlpha(50),
               highlightColor: colors.$2.withAlpha(30),
+              hoverColor: colors.$2.withAlpha(20),
+              focusColor: colors.$2.withAlpha(25),
               onTap: () => _onButtonPressed(btn.label),
               child: Center(
                 child: Text(
@@ -834,21 +849,35 @@ class _CalculatorViewState extends State<CalculatorView> {
       button: true,
       selected: selected,
       excludeSemantics: true,
-      child: GestureDetector(
-        onTap: () => _activateMode(mode),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? cs.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelLarge!.copyWith(
-              color: selected ? cs.onPrimary : cs.onSurface,
-              fontWeight: FontWeight.w700,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _activateMode(mode),
+          hoverColor: selected
+              ? cs.onPrimary.withAlpha(20)
+              : cs.onSurface.withAlpha(20),
+          focusColor: selected
+              ? cs.onPrimary.withAlpha(25)
+              : cs.onSurface.withAlpha(25),
+          splashColor: selected
+              ? cs.onPrimary.withAlpha(30)
+              : cs.onSurface.withAlpha(30),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? cs.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                color: selected ? cs.onPrimary : cs.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -1705,7 +1734,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       textAlign: TextAlign.end,
       decoration: InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         constraints: const BoxConstraints(minHeight: _matrixCellHeight),
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
