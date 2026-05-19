@@ -226,8 +226,9 @@ class _CalculatorViewState extends State<CalculatorView> {
 
   @override
   Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: colors.surface,
       body: SafeArea(
         child: ListenableBuilder(
           listenable: _controller,
@@ -271,14 +272,15 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildDisplay() {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     final bool showDisplayStatus = _controller.hasMemory || _controller.isRpnMode;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF16213E),
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
@@ -294,11 +296,11 @@ class _CalculatorViewState extends State<CalculatorView> {
                 if (_controller.hasMemory)
                   Semantics(
                     label: 'Memory indicator',
-                    child: const Text(
+                    child: Text(
                       'M',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF4FC3F7),
+                        color: cs.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -310,9 +312,9 @@ class _CalculatorViewState extends State<CalculatorView> {
                     child: Text(
                       key: const ValueKey<String>('calculator-stack-depth'),
                       'Stack ${_controller.rpnStackDepth}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF4FC3F7),
+                        color: cs.primary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -334,6 +336,7 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildInfixDisplayBody() {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -348,9 +351,9 @@ class _CalculatorViewState extends State<CalculatorView> {
               _controller.expression.isEmpty
                   ? ' '
                   : _controller.expression,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
-                color: Color(0xFF8A8FA3),
+                color: cs.outline,
                 fontFamily: 'monospace',
               ),
             ),
@@ -400,6 +403,7 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildRpnStackCard(_RpnStackSlot slot) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     final bool isPrimary = slot.register == 0;
 
     return AnimatedContainer(
@@ -409,12 +413,12 @@ class _CalculatorViewState extends State<CalculatorView> {
       constraints: BoxConstraints(minHeight: isPrimary ? 72 : 44),
       padding: EdgeInsets.all(isPrimary ? 12 : 8),
       decoration: BoxDecoration(
-        color: isPrimary ? const Color(0xFF1F2940) : const Color(0xFF18243A),
+        color: isPrimary ? cs.surfaceContainer : cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isPrimary
-              ? const Color(0xFF4FC3F7).withAlpha(80)
-              : const Color(0xFF2D2D44),
+              ? cs.primary.withAlpha(80)
+              : cs.outlineVariant,
         ),
       ),
       child: isPrimary
@@ -424,6 +428,7 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildPrimaryRpnStackCard() {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     return Semantics(
       container: true,
       liveRegion: true,
@@ -435,8 +440,8 @@ class _CalculatorViewState extends State<CalculatorView> {
           ExcludeSemantics(
             child: Text(
               'X0',
-              style: const TextStyle(
-                color: Color(0xFF4FC3F7),
+              style: TextStyle(
+                color: cs.primary,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
               ),
@@ -460,8 +465,8 @@ class _CalculatorViewState extends State<CalculatorView> {
           children: [
             Text(
               'X${slot.register}',
-              style: const TextStyle(
-                color: Color(0xFF4FC3F7),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
               ),
@@ -485,6 +490,7 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildDisplayValue({required double fontSize}) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     final Matrix? matrix = _controller.displayMatrix;
     final bool showMatrix = matrix != null &&
         !matrix.isScalar &&
@@ -507,7 +513,7 @@ class _CalculatorViewState extends State<CalculatorView> {
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w300,
-                color: Colors.white,
+                color: cs.onSurface,
                 fontFamily: 'monospace',
               ),
             ),
@@ -544,7 +550,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                   style: TextStyle(
                     fontSize: useExpanded ? fontSize * 0.78 : fontSize,
                     fontWeight: FontWeight.w300,
-                    color: Colors.white,
+                    color: cs.onSurface,
                     fontFamily: 'monospace',
                   ),
                 ),
@@ -579,9 +585,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                 _columnCount;
         final double keyHeight =
             (availableHeight - (_gridSpacing * (_rowCount - 1))) / _rowCount;
-        final double keySize = _controller.isMatrixMode
-          ? math.min(keyWidth, keyHeight)
-          : math.max(32, math.min(keyWidth, keyHeight));
+        final double keySize = math.min(keyWidth, keyHeight);
 
         return Padding(
           padding: const EdgeInsets.all(_pagePadding),
@@ -609,6 +613,7 @@ class _CalculatorViewState extends State<CalculatorView> {
     required List<_KeypadDeckDef> decks,
     required String activeDeckLabel,
   }) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     return SizedBox(
       height: _deckSelectorHeight,
       child: Row(
@@ -628,17 +633,17 @@ class _CalculatorViewState extends State<CalculatorView> {
                     ),
                     duration: const Duration(milliseconds: 180),
                     margin: EdgeInsets.only(
-                      right: index < decks.length - 1 ? 6 : 0,
+                      right: index < decks.length - 1 ? 8 : 0,
                     ),
                     decoration: BoxDecoration(
                       color: decks[index].label == activeDeckLabel
-                          ? const Color(0xFF4FC3F7)
-                          : const Color(0xFF1F2940),
+                          ? cs.secondaryContainer
+                          : cs.surfaceContainer,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: decks[index].label == activeDeckLabel
-                            ? const Color(0xFF4FC3F7)
-                            : const Color(0xFF2D2D44),
+                            ? cs.secondary
+                            : cs.outlineVariant,
                       ),
                     ),
                     alignment: Alignment.center,
@@ -647,8 +652,8 @@ class _CalculatorViewState extends State<CalculatorView> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: decks[index].label == activeDeckLabel
-                            ? const Color(0xFF16213E)
-                            : const Color(0xFFADB5BD),
+                            ? cs.onSecondaryContainer
+                            : cs.onSurfaceVariant,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.4,
@@ -746,11 +751,12 @@ class _CalculatorViewState extends State<CalculatorView> {
 
   (Color background, Color foreground) _getButtonColors(
       _ButtonCategory category) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     return switch (category) {
-      _ButtonCategory.number => (const Color(0xFF1F2940), Colors.white),
-      _ButtonCategory.operator => (const Color(0xFF0F3460), const Color(0xFF4FC3F7)),
-      _ButtonCategory.function => (const Color(0xFF2D2D44), const Color(0xFFADB5BD)),
-      _ButtonCategory.equals => (const Color(0xFF533483), Colors.white),
+      _ButtonCategory.number => (cs.surfaceContainer, cs.onSurface),
+      _ButtonCategory.operator => (cs.primaryContainer, cs.onPrimaryContainer),
+      _ButtonCategory.function => (cs.surfaceContainerHighest, cs.onSurfaceVariant),
+      _ButtonCategory.equals => (cs.tertiaryContainer, cs.onTertiaryContainer),
     };
   }
 
@@ -785,10 +791,11 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildModeSwitch() {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F2940),
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -820,6 +827,7 @@ class _CalculatorViewState extends State<CalculatorView> {
     required CalculatorMode mode,
     required String label,
   }) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
     final bool selected = _controller.mode == mode;
     return Semantics(
       label: '$label mode',
@@ -832,14 +840,14 @@ class _CalculatorViewState extends State<CalculatorView> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF4FC3F7) : Colors.transparent,
+            color: selected ? cs.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Text(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: selected ? const Color(0xFF16213E) : Colors.white,
+              color: selected ? cs.onPrimary : cs.onSurface,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1282,14 +1290,14 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
               Text(
                 _buildPreviewText(),
                 key: const ValueKey<String>('matrix-preview-text'),
-                style: const TextStyle(color: Color(0xFFCFD8DC)),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ],
             if (_error != null) ...[
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: const TextStyle(color: Color(0xFFE57373)),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
           ],
@@ -1311,7 +1319,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     if (widget.embedded) {
       return Material(
         key: const ValueKey<String>('matrix-mode-panel'),
-        color: const Color(0xFF16213E),
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         elevation: 0,
         borderRadius: BorderRadius.circular(24),
         child: Container(
@@ -1605,12 +1613,12 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
                 constraints: const BoxConstraints.expand(),
                 style: IconButton.styleFrom(
                   backgroundColor: highlighted
-                      ? const Color(0xFF203B63)
-                      : const Color(0xFF151C2F),
-                  foregroundColor: Colors.white70,
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : Theme.of(context).colorScheme.surfaceContainerLowest,
+                  foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
                   side: BorderSide(
                     color: highlighted
-                        ? const Color(0xFF4FC3F7)
+                        ? Theme.of(context).colorScheme.primary
                         : Theme.of(context).colorScheme.outlineVariant,
                   ),
                   shape: const StadiumBorder(),
@@ -1652,12 +1660,12 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
                 constraints: const BoxConstraints.expand(),
                 style: IconButton.styleFrom(
                   backgroundColor: highlighted
-                      ? const Color(0xFF203B63)
-                      : const Color(0xFF151C2F),
-                  foregroundColor: Colors.white70,
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : Theme.of(context).colorScheme.surfaceContainerLowest,
+                  foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
                   side: BorderSide(
                     color: highlighted
-                        ? const Color(0xFF4FC3F7)
+                        ? Theme.of(context).colorScheme.primary
                         : Theme.of(context).colorScheme.outlineVariant,
                   ),
                   shape: const StadiumBorder(),
@@ -1696,7 +1704,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         constraints: const BoxConstraints(minHeight: _matrixCellHeight),
         filled: true,
-        fillColor: const Color(0xFF1A2440),
+        fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
@@ -1705,9 +1713,9 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: Color(0xFF4FC3F7), width: 1.4),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(10)),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.4),
         ),
         labelText: 'Row ${row + 1}, Column ${column + 1}',
         labelStyle: const TextStyle(fontSize: 11),
@@ -1747,15 +1755,15 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       height: _matrixAddButtonSize,
       child: DecoratedBox(
         decoration: ShapeDecoration(
-          color: const Color(0xFF151C2F),
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
           shape: CircleBorder(
             side: BorderSide(
               color: Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
         ),
-        child: const Center(
-          child: Icon(Icons.add, size: 14, color: Colors.white70),
+        child: Center(
+          child: Icon(Icons.add, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ),
     );

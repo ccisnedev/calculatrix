@@ -11,6 +11,8 @@ void main() {
 class CalculatrixApp extends StatelessWidget {
   const CalculatrixApp({super.key});
 
+  static const Color _seedColor = Color(0xFF4FC3F7);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -19,11 +21,19 @@ class CalculatrixApp extends StatelessWidget {
       scrollBehavior: const _CalculatrixScrollBehavior(),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blueGrey,
+          seedColor: _seedColor,
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _seedColor,
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
       ),
+      themeMode: ThemeMode.system,
       home: const CalculatorView(),
     );
   }

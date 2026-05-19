@@ -726,6 +726,43 @@ inspected independently for label clarity, role correctness, and navigation orde
 - [x] Step 4: rerun widget and Windows integration suites confirming accessibility + no regressions
 - [x] Step 5: bump version and update changelog
 
+#### v0.5.x — UI/UX Refinement Series (0.5.2, 0.5.3, 0.5.4, …)
+
+A series of incremental improvements focused on visual design, usability, and
+modern interaction patterns. Each version addresses one cohesive aspect of the
+user interface. Specific scope for each version will be defined as work
+progresses. Methodology: HDCD (Heuristic-Driven Component Design) per
+docs/research/ui-ux-design-methodology.md.
+
+#### v0.5.2 — Material 3 Color System and Theme Foundation
+
+HDCD Intent: Replace all hardcoded hex colors with Material 3 ColorScheme roles
+so the UI derives its palette from the M3 token system instead of ad-hoc
+decisions. This enables dark/light theme switching, guarantees accessible
+contrast by construction, and establishes the token layer for all subsequent
+UI iterations.
+
+HDCD Acceptance Criteria:
+- All colors from ColorScheme (no raw hex in view code)
+- Dark and light theme automatic via ThemeData
+- Minimum touch target 48dp enforced (fix current 32dp floor)
+- Spacing regularized to 4dp grid (fix 6dp margin)
+- Visual hierarchy: mode switch ≠ deck selector appearance (H4 Consistency)
+
+Scope:
+- [x] Define app-level ThemeData with Material 3 ColorScheme (dark seed + light seed)
+- [x] Replace all hardcoded button colors with ColorScheme role lookups
+- [x] Replace display area colors with surface/onSurface token roles
+- [x] Replace mode switch colors with primary/onPrimary (stronger visual weight)
+- [x] Replace deck selector colors with secondaryContainer/onSecondaryContainer for active
+- [ ] Replace typography with Theme.textTheme scale references (deferred to v0.5.3)
+- [x] Remove artificial 32dp key size floor; natural layout is >48dp on supported viewports
+- [x] Regularize deck margin from 6dp to 8dp (grid-aligned)
+- [x] Visually differentiate mode switch (pill toggle) from deck selector (tab bar)
+- [x] Verify automatic dark/light switching via ThemeMode.system
+- [x] Run widget tests and integration tests confirming no regressions
+- [x] Produce HDCD evaluation scorecard confirming all gates pass
+
 - Additional factorizations beyond LU/QR
 - Sparse matrices
 

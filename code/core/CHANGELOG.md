@@ -4,6 +4,22 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.2] - 2026-05-18
+
+### Changed
+
+- Migrated all hardcoded hex colors in the calculator UI to Material 3
+  ColorScheme role lookups (`surfaceContainer`, `primaryContainer`,
+  `tertiaryContainer`, `secondaryContainer`, etc.).
+- Added dark and light ThemeData with `ColorScheme.fromSeed` (seed:
+  `0xFF4FC3F7`) and automatic switching via `ThemeMode.system`.
+- Mode switch now uses `primary`/`onPrimary` roles; deck selector uses
+  `secondaryContainer`/`onSecondaryContainer` for visual hierarchy
+  differentiation (H4 Consistency).
+- Regularized deck margin from 6 dp to 8 dp (4 dp grid-aligned).
+- Removed artificial 32 dp minimum key size floor; keys derive their size
+  naturally from layout constraints (>48 dp on all supported viewports).
+
 ## [0.5.1] - 2026-05-18
 
 ### Fixed
