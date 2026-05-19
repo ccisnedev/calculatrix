@@ -755,7 +755,7 @@ Scope:
 - [x] Replace display area colors with surface/onSurface token roles
 - [x] Replace mode switch colors with primary/onPrimary (stronger visual weight)
 - [x] Replace deck selector colors with secondaryContainer/onSecondaryContainer for active
-- [ ] Replace typography with Theme.textTheme scale references (deferred to v0.5.3)
+- [x] Replace typography with Theme.textTheme scale references (done in v0.5.3)
 - [x] Remove artificial 32dp key size floor; natural layout is >48dp on supported viewports
 - [x] Regularize deck margin from 6dp to 8dp (grid-aligned)
 - [x] Visually differentiate mode switch (pill toggle) from deck selector (tab bar)
@@ -765,6 +765,31 @@ Scope:
 
 - Additional factorizations beyond LU/QR
 - Sparse matrices
+
+#### v0.5.3 — Typography Scale Migration
+
+HDCD Intent: Replace all hardcoded fontSize/fontWeight values with Material 3
+TextTheme role references so typography responds to system accessibility
+settings, stays consistent across the app, and enables future theme
+customization.
+
+HDCD Acceptance Criteria:
+- All text styles derive from Theme.textTheme roles (with copyWith for monospace)
+- No raw fontSize literals in view code (except dynamic calculator display)
+- Font weight semantics come from textTheme role definitions where possible
+- Text scales properly with system accessibility large-text settings
+- Visual appearance unchanged (matching roles selected to preserve current sizes)
+
+Scope:
+- [x] Replace memory/stack indicators with textTheme.labelLarge
+- [x] Replace expression text with textTheme.titleMedium + monospace
+- [x] Replace display value with textTheme.displaySmall/headlineMedium + monospace
+- [x] Replace RPN register labels with textTheme.labelLarge + monospace
+- [x] Replace deck selector labels with textTheme.labelMedium
+- [x] Replace button labels with textTheme.titleLarge/titleMedium (size-adaptive)
+- [x] Replace mode switch labels with textTheme.labelLarge
+- [x] Replace matrix cell labelStyle with textTheme.labelSmall
+- [x] Run widget tests and integration tests confirming no regressions
 
 ---
 

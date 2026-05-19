@@ -298,8 +298,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                     label: 'Memory indicator',
                     child: Text(
                       'M',
-                      style: TextStyle(
-                        fontSize: 14,
+                      style: Theme.of(context).textTheme.labelLarge!.copyWith(
                         color: cs.primary,
                         fontWeight: FontWeight.bold,
                       ),
@@ -312,8 +311,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                     child: Text(
                       key: const ValueKey<String>('calculator-stack-depth'),
                       'Stack ${_controller.rpnStackDepth}',
-                      style: TextStyle(
-                        fontSize: 14,
+                      style: Theme.of(context).textTheme.labelLarge!.copyWith(
                         color: cs.primary,
                         fontWeight: FontWeight.w600,
                       ),
@@ -351,10 +349,10 @@ class _CalculatorViewState extends State<CalculatorView> {
               _controller.expression.isEmpty
                   ? ' '
                   : _controller.expression,
-              style: TextStyle(
-                fontSize: 20,
+              style: Theme.of(context).textTheme.titleMedium!.copyWith(
                 color: cs.outline,
                 fontFamily: 'monospace',
+                fontSize: 20,
               ),
             ),
           ),
@@ -440,7 +438,7 @@ class _CalculatorViewState extends State<CalculatorView> {
           ExcludeSemantics(
             child: Text(
               'X0',
-              style: TextStyle(
+              style: Theme.of(context).textTheme.labelLarge!.copyWith(
                 color: cs.primary,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
@@ -465,7 +463,7 @@ class _CalculatorViewState extends State<CalculatorView> {
           children: [
             Text(
               'X${slot.register}',
-              style: TextStyle(
+              style: Theme.of(context).textTheme.labelLarge!.copyWith(
                 color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
@@ -478,7 +476,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
-                style: const TextStyle(
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                   fontFamily: 'monospace',
                 ),
               ),
@@ -510,7 +508,7 @@ class _CalculatorViewState extends State<CalculatorView> {
             child: Text(
               key: const ValueKey<String>('calculator-display-text'),
               _controller.display,
-              style: TextStyle(
+              style: Theme.of(context).textTheme.displaySmall!.copyWith(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w300,
                 color: cs.onSurface,
@@ -547,7 +545,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                   key: const ValueKey<String>('calculator-display-text'),
                   visualValue,
                   textAlign: TextAlign.right,
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.displaySmall!.copyWith(
                     fontSize: useExpanded ? fontSize * 0.78 : fontSize,
                     fontWeight: FontWeight.w300,
                     color: cs.onSurface,
@@ -650,11 +648,10 @@ class _CalculatorViewState extends State<CalculatorView> {
                     child: Text(
                       decks[index].label,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.labelMedium!.copyWith(
                         color: decks[index].label == activeDeckLabel
                             ? cs.onSecondaryContainer
                             : cs.onSurfaceVariant,
-                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.4,
                       ),
@@ -735,7 +732,10 @@ class _CalculatorViewState extends State<CalculatorView> {
               child: Center(
                 child: Text(
                   btn.label,
-                  style: TextStyle(
+                  style: (btn.label.length > 1
+                          ? Theme.of(context).textTheme.titleMedium!
+                          : Theme.of(context).textTheme.titleLarge!)
+                      .copyWith(
                     fontSize: btn.label.length > 1 ? 18 : 28,
                     fontWeight: FontWeight.w500,
                     color: colors.$2,
@@ -846,7 +846,7 @@ class _CalculatorViewState extends State<CalculatorView> {
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.labelLarge!.copyWith(
               color: selected ? cs.onPrimary : cs.onSurface,
               fontWeight: FontWeight.w700,
             ),
@@ -1290,14 +1290,18 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
               Text(
                 _buildPreviewText(),
                 key: const ValueKey<String>('matrix-preview-text'),
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
             if (_error != null) ...[
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
               ),
             ],
           ],
@@ -1718,7 +1722,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
           borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.4),
         ),
         labelText: 'Row ${row + 1}, Column ${column + 1}',
-        labelStyle: const TextStyle(fontSize: 11),
+        labelStyle: Theme.of(context).textTheme.labelSmall,
       ),
       onTap: () {
         _beginEditingCell(row, column);

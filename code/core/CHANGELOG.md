@@ -4,6 +4,23 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.3] - 2026-05-19
+
+### Changed
+
+- Migrated all hardcoded `TextStyle` constructors in the calculator UI to
+  `Theme.of(context).textTheme` role references with `.copyWith()` overrides.
+- Memory/stack indicators now use `labelLarge`.
+- Expression text uses `titleMedium` (monospace override).
+- Display value uses `displaySmall` (monospace override, dynamic sizing).
+- RPN register labels use `labelLarge` (monospace override).
+- Deck selector labels use `labelMedium`.
+- Button labels use `titleMedium`/`titleLarge` (size-adaptive).
+- Mode switch labels use `labelLarge`.
+- Matrix cell labels use `labelSmall`.
+- Matrix preview/error text uses `bodyMedium`.
+- Zero raw `TextStyle(...)` constructors remain in view code.
+
 ## [0.5.2] - 2026-05-18
 
 ### Changed
