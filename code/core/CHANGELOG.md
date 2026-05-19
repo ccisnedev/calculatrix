@@ -4,6 +4,20 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.4] - 2026-05-19
+
+### Changed
+
+- Unified all border radii to M3 shape scale: 12 (medium), 16 (large),
+  24 (extraLarge). Removed ad-hoc values (10, 14, 18).
+- Calculator buttons now use elevation 0 (flat tonal M3 style) instead of
+  elevation 2 with drop shadows.
+- Drag feedback widgets use Material elevation instead of hardcoded BoxShadow.
+- Deck selector tabs: radius 14 → 12 (medium).
+- Mode switch container: radius 18 → 16 (large).
+- Mode button pill: radius 14 → 12 (medium).
+- Matrix cell inputs: radius 10 → 12 (medium).
+
 ## [0.5.3] - 2026-05-19
 
 ### Changed

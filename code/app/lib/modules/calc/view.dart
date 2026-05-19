@@ -637,7 +637,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                       color: decks[index].label == activeDeckLabel
                           ? cs.secondaryContainer
                           : cs.surfaceContainer,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: decks[index].label == activeDeckLabel
                             ? cs.secondary
@@ -723,7 +723,7 @@ class _CalculatorViewState extends State<CalculatorView> {
             key: ValueKey<String>('calculator-button-${btn.label}'),
             color: colors.$1,
             borderRadius: BorderRadius.circular(16),
-            elevation: 2,
+            elevation: 0,
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
               splashColor: colors.$2.withAlpha(50),
@@ -796,7 +796,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
@@ -841,7 +841,7 @@ class _CalculatorViewState extends State<CalculatorView> {
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: selected ? cs.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             label,
@@ -1710,15 +1710,15 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(10)),
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
           borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.4),
         ),
         labelText: 'Row ${row + 1}, Column ${column + 1}',
@@ -1812,18 +1812,16 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
 
   Widget _buildRowDragFeedback(int row) {
     return Material(
-      color: Colors.transparent,
+      elevation: 6,
+      borderRadius: BorderRadius.circular(16),
+      color: Theme.of(context).colorScheme.surface,
       child: Container(
         key: ValueKey<String>('matrix-row-drag-feedback-$row'),
         width: 360,
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Theme.of(context).colorScheme.outline),
-          boxShadow: const [
-            BoxShadow(color: Color(0x24000000), blurRadius: 12, offset: Offset(0, 6)),
-          ],
         ),
         child: Row(
           children: [
@@ -1841,18 +1839,16 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
 
   Widget _buildColumnDragFeedback(int column) {
     return Material(
-      color: Colors.transparent,
+      elevation: 6,
+      borderRadius: BorderRadius.circular(16),
+      color: Theme.of(context).colorScheme.surface,
       child: Container(
         key: ValueKey<String>('matrix-column-drag-feedback-$column'),
         width: 96,
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Theme.of(context).colorScheme.outline),
-          boxShadow: const [
-            BoxShadow(color: Color(0x24000000), blurRadius: 12, offset: Offset(0, 6)),
-          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

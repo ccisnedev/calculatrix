@@ -791,6 +791,30 @@ Scope:
 - [x] Replace matrix cell labelStyle with textTheme.labelSmall
 - [x] Run widget tests and integration tests confirming no regressions
 
+#### v0.5.4 — Shape System and Elevation Cleanup
+
+HDCD Intent: Unify border radii to a consistent M3 shape scale and remove
+drop-shadow elevation from tonal buttons (M3 FilledTonalButton pattern uses
+elevation 0 with colored containers). This reduces visual noise, improves
+consistency (H4), and modernizes the aesthetic (Aesthetic-Usability Effect).
+
+HDCD Acceptance Criteria:
+- All radii map to M3 shape tokens: 8 (small), 12 (medium), 16 (large), 28 (extraLarge)
+- No ad-hoc radius values (10, 14, 18) remain
+- Buttons use elevation 0 (flat tonal) instead of elevation 2 (drop shadow)
+- Drag feedback uses Material elevation instead of hardcoded BoxShadow
+- Visual hierarchy maintained through color contrast, not shadows
+
+Scope:
+- [x] Unify button radius from 16 to 16 (large — no change needed)
+- [x] Unify deck selector radius from 14 to 12 (medium)
+- [x] Unify mode switch container radius from 18 to 16 (large)
+- [x] Unify mode button inner radius from 14 to 12 (medium)
+- [x] Unify matrix input radius from 10 to 12 (medium)
+- [x] Remove button elevation (2 → 0) for M3 flat tonal style
+- [x] Replace drag feedback BoxShadow with Material elevation widget
+- [x] Run widget tests and integration tests confirming no regressions
+
 ---
 
 ## General Backlog
