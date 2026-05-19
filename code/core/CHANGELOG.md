@@ -4,6 +4,20 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.4] - 2026-05-19
+
+### Added
+
+- **`Matrix.exp()` method**: computes the matrix exponential via truncated
+  Taylor series (I + A + A²/2! + A³/3! + ..., truncated at 50 terms).
+  For pure imaginary matrices θ·J, yields rotation matrices:
+  expm(θ·J) = [[cos(θ), -sin(θ)], [sin(θ), cos(θ)]].
+  Enables Euler's formula verification: `exp(π·i) + I = 0`.
+- **Comprehensive exponential test suite** (`matrix_exponential_test.dart`):
+  13 tests covering exp(0) = I, Euler's formula (e^(πi) = -I),
+  full rotations (e^(2πi) = I), angle addition law for complex exponentials,
+  and mixed real-complex: exp(3 + 2i) = e³·exp(2i).
+
 ## [0.6.3] - 2026-05-19
 
 ### Added
