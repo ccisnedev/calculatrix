@@ -1472,6 +1472,42 @@ class Matrix {
     );
   }
 
+  /// Computes the matrix exponential via Taylor series.
+  ///
+  /// For a square matrix A, expm(A) = I + A + A²/2! + A³/3! + ...
+  /// For pure imaginary matrices θ·J (where J = i), this yields:
+  /// expm(θ·J) = [[cos(θ), -sin(θ)], [sin(θ), cos(θ)]] (rotation matrix).
+  /// Truncates at 50 terms for numerical stability.
+  Matrix exp({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    _requireSquare(operation: 'exponential');
+
+    if (rowCount == 1 && columnCount == 1) {
+      // Scalar case: exp(a) = e^a
+      return Matrix.scalar(math.exp(scalarValue));
+    }
+
+    // Taylor series: expm(A) = I + A + A²/2! + A³/3! + ...
+    Matrix result = Matrix.identity(rowCount);
+    Matrix term = Matrix.identity(rowCount);
+    double factorial = 1;
+
+    for (int n = 1; n <= 50; n++) {
+      factorial *= n;
+      term = term * this;
+      result = result + term.scale(1 / factorial);
+
+      // Check convergence: if term norm is small enough, stop
+      if (term._infinityNorm() / factorial < absoluteTolerance) {
+        break;
+      }
+    }
+
+    return result;
+  }
+
   Matrix transpose() {
     final List<List<double>> result = List<List<double>>.generate(
       columnCount,

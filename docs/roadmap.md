@@ -912,12 +912,14 @@ New layout:
 - [x] Display complex results in `a + bi` notation (done in v0.6.2)
 - [x] Complex conjugate button (CONJ = transpose for complex-form matrices)
 
-### v0.6.4 — Complex functions (planned)
+### v0.6.4 — Complex functions via matrix exponential
 
-- [ ] Complex exponential via matrix exponential: $e^{θi}$
-- [ ] Euler's formula verification: $e^{πi} + I = 0$
-- [ ] Complex logarithm
-- [ ] Polar form display: $r∠θ$
+- [x] `Matrix.exp()` method: computes the matrix exponential via Taylor series
+- [ ] `Matrix.log()` method: deferred (logaritmo matricial — complex implementation)
+- [ ] EXP button in Infix/RPN decks (deferred — space constraints in MAIN deck)
+- [x] Verify Euler's formula: `e^(πi) + I = 0` (comprehensive test suite)
+- [ ] Polar form display: for complex `a + bi`, show as `r∠θ` (deferred)
+- [ ] Complex logarithm button (deferred)
 
 ---
 
