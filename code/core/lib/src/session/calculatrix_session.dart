@@ -417,6 +417,8 @@ class CalculatrixSession {
         return _applyImmediateInfixUnary(_sqrtValue);
       case 'INV':
         return _applyImmediateInfixUnary(_invertValue);
+      case 'CONJ':
+        return _applyImmediateInfixUnary(_transposeValue);
       case '%':
         return _queueInfixPercent();
       default:
@@ -768,6 +770,10 @@ class CalculatrixSession {
 
   Matrix _invertValue(Matrix value) {
     return value.inverse();
+  }
+
+  Matrix _transposeValue(Matrix value) {
+    return value.transpose();
   }
 
   String _normalizeSessionPercentExpression(String expression) {

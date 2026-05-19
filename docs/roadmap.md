@@ -906,11 +906,11 @@ New layout:
 
 ### v0.6.3 — Complex arithmetic in calculator
 
-- [ ] Add `i` button to keypad (Infix and RPN)
-- [ ] Scalar promotion: when adding 1×1 to 2×2, promote scalar to $k \cdot I_2$
-- [ ] Input `3+2i` parsed as `3I + 2J` internally
-- [ ] Display complex results in `a + bi` notation
-- [ ] Complex conjugate operation (via transpose)
+- [x] Add `i` button to keypad (Infix and RPN)
+- [x] Scalar promotion: when adding/subtracting/multiplying 1×1 with n×n square, promote scalar to $k \cdot I_n$
+- [x] Input `3+2i` parsed as `3I + 2J` internally (via scalar promotion + `i` button)
+- [x] Display complex results in `a + bi` notation (done in v0.6.2)
+- [x] Complex conjugate button (CONJ = transpose for complex-form matrices)
 
 ### v0.6.4 — Complex functions (planned)
 

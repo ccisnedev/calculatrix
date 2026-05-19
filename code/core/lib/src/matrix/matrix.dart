@@ -222,13 +222,15 @@ class Matrix {
   }
 
   Matrix operator +(Matrix other) {
-    _requireSameDimensions(other, operation: 'addition');
+    final Matrix a = _promoteScalar(this, other);
+    final Matrix b = _promoteScalar(other, this);
+    a._requireSameDimensions(b, operation: 'addition');
 
     final List<List<double>> result = List<List<double>>.generate(
-      rowCount,
+      a.rowCount,
       (int r) => List<double>.generate(
-        columnCount,
-        (int c) => _rows[r][c] + other._rows[r][c],
+        a.columnCount,
+        (int c) => a._rows[r][c] + b._rows[r][c],
         growable: false,
       ),
       growable: false,
@@ -238,13 +240,15 @@ class Matrix {
   }
 
   Matrix operator -(Matrix other) {
-    _requireSameDimensions(other, operation: 'subtraction');
+    final Matrix a = _promoteScalar(this, other);
+    final Matrix b = _promoteScalar(other, this);
+    a._requireSameDimensions(b, operation: 'subtraction');
 
     final List<List<double>> result = List<List<double>>.generate(
-      rowCount,
+      a.rowCount,
       (int r) => List<double>.generate(
-        columnCount,
-        (int c) => _rows[r][c] - other._rows[r][c],
+        a.columnCount,
+        (int c) => a._rows[r][c] - b._rows[r][c],
         growable: false,
       ),
       growable: false,
@@ -1692,6 +1696,21 @@ class Matrix {
         '${other.rowCount}x${other.columnCount}.',
       );
     }
+  }
+
+  /// Scalar promotion: if [candidate] is 1×1 and [reference] is n×n square
+  /// (n > 1), returns `candidate.scalarValue · Iₙ`; otherwise returns
+  /// [candidate] unchanged.
+  ///
+  /// This enables natural complex arithmetic: `3 + Matrix.i` promotes 3 to
+  /// `3·I₂` before the element-wise addition, yielding `[[3,-1],[1,3]]`.
+  static Matrix _promoteScalar(Matrix candidate, Matrix reference) {
+    if (candidate.isScalar &&
+        reference.isSquare &&
+        reference.rowCount > 1) {
+      return Matrix.identity(reference.rowCount).scale(candidate.scalarValue);
+    }
+    return candidate;
   }
 
   void _requireSquare({required String operation}) {

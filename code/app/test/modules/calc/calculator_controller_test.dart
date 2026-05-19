@@ -367,6 +367,25 @@ void main() {
       // sqrt(-4) = 2i — displayed in complex notation, not raw matrix literal
       expect(controller.result, '2i');
     });
+
+    test('insertImaginaryUnit inserts Matrix.i into Infix expression', () {
+      controller.input('2');
+      controller.input('×');
+      controller.insertImaginaryUnit();
+      controller.evaluate();
+      // 2 * i = [[0,-2],[2,0]] = 2i
+      expect(controller.result, '2i');
+    });
+
+    test('3 + 2*i = 3 + 2i via scalar promotion', () {
+      controller.input('3');
+      controller.input('+');
+      controller.input('2');
+      controller.input('×');
+      controller.insertImaginaryUnit();
+      controller.evaluate();
+      expect(controller.result, '3 + 2i');
+    });
   });
 
   group('CalculatorController - repeat equals', () {

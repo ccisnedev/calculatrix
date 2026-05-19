@@ -187,12 +187,12 @@ void main() {
     testWidgets('keypad has all buttons', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
       final expected = [
-        'MC', 'MR', 'M-', 'M+',
+        'MC', 'MR', 'CONJ', 'M+',
         'C', '√', '%', '÷',
         '7', '8', '9', '×',
         '4', '5', '6', '-',
         '1', '2', '3', '+',
-        '±', '.', '=', 'MAT', '(', ')', 'INV', '⌫', 'ID',
+        '±', '.', '=', 'MAT', '(', ')', 'INV', '⌫', 'i',
       ];
       for (final label in expected) {
         await _ensureCalculatorButtonVisible(tester, label);

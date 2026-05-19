@@ -102,9 +102,9 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef(')', _ButtonCategory.function),
       _ButtonDef('MC', _ButtonCategory.function),
       _ButtonDef('MR', _ButtonCategory.function),
-      _ButtonDef('M-', _ButtonCategory.function),
+      _ButtonDef('CONJ', _ButtonCategory.function),
       _ButtonDef('M+', _ButtonCategory.function),
-      _ButtonDef('ID', _ButtonCategory.function),
+      _ButtonDef('i', _ButtonCategory.function),
     ]),
   ];
 
@@ -118,8 +118,8 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonDef('DUP', _ButtonCategory.function),
       _ButtonDef('DROP', _ButtonCategory.function),
       _ButtonDef('SWAP', _ButtonCategory.function),
-      _ButtonDef('OVER', _ButtonCategory.function),
-      _ButtonDef('ROT', _ButtonCategory.function),
+      _ButtonDef('CONJ', _ButtonCategory.function),
+      _ButtonDef('i', _ButtonCategory.function),
     ]),
     _KeypadDeckDef('STACK', <_ButtonDef>[
       _ButtonDef('DUP', _ButtonCategory.function),
@@ -1051,6 +1051,10 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.executeRpnMacro(const AppendZeroColumnMacro());
         case '±':
           _controller.toggleSign();
+        case 'i':
+          _controller.insertImaginaryUnit();
+        case 'CONJ':
+          _controller.executeRpnCommand(const TransposeCommand());
         case 'MC':
           _controller.memoryClear();
         case 'MR':
@@ -1077,6 +1081,10 @@ class _CalculatorViewState extends State<CalculatorView> {
         _controller.evaluate();
       case '±':
         _controller.toggleSign();
+      case 'i':
+        _controller.insertImaginaryUnit();
+      case 'CONJ':
+        _controller.input('CONJ');
       case 'MC':
         _controller.memoryClear();
       case 'MR':
@@ -1130,6 +1138,8 @@ class _CalculatorViewState extends State<CalculatorView> {
       'ID' => 'Create identity matrix',
       'I' => 'Identity matrix 2 by 2',
       'J' => 'Imaginary unit matrix',
+      'i' => 'Imaginary unit i',
+      'CONJ' => 'Complex conjugate (transpose)',
       'CLR' => 'Clear visible matrix cells',
       '2x2' => 'Set matrix order to 2 by 2',
       '3x3' => 'Set matrix order to 3 by 3',

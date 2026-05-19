@@ -88,6 +88,11 @@ class CalculatorController extends ChangeNotifier {
     _mutate(() => _session.insertMatrixLiteral(literal));
   }
 
+  /// Inserts the imaginary unit J = [[0,-1],[1,0]] as a matrix literal.
+  void insertImaginaryUnit() {
+    insertMatrixLiteral('[[0,-1],[1,0]]');
+  }
+
   /// Appends a character (digit, operator, paren) to the expression.
   void input(String value) {
     _mutate(() => _session.input(value));

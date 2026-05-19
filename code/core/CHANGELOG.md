@@ -4,7 +4,29 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.6.2] - 2026-05-27
+## [0.6.3] - 2026-05-19
+
+### Added
+
+- **Scalar promotion** in `Matrix.+` and `Matrix.-`: when one operand is a
+  1×1 scalar and the other is n×n square (n > 1), the scalar `k` is
+  automatically promoted to `k·Iₙ` before the element-wise operation. This
+  enables natural complex arithmetic: `Matrix.scalar(3) + Matrix.i` yields
+  `Matrix.complex(3, 1)` = `3 + i`.
+- `CONJ` button (Infix and RPN): applies transpose, yielding the complex
+  conjugate for complex-form matrices (e.g., `CONJ(3+2i)` = `3 - 2i`).
+- `i` button in Infix MAIN and RPN MAIN decks: inserts the imaginary unit
+  `J = [[0,-1],[1,0]]` as a matrix literal, enabling expressions like
+  `3 + 2 × i =` to evaluate to `3 + 2i`.
+
+### Changed
+
+- Infix MAIN deck: replaced `ID` with `i` and `M-` with `CONJ`. The identity
+  preset remains accessible via the I button in the matrix editor EDIT deck.
+- RPN MAIN deck: replaced `OVER` and `ROT` with `CONJ` and `i`. Both stack
+  operations remain in the STACK deck.
+
+## [0.6.2] - 2026-05-19
 
 ### Added
 
