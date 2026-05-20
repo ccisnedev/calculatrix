@@ -945,6 +945,17 @@ New layout:
 - [x] Add proof-oriented worked examples (Euler identity, conjugation,
   spectral decomposition invariants)
 
+### v0.6.7 — Matrix editor web input reliability hardening
+
+- [x] Stabilize matrix editor keypad-driven input updates without forcing
+  immediate refocus after every key press
+- [x] Prevent accidental value concatenation when selecting a populated cell:
+  first keypad key replaces selection, subsequent keys append
+- [x] Normalize leading decimal keypad input to `0.` for predictable parsing
+- [x] Add widget regressions for replace-on-first-key and leading decimal
+  normalization
+- [x] Validate matrix editor widget suite remains green after hardening
+
 Reference artifact:
 
 - [x] `docs/spec/calculatrix_mathematics.md`

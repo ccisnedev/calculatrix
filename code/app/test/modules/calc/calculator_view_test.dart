@@ -1037,6 +1037,31 @@ void main() {
       expect(_matrixEditableText(tester, 0, 1).readOnly, isTrue);
     });
 
+    testWidgets('matrix editor keypad replaces selected cell on first key and appends afterwards', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+      await _enterMatrixCell(tester, 0, 0, '12');
+
+      await _tapFinderCenter(tester, _matrixCell(0, 0));
+      await _tapCalculatorButton(tester, '7');
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '7');
+
+      await _tapCalculatorButton(tester, '8');
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '78');
+    });
+
+    testWidgets('matrix editor keypad normalizes a leading decimal point to 0.', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+
+      await _tapFinderCenter(tester, _matrixCell(0, 0));
+      await _tapCalculatorButton(tester, '.');
+
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '0.');
+    });
+
     testWidgets('matrix editor keeps actions usable while editing a 4x4 draft', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());

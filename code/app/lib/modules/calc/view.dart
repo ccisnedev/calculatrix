@@ -1228,6 +1228,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
   int? _editingRow;
   int? _editingColumn;
   String? _editingStartValue;
+  bool _replaceSelectionOnNextInput = false;
   int? _openRowActions;
   int? _openColumnActions;
   int? _draggingRow;
@@ -2599,14 +2600,18 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       _editingColumn = _selectedColumn;
       final TextEditingController controller =
           _controllers[_selectedRow][_selectedColumn];
-      final String nextValue = controller.text + fragment;
+      final String nextValue;
+      if (_replaceSelectionOnNextInput) {
+        nextValue = _normalizedFirstInput(fragment);
+      } else {
+        nextValue = controller.text + fragment;
+      }
       controller.text = nextValue;
       controller.selection = TextSelection.collapsed(offset: nextValue.length);
       _draft.setCell(_selectedRow, _selectedColumn, nextValue);
+      _replaceSelectionOnNextInput = false;
       _error = null;
     });
-
-    _requestCellFocus(_selectedRow, _selectedColumn);
   }
 
   void _backspaceSelectedCell() {
@@ -2622,10 +2627,9 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       controller.text = nextValue;
       controller.selection = TextSelection.collapsed(offset: nextValue.length);
       _draft.setCell(_selectedRow, _selectedColumn, nextValue);
+      _replaceSelectionOnNextInput = false;
       _error = null;
     });
-
-    _requestCellFocus(_selectedRow, _selectedColumn);
   }
 
   void _clearSelectedCell() {
@@ -2634,10 +2638,9 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       _editingColumn = _selectedColumn;
       _controllers[_selectedRow][_selectedColumn].clear();
       _draft.setCell(_selectedRow, _selectedColumn, '');
+      _replaceSelectionOnNextInput = false;
       _error = null;
     });
-
-    _requestCellFocus(_selectedRow, _selectedColumn);
   }
 
   void _toggleSelectedCellSign() {
@@ -2658,10 +2661,16 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       controller.text = nextValue;
       controller.selection = TextSelection.collapsed(offset: nextValue.length);
       _draft.setCell(_selectedRow, _selectedColumn, nextValue);
+      _replaceSelectionOnNextInput = false;
       _error = null;
     });
+  }
 
-    _requestCellFocus(_selectedRow, _selectedColumn);
+  String _normalizedFirstInput(String fragment) {
+    if (fragment == '.') {
+      return '0.';
+    }
+    return fragment;
   }
 
   bool get _isEditing => _editingRow != null && _editingColumn != null;
@@ -2741,6 +2750,9 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
 
   void _beginEditingCell(int row, int column) {
     if (_isEditingCell(row, column)) {
+      setState(() {
+        _replaceSelectionOnNextInput = true;
+      });
       _requestCellFocus(row, column, selectAll: true);
       return;
     }
@@ -2751,6 +2763,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       _editingRow = row;
       _editingColumn = column;
       _editingStartValue = _draft.cellValue(row, column);
+      _replaceSelectionOnNextInput = true;
       _closeStructuralActions();
       _error = null;
     });
@@ -2834,6 +2847,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     _editingRow = null;
     _editingColumn = null;
     _editingStartValue = null;
+    _replaceSelectionOnNextInput = false;
   }
 
   void _closeStructuralActions() {
