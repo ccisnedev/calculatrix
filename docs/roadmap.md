@@ -967,6 +967,95 @@ Release gate before publication planning:
 
 ---
 
+## Stage 7 — "Honest RPN Shell" (0.6.x → 0.7.0)
+
+Stage 7 removes the remaining shell-level fiction that presents `Infix` and
+`Matrix` as peer runtime modes. The persistent app surface becomes explicitly
+`RPN`, while `Infix` and `Matrix` become invoked editors over a pre-stack draft.
+Committed stack registers keep truthful `X0`, `X1`, `X2`, ... numbering at all
+times; a pending draft is never mislabeled as part of the committed stack.
+
+### v0.6.x → v0.7.0
+
+- [x] Remove the visible `Infix / RPN / Matrix` mode switch from the app shell
+- [x] Make `RPN` the only persistent shell surface in the Flutter app
+- [x] Introduce one labeled pre-stack draft surface distinct from committed
+  `X0`, `X1`, `X2`, ... stack registers
+- [x] Keep committed stack numbering stable while a draft exists; `X0` must
+  remain the committed top of stack until a real commit happens
+- [x] Preserve current `RPN` draft semantics where `ENTER` and unary/binary
+  operators may still commit the active draft through the core stack engine
+- [x] Replace direct notation/mode switching with an `EDIT` module exposing
+  explicit `INFIX` and `MATRIX` editor entry points
+- [x] In the `INFIX` editor, keep `=` as an infix-only action and make `ENTER`
+  the action that resolves the draft to matrices, pushes the result to the
+  stack, and returns to the `RPN` shell
+- [x] In the `MATRIX` editor, make `ENTER` validate and push the matrix draft to
+  the stack, then return to the `RPN` shell
+- [x] Make `CANCEL` discard the pending editor draft and return to `RPN`
+- [x] Keep touch interaction on committed stack cards read-only; editing begins
+  only through the explicit `EDIT` module entry points
+- [x] Make the fixed `DELETE` key draft-scoped when a draft exists, and use the
+  same key as `DROP` on committed `X0` when no draft exists
+- [x] Add pocket-calculator-style `MRC` behavior where the first press recalls
+  memory and the second consecutive press clears it
+- [x] Replace the dynamic deck selector with one fixed module bar containing:
+  `BASIC`, `STACK`, `MATH`, `MATRIX`, `VECTOR`, `FACT`, `PROP`, `EDIT`,
+  `BUILD`, `MEM`
+- [x] Keep each module page at 10 command slots without filler duplication;
+  empty slots are acceptable when a module needs fewer actions
+- [x] Add command overflow paging with `>` on the first overflowing page and
+  `<` / `>` on intermediate pages only when additional pages actually exist
+- [x] Adopt the fixed keypad layout:
+
+```text
+ 7   8   9   ÷   INFIX
+ 4   5   6   ×   DELETE
+ 1   2   3   -   =
+ 0   .   ±   +   ENTER
+```
+
+- [x] Seed `BASIC` with the initial 10 command slots:
+
+```text
+ MRC  M-   M+   AC   C
+ ___  %   SQRT INV   i
+```
+
+- [x] Reserve `MATH` as the future home for transcendental and advanced scalar
+  functions such as `log`, `ln`, and `exp` once the fixed-module shell is
+  stable
+
+##### TDD Execution Order
+
+- [x] Step 1: lock the new shell contract in controller/widget tests so drafts
+  are no longer labeled as committed `X` registers and the committed stack
+  remains visually stable while a draft exists
+- [x] Step 2: separate the pre-stack draft surface from committed stack
+  presentation in the app without changing core matrix semantics
+- [x] Step 3: wire the fixed keypad layout and the fixed module bar, including
+  empty command slots and overflow page navigation
+- [x] Step 4: route `INFIX` and `MATRIX` through the `EDIT` module and prove
+  `ENTER` / `CANCEL` editor return semantics with focused widget and
+  integration coverage
+- [x] Step 5: implement contextual `DELETE` / `DROP`, `MRC` toggle behavior,
+  and the initial `BASIC` module button map with regression tests
+- [x] Step 6: refresh public shell docs and rerun focused core, app, and CLI
+  validation before closing the `v0.7.0` slice
+
+### v0.7.0 — Stable Release
+
+- [x] One persistent `RPN` shell with truthful committed stack registers
+- [x] Invoked `INFIX` and `MATRIX` editors over a labeled pre-stack draft
+  distinct from committed registers
+- [x] Fixed keypad layout and fixed module taxonomy in the Flutter shell
+- [x] Context-aware `DELETE` / `DROP` and pocket-calculator-style `MRC`
+  semantics
+- [x] Green validation across core, app, and CLI with refreshed shell
+  documentation
+
+---
+
 ## General Backlog
 
 - Performance profiling

@@ -35,7 +35,9 @@ void main() {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('5'));
+      await tester.tap(_calculatorButton('INFIX'));
+      await tester.pumpAndSettle();
+      await tester.tap(_calculatorButton('5'));
       await tester.pump();
 
       expect(
@@ -80,38 +82,33 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('mode buttons have descriptive semantic labels',
+    testWidgets('editor entry buttons have descriptive semantic labels',
         (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
       expect(
-        find.bySemanticsLabel('Infix mode'),
+        find.bySemanticsLabel('Open infix editor'),
         findsOneWidget,
       );
+      await _ensureDeck(tester, 'EDIT');
       expect(
-        find.bySemanticsLabel('RPN mode'),
-        findsOneWidget,
-      );
-      // 'Matrix mode' may match both the mode button and the MAT button
-      expect(
-        find.bySemanticsLabel('Matrix mode'),
+        find.bySemanticsLabel('Open matrix editor'),
         findsAtLeastNWidgets(1),
       );
       handle.dispose();
     });
 
-    testWidgets('deck selectors have descriptive labels', (tester) async {
+    testWidgets('module selectors have descriptive labels', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      // Switch to RPN to see all deck selectors
-      await tester.tap(find.bySemanticsLabel('RPN mode'));
-      await tester.pumpAndSettle();
-
-      // Deck selectors use format "X deck"
       expect(
-        find.bySemanticsLabel('Main functions deck'),
+        find.bySemanticsLabel('Basic commands module'),
+        findsAtLeastNWidgets(1),
+      );
+      expect(
+        find.bySemanticsLabel('Editor entry points module'),
         findsAtLeastNWidgets(1),
       );
       handle.dispose();
@@ -121,10 +118,6 @@ void main() {
         (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-
-      // Switch to RPN mode
-      await tester.tap(find.bySemanticsLabel('RPN mode'));
-      await tester.pumpAndSettle();
 
       // Check stack operations deck
       await _ensureDeck(tester, 'STACK');
@@ -181,11 +174,10 @@ void main() {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      // Switch to RPN mode and open matrix editor
-      await tester.tap(find.bySemanticsLabel('RPN mode'));
+      await _ensureDeck(tester, 'EDIT');
       await tester.pumpAndSettle();
 
-      final matButton = _calculatorButton('MAT');
+      final matButton = _calculatorButton('MATRIX');
       await tester.tap(matButton);
       await tester.pumpAndSettle();
 
@@ -204,11 +196,10 @@ void main() {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      // Switch to RPN mode and open matrix editor
-      await tester.tap(find.bySemanticsLabel('RPN mode'));
+      await _ensureDeck(tester, 'EDIT');
       await tester.pumpAndSettle();
 
-      final matButton = _calculatorButton('MAT');
+      final matButton = _calculatorButton('MATRIX');
       await tester.tap(matButton);
       await tester.pumpAndSettle();
 

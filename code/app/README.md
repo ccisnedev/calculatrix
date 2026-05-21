@@ -5,11 +5,12 @@ Flutter consumer shell for Calculatrix.
 This app depends on the shared core package in `../core` and is responsible for
 UI, interaction flows, matrix entry, display policy, and platform packaging.
 
-## Shell modes
+## Shell model
 
-- `Infix`: algebra-style entry that compiles to the canonical stack kernel
-- `RPN`: direct-command surface with stack summaries and matrix command pages
-- `Matrix`: bounded workstation for matrix editing and structural workflows
+- Persistent `RPN` shell with truthful committed stack summaries
+- Explicit `INFIX` editor over a pre-stack draft routed through the canonical stack kernel
+- Explicit `MATRIX` editor for bounded matrix editing over the same draft surface
+- Fixed module bar plus fixed keypad with contextual `DELETE` / `DROP` and pocket-calculator-style `MRC`
 
 ## Common Commands
 

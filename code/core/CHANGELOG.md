@@ -4,6 +4,22 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-05-21
+
+### Changed
+
+- Coordinated version alignment with the repository-wide `0.7.0` release that
+  closes the Stage 7 Flutter shell milestone.
+- No public `package:calculatrix` API or semantic contracts changed in this
+  release; core math, machine, and session behavior remain the same as in
+  `0.6.6`.
+
+### Documentation
+
+- Consumer-facing docs now describe the Flutter shell as a persistent `RPN`
+  surface with explicit `INFIX` and `MATRIX` editors over the unchanged core
+  session model.
+
 ## [0.6.6] - 2026-05-19
 
 ### Added

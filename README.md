@@ -1,11 +1,12 @@
 # Calculatrix
 
 > Calculadora multiplataforma matrix-first con un core canónico basado en
-> stack machine y tres superficies visibles: `Infix`, `RPN` y `Matrix`.
+> stack machine y un shell persistente `RPN` con editores invocados `INFIX` y
+> `MATRIX`.
 
 [![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
 
-## Highlights (v0.4.10)
+## Highlights (current)
 
 - `package:calculatrix` es la fuente semántica única para app y CLI.
 - El core público expone `CalculatrixMachine`, comandos tipados, macros
@@ -30,10 +31,12 @@
   `FACT`.
 - La línea `v0.3.1` mantiene `√` inmediato y `%` tipo Casio en `Infix`, sin
   alterar los contratos públicos de parser ni `RPN`.
-- La app usa un solo teclado `6x4`: las cuatro filas inferiores permanecen
-  fijas como calculadora clásica y solo las dos filas superiores cambian por
-  deck según el modo activo.
-- La app Flutter ofrece tres modos visibles: `Infix`, `RPN` y `Matrix`.
+- La app usa un keypad fijo `4x5` y una barra fija de módulos: `BASIC`,
+  `STACK`, `MATH`, `MATRIX`, `VECTOR`, `FACT`, `PROP`, `EDIT`, `BUILD`, `MEM`.
+- La app Flutter expone un shell persistente `RPN`; `INFIX` y `MATRIX` se
+  abren como editores explícitos sobre un draft pre-stack.
+- El draft del shell se presenta como `Draft`, separado del `X0` comprometido,
+  que conserva su numeración veraz mientras no haya commit real.
 - El workstation matricial soporta edición estructural acotada `2x2` a `4x4`,
   presets, reordenamiento y confirmación canónica del literal final.
 - El CLI soporta modos `infix`, `rpn`, `command` y `macro` sobre la misma
@@ -66,7 +69,7 @@ code/core/lib/
 
 code/app/lib/modules/calc/
   controller.dart  # presentation adapter over CalculatrixSession
-  view.dart        # shell Infix/RPN/Matrix y workstation UI
+  view.dart        # shell RPN persistente, draft pre-stack y editores invocados
 
 code/cli/bin/
   calculatrix_cli.dart

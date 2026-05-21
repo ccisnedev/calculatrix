@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-05-21
+
+Closes Stage 7, Honest RPN Shell, as a coordinated repository release.
+
+### Core
+
+- Synchronized `calculatrix` to `0.7.0` for the coordinated release.
+- No new public core API or semantic changes beyond the already-shipped `0.6.x`
+	matrix, stack, and session contracts.
+
+### App
+
+- The Flutter shell now ships as one persistent `RPN` surface without the old
+	visible `Infix / RPN / Matrix` mode switch.
+- `INFIX` and `MATRIX` are explicit editors over a pre-stack `Draft` surface,
+	while committed `X0`, `X1`, ... remain visually truthful.
+- The keypad now follows the fixed Stage 7 layout and the shell exposes the
+	fixed module taxonomy `BASIC`, `STACK`, `MATH`, `MATRIX`, `VECTOR`, `FACT`,
+	`PROP`, `EDIT`, `BUILD`, `MEM`.
+- `DELETE` is contextual (`draft edit` vs `DROP`) and `MRC` now follows the
+	pocket-calculator recall/clear interaction.
+
+### CLI
+
+- Synchronized `calculatrix_cli` to `0.7.0` for the coordinated release.
+- CLI command surfaces remain semantically aligned with the unchanged shared
+	core contracts.
+
+### Docs
+
+- Refreshed Stage 7 roadmap, architecture notes, spec wording, and public
+	README surfaces to describe the implemented shell model.
+
+### QA
+
+- Full coordinated validation green before release closure:
+	- core: `dart test` -> 429 passing tests
+	- CLI: `dart test` -> 12 passing tests
+	- app: `flutter analyze` clean
+	- app widget/unit: 157 passing tests, 3 skipped
+	- app Windows integration: 19 passing tests
+
 ## [0.4.50] - 2026-05-18
 
 Adds formal definitional operations: minor, cofactor matrix, and adjugate

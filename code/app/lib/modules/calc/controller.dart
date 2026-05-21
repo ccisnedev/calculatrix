@@ -10,15 +10,16 @@ enum CalculatorMode { infix, rpn, matrix }
 class CalculatorController extends ChangeNotifier {
   CalculatorController({CalculatrixSession? session})
       : _session = session ?? CalculatrixSession() {
+    _session.setMode(CalculatrixMode.rpn);
     _syncPresentation();
   }
 
   final CalculatrixSession _session;
-  CalculatorMode _mode = CalculatorMode.infix;
-  CalculatorMode _lastNonMatrixMode = CalculatorMode.infix;
+  CalculatorMode _mode = CalculatorMode.rpn;
   String _result = '';
   String _error = '';
   Matrix? _displayMatrix;
+  bool _mrcArmed = false;
 
   CalculatorMode get mode => _mode;
 
@@ -38,6 +39,8 @@ class CalculatorController extends ChangeNotifier {
 
   bool get isRpnMode => mode == CalculatorMode.rpn;
 
+  bool get isInfixMode => mode == CalculatorMode.infix;
+
   bool get isMatrixMode => mode == CalculatorMode.matrix;
 
   bool get isRpnEntryMode => _session.mode == CalculatrixMode.rpn;
@@ -47,6 +50,33 @@ class CalculatorController extends ChangeNotifier {
   List<String> get rpnStackLiterals => _session.rpnStackLiterals;
 
   String get rpnTopLiteral => _session.rpnTopLiteral;
+
+  bool get hasDraftDisplay => _error.isNotEmpty || expression.isNotEmpty;
+
+  bool get deleteWouldEditDraft =>
+      isMatrixMode || isInfixMode || _error.isNotEmpty || expression.isNotEmpty;
+
+  String get draftDisplay => _error.isNotEmpty ? _error : expression;
+
+  String get committedRpnDisplay {
+    final Matrix? currentValue = _session.currentValue;
+    if (currentValue == null) {
+      return '0';
+    }
+
+    return currentValue.isComplexForm
+        ? MatrixDisplayFormatter.complex(currentValue)
+        : _session.rpnTopLiteral;
+  }
+
+  Matrix? get committedRpnDisplayMatrix {
+    final Matrix? currentValue = _session.currentValue;
+    if (currentValue == null || currentValue.isScalar || currentValue.isComplexForm) {
+      return null;
+    }
+
+    return currentValue;
+  }
 
   /// The display text shown to the user.
   String get display {
@@ -63,17 +93,31 @@ class CalculatorController extends ChangeNotifier {
 
     _mutate(() {
       _mode = mode;
-      if (mode == CalculatorMode.matrix) {
-        return;
+      switch (mode) {
+        case CalculatorMode.rpn:
+          _session.setMode(CalculatrixMode.rpn);
+        case CalculatorMode.infix:
+          _session.setMode(CalculatrixMode.infix);
+        case CalculatorMode.matrix:
+          return;
       }
-
-      _lastNonMatrixMode = mode;
-      _session.setMode(
-        mode == CalculatorMode.rpn
-            ? CalculatrixMode.rpn
-            : CalculatrixMode.infix,
-      );
     });
+  }
+
+  void openInfixEditor() {
+    setMode(CalculatorMode.infix);
+  }
+
+  void openMatrixEditor() {
+    setMode(CalculatorMode.matrix);
+  }
+
+  void cancelEditor() {
+    if (_mode == CalculatorMode.rpn) {
+      return;
+    }
+
+    setMode(CalculatorMode.rpn);
   }
 
   void exitMatrixMode() {
@@ -81,7 +125,52 @@ class CalculatorController extends ChangeNotifier {
       return;
     }
 
-    setMode(_lastNonMatrixMode);
+    cancelEditor();
+  }
+
+  void submitInfixEditor() {
+    if (_mode != CalculatorMode.infix) {
+      return;
+    }
+
+    _mutate(() {
+      if (_session.expression.isNotEmpty) {
+        _session.evaluate();
+      }
+
+      if (_session.hasError || _session.currentValue == null) {
+        return;
+      }
+
+      _mode = CalculatorMode.rpn;
+      _session.setMode(CalculatrixMode.rpn);
+    });
+  }
+
+  void submitMatrixEditorLiteral(String literal) {
+    _mutate(() {
+      if (_session.mode != CalculatrixMode.rpn) {
+        _session.setMode(CalculatrixMode.rpn);
+      }
+
+      _mode = CalculatorMode.rpn;
+      _session.insertMatrixLiteral(literal);
+    });
+  }
+
+  void submitMatrixEditorStackCommand(
+    String literal,
+    CalculatrixCommand command,
+  ) {
+    _mutate(() {
+      if (_session.mode != CalculatrixMode.rpn) {
+        _session.setMode(CalculatrixMode.rpn);
+      }
+
+      _mode = CalculatorMode.rpn;
+      _session.insertMatrixLiteral(literal);
+      _session.executeCommand(command);
+    });
   }
 
   void insertMatrixLiteral(String literal) {
@@ -108,6 +197,20 @@ class CalculatorController extends ChangeNotifier {
     _mutate(_session.clear);
   }
 
+  void allClear() {
+    _mutate(() {
+      if (_session.mode == CalculatrixMode.infix) {
+        _session.clear();
+        _mode = CalculatorMode.rpn;
+        _session.setMode(CalculatrixMode.rpn);
+      }
+
+      _session.clear();
+      _session.clear();
+      _session.memoryClear();
+    });
+  }
+
   /// Deletes the last character from the expression.
   void backspace() {
     _mutate(_session.backspace);
@@ -126,6 +229,19 @@ class CalculatorController extends ChangeNotifier {
   /// Recalls memory value into expression.
   void memoryRecall() {
     _mutate(_session.memoryRecall);
+  }
+
+  void memoryRecallClear() {
+    _mutate(() {
+      if (_mrcArmed) {
+        _session.memoryClear();
+        _mrcArmed = false;
+        return;
+      }
+
+      _session.memoryRecall();
+      _mrcArmed = true;
+    }, resetMrcSequence: false);
   }
 
   /// Adds current display value to memory.
@@ -194,7 +310,11 @@ class CalculatorController extends ChangeNotifier {
     return str;
   }
 
-  void _mutate(void Function() action) {
+  void _mutate(void Function() action, {bool resetMrcSequence = true}) {
+    if (resetMrcSequence) {
+      _mrcArmed = false;
+    }
+
     action();
     if (_session.hasError) {
       debugPrint('Eval error: ${_session.lastError}');

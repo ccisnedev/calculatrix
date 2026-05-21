@@ -13,8 +13,34 @@ enum _ButtonCategory { number, operator, function, equals }
 class _ButtonDef {
   final String label;
   final _ButtonCategory category;
+  final String? keySuffix;
+  final String? visualLabel;
+  final bool enabled;
 
-  const _ButtonDef(this.label, this.category);
+  const _ButtonDef(
+    this.label,
+    this.category, {
+    this.keySuffix,
+    this.visualLabel,
+  }) : enabled = true;
+
+  const _ButtonDef.empty()
+      : label = '',
+        category = _ButtonCategory.function,
+        keySuffix = null,
+        visualLabel = null,
+        enabled = false;
+
+  String get keyLabel => keySuffix == null ? label : '$label-$keySuffix';
+
+  String get visibleLabel => visualLabel ?? label;
+}
+
+class _KeypadModuleDef {
+  final String label;
+  final List<List<_ButtonDef>> pages;
+
+  const _KeypadModuleDef(this.label, this.pages);
 }
 
 enum _StructuralAxis { row, column }
@@ -27,13 +53,6 @@ class _StructuralDragData {
 
   final _StructuralAxis axis;
   final int index;
-}
-
-class _KeypadDeckDef {
-  final String label;
-  final List<_ButtonDef> buttons;
-
-  const _KeypadDeckDef(this.label, this.buttons);
 }
 
 class _RpnStackSlot {
@@ -64,28 +83,29 @@ class _CalculatorViewState extends State<CalculatorView> {
   static const double _displayFraction = 0.38196601125;
   static const double _pagePadding = 12;
   static const double _gridSpacing = 8;
-  static const double _deckSelectorHeight = 48;
+  static const double _deckSelectorHeight = 96;
 
-  String _infixDeckLabel = 'MAIN';
-  String _rpnDeckLabel = 'MAIN';
-  String _matrixDeckLabel = 'EDIT';
+  String _selectedModuleLabel = 'BASIC';
+  final Map<String, int> _modulePageIndices = <String, int>{};
+
+  static const _ButtonDef _emptySlot = _ButtonDef.empty();
 
   static const List<_ButtonDef> _fixedBottomButtons = <_ButtonDef>[
     _ButtonDef('7', _ButtonCategory.number),
     _ButtonDef('8', _ButtonCategory.number),
     _ButtonDef('9', _ButtonCategory.number),
     _ButtonDef('÷', _ButtonCategory.operator),
-    _ButtonDef('INV', _ButtonCategory.function),
+    _ButtonDef('INFIX', _ButtonCategory.function),
     _ButtonDef('4', _ButtonCategory.number),
     _ButtonDef('5', _ButtonCategory.number),
     _ButtonDef('6', _ButtonCategory.number),
     _ButtonDef('×', _ButtonCategory.operator),
-    _ButtonDef('√', _ButtonCategory.function),
+    _ButtonDef('DELETE', _ButtonCategory.function, visualLabel: '⌫'),
     _ButtonDef('1', _ButtonCategory.number),
     _ButtonDef('2', _ButtonCategory.number),
     _ButtonDef('3', _ButtonCategory.number),
     _ButtonDef('-', _ButtonCategory.operator),
-    _ButtonDef('⌫', _ButtonCategory.function),
+    _ButtonDef('=', _ButtonCategory.equals),
     _ButtonDef('0', _ButtonCategory.number),
     _ButtonDef('.', _ButtonCategory.number),
     _ButtonDef('±', _ButtonCategory.function),
@@ -93,144 +113,158 @@ class _CalculatorViewState extends State<CalculatorView> {
     _ButtonDef('ENTER', _ButtonCategory.equals),
   ];
 
-  static const List<_KeypadDeckDef> _infixDecks = <_KeypadDeckDef>[
-    _KeypadDeckDef('MAIN', <_ButtonDef>[
-      _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('C', _ButtonCategory.function),
-      _ButtonDef('%', _ButtonCategory.function),
-      _ButtonDef('(', _ButtonCategory.function),
-      _ButtonDef(')', _ButtonCategory.function),
-      _ButtonDef('MC', _ButtonCategory.function),
-      _ButtonDef('MR', _ButtonCategory.function),
-      _ButtonDef('CONJ', _ButtonCategory.function),
-      _ButtonDef('M+', _ButtonCategory.function),
-      _ButtonDef('i', _ButtonCategory.function),
+  static const List<_KeypadModuleDef> _modules = <_KeypadModuleDef>[
+    _KeypadModuleDef('BASIC', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _ButtonDef('MRC', _ButtonCategory.function),
+        _ButtonDef('M-', _ButtonCategory.function),
+        _ButtonDef('M+', _ButtonCategory.function),
+        _ButtonDef('AC', _ButtonCategory.function),
+        _ButtonDef('C', _ButtonCategory.function),
+        _emptySlot,
+        _ButtonDef('%', _ButtonCategory.function),
+        _ButtonDef('SQRT', _ButtonCategory.function),
+        _ButtonDef('INV', _ButtonCategory.function),
+        _ButtonDef('i', _ButtonCategory.function),
+      ],
     ]),
-  ];
-
-  static const List<_KeypadDeckDef> _rpnDecks = <_KeypadDeckDef>[
-    _KeypadDeckDef('MAIN', <_ButtonDef>[
-      _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('C', _ButtonCategory.function),
-      _ButtonDef('%', _ButtonCategory.function),
-      _ButtonDef('MR', _ButtonCategory.function),
-      _ButtonDef('M+', _ButtonCategory.function),
-      _ButtonDef('DUP', _ButtonCategory.function),
-      _ButtonDef('DROP', _ButtonCategory.function),
-      _ButtonDef('SWAP', _ButtonCategory.function),
-      _ButtonDef('CONJ', _ButtonCategory.function),
-      _ButtonDef('i', _ButtonCategory.function),
+    _KeypadModuleDef('STACK', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _ButtonDef('DUP', _ButtonCategory.function),
+        _ButtonDef('DROP', _ButtonCategory.function),
+        _ButtonDef('SWAP', _ButtonCategory.function),
+        _ButtonDef('OVER', _ButtonCategory.function),
+        _ButtonDef('ROT', _ButtonCategory.function),
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+      ],
     ]),
-    _KeypadDeckDef('STACK', <_ButtonDef>[
-      _ButtonDef('DUP', _ButtonCategory.function),
-      _ButtonDef('DROP', _ButtonCategory.function),
-      _ButtonDef('SWAP', _ButtonCategory.function),
-      _ButtonDef('OVER', _ButtonCategory.function),
-      _ButtonDef('ROT', _ButtonCategory.function),
-      _ButtonDef('NEG', _ButtonCategory.function),
-      _ButtonDef('MC', _ButtonCategory.function),
-      _ButtonDef('M-', _ButtonCategory.function),
-      _ButtonDef('M+', _ButtonCategory.function),
-      _ButtonDef('MR', _ButtonCategory.function),
+    _KeypadModuleDef('MATH', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+      ],
     ]),
-    _KeypadDeckDef('MATRIX', <_ButtonDef>[
-      _ButtonDef('T', _ButtonCategory.function),
-      _ButtonDef('DET', _ButtonCategory.function),
-      _ButtonDef('ZEROS', _ButtonCategory.function),
-      _ButtonDef('ONES', _ButtonCategory.function),
-      _ButtonDef('AROW', _ButtonCategory.function),
-      _ButtonDef('ACOL', _ButtonCategory.function),
-      _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('NEG', _ButtonCategory.function),
-      _ButtonDef('MC', _ButtonCategory.function),
-      _ButtonDef('M-', _ButtonCategory.function),
+    _KeypadModuleDef('MATRIX', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _ButtonDef('T', _ButtonCategory.function),
+        _ButtonDef('DET', _ButtonCategory.function),
+        _ButtonDef('INV', _ButtonCategory.function),
+        _ButtonDef('RREF', _ButtonCategory.function),
+        _ButtonDef('ZEROS', _ButtonCategory.function),
+        _ButtonDef('ONES', _ButtonCategory.function),
+        _ButtonDef('AROW', _ButtonCategory.function),
+        _ButtonDef('ACOL', _ButtonCategory.function),
+        _ButtonDef('NEG', _ButtonCategory.function),
+        _ButtonDef('>', _ButtonCategory.function),
+      ],
+      <_ButtonDef>[
+        _ButtonDef('<', _ButtonCategory.function),
+        _ButtonDef('TR', _ButtonCategory.function),
+        _ButtonDef('RANK', _ButtonCategory.function),
+        _ButtonDef('NORM', _ButtonCategory.function),
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+      ],
     ]),
-    _KeypadDeckDef('FACT', <_ButtonDef>[
-      _ButtonDef('LU', _ButtonCategory.function),
-      _ButtonDef('QR', _ButtonCategory.function),
-      _ButtonDef('RREF', _ButtonCategory.function),
-      _ButtonDef('EIG', _ButtonCategory.function),
-      _ButtonDef('DIAG', _ButtonCategory.function),
-      _ButtonDef('COF', _ButtonCategory.function),
-      _ButtonDef('ADJ', _ButtonCategory.function),
-      _ButtonDef('TR', _ButtonCategory.function),
-      _ButtonDef('NORM', _ButtonCategory.function),
-      _ButtonDef('SNORM', _ButtonCategory.function),
+    _KeypadModuleDef('VECTOR', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _ButtonDef('DOT', _ButtonCategory.function),
+        _ButtonDef('CROSS', _ButtonCategory.function),
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+      ],
     ]),
-    _KeypadDeckDef('PROP', <_ButtonDef>[
-      _ButtonDef('DET', _ButtonCategory.function),
-      _ButtonDef('RANK', _ButtonCategory.function),
-      _ButtonDef('NORM', _ButtonCategory.function),
-      _ButtonDef('SNORM', _ButtonCategory.function),
-      _ButtonDef('TR', _ButtonCategory.function),
-      _ButtonDef('EIG', _ButtonCategory.function),
-      _ButtonDef('COF', _ButtonCategory.function),
-      _ButtonDef('ADJ', _ButtonCategory.function),
-      _ButtonDef('DOT', _ButtonCategory.function),
-      _ButtonDef('CROSS', _ButtonCategory.function),
+    _KeypadModuleDef('FACT', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _ButtonDef('LU', _ButtonCategory.function),
+        _ButtonDef('QR', _ButtonCategory.function),
+        _ButtonDef('EIG', _ButtonCategory.function),
+        _ButtonDef('DIAG', _ButtonCategory.function),
+        _ButtonDef('COF', _ButtonCategory.function),
+        _ButtonDef('ADJ', _ButtonCategory.function),
+        _ButtonDef('SNORM', _ButtonCategory.function),
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+      ],
     ]),
-    _KeypadDeckDef('VEC', <_ButtonDef>[
-      _ButtonDef('DOT', _ButtonCategory.function),
-      _ButtonDef('CROSS', _ButtonCategory.function),
-      _ButtonDef('NORM', _ButtonCategory.function),
-      _ButtonDef('T', _ButtonCategory.function),
-      _ButtonDef('DUP', _ButtonCategory.function),
-      _ButtonDef('SWAP', _ButtonCategory.function),
-      _ButtonDef('NEG', _ButtonCategory.function),
-      _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('RANK', _ButtonCategory.function),
-      _ButtonDef('DET', _ButtonCategory.function),
+    _KeypadModuleDef('PROP', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _ButtonDef('DET', _ButtonCategory.function),
+        _ButtonDef('TR', _ButtonCategory.function),
+        _ButtonDef('RANK', _ButtonCategory.function),
+        _ButtonDef('NORM', _ButtonCategory.function),
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+      ],
     ]),
-  ];
-
-  static const List<_KeypadDeckDef> _matrixDecks = <_KeypadDeckDef>[
-    _KeypadDeckDef('EDIT', <_ButtonDef>[
-      _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('C', _ButtonCategory.function),
-      _ButtonDef('2x2', _ButtonCategory.function),
-      _ButtonDef('3x3', _ButtonCategory.function),
-      _ButtonDef('4x4', _ButtonCategory.function),
-      _ButtonDef('CLR', _ButtonCategory.function),
-      _ButtonDef('AROW', _ButtonCategory.function),
-      _ButtonDef('ACOL', _ButtonCategory.function),
-      _ButtonDef('I', _ButtonCategory.function),
-      _ButtonDef('J', _ButtonCategory.function),
+    _KeypadModuleDef('EDIT', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _ButtonDef('INFIX', _ButtonCategory.function, keySuffix: 'edit'),
+        _ButtonDef('MATRIX', _ButtonCategory.function),
+        _ButtonDef('CANCEL', _ButtonCategory.function),
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+      ],
     ]),
-    _KeypadDeckDef('BUILD', <_ButtonDef>[
-      _ButtonDef('ZEROS', _ButtonCategory.function),
-      _ButtonDef('ONES', _ButtonCategory.function),
-      _ButtonDef('ID', _ButtonCategory.function),
-      _ButtonDef('T', _ButtonCategory.function),
-      _ButtonDef('DET', _ButtonCategory.function),
-      _ButtonDef('AROW', _ButtonCategory.function),
-      _ButtonDef('ACOL', _ButtonCategory.function),
-      _ButtonDef('NEG', _ButtonCategory.function),
-      _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('CLR', _ButtonCategory.function),
+    _KeypadModuleDef('BUILD', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _ButtonDef('2x2', _ButtonCategory.function),
+        _ButtonDef('3x3', _ButtonCategory.function),
+        _ButtonDef('4x4', _ButtonCategory.function),
+        _ButtonDef('ID', _ButtonCategory.function),
+        _ButtonDef('I', _ButtonCategory.function),
+        _ButtonDef('J', _ButtonCategory.function),
+        _ButtonDef('CLR', _ButtonCategory.function),
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+      ],
     ]),
-    _KeypadDeckDef('FACT', <_ButtonDef>[
-      _ButtonDef('LU', _ButtonCategory.function),
-      _ButtonDef('QR', _ButtonCategory.function),
-      _ButtonDef('T', _ButtonCategory.function),
-      _ButtonDef('EIG', _ButtonCategory.function),
-      _ButtonDef('DET', _ButtonCategory.function),
-      _ButtonDef('ZEROS', _ButtonCategory.function),
-      _ButtonDef('ONES', _ButtonCategory.function),
-      _ButtonDef('ID', _ButtonCategory.function),
-      _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('CLR', _ButtonCategory.function),
-    ]),
-    _KeypadDeckDef('MEM', <_ButtonDef>[
-      _ButtonDef('MC', _ButtonCategory.function),
-      _ButtonDef('MR', _ButtonCategory.function),
-      _ButtonDef('M-', _ButtonCategory.function),
-      _ButtonDef('M+', _ButtonCategory.function),
-      _ButtonDef('MAT', _ButtonCategory.function),
-      _ButtonDef('C', _ButtonCategory.function),
-      _ButtonDef('CLR', _ButtonCategory.function),
-      _ButtonDef('2x2', _ButtonCategory.function),
-      _ButtonDef('3x3', _ButtonCategory.function),
-      _ButtonDef('4x4', _ButtonCategory.function),
+    _KeypadModuleDef('MEM', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+      ],
     ]),
   ];
 
@@ -304,8 +338,6 @@ class _CalculatorViewState extends State<CalculatorView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildModeSwitch(),
-          const SizedBox(height: 12),
           if (showDisplayStatus) ...[
             Row(
               children: [
@@ -388,6 +420,10 @@ class _CalculatorViewState extends State<CalculatorView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_controller.hasDraftDisplay) ...[
+            _buildRpnDraftCard(),
+            if (visualOrder.isNotEmpty) const SizedBox(height: 4),
+          ],
           for (int index = 0; index < visualOrder.length; index++) ...[
             _buildRpnStackCard(visualOrder[index]),
             if (index < visualOrder.length - 1) const SizedBox(height: 4),
@@ -398,11 +434,23 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   List<_RpnStackSlot> _buildRpnDisplaySlots() {
-    final bool overlaysCommittedTop =
-        _controller.expression.isNotEmpty || _controller.error.isNotEmpty;
-    final Iterable<String> stackedLiterals = overlaysCommittedTop
-        ? _controller.rpnStackLiterals
-        : _controller.rpnStackLiterals.skip(1);
+    if (_controller.rpnStackDepth == 0 && _controller.hasDraftDisplay) {
+      return const <_RpnStackSlot>[];
+    }
+
+    if (_controller.hasDraftDisplay) {
+      return <_RpnStackSlot>[
+        for (int register = 0;
+            register < _controller.rpnStackLiterals.length;
+            register++)
+          _RpnStackSlot(
+            register: register,
+            literal: _controller.rpnStackLiterals[register],
+          ),
+      ];
+    }
+
+    final Iterable<String> stackedLiterals = _controller.rpnStackLiterals.skip(1);
     final List<_RpnStackSlot> slots = <_RpnStackSlot>[
       const _RpnStackSlot(register: 0),
     ];
@@ -418,7 +466,7 @@ class _CalculatorViewState extends State<CalculatorView> {
 
   Widget _buildRpnStackCard(_RpnStackSlot slot) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final bool isPrimary = slot.register == 0;
+    final bool isPrimary = slot.register == 0 && !_controller.hasDraftDisplay;
 
     return AnimatedContainer(
       key: ValueKey<String>('rpn-stack-card-${slot.register}'),
@@ -442,29 +490,165 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildPrimaryRpnStackCard() {
+    return _buildPrimaryRpnCardFrame(
+      semanticsLabel: 'Committed register X0',
+      headline: 'X0',
+      headlineColor: Theme.of(context).colorScheme.primary,
+      value: _buildCommittedRpnDisplayValue(fontSize: 28),
+    );
+  }
+
+  Widget _buildRpnDraftCard() {
     final ColorScheme cs = Theme.of(context).colorScheme;
+    final bool showsError = _controller.error.isNotEmpty;
+    final String draftText = _controller.draftDisplay;
+
+    return AnimatedContainer(
+      key: const ValueKey<String>('rpn-draft-card'),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      constraints: const BoxConstraints(minHeight: 72),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: showsError ? cs.errorContainer : cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: showsError ? cs.error : cs.primary.withAlpha(80),
+        ),
+      ),
+      child: _buildPrimaryRpnCardFrame(
+        semanticsLabel: showsError ? 'Draft error: $draftText' : 'Draft: $draftText',
+        headline: showsError ? 'ERROR' : 'DRAFT',
+        headlineColor: showsError ? cs.onErrorContainer : cs.primary,
+        value: _buildDraftRpnDisplayValue(
+          fontSize: 28,
+          showsError: showsError,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryRpnCardFrame({
+    required String semanticsLabel,
+    required String headline,
+    required Color headlineColor,
+    required Widget value,
+  }) {
     return Semantics(
       container: true,
       liveRegion: true,
-      label: 'Entry register X0',
+      label: semanticsLabel,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ExcludeSemantics(
             child: Text(
-              'X0',
+              headline,
               style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                color: cs.primary,
+                color: headlineColor,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
               ),
             ),
           ),
           const SizedBox(height: 8),
-          _buildDisplayValue(fontSize: 28),
+          value,
         ],
       ),
+    );
+  }
+
+  Widget _buildDraftRpnDisplayValue({
+    required double fontSize,
+    required bool showsError,
+  }) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        reverse: true,
+        child: Text(
+          key: const ValueKey<String>('rpn-draft-text'),
+          _controller.draftDisplay,
+          style: Theme.of(context).textTheme.displaySmall!.copyWith(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w300,
+            color: showsError ? cs.onErrorContainer : cs.onSurface,
+            fontFamily: 'monospace',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommittedRpnDisplayValue({required double fontSize}) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final Matrix? matrix = _controller.committedRpnDisplayMatrix;
+
+    if (matrix == null) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Semantics(
+          liveRegion: true,
+          label: 'Display: ${_controller.committedRpnDisplay}',
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            reverse: true,
+            child: Text(
+              key: const ValueKey<String>('calculator-display-text'),
+              _controller.committedRpnDisplay,
+              style: Theme.of(context).textTheme.displaySmall!.copyWith(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w300,
+                color: cs.onSurface,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool useExpanded = constraints.maxWidth >= 240 &&
+            matrix.rowCount <= 4 &&
+            matrix.columnCount <= 4;
+        final String semanticValue = MatrixDisplayFormatter.compact(matrix);
+        final String visualValue = useExpanded
+            ? MatrixDisplayFormatter.expanded(matrix)
+            : semanticValue;
+
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Semantics(
+            liveRegion: true,
+            label:
+                'Display: $semanticValue. Matrix ${matrix.rowCount} by ${matrix.columnCount}',
+            child: SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                reverse: !useExpanded,
+                child: Text(
+                  key: const ValueKey<String>('calculator-display-text'),
+                  visualValue,
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.displaySmall!.copyWith(
+                    fontSize: useExpanded ? fontSize * 0.78 : fontSize,
+                    fontWeight: FontWeight.w300,
+                    color: cs.onSurface,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -577,17 +761,10 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildKeypad() {
-    final List<_KeypadDeckDef> decks = _decksForCurrentMode();
-    final String selectedDeckLabel = _selectedDeckLabelForCurrentMode();
-    final _KeypadDeckDef activeDeck = decks.firstWhere(
-      (_KeypadDeckDef deck) => deck.label == selectedDeckLabel,
-      orElse: () => decks.first,
-    );
-    final String enterLabel = _controller.isRpnEntryMode ? 'ENTER' : '=';
+    final _KeypadModuleDef activeDeck = _activeModule();
     final List<_ButtonDef> buttons = <_ButtonDef>[
-      ...activeDeck.buttons,
-      ..._fixedBottomButtons.map((_ButtonDef b) =>
-          b.label == 'ENTER' ? _ButtonDef(enterLabel, b.category) : b),
+      ..._activeModuleButtons(activeDeck),
+      ..._fixedBottomButtons,
     ];
 
     return LayoutBuilder(
@@ -609,7 +786,7 @@ class _CalculatorViewState extends State<CalculatorView> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildKeypadDeckSelectorRow(
-                decks: decks,
+                decks: _modules,
                 activeDeckLabel: activeDeck.label,
               ),
               Expanded(
@@ -626,73 +803,65 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildKeypadDeckSelectorRow({
-    required List<_KeypadDeckDef> decks,
+    required List<_KeypadModuleDef> decks,
     required String activeDeckLabel,
   }) {
     final ColorScheme cs = Theme.of(context).colorScheme;
     return SizedBox(
       height: _deckSelectorHeight,
-      child: Row(
-        children: [
-          for (int index = 0; index < decks.length; index++) ...[
-            Expanded(
-              child: Semantics(
-                button: true,
-                selected: decks[index].label == activeDeckLabel,
-                label: '${_deckDescription(decks[index].label)} deck',
-                excludeSemantics: true,
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        itemCount: decks.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 5,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 2.4,
+        ),
+        itemBuilder: (BuildContext context, int index) {
+          final _KeypadModuleDef deck = decks[index];
+          final bool selected = deck.label == activeDeckLabel;
+          return Semantics(
+            button: true,
+            selected: selected,
+            label: '${_deckDescription(deck.label)} module',
+            excludeSemantics: true,
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _selectDeck(deck.label),
+                hoverColor: (selected ? cs.onSecondaryContainer : cs.onSurfaceVariant)
+                    .withAlpha(20),
+                focusColor: (selected ? cs.onSecondaryContainer : cs.onSurfaceVariant)
+                    .withAlpha(25),
+                child: AnimatedContainer(
+                  key: ValueKey<String>('calculator-keypad-deck-${deck.label}'),
+                  duration: const Duration(milliseconds: 180),
+                  decoration: BoxDecoration(
+                    color: selected ? cs.secondaryContainer : cs.surfaceContainer,
                     borderRadius: BorderRadius.circular(12),
-                    onTap: () => _selectDeck(decks[index].label),
-                    hoverColor: (decks[index].label == activeDeckLabel
-                            ? cs.onSecondaryContainer
-                            : cs.onSurfaceVariant)
-                        .withAlpha(20),
-                    focusColor: (decks[index].label == activeDeckLabel
-                            ? cs.onSecondaryContainer
-                            : cs.onSurfaceVariant)
-                        .withAlpha(25),
-                    child: AnimatedContainer(
-                      key: ValueKey<String>(
-                        'calculator-keypad-deck-${decks[index].label}',
-                      ),
-                      duration: const Duration(milliseconds: 180),
-                      margin: EdgeInsets.only(
-                        right: index < decks.length - 1 ? 8 : 0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: decks[index].label == activeDeckLabel
-                            ? cs.secondaryContainer
-                            : cs.surfaceContainer,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: decks[index].label == activeDeckLabel
-                              ? cs.secondary
-                              : cs.outlineVariant,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        decks[index].label,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.labelMedium!.copyWith(
-                          color: decks[index].label == activeDeckLabel
-                              ? cs.onSecondaryContainer
-                              : cs.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
+                    border: Border.all(
+                      color: selected ? cs.secondary : cs.outlineVariant,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    deck.label,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelMedium!.copyWith(
+                      color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
               ),
             ),
-          ],
-        ],
+          );
+        },
       ),
     );
   }
@@ -740,8 +909,26 @@ class _CalculatorViewState extends State<CalculatorView> {
   }
 
   Widget _buildButton(_ButtonDef btn, double keySize) {
+    if (!btn.enabled) {
+      final ColorScheme cs = Theme.of(context).colorScheme;
+      return ExcludeSemantics(
+        child: SizedBox.square(
+          dimension: keySize,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cs.outlineVariant.withAlpha(120)),
+            ),
+          ),
+        ),
+      );
+    }
+
     final colors = _getButtonColors(btn.category);
-    final semanticName = _semanticLabel(btn.label);
+    final String semanticName = btn.label == 'DELETE'
+      ? (_controller.deleteWouldEditDraft ? 'Delete draft' : 'Drop top')
+      : _semanticLabel(btn.label);
     return Semantics(
       button: true,
       label: semanticName,
@@ -751,7 +938,7 @@ class _CalculatorViewState extends State<CalculatorView> {
         child: Tooltip(
           message: semanticName,
           child: Material(
-            key: ValueKey<String>('calculator-button-${btn.label}'),
+            key: ValueKey<String>('calculator-button-${btn.keyLabel}'),
             color: colors.$1,
             borderRadius: BorderRadius.circular(16),
             elevation: 0,
@@ -764,12 +951,12 @@ class _CalculatorViewState extends State<CalculatorView> {
               onTap: () => _onButtonPressed(btn.label),
               child: Center(
                 child: Text(
-                  btn.label,
-                  style: (btn.label.length > 1
+                  btn.visibleLabel,
+                  style: (btn.visibleLabel.length > 1
                           ? Theme.of(context).textTheme.titleMedium!
                           : Theme.of(context).textTheme.titleLarge!)
                       .copyWith(
-                    fontSize: btn.label.length > 1 ? 18 : 28,
+                    fontSize: btn.visibleLabel.length > 1 ? 18 : 28,
                     fontWeight: FontWeight.w500,
                     color: colors.$2,
                   ),
@@ -793,122 +980,65 @@ class _CalculatorViewState extends State<CalculatorView> {
     };
   }
 
-  List<_KeypadDeckDef> _decksForCurrentMode() {
-    if (_controller.isMatrixMode) {
-          return _controller.isRpnEntryMode
-              ? _matrixDecks
-              : _matrixDecks.where((_KeypadDeckDef deck) => deck.label != 'FACT').toList(growable: false);
-    }
-
-    return _controller.isRpnMode ? _rpnDecks : _infixDecks;
+  _KeypadModuleDef _activeModule() {
+    return _modules.firstWhere(
+      (_KeypadModuleDef module) => module.label == _selectedModuleLabel,
+      orElse: () => _modules.first,
+    );
   }
 
-  String _selectedDeckLabelForCurrentMode() {
-    if (_controller.isMatrixMode) {
-      return _matrixDeckLabel;
+  List<_ButtonDef> _activeModuleButtons(_KeypadModuleDef module) {
+    final int pageIndex = _modulePageIndices[module.label] ?? 0;
+    return module.pages[pageIndex.clamp(0, module.pages.length - 1)];
+  }
+
+  void _changeActiveModulePage(int delta) {
+    final _KeypadModuleDef module = _activeModule();
+    if (module.pages.length <= 1) {
+      return;
     }
 
-    return _controller.isRpnMode ? _rpnDeckLabel : _infixDeckLabel;
+    final int currentPage = _modulePageIndices[module.label] ?? 0;
+    final int nextPage = (currentPage + delta).clamp(0, module.pages.length - 1);
+    if (nextPage == currentPage) {
+      return;
+    }
+
+    setState(() {
+      _modulePageIndices[module.label] = nextPage;
+    });
   }
 
   void _selectDeck(String deckLabel) {
     setState(() {
-      if (_controller.isMatrixMode) {
-        _matrixDeckLabel = deckLabel;
-      } else if (_controller.isRpnMode) {
-        _rpnDeckLabel = deckLabel;
-      } else {
-        _infixDeckLabel = deckLabel;
-      }
+      _selectedModuleLabel = deckLabel;
+      _modulePageIndices.putIfAbsent(deckLabel, () => 0);
     });
   }
 
-  Widget _buildModeSwitch() {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildModeButton(
-              mode: CalculatorMode.infix,
-              label: 'Infix',
-            ),
-          ),
-          Expanded(
-            child: _buildModeButton(
-              mode: CalculatorMode.rpn,
-              label: 'RPN',
-            ),
-          ),
-          Expanded(
-            child: _buildModeButton(
-              mode: CalculatorMode.matrix,
-              label: 'Matrix',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModeButton({
-    required CalculatorMode mode,
-    required String label,
-  }) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    final bool selected = _controller.mode == mode;
-    return Semantics(
-      label: '$label mode',
-      button: true,
-      selected: selected,
-      excludeSemantics: true,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => _activateMode(mode),
-          hoverColor: selected
-              ? cs.onPrimary.withAlpha(20)
-              : cs.onSurface.withAlpha(20),
-          focusColor: selected
-              ? cs.onPrimary.withAlpha(25)
-              : cs.onSurface.withAlpha(25),
-          splashColor: selected
-              ? cs.onPrimary.withAlpha(30)
-              : cs.onSurface.withAlpha(30),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              color: selected ? cs.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                color: selected ? cs.onPrimary : cs.onSurface,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   void _activateMode(CalculatorMode mode) {
-    _controller.setMode(mode);
+    switch (mode) {
+      case CalculatorMode.infix:
+        _controller.openInfixEditor();
+      case CalculatorMode.rpn:
+        _controller.cancelEditor();
+      case CalculatorMode.matrix:
+        _controller.openMatrixEditor();
+    }
     setState(() {});
   }
 
   void _onButtonPressed(String label) {
+    if (label == '>') {
+      _changeActiveModulePage(1);
+      return;
+    }
+
+    if (label == '<') {
+      _changeActiveModulePage(-1);
+      return;
+    }
+
     if (_controller.isMatrixMode) {
       final _MatrixEditorDialogState? editor = _matrixEditorKey.currentState;
       if (editor == null) {
@@ -917,10 +1047,19 @@ class _CalculatorViewState extends State<CalculatorView> {
 
       switch (label) {
         case 'MAT':
+        case 'CANCEL':
+        case 'MATRIX':
           editor._cancel();
-        case '=':
+        case 'DELETE':
+          editor._handleAppKey('⌫');
         case 'ENTER':
           editor._submit();
+        case '=':
+          return;
+        case 'AC':
+          _controller.allClear();
+        case 'MRC':
+          _controller.memoryRecallClear();
         case '2x2':
           editor._selectOrder(2);
         case '3x3':
@@ -977,14 +1116,27 @@ class _CalculatorViewState extends State<CalculatorView> {
 
     if (_controller.isRpnMode) {
       switch (label) {
+        case 'INFIX':
+          _activateMode(CalculatorMode.infix);
+        case 'MATRIX':
         case 'MAT':
           _activateMode(CalculatorMode.matrix);
+        case 'AC':
+          _controller.allClear();
+        case 'MRC':
+          _controller.memoryRecallClear();
+        case 'DELETE':
+          if (_controller.hasDraftDisplay) {
+            _controller.backspace();
+          } else {
+            _controller.dropRpn();
+          }
         case 'C':
           _controller.clear();
-        case '⌫':
-          _controller.backspace();
         case 'ENTER':
           _controller.enter();
+        case '=':
+          return;
         case '+':
           _controller.applyRpnBinary(RpnBinaryOperator.add);
         case '-':
@@ -993,7 +1145,7 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.applyRpnBinary(RpnBinaryOperator.multiply);
         case '÷':
           _controller.applyRpnBinary(RpnBinaryOperator.divide);
-        case '√':
+        case 'SQRT':
           _controller.applyRpnUnary(RpnUnaryOperator.sqrt);
         case '%':
           _controller.applyRpnUnary(RpnUnaryOperator.percent);
@@ -1069,9 +1221,58 @@ class _CalculatorViewState extends State<CalculatorView> {
       return;
     }
 
+    if (_controller.isInfixMode) {
+      switch (label) {
+        case 'INFIX':
+          return;
+        case 'MATRIX':
+        case 'MAT':
+          _activateMode(CalculatorMode.matrix);
+        case 'CANCEL':
+          _controller.cancelEditor();
+        case 'AC':
+          _controller.allClear();
+        case 'MRC':
+          _controller.memoryRecallClear();
+        case 'C':
+          _controller.clear();
+        case 'DELETE':
+          _controller.backspace();
+        case 'ENTER':
+          _controller.submitInfixEditor();
+        case '=':
+          _controller.evaluate();
+        case 'SQRT':
+          _controller.input('√');
+        case 'INV':
+          _controller.input('INV');
+        case '±':
+          _controller.toggleSign();
+        case 'i':
+          _controller.insertImaginaryUnit();
+        case 'CONJ':
+          _controller.input('CONJ');
+        case 'MC':
+          _controller.memoryClear();
+        case 'MR':
+          _controller.memoryRecall();
+        case 'M+':
+          _controller.memoryAdd();
+        case 'M-':
+          _controller.memorySubtract();
+        default:
+          _controller.input(label);
+      }
+      return;
+    }
+
     switch (label) {
       case 'MAT':
         _activateMode(CalculatorMode.matrix);
+      case 'AC':
+        _controller.allClear();
+      case 'MRC':
+        _controller.memoryRecallClear();
       case 'C':
         _controller.clear();
       case '⌫':
@@ -1101,8 +1302,12 @@ class _CalculatorViewState extends State<CalculatorView> {
   String _semanticLabel(String label) {
     return switch (label) {
       'MAT' => 'Matrix mode',
+      'INFIX' => 'Open infix editor',
+      'MATRIX' => 'Open matrix editor',
+      'CANCEL' => 'Cancel editor',
+      'MRC' => 'Memory recall or clear',
+      'AC' => 'All clear',
       'C' => 'Clear',
-      '⌫' => 'Backspace',
       '=' => 'Equals',
       'ENTER' => 'Enter',
       '+' => 'Plus',
@@ -1135,6 +1340,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       'NEG' => 'Negate top matrix',
       'ZEROS' => 'Fill zeros like top matrix',
       'ONES' => 'Fill ones like top matrix',
+      'SQRT' => 'Square root',
       'ID' => 'Create identity matrix',
       'I' => 'Identity matrix 2 by 2',
       'J' => 'Imaginary unit matrix',
@@ -1154,21 +1360,24 @@ class _CalculatorViewState extends State<CalculatorView> {
       'MR' => 'Memory recall',
       'M+' => 'Memory add',
       'M-' => 'Memory subtract',
+      '>' => 'Next module page',
+      '<' => 'Previous module page',
       _ => label,
     };
   }
 
   String _deckDescription(String label) {
     return switch (label) {
-      'MAIN' => 'Main functions',
-      'MEM' => 'Memory operations',
+      'BASIC' => 'Basic commands',
       'STACK' => 'Stack operations',
+      'MATH' => 'Reserved math commands',
       'MATRIX' => 'Matrix operations',
+      'VECTOR' => 'Vector operations',
       'FACT' => 'Factorizations',
-      'PROP' => 'Properties',
-      'VEC' => 'Vector operations',
-      'EDIT' => 'Edit matrix',
-      'BUILD' => 'Build matrix',
+      'PROP' => 'Matrix properties',
+      'EDIT' => 'Editor entry points',
+      'BUILD' => 'Matrix building',
+      'MEM' => 'Memory module',
       _ => label,
     };
   }
@@ -1176,21 +1385,16 @@ class _CalculatorViewState extends State<CalculatorView> {
   Widget _buildMatrixModeBody() {
     return _MatrixEditorDialog(
       key: _matrixEditorKey,
-      isRpnMode: _controller.isRpnEntryMode,
+      isRpnMode: true,
       embedded: true,
-      onCancel: _controller.exitMatrixMode,
+      onCancel: _controller.cancelEditor,
       onSubmitted: (String literal) {
-        _controller.insertMatrixLiteral(literal);
-        _controller.exitMatrixMode();
+        _controller.submitMatrixEditorLiteral(literal);
       },
       onStackExpandingCommand:
-          _controller.isRpnEntryMode
-              ? (String literal, CalculatrixCommand command) {
-                  _controller.insertMatrixLiteral(literal);
-                  _controller.executeRpnCommand(command);
-                  _controller.exitMatrixMode();
-                }
-              : null,
+          (String literal, CalculatrixCommand command) {
+            _controller.submitMatrixEditorStackCommand(literal, command);
+          },
     );
   }
 }

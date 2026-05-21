@@ -14,9 +14,16 @@ void main() {
     controller.dispose();
   });
 
+  void openInfixEditor() {
+    if (!controller.isInfixMode) {
+      controller.openInfixEditor();
+    }
+  }
+
   group('CalculatorController', () {
-    test('initial notation mode is infix', () {
-      expect(controller.mode, CalculatorMode.infix);
+    test('initial shell mode is rpn', () {
+      expect(controller.mode, CalculatorMode.rpn);
+      expect(controller.isRpnMode, isTrue);
     });
 
     test('can switch notation mode', () {
@@ -37,6 +44,20 @@ void main() {
       expect(controller.mode, CalculatorMode.rpn);
     });
 
+    test('submitting the infix editor pushes the resolved result into the rpn shell', () {
+      controller.openInfixEditor();
+      controller.input('3');
+      controller.input('+');
+      controller.input('4');
+
+      controller.submitInfixEditor();
+
+      expect(controller.mode, CalculatorMode.rpn);
+      expect(controller.rpnStackDepth, 1);
+      expect(controller.rpnTopLiteral, '[[7]]');
+      expect(controller.expression, '');
+    });
+
     test('can execute public matrix commands and macros in rpn mode', () {
       controller.setMode(CalculatorMode.rpn);
       controller.insertMatrixLiteral('[[1,2],[3,4]]');
@@ -53,12 +74,14 @@ void main() {
     });
 
     test('input appends to expression', () {
+      openInfixEditor();
       controller.input('3');
       expect(controller.expression, '3');
       expect(controller.display, '3');
     });
 
     test('multiple inputs concatenate', () {
+      openInfixEditor();
       controller.input('3');
       controller.input('+');
       controller.input('4');
@@ -66,6 +89,7 @@ void main() {
     });
 
     test('clear resets expression', () {
+      openInfixEditor();
       controller.input('3');
       controller.input('+');
       controller.clear();
@@ -74,6 +98,7 @@ void main() {
     });
 
     test('backspace removes last character', () {
+      openInfixEditor();
       controller.input('3');
       controller.input('+');
       controller.input('4');
@@ -82,11 +107,13 @@ void main() {
     });
 
     test('backspace on empty does nothing', () {
+      openInfixEditor();
       controller.backspace();
       expect(controller.expression, '');
     });
 
     test('notifies listeners on input', () {
+      openInfixEditor();
       var notified = false;
       controller.addListener(() => notified = true);
       controller.input('5');
@@ -94,6 +121,7 @@ void main() {
     });
 
     test('notifies listeners on clear', () {
+      openInfixEditor();
       controller.input('5');
       var notified = false;
       controller.addListener(() => notified = true);
@@ -102,6 +130,7 @@ void main() {
     });
 
     test('notifies listeners on backspace', () {
+      openInfixEditor();
       controller.input('5');
       var notified = false;
       controller.addListener(() => notified = true);
@@ -111,6 +140,10 @@ void main() {
   });
 
   group('CalculatorController - evaluation', () {
+    setUp(() {
+      openInfixEditor();
+    });
+
     test('evaluate simple addition', () {
       controller.input('3');
       controller.input('+');
@@ -203,6 +236,10 @@ void main() {
   });
 
   group('CalculatorController - memory', () {
+    setUp(() {
+      openInfixEditor();
+    });
+
     test('memory is initially empty', () {
       expect(controller.hasMemory, isFalse);
     });
@@ -281,9 +318,54 @@ void main() {
       expect(controller.rpnStackDepth, 2);
       expect(controller.rpnTopLiteral, '[[-1,-2],[-3,-4]]');
     });
+
+    test('MRC recalls memory on the first press', () {
+      controller.openInfixEditor();
+      controller.input('8');
+      controller.evaluate();
+      controller.memoryAdd();
+
+      controller.clear();
+      controller.memoryRecallClear();
+
+      expect(controller.expression, '8');
+      expect(controller.hasMemory, isTrue);
+    });
+
+    test('MRC clears memory on the second consecutive press', () {
+      controller.openInfixEditor();
+      controller.input('8');
+      controller.evaluate();
+      controller.memoryAdd();
+
+      controller.clear();
+      controller.memoryRecallClear();
+      controller.memoryRecallClear();
+
+      expect(controller.hasMemory, isFalse);
+    });
+
+    test('a non-MRC action resets the consecutive MRC cycle', () {
+      controller.openInfixEditor();
+      controller.input('8');
+      controller.evaluate();
+      controller.memoryAdd();
+
+      controller.clear();
+      controller.memoryRecallClear();
+      controller.clear();
+      controller.memoryRecallClear();
+
+      expect(controller.hasMemory, isTrue);
+      expect(controller.expression, '8');
+    });
   });
 
   group('CalculatorController - sign toggle', () {
+    setUp(() {
+      openInfixEditor();
+    });
+
     test('toggle sign on expression', () {
       controller.input('5');
       controller.toggleSign();
@@ -342,6 +424,10 @@ void main() {
   });
 
   group('CalculatorController - sqrt and percent', () {
+    setUp(() {
+      openInfixEditor();
+    });
+
     test('sqrt evaluation', () {
       controller.input('√');
       controller.input('9');
@@ -389,6 +475,10 @@ void main() {
   });
 
   group('CalculatorController - repeat equals', () {
+    setUp(() {
+      openInfixEditor();
+    });
+
     test('pressing = again repeats last operation', () {
       controller.input('5');
       controller.input('+');
@@ -426,6 +516,10 @@ void main() {
   });
 
   group('CalculatorController - precision', () {
+    setUp(() {
+      openInfixEditor();
+    });
+
     test('1÷3 has reasonable precision', () {
       controller.input('1');
       controller.input('÷');
@@ -480,6 +574,10 @@ void main() {
   });
 
   group('CalculatorController - matrix entry', () {
+    setUp(() {
+      openInfixEditor();
+    });
+
     test('inserts matrix literal into infix expression', () {
       controller.insertMatrixLiteral('[[1,2],[3,4]]');
 
@@ -582,6 +680,10 @@ void main() {
   });
 
   group('CalculatorController - shared current value', () {
+    setUp(() {
+      openInfixEditor();
+    });
+
     test('switching to rpn keeps an infix draft private and uncommitted', () {
       controller.input('1');
       controller.input('+');
@@ -671,6 +773,10 @@ void main() {
   });
 
   group('CalculatorController - matrix display', () {
+    setUp(() {
+      openInfixEditor();
+    });
+
     test('keeps non-scalar infix results instead of collapsing to scalarValue', () {
       controller.input('[[1],[2]]');
       controller.input('×');

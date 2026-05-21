@@ -62,18 +62,29 @@ Finder _calculatorButton(String label) {
   return find.byKey(ValueKey<String>('calculator-button-$label'));
 }
 
+Finder _rpnStackCard(int register) {
+  return find.byKey(ValueKey<String>('rpn-stack-card-$register'));
+}
+
+Finder _rpnDraftCard() {
+  return find.byKey(const ValueKey<String>('rpn-draft-card'));
+}
+
 Finder _keypadDeckSelector(String label) {
   return find.byKey(ValueKey<String>('calculator-keypad-deck-$label'));
 }
 
 const List<String> _keypadDeckLabels = <String>[
-  'MAIN',
-  'MEM',
+  'BASIC',
   'STACK',
+  'MATH',
   'MATRIX',
+  'VECTOR',
   'FACT',
+  'PROP',
   'EDIT',
   'BUILD',
+  'MEM',
 ];
 
 Future<void> _ensureCalculatorButtonVisible(
@@ -133,7 +144,12 @@ Future<void> _activateMatrixControl(WidgetTester tester, Finder control) async {
 }
 
 Future<void> _openMatrixEditor(WidgetTester tester) async {
-  await _tapCalculatorButton(tester, 'MAT');
+  await _tapFinderCenter(tester, _keypadDeckSelector('EDIT'));
+  await _tapCalculatorButton(tester, 'MATRIX');
+}
+
+Future<void> _openInfixEditor(WidgetTester tester) async {
+  await _tapCalculatorButton(tester, 'INFIX');
 }
 
 Future<void> _enterMatrixCell(
@@ -154,13 +170,11 @@ Future<void> _enterMatrixCell(
 Future<void> _tapMatrixAction(WidgetTester tester, String label) async {
   switch (label) {
     case 'Insert':
-      await _tapCalculatorButton(tester, '=');
-      return;
     case 'Push':
       await _tapCalculatorButton(tester, 'ENTER');
       return;
     case 'Cancel':
-      await _tapCalculatorButton(tester, 'MAT');
+      await _tapCalculatorButton(tester, 'CANCEL');
       return;
     default:
       await _tapCalculatorButton(tester, label);
@@ -184,29 +198,27 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('keypad has all buttons', (tester) async {
+    testWidgets('keypad has all Stage 7 shell buttons', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
       final expected = [
-        'MC', 'MR', 'CONJ', 'M+',
-        'C', '√', '%', '÷',
-        '7', '8', '9', '×',
-        '4', '5', '6', '-',
-        '1', '2', '3', '+',
-        '±', '.', '=', 'MAT', '(', ')', 'INV', '⌫', 'i',
+        'MRC', 'M-', 'M+', 'AC', 'C', '%', 'SQRT', 'INV', 'i',
+        '7', '8', '9', '÷', 'INFIX',
+        '4', '5', '6', '×', 'DELETE',
+        '1', '2', '3', '-', '=',
+        '0', '.', '±', '+', 'ENTER',
       ];
       for (final label in expected) {
         await _ensureCalculatorButtonVisible(tester, label);
         expect(_calculatorButton(label), findsOneWidget,
             reason: 'Button "$label" not found');
       }
-      // '0' appears in both display and button
-      expect(find.text('0'), findsWidgets);
     });
 
     testWidgets('tap digit updates expression', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('5'));
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, '5');
       await tester.pump();
       expect(
         find.bySemanticsLabel(RegExp(r'Expression: 5')),
@@ -215,31 +227,28 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('tap enter evaluates expression', (tester) async {
+    testWidgets('equals evaluates inside the infix editor without committing to stack', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('3'));
-      await tester.pump();
-      await tester.tap(find.text('+'));
-      await tester.pump();
-      await tester.tap(find.text('4'));
-      await tester.pump();
-      await tester.tap(find.text('='));
-      await tester.pump();
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, '3');
+      await _tapCalculatorButton(tester, '+');
+      await _tapCalculatorButton(tester, '4');
+      await _tapCalculatorButton(tester, '=');
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 7')),
         findsOneWidget,
       );
+      expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsNothing);
       handle.dispose();
     });
 
     testWidgets('clear button resets display', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('9'));
-      await tester.pump();
-      await tester.tap(find.text('C'));
-      await tester.pump();
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, '9');
+      await _tapCalculatorButton(tester, 'C');
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 0')),
         findsOneWidget,
@@ -250,10 +259,9 @@ void main() {
     testWidgets('sqrt button applies immediately in infix mode', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('9'));
-      await tester.pump();
-      await tester.tap(find.text('√'));
-      await tester.pump();
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, '9');
+      await _tapCalculatorButton(tester, 'SQRT');
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 3')),
         findsOneWidget,
@@ -264,13 +272,10 @@ void main() {
     testWidgets('sqrt of negative number returns imaginary unit', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      // Enter 1, negate it to -1, apply sqrt directly (no =)
-      await tester.tap(find.text('1'));
-      await tester.pump();
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, '1');
       await _tapCalculatorButton(tester, '±');
-      await tester.pump();
-      await _tapCalculatorButton(tester, '√');
-      await tester.pump();
+      await _tapCalculatorButton(tester, 'SQRT');
       // Should show the matrix literal in expression
       expect(
         find.bySemanticsLabel(RegExp(r'Expression: \[\[0,-1\],\[1,0\]\]')),
@@ -282,14 +287,11 @@ void main() {
     testWidgets('operator buttons work', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('8'));
-      await tester.pump();
-      await tester.tap(find.text('×'));
-      await tester.pump();
-      await tester.tap(find.text('2'));
-      await tester.pump();
-      await tester.tap(find.text('='));
-      await tester.pump();
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, '8');
+      await _tapCalculatorButton(tester, '×');
+      await _tapCalculatorButton(tester, '2');
+      await _tapCalculatorButton(tester, '=');
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 16')),
         findsOneWidget,
@@ -300,14 +302,11 @@ void main() {
     testWidgets('percent button evaluates a bare operand on equals in infix mode', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('5'));
-      await tester.pump();
-      await tester.tap(find.text('0'));
-      await tester.pump();
-      await tester.tap(find.text('%'));
-      await tester.pump();
-      await tester.tap(find.text('='));
-      await tester.pump();
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, '5');
+      await _tapCalculatorButton(tester, '0');
+      await _tapCalculatorButton(tester, '%');
+      await _tapCalculatorButton(tester, '=');
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 0\.5')),
         findsOneWidget,
@@ -318,18 +317,13 @@ void main() {
     testWidgets('percent button supports casio-style x percent y infix flow', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('1'));
-      await tester.pump();
-      await tester.tap(find.text('2'));
-      await tester.pump();
-      await tester.tap(find.text('%'));
-      await tester.pump();
-      await tester.tap(find.text('5'));
-      await tester.pump();
-      await tester.tap(find.text('0'));
-      await tester.pump();
-      await tester.tap(find.text('='));
-      await tester.pump();
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, '1');
+      await _tapCalculatorButton(tester, '2');
+      await _tapCalculatorButton(tester, '%');
+      await _tapCalculatorButton(tester, '5');
+      await _tapCalculatorButton(tester, '0');
+      await _tapCalculatorButton(tester, '=');
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 6')),
         findsOneWidget,
@@ -340,20 +334,14 @@ void main() {
     testWidgets('percent button supports calculator-style additive infix flow', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-      await tester.tap(find.text('5'));
-      await tester.pump();
-      await tester.tap(find.text('0'));
-      await tester.pump();
-      await tester.tap(find.text('+'));
-      await tester.pump();
-      await tester.tap(find.text('1'));
-      await tester.pump();
-      await tester.tap(find.text('2'));
-      await tester.pump();
-      await tester.tap(find.text('%'));
-      await tester.pump();
-      await tester.tap(find.text('='));
-      await tester.pump();
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, '5');
+      await _tapCalculatorButton(tester, '0');
+      await _tapCalculatorButton(tester, '+');
+      await _tapCalculatorButton(tester, '1');
+      await _tapCalculatorButton(tester, '2');
+      await _tapCalculatorButton(tester, '%');
+      await _tapCalculatorButton(tester, '=');
       expect(
         find.bySemanticsLabel(RegExp(r'Display: 56')),
         findsOneWidget,
@@ -364,6 +352,7 @@ void main() {
     testWidgets('display has expression semantic label', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
+      await _openInfixEditor(tester);
       expect(
         find.bySemanticsLabel(RegExp(r'Expression: ')),
         findsOneWidget,
@@ -371,19 +360,179 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('shows visible notation mode switch', (tester) async {
+    testWidgets('starts in the persistent rpn shell without a visible mode switch', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      expect(find.text('Infix'), findsOneWidget);
-      expect(find.text('RPN'), findsOneWidget);
-      expect(find.text('Matrix'), findsOneWidget);
+      expect(find.text('Infix'), findsNothing);
+      expect(find.text('RPN'), findsNothing);
+      expect(find.text('Matrix'), findsNothing);
+      expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsOneWidget);
+      expect(find.text('Stack 0'), findsOneWidget);
     });
 
-    testWidgets('matrix mode can be opened from the visible mode switch', (tester) async {
+    testWidgets('edit module exposes infix and matrix editor entry points', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('Matrix'));
+      await tester.tap(_keypadDeckSelector('EDIT'));
       await tester.pumpAndSettle();
+
+      expect(find.text('INFIX'), findsAtLeastNWidgets(2));
+      expect(_calculatorButton('MATRIX'), findsOneWidget);
+    });
+
+    testWidgets('module bar exposes the fixed Stage 7 taxonomy', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      const List<String> modules = <String>[
+        'BASIC',
+        'STACK',
+        'MATH',
+        'MATRIX',
+        'VECTOR',
+        'FACT',
+        'PROP',
+        'EDIT',
+        'BUILD',
+        'MEM',
+      ];
+
+      for (final String module in modules) {
+        expect(_keypadDeckSelector(module), findsOneWidget);
+      }
+    });
+
+    testWidgets('basic module exposes the agreed Stage 7 seed map', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      for (final String label in <String>['MRC', 'M-', 'M+', 'AC', 'C', '%', 'SQRT', 'INV', 'i']) {
+        expect(_calculatorButton(label), findsOneWidget);
+      }
+
+      expect(_calculatorButton('>'), findsNothing);
+      expect(_calculatorButton('<'), findsNothing);
+    });
+
+    testWidgets('only overflowing modules expose paging arrows', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(_calculatorButton('>'), findsNothing);
+      expect(_calculatorButton('<'), findsNothing);
+
+      await _tapFinderCenter(tester, _keypadDeckSelector('MATRIX'));
+
+      expect(_calculatorButton('>'), findsOneWidget);
+      expect(_calculatorButton('<'), findsNothing);
+
+      await _tapCalculatorButton(tester, '>');
+
+      expect(_calculatorButton('<'), findsOneWidget);
+      expect(_calculatorButton('TR'), findsOneWidget);
+      expect(_calculatorButton('T'), findsNothing);
+    });
+
+    testWidgets('delete key semantics switch between draft editing and drop', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(
+        find.ancestor(
+          of: _calculatorButton('DELETE'),
+          matching: find.bySemanticsLabel('Drop top'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('2'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.ancestor(
+          of: _calculatorButton('DELETE'),
+          matching: find.bySemanticsLabel('Delete draft'),
+        ),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('infix editor enter pushes the draft result and returns to rpn', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(_keypadDeckSelector('EDIT'));
+      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'INFIX');
+
+      expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsNothing);
+
+      await tester.tap(find.text('3'));
+      await tester.pump();
+      await tester.tap(find.text('+'));
+      await tester.pump();
+      await tester.tap(find.text('4'));
+      await tester.pump();
+      await tester.tap(find.text('='));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsNothing);
+
+      await tester.tap(find.text('ENTER'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+      expect(find.descendant(
+        of: _rpnStackCard(0),
+        matching: find.byKey(const ValueKey<String>('calculator-display-text')),
+      ), findsOneWidget);
+      expect(find.text('7'), findsAtLeastNWidgets(1));
+    });
+
+    testWidgets('matrix editor cancel discards the draft and returns to rpn', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(_keypadDeckSelector('EDIT'));
+      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'MATRIX');
+
+      expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsOneWidget);
+
+      await _enterMatrixCell(tester, 0, 0, '1');
+      await _enterMatrixCell(tester, 0, 1, '2');
+
+      await _tapCalculatorButton(tester, 'CANCEL');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsNothing);
+      expect(find.text('Stack 0'), findsOneWidget);
+      expect(_rpnStackCard(1), findsNothing);
+      expect(_rpnDraftCard(), findsNothing);
+    });
+
+    testWidgets('matrix editor enter pushes the matrix and returns to rpn', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await tester.tap(_keypadDeckSelector('EDIT'));
+      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, 'MATRIX');
+
+      await _enterMatrixCell(tester, 0, 0, '1');
+      await _enterMatrixCell(tester, 0, 1, '2');
+      await _enterMatrixCell(tester, 1, 0, '3');
+      await _enterMatrixCell(tester, 1, 1, '4');
+
+      await tester.tap(find.text('ENTER'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsNothing);
+      expect(find.text('Stack 1'), findsOneWidget);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp(r'Display: \[\[1, 2\], \[3, 4\]\]')), findsOneWidget);
+    });
+
+    testWidgets('matrix editor opens from the explicit EDIT entry point', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
 
       expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsOneWidget);
       expect(find.text('Matrix editor'), findsNothing);
@@ -391,14 +540,13 @@ void main() {
       expect(find.byType(PageView), findsNothing);
     });
 
-    testWidgets('matrix mode preserves the same display and keypad shell sizes', (tester) async {
+    testWidgets('matrix editor preserves the same display and keypad shell sizes', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       final Size infixDisplaySize = tester.getSize(_displayShell());
       final Size infixKeypadSize = tester.getSize(_keypadShell());
 
-      await tester.tap(find.text('Matrix'));
-      await tester.pumpAndSettle();
+      await _openMatrixEditor(tester);
 
       final Size matrixDisplaySize = tester.getSize(_displayShell());
       final Size matrixKeypadSize = tester.getSize(_keypadShell());
@@ -409,49 +557,57 @@ void main() {
       expect((matrixKeypadSize.height - infixKeypadSize.height).abs(), lessThanOrEqualTo(1.0));
     });
 
-    testWidgets('matrix mode hides stale notation copy and stack depth chrome', (tester) async {
+    testWidgets('matrix editor hides stack depth chrome while active', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('4'));
-      await tester.pump();
-      await tester.tap(find.text('ENTER'));
-      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, '4');
+      await _tapCalculatorButton(tester, 'ENTER');
 
       expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsOneWidget);
       expect(find.text('Stack 1'), findsOneWidget);
 
-      await tester.tap(find.text('Matrix'));
-      await tester.pumpAndSettle();
+      await _openMatrixEditor(tester);
 
       expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsOneWidget);
       expect(find.byKey(const ValueKey<String>('calculator-stack-depth')), findsNothing);
       expect(find.text('Stack 1'), findsNothing);
-      expect(find.text('RPN entry'), findsNothing);
-      expect(find.text('Infix entry'), findsNothing);
     });
 
-    testWidgets('infix keypad exposes all controls in a single deck', (tester) async {
+    testWidgets('basic module and fixed keypad expose the stable Stage 7 controls', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       expect(_calculatorButton('7'), findsOneWidget);
       expect(_calculatorButton('='), findsOneWidget);
-      expect(_calculatorButton('MC'), findsOneWidget);
-      expect(_calculatorButton('MR'), findsOneWidget);
-      expect(_calculatorButton('('), findsOneWidget);
-      expect(_calculatorButton('⌫'), findsOneWidget);
+      expect(_calculatorButton('MRC'), findsOneWidget);
+      expect(_calculatorButton('AC'), findsOneWidget);
+      expect(_calculatorButton('SQRT'), findsOneWidget);
+      expect(_calculatorButton('DELETE'), findsOneWidget);
+      expect(find.text('⌫'), findsOneWidget);
       expect(_calculatorButton('INV'), findsOneWidget);
     });
 
-    testWidgets('rpn mode exposes stack actions from the stack deck', (tester) async {
+    testWidgets('equals is inert in the rpn shell while ENTER commits the draft',
+        (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, '4');
+      await _tapCalculatorButton(tester, '=');
 
-      await tester.tap(_keypadDeckSelector('STACK'));
-      await tester.pumpAndSettle();
+      expect(find.text('Stack 0'), findsOneWidget);
+      expect(_rpnDraftCard(), findsOneWidget);
+      expect(find.descendant(of: _rpnDraftCard(), matching: find.text('4')), findsOneWidget);
+
+      await _tapCalculatorButton(tester, 'ENTER');
+
+      expect(_rpnDraftCard(), findsNothing);
+      expect(_rpnStackCard(0), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
+    });
+
+    testWidgets('stack module exposes stack actions', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _tapFinderCenter(tester, _keypadDeckSelector('STACK'));
 
       expect(find.text('DUP'), findsOneWidget);
       expect(find.text('DROP'), findsOneWidget);
@@ -459,6 +615,32 @@ void main() {
       expect(find.text('ROT'), findsOneWidget);
       expect(_calculatorButton('7'), findsOneWidget);
       expect(_calculatorButton('ENTER'), findsOneWidget);
+    });
+
+    testWidgets('active rpn draft occupies the primary slot above committed X0', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _tapCalculatorButton(tester, '4');
+      await _tapCalculatorButton(tester, 'ENTER');
+
+      await _tapCalculatorButton(tester, '2');
+
+      expect(_rpnDraftCard(), findsOneWidget);
+      expect(find.descendant(of: _rpnDraftCard(), matching: find.text('2')), findsOneWidget);
+      expect(find.descendant(of: _rpnStackCard(0), matching: find.text('X0')), findsOneWidget);
+      expect(find.descendant(
+        of: _rpnStackCard(0),
+        matching: find.text('[[4]]'),
+      ), findsOneWidget);
+      expect(_rpnStackCard(1), findsNothing);
+      expect(
+        tester.getTopLeft(_rpnDraftCard()).dy,
+        lessThan(tester.getTopLeft(_rpnStackCard(0)).dy),
+      );
+      expect(
+        tester.getSize(_rpnDraftCard()).height,
+        greaterThan(tester.getSize(_rpnStackCard(0)).height),
+      );
     });
 
     testWidgets('uses square calculator keys', (tester) async {
@@ -606,7 +788,7 @@ void main() {
       expect(find.byTooltip('Delete column'), findsOneWidget);
     });
 
-    testWidgets('matrix editor duplicate row copies the source row into the final literal', (tester) async {
+    testWidgets('matrix editor duplicate row pushes the reordered matrix to the stack', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
@@ -631,13 +813,14 @@ void main() {
       await _tapMatrixAction(tester, 'Insert');
 
       expect(
-        find.bySemanticsLabel(RegExp(r'Expression: \[\[1,2\],\[1,2\],\[3,4\]\]')),
+        find.bySemanticsLabel(RegExp(r'Display: \[\[1, 2\], \[1, 2\], \[3, 4\]\]')),
         findsOneWidget,
       );
+      expect(find.text('Stack 1'), findsOneWidget);
       handle.dispose();
     });
 
-    testWidgets('matrix editor delete column removes that column from preview and final literal', (tester) async {
+    testWidgets('matrix editor delete column pushes the reduced matrix to the stack', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
@@ -664,9 +847,10 @@ void main() {
       await _tapMatrixAction(tester, 'Insert');
 
       expect(
-        find.bySemanticsLabel(RegExp(r'Expression: \[\[1,3\],\[4,6\]\]')),
+        find.bySemanticsLabel(RegExp(r'Display: \[\[1, 3\], \[4, 6\]\]')),
         findsOneWidget,
       );
+      expect(find.text('Stack 1'), findsOneWidget);
       handle.dispose();
     });
 
@@ -768,7 +952,7 @@ void main() {
       expect(_matrixEditableText(tester, 1, 2).controller.text, '6');
     }, skip: true);
 
-    testWidgets('matrix editor inserts a 3x2 matrix after adding a row', (tester) async {
+    testWidgets('matrix editor pushes a 3x2 matrix after adding a row', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
@@ -789,13 +973,14 @@ void main() {
       await _tapMatrixAction(tester, 'Insert');
 
       expect(
-        find.bySemanticsLabel(RegExp(r'Expression: \[\[1,2\],\[3,4\],\[5,6\]\]')),
+        find.bySemanticsLabel(RegExp(r'Display: \[\[1, 2\], \[3, 4\], \[5, 6\]\]')),
         findsOneWidget,
       );
+      expect(find.text('Stack 1'), findsOneWidget);
       handle.dispose();
     });
 
-    testWidgets('matrix editor inserts serialized matrix into infix expression', (tester) async {
+    testWidgets('matrix editor pushes the serialized matrix onto the stack', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
@@ -809,13 +994,14 @@ void main() {
       await _tapMatrixAction(tester, 'Insert');
 
       expect(
-        find.bySemanticsLabel(RegExp(r'Expression: \[\[1,2\],\[3,4\]\]')),
+        find.bySemanticsLabel(RegExp(r'Display: \[\[1, 2\], \[3, 4\]\]')),
         findsOneWidget,
       );
+      expect(find.text('Stack 1'), findsOneWidget);
       handle.dispose();
     });
 
-    testWidgets('matrix editor cancel keeps expression unchanged', (tester) async {
+    testWidgets('matrix editor cancel keeps the rpn shell unchanged', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
@@ -824,6 +1010,7 @@ void main() {
       await _tapMatrixAction(tester, 'Cancel');
 
       expect(find.bySemanticsLabel(RegExp(r'Display: 0')), findsOneWidget);
+      expect(find.text('Stack 0'), findsOneWidget);
       handle.dispose();
     });
 
@@ -926,9 +1113,6 @@ void main() {
     testWidgets('matrix mode entered from RPN exposes a factorization deck and applies LU to the draft', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-
       await _openMatrixEditor(tester);
       expect(_keypadDeckSelector('FACT'), findsOneWidget);
 
@@ -955,9 +1139,6 @@ void main() {
 
     testWidgets('matrix mode entered from RPN applies QR to the draft and returns to the stack view', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
-
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
 
       await _openMatrixEditor(tester);
       await _enterMatrixCell(tester, 0, 0, '1');
@@ -1071,8 +1252,8 @@ void main() {
       await _tapCalculatorButton(tester, 'ZEROS');
       await _enterMatrixCell(tester, 3, 3, '9');
 
-      await _ensureCalculatorButtonVisible(tester, 'MAT');
-      expect(_calculatorButton('MAT'), findsWidgets);
+      await _ensureCalculatorButtonVisible(tester, 'CANCEL');
+      expect(_calculatorButton('CANCEL'), findsOneWidget);
       expect(_calculatorButton('='), findsOneWidget);
 
       await _tapMatrixAction(tester, 'Insert');
@@ -1080,36 +1261,29 @@ void main() {
       expect(
         find.bySemanticsLabel(
           RegExp(
-            r'Expression: \[\[0,0,0,0\],\[0,0,0,0\],\[0,0,0,0\],\[0,0,0,9\]\]',
+            r'Display: \[\[0, 0, 0, 0\], \[0, 0, 0, 0\], \[0, 0, 0, 0\], \[0, 0, 0, 9\]\]',
           ),
         ),
         findsOneWidget,
       );
+      expect(find.text('Stack 1'), findsOneWidget);
       handle.dispose();
     });
 
-    testWidgets('switching to rpn relabels the primary action to ENTER', (tester) async {
+    testWidgets('shell keeps both = and ENTER visible in stable positions', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-
       expect(find.text('ENTER'), findsOneWidget);
-      expect(find.text('='), findsNothing);
+      expect(find.text('='), findsOneWidget);
     });
 
     testWidgets('rpn mode renders the committed top as X0 without duplicating the display', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('4'));
-      await tester.pump();
-      await tester.tap(find.text('2'));
-      await tester.pump();
-      await tester.tap(find.text('ENTER'));
-      await tester.pumpAndSettle();
+      await _tapCalculatorButton(tester, '4');
+      await _tapCalculatorButton(tester, '2');
+      await _tapCalculatorButton(tester, 'ENTER');
 
       expect(find.bySemanticsLabel(RegExp(r'Stack depth: 1')), findsOneWidget);
       expect(find.byKey(const ValueKey<String>('rpn-stack-card-0')), findsOneWidget);
@@ -1126,32 +1300,23 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('rpn mode shows the draft in X0 and the committed top in X1', (tester) async {
+    testWidgets('when a draft exists X0 and X1 share the same stack styling', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('4'));
-      await tester.pump();
-      await tester.tap(find.text('ENTER'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('7'));
-      await tester.pump();
+      await _tapCalculatorButton(tester, '4');
+      await _tapCalculatorButton(tester, 'ENTER');
+      await _tapCalculatorButton(tester, '5');
+      await _tapCalculatorButton(tester, 'ENTER');
+      await _tapCalculatorButton(tester, '7');
 
       expect(find.byKey(const ValueKey<String>('rpn-stack-card-0')), findsOneWidget);
       expect(find.byKey(const ValueKey<String>('rpn-stack-card-1')), findsOneWidget);
+      expect(_rpnDraftCard(), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(const ValueKey<String>('rpn-stack-card-0')),
           matching: find.text('X0'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey<String>('rpn-stack-card-0')),
-          matching: find.text('7'),
         ),
         findsOneWidget,
       );
@@ -1164,14 +1329,24 @@ void main() {
       );
       expect(
         find.descendant(
-          of: find.byKey(const ValueKey<String>('rpn-stack-card-1')),
-          matching: find.text('[[4]]'),
+          of: _rpnDraftCard(),
+          matching: find.text('7'),
         ),
         findsOneWidget,
       );
       expect(
-        tester.getTopLeft(find.byKey(const ValueKey<String>('rpn-stack-card-1'))).dy,
+        tester.getTopLeft(_rpnDraftCard()).dy,
         lessThan(tester.getTopLeft(find.byKey(const ValueKey<String>('rpn-stack-card-0'))).dy),
+      );
+      expect(
+        (tester.getSize(find.byKey(const ValueKey<String>('rpn-stack-card-0'))).height -
+                tester.getSize(find.byKey(const ValueKey<String>('rpn-stack-card-1'))).height)
+            .abs(),
+        lessThanOrEqualTo(1.0),
+      );
+      expect(
+        tester.getSize(_rpnDraftCard()).height,
+        greaterThan(tester.getSize(find.byKey(const ValueKey<String>('rpn-stack-card-0'))).height),
       );
       expect(find.byKey(const ValueKey<String>('calculator-expression-text')), findsNothing);
       handle.dispose();
@@ -1180,10 +1355,7 @@ void main() {
     testWidgets('rpn mode exposes matrix command actions from the matrix deck', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await tester.tap(_keypadDeckSelector('MATRIX'));
-      await tester.pumpAndSettle();
+      await _tapFinderCenter(tester, _keypadDeckSelector('MATRIX'));
 
       expect(find.text('T'), findsOneWidget);
       expect(find.text('INV'), findsOneWidget);
@@ -1195,10 +1367,7 @@ void main() {
     testWidgets('rpn mode exposes factorization actions from the factor deck', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await tester.tap(_keypadDeckSelector('FACT'));
-      await tester.pumpAndSettle();
+      await _tapFinderCenter(tester, _keypadDeckSelector('FACT'));
 
       expect(find.text('LU'), findsOneWidget);
       expect(find.text('QR'), findsOneWidget);
@@ -1211,17 +1380,14 @@ void main() {
     testWidgets('rpn mode exposes direct matrix command buttons and applies transpose', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await _tapCalculatorButton(tester, 'MAT');
+      await _openMatrixEditor(tester);
       await _enterMatrixCell(tester, 0, 0, '1');
       await _enterMatrixCell(tester, 0, 1, '2');
       await _enterMatrixCell(tester, 1, 0, '3');
       await _enterMatrixCell(tester, 1, 1, '4');
       await _tapMatrixAction(tester, 'Push');
 
-      await tester.tap(_keypadDeckSelector('MATRIX'));
-      await tester.pumpAndSettle();
+      await _tapFinderCenter(tester, _keypadDeckSelector('MATRIX'));
 
       expect(find.text('T'), findsOneWidget);
       expect(find.text('ZEROS'), findsOneWidget);
@@ -1239,19 +1405,15 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await _tapCalculatorButton(tester, 'MAT');
+      await _openMatrixEditor(tester);
       await _enterMatrixCell(tester, 0, 0, '4');
       await _enterMatrixCell(tester, 0, 1, '7');
       await _enterMatrixCell(tester, 1, 0, '2');
       await _enterMatrixCell(tester, 1, 1, '6');
       await _tapMatrixAction(tester, 'Push');
 
-      await tester.tap(_keypadDeckSelector('MATRIX'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('DET'));
-      await tester.pumpAndSettle();
+      await _tapFinderCenter(tester, _keypadDeckSelector('MATRIX'));
+      await _tapCalculatorButton(tester, 'DET');
 
       expect(
         find.bySemanticsLabel(RegExp(r'Display: \[\[10\]\]')),
@@ -1264,9 +1426,7 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await _tapCalculatorButton(tester, 'MAT');
+      await _openMatrixEditor(tester);
       await _tapCalculatorButton(tester, '3x3');
       await _enterMatrixCell(tester, 0, 0, '2');
       await _enterMatrixCell(tester, 0, 1, '1');
@@ -1279,10 +1439,8 @@ void main() {
       await _enterMatrixCell(tester, 2, 2, '2');
       await _tapMatrixAction(tester, 'Push');
 
-      await tester.tap(_keypadDeckSelector('FACT'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('LU'));
-      await tester.pumpAndSettle();
+      await _tapFinderCenter(tester, _keypadDeckSelector('FACT'));
+      await _tapCalculatorButton(tester, 'LU');
 
       expect(find.bySemanticsLabel(RegExp(r'Stack depth: 3')), findsOneWidget);
       expect(find.text('Stack 3'), findsOneWidget);
@@ -1297,9 +1455,7 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await _tapCalculatorButton(tester, 'MAT');
+      await _openMatrixEditor(tester);
       await _enterMatrixCell(tester, 0, 0, '1');
       await _enterMatrixCell(tester, 0, 1, '0');
       await _enterMatrixCell(tester, 1, 0, '0');
@@ -1309,10 +1465,8 @@ void main() {
       await _enterMatrixCell(tester, 2, 1, '0');
       await _tapMatrixAction(tester, 'Push');
 
-      await tester.tap(_keypadDeckSelector('FACT'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('QR'));
-      await tester.pumpAndSettle();
+      await _tapFinderCenter(tester, _keypadDeckSelector('FACT'));
+      await _tapCalculatorButton(tester, 'QR');
 
       expect(find.bySemanticsLabel(RegExp(r'Stack depth: 2')), findsOneWidget);
       expect(find.text('Stack 2'), findsOneWidget);
@@ -1327,19 +1481,15 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await _tapCalculatorButton(tester, 'MAT');
+      await _openMatrixEditor(tester);
       await _enterMatrixCell(tester, 0, 0, '2');
       await _enterMatrixCell(tester, 0, 1, '0');
       await _enterMatrixCell(tester, 1, 0, '0');
       await _enterMatrixCell(tester, 1, 1, '3');
       await _tapMatrixAction(tester, 'Push');
 
-      await tester.tap(_keypadDeckSelector('FACT'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('EIG'));
-      await tester.pumpAndSettle();
+      await _tapFinderCenter(tester, _keypadDeckSelector('FACT'));
+      await _tapCalculatorButton(tester, 'EIG');
 
       expect(find.bySemanticsLabel(RegExp(r'Stack depth: 1')), findsOneWidget);
       expect(find.text('Stack 1'), findsOneWidget);
@@ -1354,17 +1504,14 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
-      await tester.tap(find.text('RPN'));
-      await tester.pumpAndSettle();
-      await _tapCalculatorButton(tester, 'MAT');
+      await _openMatrixEditor(tester);
       await _enterMatrixCell(tester, 0, 0, '1');
       await _enterMatrixCell(tester, 0, 1, '2');
       await _enterMatrixCell(tester, 1, 0, '3');
       await _enterMatrixCell(tester, 1, 1, '4');
       await _tapMatrixAction(tester, 'Push');
 
-      await tester.tap(_keypadDeckSelector('MATRIX'));
-      await tester.pumpAndSettle();
+      await _tapFinderCenter(tester, _keypadDeckSelector('MATRIX'));
 
       await _ensureCalculatorButtonVisible(tester, 'AROW');
       expect(find.text('AROW'), findsOneWidget);
@@ -1395,19 +1542,9 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('infix mode renders non-scalar matrix results in the display', (tester) async {
+    testWidgets('rpn shell renders non-scalar matrix results in the committed display', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
-
-      await _openMatrixEditor(tester);
-      await _enterMatrixCell(tester, 0, 0, '1');
-      await _enterMatrixCell(tester, 0, 1, '0');
-      await _enterMatrixCell(tester, 1, 0, '0');
-      await _enterMatrixCell(tester, 1, 1, '1');
-      await _tapMatrixAction(tester, 'Insert');
-
-      await tester.tap(find.text('×'));
-      await tester.pump();
 
       await _openMatrixEditor(tester);
       await _enterMatrixCell(tester, 0, 0, '3');
@@ -1416,14 +1553,12 @@ void main() {
       await _enterMatrixCell(tester, 1, 1, '6');
       await _tapMatrixAction(tester, 'Insert');
 
-      await tester.tap(find.text('='));
-      await tester.pumpAndSettle();
-
       expect(
         find.bySemanticsLabel(RegExp(r'Display: \[\[3, 4\], \[5, 6\]\]')),
         findsOneWidget,
       );
       expect(find.text('[3 4]\n[5 6]'), findsOneWidget);
+      expect(find.text('Stack 1'), findsOneWidget);
       handle.dispose();
     });
   });
