@@ -7,6 +7,9 @@
    id="svg13"
    sodipodi:docname="logo.svg"
    inkscape:version="1.3 (0e150ed6c4, 2023-07-21)"
+   inkscape:export-filename="..\app\assets\icon\icon.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -20,9 +23,9 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="4.452563"
-     inkscape:cx="111.39651"
-     inkscape:cy="76.921988"
+     inkscape:zoom="1.5742187"
+     inkscape:cx="76.863524"
+     inkscape:cy="119.1067"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
      inkscape:window-x="-8"
@@ -41,7 +44,8 @@
        y1="22"
        x2="214"
        y2="234"
-       gradientUnits="userSpaceOnUse">
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="translate(-33,-21.598015)">
       <stop
          offset="0"
          stop-color="#273449"
@@ -57,7 +61,8 @@
        y1="46"
        x2="198"
        y2="196"
-       gradientUnits="userSpaceOnUse">
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(1.2056511,0,0,1.2056511,-27.992137,-26.122339)">
       <stop
          offset="0"
          stop-color="#eef7f2"
@@ -82,142 +87,152 @@
     </filter>
   </defs>
   <rect
-     x="34"
-     y="22"
+     x="1"
+     y="0.40198508"
      width="188"
      height="212"
      rx="26"
      fill="url(#case)"
      filter="url(#shadow)"
-     id="rect4" />
+     id="rect4"
+     style="fill:url(#case)"
+     transform="matrix(1.2056511,0,0,1.2056511,11.794349,-0.08266866)" />
   <rect
-     x="52"
-     y="42"
-     width="152"
-     height="152"
-     rx="18"
+     x="34.701721"
+     y="24.515007"
+     width="183.25896"
+     height="183.25896"
+     rx="21.701719"
      fill="url(#screen)"
-     id="rect5" />
+     id="rect5"
+     style="fill:url(#screen);stroke-width:1.20565" />
   <rect
-     x="62"
-     y="52"
-     width="132"
-     height="132"
-     rx="12"
+     x="46.758228"
+     y="36.571518"
+     width="159.14594"
+     height="159.14594"
+     rx="14.467813"
      fill="none"
      stroke="#273449"
      stroke-opacity="0.18"
-     stroke-width="3"
+     stroke-width="3.61695"
      id="rect6" />
   <path
-     d="M78 74H66v108h12"
+     d="M 66.048646,63.09584 H 51.580834 v 130.21032 h 14.467812"
      fill="none"
      stroke="#101722"
-     stroke-width="8"
+     stroke-width="9.64521"
      stroke-linecap="round"
      stroke-linejoin="round"
      id="path6" />
   <path
-     d="M178 74h12v108h-12"
+     d="m 186.61375,63.09584 h 14.46781 v 130.21032 h -14.46781"
      fill="none"
      stroke="#101722"
-     stroke-width="8"
+     stroke-width="9.64521"
      stroke-linecap="round"
      stroke-linejoin="round"
      id="path7" />
   <line
-     x1="128"
-     y1="66"
-     x2="128"
-     y2="170"
+     x1="126.3312"
+     y1="53.45063"
+     x2="126.3312"
+     y2="178.83833"
      stroke="#273449"
      stroke-opacity="0.18"
-     stroke-width="3"
+     stroke-width="3.61695"
      id="line7" />
   <line
-     x1="180"
-     y1="118"
-     x2="76"
-     y2="118"
+     x1="189.02505"
+     y1="116.14449"
+     x2="63.637344"
+     y2="116.14449"
      stroke="#273449"
      stroke-opacity="0.18"
-     stroke-width="3"
+     stroke-width="3.61695"
      id="line8" />
   <rect
-     x="-172"
-     y="74"
-     width="38"
-     height="38"
-     rx="9"
+     x="-179.37985"
+     y="63.09584"
+     width="45.814739"
+     height="45.814739"
+     rx="10.85086"
      fill="#f36f45"
      id="rect8"
-     transform="scale(-1,1)" />
+     transform="scale(-1,1)"
+     style="fill:#4563f3;fill-opacity:1;stroke-width:1.20565" />
   <rect
-     x="-122"
-     y="124"
-     width="38"
-     height="38"
-     rx="9"
+     x="-119.09729"
+     y="123.3784"
+     width="45.814739"
+     height="45.814739"
+     rx="10.85086"
      fill="#f36f45"
      id="rect9"
-     transform="scale(-1,1)" />
+     transform="scale(-1,1)"
+     style="stroke-width:1.20565" />
   <circle
-     cx="-103"
-     cy="93"
-     r="8"
+     cx="-96.189926"
+     cy="86.003212"
+     r="9.6452084"
      fill="#273449"
      fill-opacity="0.34"
      id="circle9"
-     transform="scale(-1,1)" />
+     transform="scale(-1,1)"
+     style="stroke-width:1.20565" />
   <circle
-     cx="-153"
-     cy="143"
-     r="8"
+     cx="-156.47247"
+     cy="146.28577"
+     r="9.6452084"
      fill="#273449"
      fill-opacity="0.34"
      id="circle10"
-     transform="scale(-1,1)" />
+     transform="scale(-1,1)"
+     style="stroke-width:1.20565" />
   <path
-     d="m 157,84 v 18"
+     d="M 161.29508,75.15235 V 96.85407"
      stroke="#fff8ef"
-     stroke-width="8"
+     stroke-width="9.64521"
      stroke-linecap="round"
      id="path10" />
   <path
-     d="m 107,134 v 18"
+     d="m 101.01253,135.43491 v 21.70172"
      stroke="#fff8ef"
-     stroke-width="8"
+     stroke-width="9.64521"
      stroke-linecap="round"
      id="path11" />
   <rect
-     x="68"
-     y="207"
-     width="28"
-     height="12"
-     rx="6"
+     x="53.992134"
+     y="223.44742"
+     width="33.758228"
+     height="14.467813"
+     rx="7.2339063"
      fill="#f36f45"
-     id="rect11" />
+     id="rect11"
+     style="stroke-width:1.20565" />
   <rect
-     x="108"
-     y="207"
-     width="28"
-     height="12"
-     rx="6"
+     x="102.21818"
+     y="223.44742"
+     width="33.758228"
+     height="14.467813"
+     rx="7.2339063"
      fill="#d6dee9"
-     id="rect12" />
+     id="rect12"
+     style="stroke-width:1.20565" />
   <rect
-     x="148"
-     y="207"
-     width="40"
-     height="12"
-     rx="6"
+     x="150.44421"
+     y="223.44742"
+     width="48.226044"
+     height="14.467813"
+     rx="7.2339063"
      fill="#d6dee9"
-     id="rect13" />
+     id="rect13"
+     style="stroke-width:1.20565" />
   <rect
-     style="fill:#4563f3;fill-opacity:1;stroke-width:6.64753"
+     style="fill:#fff8ef;fill-opacity:1;stroke-width:8.0146"
      id="rect14"
-     width="10"
-     height="4"
-     x="140"
-     y="91" />
+     width="12.056511"
+     height="4.8226042"
+     x="140.79901"
+     y="83.591911" />
 </svg>
