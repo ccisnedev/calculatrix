@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:calculatrix/calculatrix.dart';
 
@@ -20,6 +22,13 @@ class CalculatorController extends ChangeNotifier {
   String _error = '';
   Matrix? _displayMatrix;
   bool _mrcArmed = false;
+  Timer? _infixMemoryStatusTimer;
+  String? _transientInfixMemoryStatusText;
+  String? _transientInfixMemoryStatusSemanticsText;
+
+  static const Duration _infixMemoryStatusPreviewDuration = Duration(
+    milliseconds: 900,
+  );
 
   CalculatorMode get mode => _mode;
 
@@ -34,8 +43,60 @@ class CalculatorController extends ChangeNotifier {
 
   Matrix? get displayMatrix => _displayMatrix;
 
+  Matrix? get matrixEditorSeedMatrix {
+    if (_error.isNotEmpty) {
+      return null;
+    }
+
+    final String trimmed = expression.trim();
+    if (trimmed.isEmpty || !trimmed.startsWith('[[') || !trimmed.endsWith(']]')) {
+      return null;
+    }
+
+    try {
+      final Matrix matrix = Calculatrix.evaluateInfix(trimmed);
+      if (matrix.rowCount > 4 || matrix.columnCount > 4) {
+        return null;
+      }
+
+      return matrix;
+    } on FormatException {
+      return null;
+    } on CalculatrixError {
+      return null;
+    }
+  }
+
   /// Whether memory contains a non-zero value.
   bool get hasMemory => _session.hasMemory;
+
+  String get infixMemoryStatusText {
+    final String? transientStatus = _transientInfixMemoryStatusText;
+    if (transientStatus != null) {
+      return transientStatus;
+    }
+
+    final Matrix? memory = _session.memoryValue;
+    if (memory == null) {
+      return 'MEM: empty';
+    }
+
+    return 'MEM: ${_formatMemoryPreview(memory)}';
+  }
+
+  String get infixMemoryStatusSemanticsText {
+    final String? transientStatus = _transientInfixMemoryStatusSemanticsText;
+    if (transientStatus != null) {
+      return transientStatus;
+    }
+
+    final Matrix? memory = _session.memoryValue;
+    if (memory == null) {
+      return 'Memory status: empty';
+    }
+
+    return 'Memory status: ${_formatMemoryPreview(memory)}';
+  }
 
   bool get isRpnMode => mode == CalculatorMode.rpn;
 
@@ -64,14 +125,12 @@ class CalculatorController extends ChangeNotifier {
       return '0';
     }
 
-    return currentValue.isComplexForm
-        ? MatrixDisplayFormatter.complex(currentValue)
-        : _session.rpnTopLiteral;
+    return _session.rpnTopLiteral;
   }
 
   Matrix? get committedRpnDisplayMatrix {
     final Matrix? currentValue = _session.currentValue;
-    if (currentValue == null || currentValue.isScalar || currentValue.isComplexForm) {
+    if (currentValue == null || currentValue.isScalar) {
       return null;
     }
 
@@ -192,6 +251,13 @@ class CalculatorController extends ChangeNotifier {
     _mutate(_session.evaluate);
   }
 
+  void revealCommittedRpnMatrixForm() {
+    final Matrix? currentValue = _session.currentValue;
+    if (!isRpnMode || currentValue == null || currentValue.isScalar) {
+      return;
+    }
+  }
+
   /// Clears the entire expression and result.
   void clear() {
     _mutate(_session.clear);
@@ -246,12 +312,24 @@ class CalculatorController extends ChangeNotifier {
 
   /// Adds current display value to memory.
   void memoryAdd() {
-    _mutate(_session.memoryAdd);
+    final _MemoryStatusPreview? preview = _buildMemoryStatusPreview('+');
+    _mutate(() {
+      _session.memoryAdd();
+      if (!_session.hasError && preview != null) {
+        _showTransientInfixMemoryStatus(preview);
+      }
+    }, clearTransientInfixMemoryStatus: preview == null);
   }
 
   /// Subtracts current display value from memory.
   void memorySubtract() {
-    _mutate(_session.memorySubtract);
+    final _MemoryStatusPreview? preview = _buildMemoryStatusPreview('-');
+    _mutate(() {
+      _session.memorySubtract();
+      if (!_session.hasError && preview != null) {
+        _showTransientInfixMemoryStatus(preview);
+      }
+    }, clearTransientInfixMemoryStatus: preview == null);
   }
 
   void enter() {
@@ -310,9 +388,84 @@ class CalculatorController extends ChangeNotifier {
     return str;
   }
 
-  void _mutate(void Function() action, {bool resetMrcSequence = true}) {
+  String _formatMemoryPreview(Matrix memory) {
+    return _formatHonestValue(memory);
+  }
+
+  String _formatHonestValue(Matrix value) {
+    if (value.isScalar) {
+      return _formatResult(value.scalarValue);
+    }
+
+    return MatrixDisplayFormatter.compact(value);
+  }
+
+  _MemoryStatusPreview? _buildMemoryStatusPreview(String operatorSymbol) {
+    if (!isInfixMode) {
+      return null;
+    }
+
+    final Matrix? operand = _currentMemoryOperandForPreview();
+    if (operand == null) {
+      return null;
+    }
+
+    final Matrix? currentMemory = _session.memoryValue;
+    final String leftOperand = currentMemory == null
+        ? '0'
+        : _formatMemoryPreview(currentMemory);
+    final String rightOperand = _formatMemoryPreview(operand);
+    final String operatorWord = operatorSymbol == '+' ? 'plus' : 'minus';
+
+    return _MemoryStatusPreview(
+      text: 'MEM: $leftOperand $operatorSymbol $rightOperand',
+      semanticsText: 'Memory status: $leftOperand $operatorWord $rightOperand',
+    );
+  }
+
+  Matrix? _currentMemoryOperandForPreview() {
+    final String currentExpression = expression;
+    if (currentExpression.isNotEmpty) {
+      try {
+        return Calculatrix.evaluateInfix(currentExpression);
+      } on FormatException {
+        return null;
+      } on CalculatrixError {
+        return null;
+      }
+    }
+
+    return _session.currentValue;
+  }
+
+  void _showTransientInfixMemoryStatus(_MemoryStatusPreview preview) {
+    _cancelInfixMemoryStatusPreview();
+    _transientInfixMemoryStatusText = preview.text;
+    _transientInfixMemoryStatusSemanticsText = preview.semanticsText;
+    _infixMemoryStatusTimer = Timer(_infixMemoryStatusPreviewDuration, () {
+      _transientInfixMemoryStatusText = null;
+      _transientInfixMemoryStatusSemanticsText = null;
+      notifyListeners();
+    });
+  }
+
+  void _cancelInfixMemoryStatusPreview() {
+    _infixMemoryStatusTimer?.cancel();
+    _infixMemoryStatusTimer = null;
+  }
+
+  void _mutate(
+    void Function() action, {
+    bool resetMrcSequence = true,
+    bool clearTransientInfixMemoryStatus = true,
+  }) {
     if (resetMrcSequence) {
       _mrcArmed = false;
+    }
+    if (clearTransientInfixMemoryStatus) {
+      _cancelInfixMemoryStatusPreview();
+      _transientInfixMemoryStatusText = null;
+      _transientInfixMemoryStatusSemanticsText = null;
     }
 
     action();
@@ -321,6 +474,12 @@ class CalculatorController extends ChangeNotifier {
     }
     _syncPresentation();
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _cancelInfixMemoryStatusPreview();
+    super.dispose();
   }
 
   void _syncPresentation() {
@@ -347,18 +506,26 @@ class CalculatorController extends ChangeNotifier {
     }
 
     if (_session.mode == CalculatrixMode.rpn) {
-      _displayMatrix = currentValue;
-      _result = currentValue.isComplexForm
-          ? MatrixDisplayFormatter.complex(currentValue)
-          : _session.rpnTopLiteral;
+      _displayMatrix = currentValue.isScalar ? null : currentValue;
+      _result = currentValue.isScalar
+        ? _formatResult(currentValue.scalarValue)
+        : _session.rpnTopLiteral;
       return;
     }
 
-    _displayMatrix = (currentValue.isScalar || currentValue.isComplexForm) ? null : currentValue;
+    _displayMatrix = currentValue.isScalar ? null : currentValue;
     _result = currentValue.isScalar
         ? _formatResult(currentValue.scalarValue)
-        : currentValue.isComplexForm
-            ? MatrixDisplayFormatter.complex(currentValue)
-            : MatrixDisplayFormatter.compact(currentValue);
+      : _formatHonestValue(currentValue);
   }
+}
+
+class _MemoryStatusPreview {
+  const _MemoryStatusPreview({
+    required this.text,
+    required this.semanticsText,
+  });
+
+  final String text;
+  final String semanticsText;
 }

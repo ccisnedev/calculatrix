@@ -59,7 +59,22 @@ EditableText _matrixEditableText(WidgetTester tester, int row, int column) {
 }
 
 Finder _calculatorButton(String label) {
+  if (label == 'INFIX') {
+    return find.byWidgetPredicate((Widget widget) {
+      final Key? key = widget.key;
+      return key == const ValueKey<String>('calculator-button-INFIX') ||
+          key == const ValueKey<String>('calculator-button-INFIX-edit');
+    });
+  }
+
   return find.byKey(ValueKey<String>('calculator-button-$label'));
+}
+
+Finder _calculatorButtonLabel(String keyLabel, String visibleLabel) {
+  return find.descendant(
+    of: _calculatorButton(keyLabel),
+    matching: find.text(visibleLabel),
+  );
 }
 
 Finder _rpnStackCard(int register) {
@@ -76,13 +91,13 @@ Finder _keypadDeckSelector(String label) {
 
 const List<String> _keypadDeckLabels = <String>[
   'BASIC',
+  'EDIT',
   'STACK',
   'MATH',
   'MATRIX',
   'VECTOR',
   'FACT',
   'PROP',
-  'EDIT',
   'BUILD',
   'MEM',
 ];
@@ -121,6 +136,24 @@ Future<void> _tapCalculatorButton(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _expectSingleLineButtonLabel(
+  WidgetTester tester, {
+  required String keyLabel,
+  required String visibleLabel,
+}) async {
+  await _ensureCalculatorButtonVisible(tester, keyLabel);
+  final Finder label = _calculatorButtonLabel(keyLabel, visibleLabel);
+  expect(label, findsOneWidget);
+  expect(
+    find.ancestor(of: label, matching: find.byType(FittedBox)),
+    findsAtLeastNWidgets(1),
+  );
+
+  final Text text = tester.widget<Text>(label);
+  expect(text.maxLines, 1);
+  expect(text.softWrap, isFalse);
+}
+
 Future<void> _tapFinderCenter(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
@@ -149,6 +182,7 @@ Future<void> _openMatrixEditor(WidgetTester tester) async {
 }
 
 Future<void> _openInfixEditor(WidgetTester tester) async {
+  await _tapFinderCenter(tester, _keypadDeckSelector('EDIT'));
   await _tapCalculatorButton(tester, 'INFIX');
 }
 
@@ -198,11 +232,11 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('keypad has all Stage 7 shell buttons', (tester) async {
+    testWidgets('keypad keeps the stable shell buttons visible', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
       final expected = [
         'MRC', 'M-', 'M+', 'AC', 'C', '%', 'SQRT', 'INV', 'i',
-        '7', '8', '9', '÷', 'INFIX',
+        '7', '8', '9', '÷',
         '4', '5', '6', '×', 'DELETE',
         '1', '2', '3', '-', '=',
         '0', '.', '±', '+', 'ENTER',
@@ -256,6 +290,71 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('infix mode shows memory state and animates add/subtract operations', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+      await _openInfixEditor(tester);
+
+      expect(find.text('MEM: empty'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('calculator-infix-controls-hint')),
+        findsNothing,
+      );
+      final double draftLeft = tester.getRect(_rpnDraftCard()).left;
+      final double memoryLeft = tester
+          .getRect(find.byKey(const ValueKey<String>('calculator-infix-memory-status')))
+          .left;
+      expect(memoryLeft - draftLeft, greaterThanOrEqualTo(16.0));
+
+      final Rect statusRailRect = tester.getRect(
+        find.byKey(const ValueKey<String>('calculator-infix-status-rail')),
+      );
+      final Rect expressionViewportRect = tester.getRect(
+        find.byKey(const ValueKey<String>('calculator-infix-expression-viewport')),
+      );
+      final Rect draftLabelRect = tester.getRect(
+        find.descendant(of: _rpnDraftCard(), matching: find.text('DRAFT')),
+      );
+      final Rect memoryStatusRect = tester.getRect(
+        find.byKey(const ValueKey<String>('calculator-infix-memory-status')),
+      );
+
+      expect(statusRailRect.height, lessThan(40.0));
+      expect(
+        (draftLabelRect.center.dy - memoryStatusRect.center.dy).abs(),
+        lessThanOrEqualTo(2.0),
+      );
+      expect(expressionViewportRect.height, greaterThan(statusRailRect.height * 2));
+      expect(
+        tester.widget<Text>(
+          find.descendant(
+            of: find.byKey(const ValueKey<String>('calculator-infix-memory-status')),
+            matching: find.byType(Text),
+          ),
+        ).maxLines,
+        1,
+      );
+
+      await _tapCalculatorButton(tester, '7');
+      await _tapCalculatorButton(tester, 'M+');
+
+      expect(find.text('MEM: 0 + 7'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1000));
+      await tester.pumpAndSettle();
+      expect(find.text('MEM: 7'), findsOneWidget);
+
+      await _tapCalculatorButton(tester, 'C');
+      await _tapCalculatorButton(tester, '2');
+      await _tapCalculatorButton(tester, 'M-');
+
+      expect(find.text('MEM: 7 - 2'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1000));
+      await tester.pumpAndSettle();
+      expect(find.text('MEM: 5'), findsOneWidget);
+
+      await _tapCalculatorButton(tester, 'MRC');
+      expect(find.text('MEM: 5'), findsOneWidget);
+    });
+
     testWidgets('sqrt button applies immediately in infix mode', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
@@ -269,14 +368,13 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('sqrt of negative number returns imaginary unit', (tester) async {
+    testWidgets('sqrt of negative number leaves an honest matrix literal in the expression', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
       await _openInfixEditor(tester);
       await _tapCalculatorButton(tester, '1');
       await _tapCalculatorButton(tester, '±');
       await _tapCalculatorButton(tester, 'SQRT');
-      // Should show the matrix literal in expression
       expect(
         find.bySemanticsLabel(RegExp(r'Expression: \[\[0,-1\],\[1,0\]\]')),
         findsOneWidget,
@@ -376,22 +474,22 @@ void main() {
       await tester.tap(_keypadDeckSelector('EDIT'));
       await tester.pumpAndSettle();
 
-      expect(find.text('INFIX'), findsAtLeastNWidgets(2));
+      expect(_calculatorButton('INFIX'), findsOneWidget);
       expect(_calculatorButton('MATRIX'), findsOneWidget);
     });
 
-    testWidgets('module bar exposes the fixed Stage 7 taxonomy', (tester) async {
+    testWidgets('module bar promotes EDIT immediately after BASIC', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       const List<String> modules = <String>[
         'BASIC',
+        'EDIT',
         'STACK',
         'MATH',
         'MATRIX',
         'VECTOR',
         'FACT',
         'PROP',
-        'EDIT',
         'BUILD',
         'MEM',
       ];
@@ -399,17 +497,70 @@ void main() {
       for (final String module in modules) {
         expect(_keypadDeckSelector(module), findsOneWidget);
       }
+
+      expect(
+        tester.getTopLeft(_keypadDeckSelector('EDIT')).dx,
+        lessThan(tester.getTopLeft(_keypadDeckSelector('STACK')).dx),
+      );
     });
 
-    testWidgets('basic module exposes the agreed Stage 7 seed map', (tester) async {
+    testWidgets('basic module exposes the 0.7.1 seed map', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       for (final String label in <String>['MRC', 'M-', 'M+', 'AC', 'C', '%', 'SQRT', 'INV', 'i']) {
         expect(_calculatorButton(label), findsOneWidget);
       }
 
+      expect(find.text('√'), findsOneWidget);
+      expect(find.text('SQRT'), findsNothing);
+
       expect(_calculatorButton('>'), findsNothing);
       expect(_calculatorButton('<'), findsNothing);
+    });
+
+    testWidgets('fixed keypad leaves the infix slot empty and keeps long captions on one line',
+        (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(_calculatorButton('INFIX'), findsNothing);
+      await _expectSingleLineButtonLabel(
+        tester,
+        keyLabel: '=',
+        visibleLabel: 'EVAL',
+      );
+      await _expectSingleLineButtonLabel(
+        tester,
+        keyLabel: 'ENTER',
+        visibleLabel: 'ENTER',
+      );
+
+      await _tapFinderCenter(tester, _keypadDeckSelector('MATRIX'));
+      await _expectSingleLineButtonLabel(
+        tester,
+        keyLabel: 'ZEROS',
+        visibleLabel: 'ZEROS',
+      );
+
+      await _tapFinderCenter(tester, _keypadDeckSelector('VECTOR'));
+      await _expectSingleLineButtonLabel(
+        tester,
+        keyLabel: 'CROSS',
+        visibleLabel: 'CROSS',
+      );
+
+      await _tapFinderCenter(tester, _keypadDeckSelector('FACT'));
+      await _expectSingleLineButtonLabel(
+        tester,
+        keyLabel: 'SNORM',
+        visibleLabel: 'SNORM',
+      );
+    });
+
+    testWidgets('button captions use the math mono family', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      final Text eval = tester.widget<Text>(_calculatorButtonLabel('=', 'EVAL'));
+      expect(eval.style?.fontFamily, 'JetBrainsMono');
     });
 
     testWidgets('only overflowing modules expose paging arrows', (tester) async {
@@ -586,22 +737,48 @@ void main() {
       expect(_calculatorButton('INV'), findsOneWidget);
     });
 
-    testWidgets('equals is inert in the rpn shell while ENTER commits the draft',
+    testWidgets('EVAL commits the rpn draft while ENTER remains available',
         (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       await _tapCalculatorButton(tester, '4');
       await _tapCalculatorButton(tester, '=');
 
-      expect(find.text('Stack 0'), findsOneWidget);
-      expect(_rpnDraftCard(), findsOneWidget);
-      expect(find.descendant(of: _rpnDraftCard(), matching: find.text('4')), findsOneWidget);
-
-      await _tapCalculatorButton(tester, 'ENTER');
-
       expect(_rpnDraftCard(), findsNothing);
       expect(_rpnStackCard(0), findsOneWidget);
       expect(find.text('Stack 1'), findsOneWidget);
+      expect(find.text('ENTER'), findsOneWidget);
+    });
+
+    testWidgets('RPN shows complex-form values directly as matrices', (tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(find.text('EVAL'), findsOneWidget);
+      expect(find.text('='), findsNothing);
+
+      await _tapCalculatorButton(tester, 'i');
+      await _tapCalculatorButton(tester, '1');
+      await _tapCalculatorButton(tester, 'ENTER');
+      await _tapCalculatorButton(tester, '+');
+
+      expect(find.text('1 + i'), findsNothing);
+      expect(
+        find.bySemanticsLabel(
+          RegExp(r'Display: \[\[1, -1\], \[1, 1\]\]\. Matrix 2 by 2'),
+        ),
+        findsOneWidget,
+      );
+
+      await _tapCalculatorButton(tester, '=');
+
+      expect(
+        find.bySemanticsLabel(
+          RegExp(r'Display: \[\[1, -1\], \[1, 1\]\]\. Matrix 2 by 2'),
+        ),
+        findsOneWidget,
+      );
+      handle.dispose();
     });
 
     testWidgets('stack module exposes stack actions', (tester) async {
@@ -617,7 +794,7 @@ void main() {
       expect(_calculatorButton('ENTER'), findsOneWidget);
     });
 
-    testWidgets('active rpn draft occupies the primary slot above committed X0', (tester) async {
+    testWidgets('active rpn draft occupies the primary slot below committed X0', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       await _tapCalculatorButton(tester, '4');
@@ -635,12 +812,52 @@ void main() {
       expect(_rpnStackCard(1), findsNothing);
       expect(
         tester.getTopLeft(_rpnDraftCard()).dy,
-        lessThan(tester.getTopLeft(_rpnStackCard(0)).dy),
+        greaterThan(tester.getTopLeft(_rpnStackCard(0)).dy),
       );
       expect(
         tester.getSize(_rpnDraftCard()).height,
         greaterThan(tester.getSize(_rpnStackCard(0)).height),
       );
+    });
+
+    testWidgets('infix mode expands the draft card instead of replacing it with a separate surface',
+        (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _tapCalculatorButton(tester, '2');
+      final Size rpnDraftSize = tester.getSize(_rpnDraftCard());
+
+      await _openInfixEditor(tester);
+
+      expect(_rpnDraftCard(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: _rpnDraftCard(),
+          matching: find.byKey(const ValueKey<String>('calculator-expression-text')),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.getSize(_rpnDraftCard()).height, greaterThan(rpnDraftSize.height));
+    });
+
+    testWidgets('matrix mode expands the draft card and hosts the embedded editor inside it',
+        (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _tapCalculatorButton(tester, '2');
+      final Size rpnDraftSize = tester.getSize(_rpnDraftCard());
+
+      await _openMatrixEditor(tester);
+
+      expect(_rpnDraftCard(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: _rpnDraftCard(),
+          matching: find.byKey(const ValueKey<String>('matrix-mode-panel')),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.getSize(_rpnDraftCard()).height, greaterThan(rpnDraftSize.height));
     });
 
     testWidgets('uses square calculator keys', (tester) async {
@@ -674,6 +891,25 @@ void main() {
       expect(find.text('Columns'), findsNothing);
       expect(find.text('['), findsNothing);
       expect(find.text(']'), findsNothing);
+    });
+
+    testWidgets('matrix editor inherits the current matrix draft content', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openInfixEditor(tester);
+      await _tapCalculatorButton(tester, 'i');
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Expression: \[\[0,-1\],\[1,0\]\]')),
+        findsOneWidget,
+      );
+
+      await _openMatrixEditor(tester);
+
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '0');
+      expect(_matrixEditableText(tester, 0, 1).controller.text, '-1');
+      expect(_matrixEditableText(tester, 1, 0).controller.text, '1');
+      expect(_matrixEditableText(tester, 1, 1).controller.text, '0');
     });
 
     testWidgets('matrix editor uses compact structural affordances instead of cell-sized chrome', (tester) async {
@@ -1056,7 +1292,6 @@ void main() {
       expect(_matrixEditableText(tester, 0, 0).controller.text, '1');
       expect(_matrixEditableText(tester, 0, 1).controller.text, '1');
       expect(_matrixEditableText(tester, 1, 0).controller.text, '1');
-      expect(_matrixEditableText(tester, 1, 1).controller.text, '1');
     });
 
     testWidgets('matrix editor transpose rewrites a valid draft through the core command path', (tester) async {
@@ -1074,6 +1309,21 @@ void main() {
       expect(_matrixEditableText(tester, 0, 1).controller.text, '3');
       expect(_matrixEditableText(tester, 1, 0).controller.text, '2');
       expect(_matrixEditableText(tester, 1, 1).controller.text, '4');
+    });
+
+    testWidgets('memory strip keeps complex-form values in matrix form', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+      await _openInfixEditor(tester);
+
+      await _tapCalculatorButton(tester, 'i');
+      await _tapCalculatorButton(tester, 'M+');
+
+      expect(find.text('MEM: 0 + [[0, -1], [1, 0]]'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1000));
+      await tester.pumpAndSettle();
+      expect(find.text('MEM: [[0, -1], [1, 0]]'), findsOneWidget);
+      expect(find.text('MEM: i'), findsNothing);
+      expect(find.text('MEM: 0 + i'), findsNothing);
     });
 
     testWidgets('matrix editor inverse rewrites a valid draft through the core command path', (tester) async {
@@ -1270,11 +1520,17 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('shell keeps both = and ENTER visible in stable positions', (tester) async {
+    testWidgets('shell keeps EVAL and ENTER visible in RPN and reuses the key as = in infix', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       expect(find.text('ENTER'), findsOneWidget);
+      expect(find.text('EVAL'), findsOneWidget);
+      expect(find.text('='), findsNothing);
+
+      await _openInfixEditor(tester);
+
       expect(find.text('='), findsOneWidget);
+      expect(find.text('EVAL'), findsNothing);
     });
 
     testWidgets('rpn mode renders the committed top as X0 without duplicating the display', (tester) async {
@@ -1336,7 +1592,7 @@ void main() {
       );
       expect(
         tester.getTopLeft(_rpnDraftCard()).dy,
-        lessThan(tester.getTopLeft(find.byKey(const ValueKey<String>('rpn-stack-card-0'))).dy),
+        greaterThan(tester.getTopLeft(find.byKey(const ValueKey<String>('rpn-stack-card-0'))).dy),
       );
       expect(
         (tester.getSize(find.byKey(const ValueKey<String>('rpn-stack-card-0'))).height -

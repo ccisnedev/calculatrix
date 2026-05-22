@@ -443,34 +443,36 @@ void main() {
       expect(controller.result, '0.5');
     });
 
-    test('sqrt of negative returns scaled imaginary unit', () {
+    test('sqrt of negative returns the honest matrix result', () {
       controller.input('√');
       controller.input('(');
       controller.input('-');
       controller.input('4');
       controller.input(')');
       controller.evaluate();
-      // sqrt(-4) = 2i — displayed in complex notation, not raw matrix literal
-      expect(controller.result, '2i');
+      expect(controller.result, '[[0, -2], [2, 0]]');
+      expect(controller.displayMatrix, isNotNull);
+      expect(controller.displayMatrix, Matrix(<List<double>>[[0, -2], [2, 0]]));
     });
 
-    test('insertImaginaryUnit inserts Matrix.i into Infix expression', () {
+    test('insertImaginaryUnit keeps the result in matrix form', () {
       controller.input('2');
       controller.input('×');
       controller.insertImaginaryUnit();
       controller.evaluate();
-      // 2 * i = [[0,-2],[2,0]] = 2i
-      expect(controller.result, '2i');
+      expect(controller.result, '[[0, -2], [2, 0]]');
+      expect(controller.displayMatrix, isNotNull);
     });
 
-    test('3 + 2*i = 3 + 2i via scalar promotion', () {
+    test('3 + 2*i stays honest and shows the matrix sum', () {
       controller.input('3');
       controller.input('+');
       controller.input('2');
       controller.input('×');
       controller.insertImaginaryUnit();
       controller.evaluate();
-      expect(controller.result, '3 + 2i');
+      expect(controller.result, '[[3, -2], [2, 3]]');
+      expect(controller.displayMatrix, isNotNull);
     });
   });
 
@@ -650,7 +652,7 @@ void main() {
 
       expect(controller.rpnStackDepth, 1);
       expect(controller.rpnTopLiteral, '[[7]]');
-      expect(controller.display, '[[7]]');
+      expect(controller.display, '7');
     });
 
     test('clear removes draft but preserves committed stack in rpn mode', () {
@@ -728,7 +730,7 @@ void main() {
 
       expect(controller.rpnStackDepth, 1);
       expect(controller.rpnTopLiteral, '[[7]]');
-      expect(controller.display, '[[7]]');
+      expect(controller.display, '7');
     });
 
     test('switching back to infix uses the current rpn top as the next operand seed', () {
@@ -769,6 +771,18 @@ void main() {
       controller.evaluate();
 
       expect(controller.display, '5');
+    });
+
+    test('matrix editor inherits a 1x1 matrix draft without expanding it', () {
+      controller.openInfixEditor();
+      controller.insertMatrixLiteral('[[1]]');
+
+      final Matrix? matrix = controller.matrixEditorSeedMatrix;
+
+      expect(matrix, isNotNull);
+      expect(matrix!.rowCount, 1);
+      expect(matrix.columnCount, 1);
+      expect(matrix.at(0, 0), 1);
     });
   });
 

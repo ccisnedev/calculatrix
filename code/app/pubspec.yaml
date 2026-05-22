@@ -1,7 +1,7 @@
 name: calculatrix_app
 description: "RPN Matrix calculator app"
 publish_to: 'none'
-version: 0.7.0+30
+version: 0.7.1+31
 
 environment:
   sdk: ^3.11.5
@@ -76,3 +76,7 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  fonts:
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf

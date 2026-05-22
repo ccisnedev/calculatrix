@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:calculatrix/calculatrix.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'controller.dart';
@@ -73,6 +74,7 @@ class CalculatorView extends StatefulWidget {
 }
 
 class _CalculatorViewState extends State<CalculatorView> {
+  static const String _calculatorFontFamily = 'JetBrainsMono';
   final _controller = CalculatorController();
   final GlobalKey<_MatrixEditorDialogState> _matrixEditorKey =
       GlobalKey<_MatrixEditorDialogState>();
@@ -95,7 +97,7 @@ class _CalculatorViewState extends State<CalculatorView> {
     _ButtonDef('8', _ButtonCategory.number),
     _ButtonDef('9', _ButtonCategory.number),
     _ButtonDef('÷', _ButtonCategory.operator),
-    _ButtonDef('INFIX', _ButtonCategory.function),
+    _emptySlot,
     _ButtonDef('4', _ButtonCategory.number),
     _ButtonDef('5', _ButtonCategory.number),
     _ButtonDef('6', _ButtonCategory.number),
@@ -123,9 +125,23 @@ class _CalculatorViewState extends State<CalculatorView> {
         _ButtonDef('C', _ButtonCategory.function),
         _emptySlot,
         _ButtonDef('%', _ButtonCategory.function),
-        _ButtonDef('SQRT', _ButtonCategory.function),
+        _ButtonDef('SQRT', _ButtonCategory.function, visualLabel: '√'),
         _ButtonDef('INV', _ButtonCategory.function),
         _ButtonDef('i', _ButtonCategory.function),
+      ],
+    ]),
+    _KeypadModuleDef('EDIT', <List<_ButtonDef>>[
+      <_ButtonDef>[
+        _ButtonDef('INFIX', _ButtonCategory.function, keySuffix: 'edit'),
+        _ButtonDef('MATRIX', _ButtonCategory.function),
+        _ButtonDef('CANCEL', _ButtonCategory.function),
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
+        _emptySlot,
       ],
     ]),
     _KeypadModuleDef('STACK', <List<_ButtonDef>>[
@@ -224,20 +240,6 @@ class _CalculatorViewState extends State<CalculatorView> {
         _emptySlot,
       ],
     ]),
-    _KeypadModuleDef('EDIT', <List<_ButtonDef>>[
-      <_ButtonDef>[
-        _ButtonDef('INFIX', _ButtonCategory.function, keySuffix: 'edit'),
-        _ButtonDef('MATRIX', _ButtonCategory.function),
-        _ButtonDef('CANCEL', _ButtonCategory.function),
-        _emptySlot,
-        _emptySlot,
-        _emptySlot,
-        _emptySlot,
-        _emptySlot,
-        _emptySlot,
-        _emptySlot,
-      ],
-    ]),
     _KeypadModuleDef('BUILD', <List<_ButtonDef>>[
       <_ButtonDef>[
         _ButtonDef('2x2', _ButtonCategory.function),
@@ -323,7 +325,8 @@ class _CalculatorViewState extends State<CalculatorView> {
 
   Widget _buildDisplay() {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final bool showDisplayStatus = _controller.hasMemory || _controller.isRpnMode;
+    final bool showDisplayStatus =
+        _controller.isRpnMode || (_controller.hasMemory && !_controller.isInfixMode);
 
     return Container(
       width: double.infinity,
@@ -344,11 +347,13 @@ class _CalculatorViewState extends State<CalculatorView> {
                 if (_controller.hasMemory)
                   Semantics(
                     label: 'Memory indicator',
-                    child: Text(
-                      'M',
-                      style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                        color: cs.primary,
-                        fontWeight: FontWeight.bold,
+                    child: ExcludeSemantics(
+                      child: Text(
+                        'M',
+                        style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -356,12 +361,14 @@ class _CalculatorViewState extends State<CalculatorView> {
                 if (_controller.isRpnMode)
                   Semantics(
                     label: 'Stack depth: ${_controller.rpnStackDepth}',
-                    child: Text(
-                      key: const ValueKey<String>('calculator-stack-depth'),
-                      'Stack ${_controller.rpnStackDepth}',
-                      style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                        color: cs.primary,
-                        fontWeight: FontWeight.w600,
+                    child: ExcludeSemantics(
+                      child: Text(
+                        key: const ValueKey<String>('calculator-stack-depth'),
+                        'Stack ${_controller.rpnStackDepth}',
+                        style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -383,31 +390,215 @@ class _CalculatorViewState extends State<CalculatorView> {
 
   Widget _buildInfixDisplayBody() {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Semantics(
-          liveRegion: true,
-          label: 'Expression: ${_controller.expression}',
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            reverse: true,
-            child: Text(
-              key: const ValueKey<String>('calculator-expression-text'),
-              _controller.expression.isEmpty
-                  ? ' '
-                  : _controller.expression,
-              style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                color: cs.outline,
-                fontFamily: 'monospace',
-                fontSize: 20,
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    return AnimatedContainer(
+      key: const ValueKey<String>('rpn-draft-card'),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.primary.withAlpha(80)),
+      ),
+      child: Semantics(
+        container: true,
+        liveRegion: true,
+        label: _controller.expression.isEmpty
+            ? 'Draft infix editor'
+            : 'Draft: ${_controller.expression}',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              key: const ValueKey<String>('calculator-infix-status-rail'),
+              children: [
+                ExcludeSemantics(
+                  child: Text(
+                    'DRAFT',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelLarge!.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: _calculatorFontFamily,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Semantics(
+                      liveRegion: true,
+                      label: _controller.infixMemoryStatusSemanticsText,
+                      child: AnimatedSwitcher(
+                        key: const ValueKey<String>(
+                          'calculator-infix-memory-status',
+                        ),
+                        duration: const Duration(milliseconds: 220),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        layoutBuilder: (
+                          Widget? currentChild,
+                          List<Widget> previousChildren,
+                        ) {
+                          return Stack(
+                            alignment: Alignment.centerRight,
+                            children: <Widget>[
+                              ...previousChildren,
+                              ?currentChild,
+                            ],
+                          );
+                        },
+                        transitionBuilder: (
+                          Widget child,
+                          Animation<double> animation,
+                        ) {
+                          final Animation<Offset> offsetAnimation =
+                              Tween<Offset>(
+                                begin: const Offset(0, -0.2),
+                                end: Offset.zero,
+                              ).animate(
+                                CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOutCubic,
+                                ),
+                              );
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: offsetAnimation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: ExcludeSemantics(
+                          child: Text(
+                            _controller.infixMemoryStatusText,
+                            key: ValueKey<String>(_controller.infixMemoryStatusText),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                            style: textTheme.labelLarge!.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: _calculatorFontFamily,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: Semantics(
+                      liveRegion: true,
+                      label: 'Expression: ${_controller.expression}',
+                      child: Container(
+                        key: const ValueKey<String>(
+                          'calculator-infix-expression-viewport',
+                        ),
+                        alignment: Alignment.bottomRight,
+                        child: LayoutBuilder(
+                          builder: (
+                            BuildContext context,
+                            BoxConstraints constraints,
+                          ) {
+                            return SingleChildScrollView(
+                              reverse: true,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth: constraints.maxWidth,
+                                  minHeight: constraints.maxHeight,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.bottomRight,
+                                  child: ExcludeSemantics(
+                                    child: Text(
+                                      key: const ValueKey<String>(
+                                        'calculator-expression-text',
+                                      ),
+                                      _controller.expression.isEmpty
+                                          ? ' '
+                                          : _controller.expression,
+                                      textAlign: TextAlign.right,
+                                      softWrap: true,
+                                      style: textTheme.titleLarge!.copyWith(
+                                        color: cs.outline,
+                                        fontFamily: _calculatorFontFamily,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    flex: 3,
+                    child: _buildDisplayValue(fontSize: 40),
+                  ),
+                ],
               ),
             ),
-          ),
+          ],
         ),
-        const Spacer(),
-        Expanded(child: _buildDisplayValue(fontSize: 40)),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildEditorDraftCard({
+    required String semanticsLabel,
+    required Widget child,
+  }) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+
+    return AnimatedContainer(
+      key: const ValueKey<String>('rpn-draft-card'),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.primary.withAlpha(80)),
+      ),
+      child: Semantics(
+        container: true,
+        liveRegion: true,
+        label: semanticsLabel,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ExcludeSemantics(
+              child: Text(
+                'DRAFT',
+                style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                  color: cs.primary,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: _calculatorFontFamily,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(child: child),
+          ],
+        ),
+      ),
     );
   }
 
@@ -420,13 +611,13 @@ class _CalculatorViewState extends State<CalculatorView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_controller.hasDraftDisplay) ...[
-            _buildRpnDraftCard(),
-            if (visualOrder.isNotEmpty) const SizedBox(height: 4),
-          ],
           for (int index = 0; index < visualOrder.length; index++) ...[
             _buildRpnStackCard(visualOrder[index]),
-            if (index < visualOrder.length - 1) const SizedBox(height: 4),
+            if (index < visualOrder.length - 1 || _controller.hasDraftDisplay)
+              const SizedBox(height: 4),
+          ],
+          if (_controller.hasDraftDisplay) ...[
+            _buildRpnDraftCard(),
           ],
         ],
       ),
@@ -548,7 +739,7 @@ class _CalculatorViewState extends State<CalculatorView> {
               style: Theme.of(context).textTheme.labelLarge!.copyWith(
                 color: headlineColor,
                 fontWeight: FontWeight.w700,
-                fontFamily: 'monospace',
+                fontFamily: _calculatorFontFamily,
               ),
             ),
           ),
@@ -577,7 +768,7 @@ class _CalculatorViewState extends State<CalculatorView> {
             fontSize: fontSize,
             fontWeight: FontWeight.w300,
             color: showsError ? cs.onErrorContainer : cs.onSurface,
-            fontFamily: 'monospace',
+            fontFamily: _calculatorFontFamily,
           ),
         ),
       ),
@@ -597,14 +788,16 @@ class _CalculatorViewState extends State<CalculatorView> {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             reverse: true,
-            child: Text(
-              key: const ValueKey<String>('calculator-display-text'),
-              _controller.committedRpnDisplay,
-              style: Theme.of(context).textTheme.displaySmall!.copyWith(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w300,
-                color: cs.onSurface,
-                fontFamily: 'monospace',
+            child: ExcludeSemantics(
+              child: Text(
+                key: const ValueKey<String>('calculator-display-text'),
+                _controller.committedRpnDisplay,
+                style: Theme.of(context).textTheme.displaySmall!.copyWith(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w300,
+                  color: cs.onSurface,
+                  fontFamily: _calculatorFontFamily,
+                ),
               ),
             ),
           ),
@@ -633,15 +826,17 @@ class _CalculatorViewState extends State<CalculatorView> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 reverse: !useExpanded,
-                child: Text(
-                  key: const ValueKey<String>('calculator-display-text'),
-                  visualValue,
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.displaySmall!.copyWith(
-                    fontSize: useExpanded ? fontSize * 0.78 : fontSize,
-                    fontWeight: FontWeight.w300,
-                    color: cs.onSurface,
-                    fontFamily: 'monospace',
+                child: ExcludeSemantics(
+                  child: Text(
+                    key: const ValueKey<String>('calculator-display-text'),
+                    visualValue,
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.displaySmall!.copyWith(
+                      fontSize: useExpanded ? fontSize * 0.78 : fontSize,
+                      fontWeight: FontWeight.w300,
+                      color: cs.onSurface,
+                      fontFamily: _calculatorFontFamily,
+                    ),
                   ),
                 ),
               ),
@@ -666,7 +861,7 @@ class _CalculatorViewState extends State<CalculatorView> {
               style: Theme.of(context).textTheme.labelLarge!.copyWith(
                 color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w700,
-                fontFamily: 'monospace',
+                fontFamily: _calculatorFontFamily,
               ),
             ),
             const SizedBox(width: 8),
@@ -677,7 +872,7 @@ class _CalculatorViewState extends State<CalculatorView> {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  fontFamily: 'monospace',
+                  fontFamily: _calculatorFontFamily,
                 ),
               ),
             ),
@@ -705,14 +900,16 @@ class _CalculatorViewState extends State<CalculatorView> {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             reverse: true,
-            child: Text(
-              key: const ValueKey<String>('calculator-display-text'),
-              _controller.display,
-              style: Theme.of(context).textTheme.displaySmall!.copyWith(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w300,
-                color: cs.onSurface,
-                fontFamily: 'monospace',
+            child: ExcludeSemantics(
+              child: Text(
+                key: const ValueKey<String>('calculator-display-text'),
+                _controller.display,
+                style: Theme.of(context).textTheme.displaySmall!.copyWith(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w300,
+                  color: cs.onSurface,
+                  fontFamily: _calculatorFontFamily,
+                ),
               ),
             ),
           ),
@@ -741,15 +938,17 @@ class _CalculatorViewState extends State<CalculatorView> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 reverse: !useExpanded,
-                child: Text(
-                  key: const ValueKey<String>('calculator-display-text'),
-                  visualValue,
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.displaySmall!.copyWith(
-                    fontSize: useExpanded ? fontSize * 0.78 : fontSize,
-                    fontWeight: FontWeight.w300,
-                    color: cs.onSurface,
-                    fontFamily: 'monospace',
+                child: ExcludeSemantics(
+                  child: Text(
+                    key: const ValueKey<String>('calculator-display-text'),
+                    visualValue,
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.displaySmall!.copyWith(
+                      fontSize: useExpanded ? fontSize * 0.78 : fontSize,
+                      fontWeight: FontWeight.w300,
+                      color: cs.onSurface,
+                      fontFamily: _calculatorFontFamily,
+                    ),
                   ),
                 ),
               ),
@@ -926,6 +1125,7 @@ class _CalculatorViewState extends State<CalculatorView> {
     }
 
     final colors = _getButtonColors(btn.category);
+    final String visibleLabel = _visibleLabel(btn);
     final String semanticName = btn.label == 'DELETE'
       ? (_controller.deleteWouldEditDraft ? 'Delete draft' : 'Drop top')
       : _semanticLabel(btn.label);
@@ -949,16 +1149,22 @@ class _CalculatorViewState extends State<CalculatorView> {
               hoverColor: colors.$2.withAlpha(20),
               focusColor: colors.$2.withAlpha(25),
               onTap: () => _onButtonPressed(btn.label),
-              child: Center(
-                child: Text(
-                  btn.visibleLabel,
-                  style: (btn.visibleLabel.length > 1
-                          ? Theme.of(context).textTheme.titleMedium!
-                          : Theme.of(context).textTheme.titleLarge!)
-                      .copyWith(
-                    fontSize: btn.visibleLabel.length > 1 ? 18 : 28,
-                    fontWeight: FontWeight.w500,
-                    color: colors.$2,
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    visibleLabel,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: (visibleLabel.length > 1
+                            ? Theme.of(context).textTheme.titleMedium!
+                            : Theme.of(context).textTheme.titleLarge!)
+                        .copyWith(
+                      fontSize: visibleLabel.length > 1 ? 18 : 28,
+                      fontWeight: FontWeight.w500,
+                      color: colors.$2,
+                    ),
                   ),
                 ),
               ),
@@ -978,6 +1184,14 @@ class _CalculatorViewState extends State<CalculatorView> {
       _ButtonCategory.function => (cs.surfaceContainerHighest, cs.onSurfaceVariant),
       _ButtonCategory.equals => (cs.tertiaryContainer, cs.onTertiaryContainer),
     };
+  }
+
+  String _visibleLabel(_ButtonDef button) {
+    if (button.label == '=' && !_controller.isInfixMode) {
+      return 'EVAL';
+    }
+
+    return button.visibleLabel;
   }
 
   _KeypadModuleDef _activeModule() {
@@ -1025,7 +1239,18 @@ class _CalculatorViewState extends State<CalculatorView> {
       case CalculatorMode.matrix:
         _controller.openMatrixEditor();
     }
-    setState(() {});
+    setState(() {
+      switch (mode) {
+        case CalculatorMode.infix:
+          _selectedModuleLabel = 'BASIC';
+          _modulePageIndices.putIfAbsent('BASIC', () => 0);
+        case CalculatorMode.rpn:
+          return;
+        case CalculatorMode.matrix:
+          _selectedModuleLabel = 'MATRIX';
+          _modulePageIndices.putIfAbsent('MATRIX', () => 0);
+      }
+    });
   }
 
   void _onButtonPressed(String label) {
@@ -1136,7 +1361,11 @@ class _CalculatorViewState extends State<CalculatorView> {
         case 'ENTER':
           _controller.enter();
         case '=':
-          return;
+          if (_controller.hasDraftDisplay) {
+            _controller.evaluate();
+          } else {
+            _controller.revealCommittedRpnMatrixForm();
+          }
         case '+':
           _controller.applyRpnBinary(RpnBinaryOperator.add);
         case '-':
@@ -1308,7 +1537,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       'MRC' => 'Memory recall or clear',
       'AC' => 'All clear',
       'C' => 'Clear',
-      '=' => 'Equals',
+      '=' => _controller.isInfixMode ? 'Equals' : 'Evaluate',
       'ENTER' => 'Enter',
       '+' => 'Plus',
       '-' => 'Minus',
@@ -1377,24 +1606,31 @@ class _CalculatorViewState extends State<CalculatorView> {
       'PROP' => 'Matrix properties',
       'EDIT' => 'Editor entry points',
       'BUILD' => 'Matrix building',
-      'MEM' => 'Memory module',
+      'MEM' => 'Memory',
       _ => label,
     };
   }
 
   Widget _buildMatrixModeBody() {
-    return _MatrixEditorDialog(
-      key: _matrixEditorKey,
-      isRpnMode: true,
-      embedded: true,
-      onCancel: _controller.cancelEditor,
-      onSubmitted: (String literal) {
-        _controller.submitMatrixEditorLiteral(literal);
-      },
-      onStackExpandingCommand:
-          (String literal, CalculatrixCommand command) {
-            _controller.submitMatrixEditorStackCommand(literal, command);
+    return _buildEditorDraftCard(
+      semanticsLabel: 'Draft matrix editor',
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: _MatrixEditorDialog(
+          key: _matrixEditorKey,
+          isRpnMode: true,
+          initialMatrix: _controller.matrixEditorSeedMatrix,
+          embedded: true,
+          onCancel: _controller.cancelEditor,
+          onSubmitted: (String literal) {
+            _controller.submitMatrixEditorLiteral(literal);
           },
+          onStackExpandingCommand:
+              (String literal, CalculatrixCommand command) {
+                _controller.submitMatrixEditorStackCommand(literal, command);
+              },
+        ),
+      ),
     );
   }
 }
@@ -1403,6 +1639,7 @@ class _MatrixEditorDialog extends StatefulWidget {
   const _MatrixEditorDialog({
     super.key,
     required this.isRpnMode,
+    this.initialMatrix,
     this.embedded = false,
     this.onCancel,
     this.onSubmitted,
@@ -1410,6 +1647,7 @@ class _MatrixEditorDialog extends StatefulWidget {
   });
 
   final bool isRpnMode;
+  final Matrix? initialMatrix;
   final bool embedded;
   final VoidCallback? onCancel;
   final ValueChanged<String>? onSubmitted;
@@ -1460,6 +1698,10 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       _draft.columnCount,
       'matrix-column-tab',
     );
+    final Matrix? initialMatrix = widget.initialMatrix;
+    if (initialMatrix != null) {
+      _replaceDraftWithMatrix(initialMatrix);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -1589,19 +1831,10 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     ];
 
     if (widget.embedded) {
-      return Material(
+      return Padding(
         key: const ValueKey<String>('matrix-mode-panel'),
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        elevation: 0,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 720),
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: content,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: content,
       );
     }
 
@@ -1960,13 +2193,15 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       return _buildSkeletonCell();
     }
 
+    final bool usesNativeTextEditing = !kIsWeb && _isEditingCell(row, column);
+
     return TextFormField(
       key: ValueKey<String>('matrix-cell-$row-$column'),
       controller: _controllers[row][column],
       focusNode: _focusNodes[row][column],
       keyboardType: TextInputType.none,
-      readOnly: !_isEditingCell(row, column),
-      showCursor: _isEditingCell(row, column),
+      readOnly: !usesNativeTextEditing,
+      showCursor: usesNativeTextEditing,
       textInputAction: _isLastVisibleCell(row, column)
           ? TextInputAction.done
           : TextInputAction.next,

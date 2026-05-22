@@ -12,6 +12,28 @@ class CalculatrixApp extends StatelessWidget {
   const CalculatrixApp({super.key});
 
   static const Color _seedColor = Color(0xFF4FC3F7);
+  static const String _mathFontFamily = 'JetBrainsMono';
+
+  ThemeData _buildTheme(Brightness brightness) {
+    final ThemeData base = ThemeData(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: _seedColor,
+        brightness: brightness,
+      ),
+      useMaterial3: true,
+    );
+
+    final TextTheme textTheme = base.textTheme.apply(
+      fontFamily: _mathFontFamily,
+      bodyColor: base.colorScheme.onSurface,
+      displayColor: base.colorScheme.onSurface,
+    );
+
+    return base.copyWith(
+      textTheme: textTheme,
+      primaryTextTheme: textTheme,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,20 +41,8 @@ class CalculatrixApp extends StatelessWidget {
       title: 'Calculatrix',
       debugShowCheckedModeBanner: false,
       scrollBehavior: const _CalculatrixScrollBehavior(),
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _seedColor,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _seedColor,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
       themeMode: ThemeMode.system,
       home: const CalculatorView(),
     );

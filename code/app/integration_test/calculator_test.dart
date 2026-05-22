@@ -8,13 +8,13 @@ const Duration _uiStep = Duration(milliseconds: 100);
 const List<String> _keypadDeckLabels = <String>[
   'MAIN',
   'BASIC',
+  'EDIT',
   'STACK',
   'MATH',
   'MATRIX',
   'VECTOR',
   'FACT',
   'PROP',
-  'EDIT',
   'BUILD',
   'MEM',
 ];
@@ -77,8 +77,12 @@ Future<void> _pumpApp(WidgetTester tester) async {
   await _switchMode(tester, 'Infix');
 }
 
+bool _isInfixEditorVisible() {
+  return find.byKey(const ValueKey<String>('calculator-expression-text')).evaluate().isNotEmpty;
+}
+
 Future<void> _tapEquals(WidgetTester tester) async {
-  if (_button('CANCEL').evaluate().isEmpty) {
+  if (!_isInfixEditorVisible()) {
     await _switchMode(tester, 'Infix');
   }
 
@@ -88,12 +92,14 @@ Future<void> _tapEquals(WidgetTester tester) async {
 Future<void> _switchMode(WidgetTester tester, String mode) async {
   switch (mode) {
     case 'RPN':
-      if (_button('CANCEL').evaluate().isNotEmpty) {
+      if (_isInfixEditorVisible() ||
+          find.byKey(const ValueKey<String>('matrix-mode-panel')).evaluate().isNotEmpty) {
         await _tapCalculatorButton(tester, 'CANCEL');
       }
       return;
     case 'Infix':
-      if (_button('CANCEL').evaluate().isEmpty) {
+      if (!_isInfixEditorVisible()) {
+        await _tapFinderCenter(tester, _deckSelector('EDIT'));
         await _tapCalculatorButton(tester, 'INFIX');
       }
       return;
@@ -273,6 +279,14 @@ Future<void> _confirmMatrixDialog(
 }
 
 Finder _button(String label) {
+  if (label == 'INFIX') {
+    return find.byWidgetPredicate((Widget widget) {
+      final Key? key = widget.key;
+      return key == const ValueKey<String>('calculator-button-INFIX') ||
+          key == const ValueKey<String>('calculator-button-INFIX-edit');
+    }).hitTestable();
+  }
+
   return find.byKey(ValueKey<String>('calculator-button-$label')).hitTestable();
 }
 

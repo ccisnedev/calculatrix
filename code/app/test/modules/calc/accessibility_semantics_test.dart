@@ -3,6 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:calculatrix_app/main.dart';
 
 Finder _calculatorButton(String label) {
+  if (label == 'INFIX') {
+    return find.byWidgetPredicate((Widget widget) {
+      final Key? key = widget.key;
+      return key == const ValueKey<String>('calculator-button-INFIX') ||
+          key == const ValueKey<String>('calculator-button-INFIX-edit');
+    });
+  }
+
   return find.byKey(ValueKey<String>('calculator-button-$label'));
 }
 
@@ -31,10 +39,37 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('display uses a single semantic announcement', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(find.bySemanticsLabel(RegExp(r'Display: 0')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey<String>('calculator-display-shell')),
+          matching: find.bySemanticsLabel('0'),
+        ),
+        findsNothing,
+      );
+
+      handle.dispose();
+    });
+
+    testWidgets('stack depth uses a single semantic announcement', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(find.bySemanticsLabel('Stack depth: 0'), findsOneWidget);
+      expect(find.bySemanticsLabel('Stack 0'), findsNothing);
+
+      handle.dispose();
+    });
+
     testWidgets('expression area has live region', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
+      await _ensureDeck(tester, 'EDIT');
       await tester.tap(_calculatorButton('INFIX'));
       await tester.pumpAndSettle();
       await tester.tap(_calculatorButton('5'));
@@ -47,6 +82,46 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('infix expression uses a single semantic announcement',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _ensureDeck(tester, 'EDIT');
+      await tester.tap(_calculatorButton('INFIX'));
+      await tester.pumpAndSettle();
+      await tester.tap(_calculatorButton('5'));
+      await tester.pump();
+
+      expect(find.bySemanticsLabel(RegExp(r'Expression: 5')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const ValueKey<String>('calculator-infix-expression-viewport'),
+          ),
+          matching: find.bySemanticsLabel('5'),
+        ),
+        findsNothing,
+      );
+
+      handle.dispose();
+    });
+
+    testWidgets('infix memory status uses a single semantic announcement',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _ensureDeck(tester, 'EDIT');
+      await tester.tap(_calculatorButton('INFIX'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Memory status: empty'), findsOneWidget);
+      expect(find.bySemanticsLabel('MEM: empty'), findsNothing);
+
+      handle.dispose();
+    });
+
     testWidgets('keypad buttons have descriptive semantic labels',
         (tester) async {
       final handle = tester.ensureSemantics();
@@ -55,9 +130,10 @@ void main() {
       // Verify buttons visible in MAIN deck have semantic labels
       final expectations = <String, String>{
         'C': 'Clear',
-        '√': 'Square root',
+        'SQRT': 'Square root',
         '%': 'Percent',
         '÷': 'Divide',
+        '=': 'Evaluate',
         '+': 'Plus',
         '-': 'Minus',
         '×': 'Multiply',
@@ -87,14 +163,41 @@ void main() {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
 
+      await _ensureDeck(tester, 'EDIT');
       expect(
         find.bySemanticsLabel('Open infix editor'),
-        findsOneWidget,
+        findsAtLeastNWidgets(1),
       );
-      await _ensureDeck(tester, 'EDIT');
       expect(
         find.bySemanticsLabel('Open matrix editor'),
         findsAtLeastNWidgets(1),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('the eval key announces Equals only inside the infix editor',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(
+        find.ancestor(
+          of: _calculatorButton('='),
+          matching: find.bySemanticsLabel('Evaluate'),
+        ),
+        findsOneWidget,
+      );
+
+      await _ensureDeck(tester, 'EDIT');
+      await tester.tap(_calculatorButton('INFIX'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.ancestor(
+          of: _calculatorButton('='),
+          matching: find.bySemanticsLabel('Equals'),
+        ),
+        findsOneWidget,
       );
       handle.dispose();
     });
@@ -109,6 +212,10 @@ void main() {
       );
       expect(
         find.bySemanticsLabel('Editor entry points module'),
+        findsAtLeastNWidgets(1),
+      );
+      expect(
+        find.bySemanticsLabel('Memory module'),
         findsAtLeastNWidgets(1),
       );
       handle.dispose();
