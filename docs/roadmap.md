@@ -8,9 +8,11 @@
 - **Core package**: `calculatrix`
 - **Flutter consumer**: `calculatrix_app`
 - **CLI consumer**: `calculatrix_cli`
-- **Framework**: Flutter (multi-platform, with Android as the canonical `integration_test` target)
+- **Framework**: Flutter multi-platform, with Android as the canonical
+  `integration_test` target and Windows/web used for shell and accessibility QA
 - **Architecture**: MVVM (Controller extends ChangeNotifier + notifyListeners)
-- **QA**: TDD + Widget tests + Android integration tests
+- **QA**: TDD + widget tests + Android integration tests + Windows/web shell
+  validation
 
 > **Architecture rule**: calculator logic (algebraic evaluation, matrix operations,
 > and RPN stack semantics) lives in `package:calculatrix`. Flutter app and CLI
@@ -20,7 +22,12 @@
 > 1. `code/core` must keep TDD and full unit/contract coverage for public semantics and new logic.
 > 2. `code/app` controller/view-model/editor state should target full unit coverage; widget tests protect only critical UI invariants.
 > 3. `code/app/integration_test` covers user-visible end-to-end flows for released features and runs on Android emulator/device as the canonical automated integration environment.
-> 4. `code/cli` must have automated unit + smoke/integration coverage for argument parsing, output, and representative commands.
+> 4. Browser accessibility-tree inspection on Flutter web and Windows shell validation complement widget and Android integration coverage for release-facing UX changes.
+> 5. `code/cli` must have automated unit + smoke/integration coverage for argument parsing, output, and representative commands.
+
+> **Current line note**: this roadmap reflects the post-`v0.7.0` shell state.
+> The Flutter app currently ships on the `v0.7.1` line, while the shared core
+> semantics established through Stage 7 remain the baseline for all consumers.
 
 ---
 
@@ -1053,6 +1060,28 @@ times; a pending draft is never mislabeled as part of the committed stack.
   semantics
 - [x] Green validation across core, app, and CLI with refreshed shell
   documentation
+
+### v0.7.x — Improvements and fixes on top of v0.7
+
+#### v0.7.1 — Shell hardening, honest presentation, and accessibility consistency
+
+- [x] Compress the `INFIX` editor chrome so `DRAFT` and `MEM` share one status
+  rail and most of the display height remains available to the editable
+  expression and result preview
+- [x] Preserve the established display/keypad vertical split while refining
+  only the internal display layout
+- [x] Seed the `MATRIX` editor from parseable matrix literals already present in
+  the active draft when they fit within the supported `4x4` editor bounds
+- [x] Harden Flutter web matrix editing so keypad-driven workflows and browser
+  automation avoid unstable native text-editing paths when a cell is not in an
+  active edit session
+- [x] Keep committed values and memory previews matrix-first and honest instead
+  of inventing scalar or algebraic shorthand for non-scalar values
+- [x] Complete a focused accessibility correction pass for module labels, stack
+  depth, display live regions, infix memory announcements, and infix
+  expression announcements
+- [x] Revalidate the shell with focused widget tests plus live browser
+  accessibility-tree inspection on the current web build
 
 ---
 

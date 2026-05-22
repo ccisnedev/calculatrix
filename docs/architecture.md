@@ -8,12 +8,12 @@ Calculatrix is a shared-core calculator system.
 - `calculatrix_app` is the Flutter consumer shell.
 - `calculatrix_cli` is the command-line consumer.
 
-The current default app experience is an infix calculator oriented to scalar
-and `1x1` workflows, but the runtime semantics are already matrix-first. The
-current roadmap direction after the `v0.6.x` line is an honest `RPN` shell:
-the persistent app surface is `RPN`, while `Infix` and `Matrix` are invoked
-editors over a pre-stack draft. The core continues to expose the public
-machine/command/macro layer that all consumers route through.
+This document reflects the current post-`v0.7.0` shell line, published in the
+Flutter app as `v0.7.1`. The user-facing app is no longer infix-first: the
+persistent surface is an honest `RPN` shell, while `Infix` and `Matrix` are
+invoked editors over a pre-stack draft. Complex-number support, matrix-first
+memory, and advanced linear algebra already live in the shared core; app and
+CLI remain thin consumers of that same kernel.
 
 ## Runtime Truth
 
@@ -31,15 +31,19 @@ All values are matrices. Scalars are represented as `1x1` matrices. Consumer
 layers may choose to display `1x1` results as scalar text, but that does not
 change the matrix-first semantics of the core.
 
+Complex-number workflows also remain matrix-first: the imaginary unit and all
+complex arithmetic are represented through real matrices in the core instead of
+through a separate consumer-side complex type.
+
 ## Responsibility Split
 
 | Layer | Responsibility |
 |-------|----------------|
 | `package:calculatrix` | `Matrix`, `CalculatrixMachine`, typed commands/macros/programs, infix compilation/evaluation, session facade, numeric policy, error taxonomy |
-| `calculatrix_app` | Persistent `RPN` shell, pre-stack draft lifecycle, invoked `Infix` / `Matrix` editors, fixed module bar, stack visualization, memory UX, formatting, accessibility |
+| `calculatrix_app` | Persistent `RPN` shell, pre-stack draft lifecycle, invoked `Infix` / `Matrix` editors, fixed module bar, stack visualization, matrix-editor seeding and web-input hardening, memory UX, truthful formatting, accessibility |
 | `calculatrix_cli` | Argument parsing, infix/RPN/command/macro routing, core invocation, output formatting, exit behavior |
 
-## Consumer Shell Model (v0.7.0)
+## Consumer Shell Model (v0.7.1)
 
 The current application model is a single shell with specialized surfaces, not
 multiple independent calculators.
@@ -48,15 +52,26 @@ multiple independent calculators.
 - One persistent shell mode: `RPN`
 - Two invoked editors over the same pre-stack draft: `Infix` and `Matrix`
 - One labeled `Draft` surface distinct from committed `X0`, `X1`, `X2`, ...
-- Fixed module taxonomy instead of mode-specific dynamic deck families
+- Fixed module taxonomy instead of mode-specific dynamic deck families, with
+	overflow paging where a module has more than one command page
 - Fixed keypad layout with contextual command modules above it
 - Stack visualization in the persistent `RPN` shell
+- Matrix-first committed-value and memory presentation; scalar shorthand is
+	used only when the underlying value is truly scalar
+- The `Infix` editor keeps `DRAFT` and `MEM` on a single status rail so the
+	remaining display area is spent on the expression viewport and value preview
+- Accessibility semantics for stack depth, display value, infix memory, and
+	infix expression are expected to announce once each, without duplicated
+	screen-reader output from visible text children
 - Square keys across supported screen sizes
 - Display/keypad height guided by a golden-ratio-like split when constraints allow
 
 ### Draft and Editor Contract
 
 - The app-side matrix editor serializes values to the same bracket literal accepted by the core package, for example `[[1,2],[3,4]]`.
+- When the active infix draft already contains a parseable matrix literal that
+	fits within `4x4`, opening the `Matrix` editor seeds the editor from that
+	matrix instead of forcing a blank draft.
 - The app maintains one pre-stack draft that is not part of the committed `RPN` stack until a real commit occurs.
 - The shell renders that pre-stack surface as `Draft` (or `Error` when appropriate), never as an `X` register.
 - Entering the `Infix` editor opens that draft as an infix expression draft.
@@ -80,10 +95,11 @@ multiple independent calculators.
 - `code/app` stateful logic should target full unit coverage for controllers, view-models, and editor state.
 - Widget tests should guard only critical UI contracts: semantics, fixed module bar, truthful committed stack numbering, square key geometry, matrix rendering, and stack summaries.
 - `code/app/integration_test` should cover canonical end-to-end user journeys for released features.
+- Browser accessibility-tree inspection on Flutter web and Windows shell validation complement widget and Android integration coverage for release-facing UX changes.
 - `code/cli` should add automated unit and smoke/integration coverage for argument parsing, output formatting, and representative commands.
 - Stage completion should include focused validation of core tests/analyze, Flutter tests, app integration flows, and CLI automation/smokes.
 
-## RPN Interaction Contract (v0.7.0)
+## RPN Interaction Contract (v0.7.1)
 
 ### Shared Current Value
 
@@ -104,7 +120,7 @@ multiple independent calculators.
 - In the persistent `RPN` shell, the bottom-right key is `ENTER` and continues to commit the current shell draft onto the stack.
 - In the `Infix` editor, `=` is an infix-only action, while `ENTER` resolves the editor draft to matrices, pushes the result to the stack, and returns to `RPN`.
 - In the `Matrix` editor, `ENTER` confirms the matrix draft, pushes it onto the stack, and returns to `RPN`.
-- `v0.7.0` still does **not** overload `ENTER` as implicit duplicate; duplication stays explicit via `dup`.
+- `v0.7.1` still does **not** overload `ENTER` as implicit duplicate; duplication stays explicit via `dup`.
 
 ### Operator Semantics
 
@@ -148,27 +164,43 @@ multiple independent calculators.
 
 - In the `RPN` shell, the display may show the active shell draft in a `Draft` card when editing, otherwise the top-of-stack summary for committed `X`.
 - In an invoked editor, the display shows the active editor draft and editor-local feedback.
+- In the `Infix` editor, `DRAFT` and `MEM` share a single status rail so most
+	of the display remains available to expression editing.
 - A dedicated stack surface shows recent stack levels and current depth.
 - The committed stack surface never relabels a draft as `X0`.
+- Display labels, stack depth, infix memory, and infix expression semantics are
+	treated as single announcements; visible text under a semantic label must not
+	create duplicate screen-reader output.
+- Memory previews and committed-value formatting stay matrix-first and honest;
+	non-scalar values are not coerced into fake scalar or algebraic shorthand.
 - Matrix rendering policy belongs to the consumer shell, while matrix computation remains in the core package.
 
-## Stage 3 Status and Stage 4 Gate
+## Release Status (v0.7.1)
 
-Stage 3 is complete in the current `v0.3.0` line.
+The project is now well beyond the old Stage 3 gate. The current documentation
+baseline is the honest-shell line completed in `v0.7.0` and hardened in the
+Flutter app's `v0.7.1` patch line.
 
 The stabilized foundation now includes:
 
 - `package:calculatrix` exports a public matrix stack machine, typed commands, typed macros, and typed programs.
 - Infix compiles to typed programs executed by the same machine layer.
-- The app shell is moving from visible `Infix` / `RPN` / `Matrix` modes toward one persistent `RPN` shell with invoked editors.
+- Complex-number workflows use the same matrix-first kernel, including the
+	imaginary-unit matrix representation.
+- Advanced linear algebra already ships through the public core surface,
+	including determinant, LU, QR, eigen workflows, diagonalization, norms,
+	rank, adjugate/cofactor workflows, vector operations, `rref`, `svd`, `exp`,
+	and `log`.
+- The app shell already ships as one persistent `RPN` shell with invoked
+	`Infix` and `Matrix` editors, truthful committed stack numbering, fixed
+	modules, and fixed keypad geometry.
+- The current `v0.7.1` shell line adds post-release hardening for infix display
+	density, matrix-editor seeding/web reliability, and accessibility semantics.
 - The CLI already routes infix, RPN, public commands, and public macros through the shared core.
-- Public docs, versioning, and changelog entries are aligned with the canonical core model.
-- Core, CLI, Flutter tests, and the Windows app integration suite are green.
-
-The project is ready for Stage 4.
-
-Stage 4 can now focus on advanced linear algebra on top of the stable canonical
-kernel instead of carrying unresolved Stage 3 release debt.
+- Public docs and versioned shell contracts continue to track the canonical
+	core model.
+- Core, CLI, Flutter tests, and release-facing shell validation remain the
+	standard gate for new work.
 
 See [docs/spec/stage_3_matrix_stack_machine.md](docs/spec/stage_3_matrix_stack_machine.md) for the Stage 3 contract.
 
