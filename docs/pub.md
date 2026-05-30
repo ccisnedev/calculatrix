@@ -154,17 +154,20 @@ Outcome:
   - Chosen installer URL: `https://github.com/ccisnedev/calculatrix/releases/download/v0.7.1/Calculatrix-windows-x64-0.7.1-setup.exe`
   - The installer manifest models both validated scopes using the same Inno Setup artifact with `/ALLUSERS` and `/CURRENTUSER`
   - `PackageName` remains `Calculatrix`; `AppsAndFeaturesEntries` captures the actual Windows display name `Calculatrix version 0.7.1` observed during local install validation
-- [ ] Step 7 - Run submission validation
-  - Run `winget validate` on the manifest
-  - Run the `SandboxTest.ps1` flow from `microsoft/winget-pkgs`
-  - Prepare a single-version PR to `microsoft/winget-pkgs`
+- [x] Step 7 - Run submission validation
+  - `winget validate --manifest .\release\winget\manifests\c\CcisneDev\Calculatrix\0.7.1` completed successfully
+  - `SandboxTest.ps1` from `microsoft/winget-pkgs` completed with exit code `0` against `release/winget/manifests/c/CcisneDev/Calculatrix/0.7.1/CcisneDev.Calculatrix.yaml`
+  - Direct host execution of `winget install --manifest` is blocked on this machine because the client feature `LocalManifestFiles` is only enabled by administrators; the official sandbox flow above was used instead
+  - Single-version submission PR opened: https://github.com/microsoft/winget-pkgs/pull/381654
 
 ### Operational completion checks
 
 - [x] Local manifest validation passes
   - `winget validate --manifest .\release\winget\manifests\c\CcisneDev\Calculatrix\0.7.1` completed successfully
 - [x] Local silent install and uninstall tests pass for both current-user and all-users modes
+- [x] Local `SandboxTest.ps1` submission validation passes
 - [ ] The submission PR to `microsoft/winget-pkgs` is accepted
+  - Opened PR: https://github.com/microsoft/winget-pkgs/pull/381654
 
 ## Phase 3 - Google Play
 
