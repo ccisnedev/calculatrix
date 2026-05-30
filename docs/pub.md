@@ -139,12 +139,15 @@ Outcome:
   - Future signing note: code signing is intentionally deferred, so no certificate secrets are required yet; if signing is added later, introduce dedicated repository secrets for the certificate payload and password
   - Winget follow-up note: confirm during manifest authoring whether the GitHub Release asset URL is the final installer URL to publish or whether a different publisher-controlled release surface is required
   - Validated on published release `v0.7.1`: the workflow attached `Calculatrix-windows-x64-0.7.1-setup.exe`, `Calculatrix-windows-x64-0.7.1-portable.zip`, and `SHA256SUMS.txt` to the GitHub Release
-- [ ] Step 5 - Validate local installation behavior
+- [x] Step 5 - Validate local installation behavior
   - Current-user validation passed on the published `v0.7.1` installer using `/CURRENTUSER /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
-  - Observed install location: `C:\Users\44358590\AppData\Local\Programs\Calculatrix\`
-  - Observed uninstall metadata: `DisplayVersion = 0.7.1`, `Publisher = ccisne.dev`, uninstall key `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\CcisneDev.Calculatrix_is1`
-  - Silent uninstall passed and removed both the install directory and the HKCU uninstall key
-  - Remaining gap: the `all-users` administrative path is still pending because this local shell is not elevated
+  - Observed current-user install location: `C:\Users\44358590\AppData\Local\Programs\Calculatrix\`
+  - Observed current-user uninstall metadata: `DisplayVersion = 0.7.1`, `Publisher = ccisne.dev`, uninstall key `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\CcisneDev.Calculatrix_is1`
+  - Current-user silent uninstall passed and removed both the install directory and the HKCU uninstall key
+  - All-users validation passed on the published `v0.7.1` installer using `/ALLUSERS /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
+  - Observed all-users install location: `C:\Program Files\Calculatrix\`
+  - Observed all-users uninstall metadata: `DisplayVersion = 0.7.1`, `Publisher = ccisne.dev`, uninstall key `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\CcisneDev.Calculatrix_is1`
+  - All-users silent uninstall passed and removed both the Program Files install directory and the HKLM uninstall key
 - [ ] Step 6 - Author the winget manifest
   - Fill `PackageIdentifier`, `PackageVersion`, `Publisher`, `PackageName`, `InstallerUrl`, and `InstallerSha256`
   - Keep `Publisher` and `PackageName` aligned with what Windows shows in Add / Remove Programs
@@ -156,7 +159,7 @@ Outcome:
 ### Operational completion checks
 
 - [ ] Local manifest validation passes
-- [ ] Local silent install and uninstall tests pass for both current-user and all-users modes
+- [x] Local silent install and uninstall tests pass for both current-user and all-users modes
 - [ ] The submission PR to `microsoft/winget-pkgs` is accepted
 
 ## Phase 3 - Google Play
