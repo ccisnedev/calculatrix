@@ -52,6 +52,8 @@ Outcome:
 ### Repo-owned execution tasks
 
 - [x] Keep the current custom Pages workflow in [../.github/workflows/pages-release.yml](../.github/workflows/pages-release.yml) as the publication path; the first manual deployment completed successfully without a repo-side workflow gap. [G1]
+- [x] Restrict Pages automation to `push` on `main` and `workflow_dispatch`.
+  - Root cause: the `github-pages` environment allows deployments only from `main`, while `release` workflows execute on the tag ref (for example `v0.7.1`) and therefore fail before the deploy step starts.
 - [x] Publish the canonical Calculatrix privacy policy URL at `https://ccisne.dev/legal/calculatrix/privacy/` on the shared publisher legal site. This satisfies the stable public privacy-policy URL requirement independently of the app domain. [P6]
 - [x] No repo-side Pages gap was exposed during the first deployment, so no follow-up `v0.7.x` publication patch was needed for GitHub Pages.
 
@@ -60,7 +62,7 @@ Outcome:
 - [x] A GitHub Pages deployment from Actions completes successfully
 - [ ] `calculatrix.ccisne.dev` resolves over HTTPS to the published site
 - [x] The domain remains verified in GitHub
-  - Current state: `http://calculatrix.ccisne.dev/` returns the published app, but HTTPS is still pending certificate issuance on GitHub Pages.
+  - Current state: `http://calculatrix.ccisne.dev/` returns the published app, the DNS CNAME resolves to `ccisnedev.github.io`, and HTTPS is still pending certificate issuance on GitHub Pages.
 - [x] The canonical Calculatrix privacy-policy URL `https://ccisne.dev/legal/calculatrix/privacy/` is publicly reachable
 
 ## Phase 2 - winget
