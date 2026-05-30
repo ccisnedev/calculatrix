@@ -128,7 +128,7 @@ Outcome:
 - [x] Step 3 - Expose distribution license
   - Added public product-level MIT license at [../LICENSE](../LICENSE)
   - Keep future winget manifest license metadata aligned with this root license surface
-- [ ] Step 4 - Create Windows release pipeline
+- [x] Step 4 - Create Windows release pipeline
   - Build the Windows release bundle from GitHub Actions
   - Package the installer from the release bundle
   - Automated first path: upload the installer and companion assets to the GitHub Release that triggered the workflow
@@ -136,7 +136,7 @@ Outcome:
   - Authentication model: use the workflow-scoped built-in `GITHUB_TOKEN` to upload assets to the release that triggered the workflow; no separate PAT is required for this first automated path
   - Future signing note: code signing is intentionally deferred, so no certificate secrets are required yet; if signing is added later, introduce dedicated repository secrets for the certificate payload and password
   - Winget follow-up note: confirm during manifest authoring whether the GitHub Release asset URL is the final installer URL to publish or whether a different publisher-controlled release surface is required
-  - Validation still pending: run the workflow from a published GitHub release and confirm that the installer, portable zip, and `SHA256SUMS.txt` are attached successfully
+  - Validated on published release `v0.7.1`: the workflow attached `Calculatrix-windows-x64-0.7.1-setup.exe`, `Calculatrix-windows-x64-0.7.1-portable.zip`, and `SHA256SUMS.txt` to the GitHub Release
 - [ ] Step 5 - Validate local installation behavior
   - Test install and uninstall for administrators and non-administrators
   - Test silent install and silent uninstall behavior for the chosen installer type
