@@ -39,26 +39,28 @@ Outcome:
 
 ### Official platform requirements
 
-- [ ] Enable GitHub Pages publication from a custom GitHub Actions workflow in the repository settings. [G1]
-- [ ] Add calculatrix.ccisne.dev as the custom domain in Settings > Pages. [G2]
-- [ ] Configure DNS for the chosen domain. [G2]
+- [x] Enable GitHub Pages publication from a custom GitHub Actions workflow in the repository settings. [G1]
+- [x] Add calculatrix.ccisne.dev as the custom domain in Settings > Pages. [G2]
+- [x] Configure DNS for the chosen domain. [G2]
   - Apex domain: use ALIAS, ANAME, or A records; AAAA is optional. [G2]
   - Subdomain: use a CNAME pointing to USERNAME.github.io or ORGANIZATION.github.io. [G2]
-- [ ] Verify the domain in GitHub Pages using the TXT challenge and keep the TXT record in DNS. [G3]
+- [x] Verify the domain in GitHub Pages using the TXT challenge and keep the TXT record in DNS. [G3]
 - [ ] Enable Enforce HTTPS once GitHub makes it available for the domain. [G2]
+  - Current blocker: the GitHub Pages API currently returns `The certificate does not exist yet` when attempting to enable HTTPS enforcement for `calculatrix.ccisne.dev`.
 - [ ] Do not use wildcard DNS records for the Pages domain. GitHub documents takeover risk. [G2][G3]
 
 ### Repo-owned execution tasks
 
-- [ ] Keep the current custom Pages workflow in [../.github/workflows/pages-release.yml](../.github/workflows/pages-release.yml) as the publication path unless deployment exposes a concrete gap. [G1]
+- [x] Keep the current custom Pages workflow in [../.github/workflows/pages-release.yml](../.github/workflows/pages-release.yml) as the publication path; the first manual deployment completed successfully without a repo-side workflow gap. [G1]
 - [x] Publish the canonical Calculatrix privacy policy URL at `https://ccisne.dev/legal/calculatrix/privacy/` on the shared publisher legal site. This satisfies the stable public privacy-policy URL requirement independently of the app domain. [P6]
-- [ ] Only if deployment exposes a repo-side gap, cut the minimal `v0.7.x` patch needed for GitHub Pages publication and redeploy the same release line
+- [x] No repo-side Pages gap was exposed during the first deployment, so no follow-up `v0.7.x` publication patch was needed for GitHub Pages.
 
 ### Operational completion checks
 
-- [ ] A GitHub Pages deployment from Actions completes successfully
+- [x] A GitHub Pages deployment from Actions completes successfully
 - [ ] `calculatrix.ccisne.dev` resolves over HTTPS to the published site
-- [ ] The domain remains verified in GitHub
+- [x] The domain remains verified in GitHub
+  - Current state: `http://calculatrix.ccisne.dev/` returns the published app, but HTTPS is still pending certificate issuance on GitHub Pages.
 - [x] The canonical Calculatrix privacy-policy URL `https://ccisne.dev/legal/calculatrix/privacy/` is publicly reachable
 
 ## Phase 2 - winget
