@@ -22,7 +22,8 @@ This document turns the source-backed publication checklist into the execution p
 - [ ] No file named CNAME was found in the repo.
   - Note: GitHub states that when publishing with a custom GitHub Actions workflow, a CNAME file is not required and any existing CNAME file is ignored. [G2]
 - [x] A shared publisher legal site now exists at `https://ccisne.dev/legal/` in [ccisnedev/legal](https://github.com/ccisnedev/legal), with the canonical Calculatrix privacy policy published at `https://ccisne.dev/legal/calculatrix/privacy/`.
-- [ ] Android still uses a placeholder package identity and debug signing in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts).
+- [x] Android package identity is no longer placeholder in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts): `namespace` and `applicationId` now use `dev.ccisne.calculatrix`.
+- [ ] Release signing secrets are not provisioned yet; CI scaffold now exists in [../.github/workflows/android-release.yml](../.github/workflows/android-release.yml) and [../docs/android-release-signing.md](../docs/android-release-signing.md).
 - [x] Windows runner metadata now uses the chosen public identity in [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc): `CompanyName=ccisne.dev`, `ProductName=Calculatrix`, and `OriginalFilename=Calculatrix.exe`.
 - [ ] Only one license file was found locally: [../code/core/LICENSE](../code/core/LICENSE).
 - [x] The canonical legal pages are served from `https://ccisne.dev/legal/`, including the live Calculatrix privacy policy at `https://ccisne.dev/legal/calculatrix/privacy/`.
@@ -199,14 +200,19 @@ Outcome:
 
 - [x] Android package identity placeholder has been replaced in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts) with `namespace` and `applicationId` set to `dev.ccisne.calculatrix`.
 - [ ] Release signing still needs production secrets and final keystore provisioning; scaffold is now in place via `key.properties` loading and [../code/app/android/key.properties.example](../code/app/android/key.properties.example).
+- [x] Local Android release bundle baseline exists: `flutter build appbundle --release` produces `build/app/outputs/bundle/release/app-release.aab`.
+- [ ] CI release signing secrets are still missing (`ANDROID_UPLOAD_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) for fully signed release assets.
 
 ### Repo-owned execution tasks
 
 - [x] Replace the placeholder Android package identity in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts) before creating the Play app
 - [ ] Add real release-signing inputs and the Play App Signing enrollment path
   - Current prep done: release signing config now reads `android/key.properties` when present and falls back to debug signing only for local unblock; template added at [../code/app/android/key.properties.example](../code/app/android/key.properties.example)
-- [ ] Build the release AAB from the release pipeline
-  - Local baseline done: `flutter build appbundle --release` now succeeds and produces `build/app/outputs/bundle/release/app-release.aab`
+- [x] Build the release AAB from the release pipeline
+  - Implemented workflow: [../.github/workflows/android-release.yml](../.github/workflows/android-release.yml)
+  - Workflow behavior: `workflow_dispatch` supports unsigned smoke builds (debug fallback), while `release.published` requires signing secrets and fails fast if they are missing
+  - Release outputs: `Calculatrix-android-<version>.aab` and `SHA256SUMS-android.txt` uploaded as workflow artifacts, and attached to GitHub Release on release events
+  - Signing setup reference: [../docs/android-release-signing.md](../docs/android-release-signing.md)
 - [x] Host the canonical Calculatrix privacy policy at `https://ccisne.dev/legal/calculatrix/privacy/` and point store metadata there
 
 ### Operational completion checks
@@ -226,6 +232,13 @@ Outcome:
 - [ ] Keep public distribution gated by the existing validation matrix instead of ad-hoc local releases
 - [ ] Introduce a dedicated release workflow that builds the validated web, Windows, and Android artifacts from one revision
 - [ ] Version privacy policy in the shared publisher legal repo and keep release notes and store metadata versioned alongside the relevant product repos
+
+## Near-term remaining work before Play submission
+
+- [ ] Provision Android signing secrets in GitHub Actions and run one successful signed `android-release` workflow execution
+- [ ] Create the app in Google Play Console and complete identity/developer verification
+- [ ] Complete Play listing metadata, Data safety, and App content declarations
+- [ ] Upload the signed AAB to Play Console and complete rollout configuration
 
 ## Sources
 
