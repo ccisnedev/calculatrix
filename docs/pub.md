@@ -55,7 +55,7 @@ Outcome:
 - [x] Restrict Pages automation to `push` on `main` and `workflow_dispatch`.
   - Root cause: the `github-pages` environment allows deployments only from `main`, while `release` workflows execute on the tag ref (for example `v0.7.1`) and therefore fail before the deploy step starts.
 - [x] Publish the canonical Calculatrix privacy policy URL at `https://ccisne.dev/legal/calculatrix/privacy/` on the shared publisher legal site. This satisfies the stable public privacy-policy URL requirement independently of the app domain. [P6]
-- [x] No repo-side Pages gap was exposed during the first deployment, so no follow-up `v0.7.x` publication patch was needed for GitHub Pages.
+- [x] A repo-side Pages gap was exposed during the first release-triggered deployment and fixed in `v0.7.1` follow-up work by moving the workflow trigger to `push` on `main`.
 
 ### Operational completion checks
 
@@ -140,8 +140,11 @@ Outcome:
   - Winget follow-up note: confirm during manifest authoring whether the GitHub Release asset URL is the final installer URL to publish or whether a different publisher-controlled release surface is required
   - Validated on published release `v0.7.1`: the workflow attached `Calculatrix-windows-x64-0.7.1-setup.exe`, `Calculatrix-windows-x64-0.7.1-portable.zip`, and `SHA256SUMS.txt` to the GitHub Release
 - [ ] Step 5 - Validate local installation behavior
-  - Test install and uninstall for administrators and non-administrators
-  - Test silent install and silent uninstall behavior for the chosen installer type
+  - Current-user validation passed on the published `v0.7.1` installer using `/CURRENTUSER /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
+  - Observed install location: `C:\Users\44358590\AppData\Local\Programs\Calculatrix\`
+  - Observed uninstall metadata: `DisplayVersion = 0.7.1`, `Publisher = ccisne.dev`, uninstall key `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\CcisneDev.Calculatrix_is1`
+  - Silent uninstall passed and removed both the install directory and the HKCU uninstall key
+  - Remaining gap: the `all-users` administrative path is still pending because this local shell is not elevated
 - [ ] Step 6 - Author the winget manifest
   - Fill `PackageIdentifier`, `PackageVersion`, `Publisher`, `PackageName`, `InstallerUrl`, and `InstallerSha256`
   - Keep `Publisher` and `PackageName` aligned with what Windows shows in Add / Remove Programs
@@ -153,7 +156,7 @@ Outcome:
 ### Operational completion checks
 
 - [ ] Local manifest validation passes
-- [ ] Local silent install and uninstall tests pass
+- [ ] Local silent install and uninstall tests pass for both current-user and all-users modes
 - [ ] The submission PR to `microsoft/winget-pkgs` is accepted
 
 ## Phase 3 - Google Play
