@@ -21,12 +21,11 @@ This document turns the source-backed publication checklist into the execution p
 - [x] A GitHub Pages workflow already exists in [../.github/workflows/pages-release.yml](../.github/workflows/pages-release.yml).
 - [ ] No file named CNAME was found in the repo.
   - Note: GitHub states that when publishing with a custom GitHub Actions workflow, a CNAME file is not required and any existing CNAME file is ignored. [G2]
-- [x] A public app-facing info landing page now exists in [../code/app/web/info/index.html](../code/app/web/info/index.html), while the canonical Calculatrix privacy policy lives on the shared publisher legal site at `https://ccisne.dev/legal/calculatrix/privacy/`.
 - [x] A shared publisher legal site now exists at `https://ccisne.dev/legal/` in [ccisnedev/legal](https://github.com/ccisnedev/legal), with the canonical Calculatrix privacy policy published at `https://ccisne.dev/legal/calculatrix/privacy/`.
 - [ ] Android still uses a placeholder package identity and debug signing in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts).
 - [ ] Windows runner metadata still uses placeholder publisher and product values in [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc).
 - [ ] Only one license file was found locally: [../code/core/LICENSE](../code/core/LICENSE).
-- [x] The current web build artifact includes `/info/`, verified locally after `flutter build web --release`; the canonical legal pages are served from `https://ccisne.dev/legal/`.
+- [x] The canonical legal pages are served from `https://ccisne.dev/legal/`, including the live Calculatrix privacy policy at `https://ccisne.dev/legal/calculatrix/privacy/`.
 - [ ] No Windows installer packaging files were found locally for .msix, .appx, .appinstaller, .msi, .iss, or .wxs.
 
 ## Phase 1 - GitHub Pages / calculatrix.ccisne.dev
@@ -52,8 +51,6 @@ Outcome:
 ### Repo-owned execution tasks
 
 - [ ] Keep the current custom Pages workflow in [../.github/workflows/pages-release.yml](../.github/workflows/pages-release.yml) as the publication path unless deployment exposes a concrete gap. [G1]
-- [x] Add a public `/info/` landing page to the web artifact for release-facing documentation
-- [x] Keep the app-facing `/info/` landing page and point its privacy entry to the canonical legal URL
 - [x] Publish the canonical Calculatrix privacy policy URL at `https://ccisne.dev/legal/calculatrix/privacy/` on the shared publisher legal site. This satisfies the stable public privacy-policy URL requirement independently of the app domain. [P6]
 - [ ] Only if deployment exposes a repo-side gap, cut the minimal `v0.7.x` patch needed for GitHub Pages publication and redeploy the same release line
 
