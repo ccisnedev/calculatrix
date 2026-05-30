@@ -202,6 +202,27 @@ The stabilized foundation now includes:
 - Core, CLI, Flutter tests, and release-facing shell validation remain the
 	standard gate for new work.
 
+## Planned Distribution Architecture (next stage)
+
+The next roadmap stage does not change runtime semantics. It adds a delivery
+layer around the existing consumers so the already-stable app can ship through
+public channels reproducibly.
+
+- GitHub Actions should become the canonical release orchestrator once the
+	existing validation matrix passes.
+- Android delivery target: a signed release AAB with the final public
+	`applicationId` / namespace and the metadata required by Google Play.
+- Windows delivery targets: a Store-ready Windows package identity plus a
+	signed artifact lineage that can also feed `winget`.
+- Web delivery target: `flutter build web` published to `calculatrix.ccisne.dev`
+	from the same validated revision used for app artifacts.
+- Privacy policy, store listings, certificates/secrets, and release notes are
+	delivery assets adjacent to the repo; they do not belong to the semantic core
+	but they are required for public distribution.
+- The current repository state is still pre-distribution: CI runs Flutter app
+	analyze/test plus a web-build artifact, while store publication, Windows
+	packaging, `winget`, and custom-domain deployment are not yet automated.
+
 See [docs/spec/stage_3_matrix_stack_machine.md](docs/spec/stage_3_matrix_stack_machine.md) for the Stage 3 contract.
 
 ## Cleanup Status

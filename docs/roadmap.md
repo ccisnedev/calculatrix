@@ -1085,6 +1085,65 @@ times; a pending draft is never mislabeled as part of the committed stack.
 
 ---
 
+## Stage 8 — "Public Distribution Channels" (0.7.x → 0.8.0)
+
+Stage 8 turns the already-validated Flutter consumer into a reproducible public
+product across its three current delivery surfaces: Android, Windows, and web.
+The goal is not new calculator semantics, but trusted distribution: stable
+public identity, signed artifacts, store-ready metadata, and one canonical
+release path driven by GitHub Actions.
+
+### v0.7.x → v0.8.0
+
+- [ ] Publish the Android app through Google Play from a signed release AAB
+- [ ] Publish the Windows app through Microsoft Store with a reproducible
+  package identity and release packaging flow
+- [ ] Publish the Windows release lineage through `winget`
+- [ ] Publish the Flutter web build at `calculatrix.ccisne.dev` through GitHub
+  Actions
+- [ ] Keep public distribution gated by the existing core/app/cli validation
+  matrix instead of ad-hoc local release steps
+- [ ] Document the privacy policy, store metadata, release-channel contracts,
+  and operator runbooks required by the public channels
+
+#### Initial analysis and blockers
+
+- [ ] Replace the Android `com.example.calculatrix_app` namespace and
+  `applicationId` with the final public identifier
+- [ ] Add Android release-signing inputs and GitHub Actions secrets for
+  Play-ready builds
+- [ ] Introduce a release workflow separate from CI that builds tested Android,
+  Windows, and web artifacts from one validated revision
+- [ ] Define the Windows packaging strategy (`MSIX` / Store package identity,
+  signing, and artifact layout) before Microsoft Store and `winget`
+- [ ] Add a public privacy-policy page and listing collateral required by
+  Google Play and Microsoft Store
+- [ ] Add custom-domain deployment wiring for `calculatrix.ccisne.dev`,
+  including the hosting contract and promotion of `flutter build web` output
+
+##### Execution Order
+
+- [ ] Step 1: lock release identity and signing prerequisites for Android,
+  Windows, and the privacy-policy URL
+- [ ] Step 2: add GitHub Actions release automation for validated Android,
+  Windows, and web builds
+- [ ] Step 3: deploy the web build to `calculatrix.ccisne.dev` from that
+  release pipeline
+- [ ] Step 4: package Windows artifacts for Store submission and `winget`
+  consumption from the same signed release lineage
+- [ ] Step 5: prepare Play Store and Microsoft Store listing assets, submit the
+  public channels, and close the `v0.8.0` release only after end-to-end
+  publication validation
+
+### v0.8.0 — Stable Release
+
+- [ ] Public Android distribution through Google Play
+- [ ] Public Windows distribution through Microsoft Store and `winget`
+- [ ] Public web deployment at `calculatrix.ccisne.dev`
+- [ ] Reproducible GitHub Actions release pipeline for tested app artifacts
+
+---
+
 ## General Backlog
 
 - Performance profiling
@@ -1092,3 +1151,4 @@ times; a pending draft is never mislabeled as part of the committed stack.
 - Visual themes / dark mode
 - History export
 - PWA / offline mode
+  
