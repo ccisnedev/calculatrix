@@ -1,4 +1,4 @@
-package com.example.calculatrix_app
+package dev.ccisne.calculatrix
 
 import io.flutter.embedding.android.FlutterActivity
 

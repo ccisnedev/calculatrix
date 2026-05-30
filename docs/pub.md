@@ -161,7 +161,7 @@ Outcome:
   - Direct host execution of `winget install --manifest` is blocked on this machine because the client feature `LocalManifestFiles` is only enabled by administrators; the official sandbox flow above was used instead
   - Single-version submission PR opened: https://github.com/microsoft/winget-pkgs/pull/381654
   - PR feedback then reported `STATUS_DLL_NOT_FOUND` for both machine and user scope launches; the corrective patch was to declare `Microsoft.VCRedist.2015+.x64` in the installer manifest and push the update to the PR branch
-  - `Needs-CLA` is still pending; the account owner must reply personally to the PR with the required CLA acceptance text
+  - CLA accepted by the account owner; `license/cla` is passing and `Needs-CLA` has been removed from the PR labels
 
 ### Operational completion checks
 
@@ -174,7 +174,7 @@ Outcome:
 
 ## Phase 3 - Google Play
 
-Status: blocked by final Android identity, signing, and store declarations
+Status: in preparation (identity and build path validated; store declarations pending)
 
 Outcome:
 
@@ -197,13 +197,16 @@ Outcome:
 
 ### Current repo gaps
 
-- [ ] Android still uses a placeholder identity and debug signing in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts).
+- [x] Android package identity placeholder has been replaced in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts) with `namespace` and `applicationId` set to `dev.ccisne.calculatrix`.
+- [ ] Release signing still needs production secrets and final keystore provisioning; scaffold is now in place via `key.properties` loading and [../code/app/android/key.properties.example](../code/app/android/key.properties.example).
 
 ### Repo-owned execution tasks
 
-- [ ] Replace the placeholder Android package identity in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts) before creating the Play app
+- [x] Replace the placeholder Android package identity in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts) before creating the Play app
 - [ ] Add real release-signing inputs and the Play App Signing enrollment path
+  - Current prep done: release signing config now reads `android/key.properties` when present and falls back to debug signing only for local unblock; template added at [../code/app/android/key.properties.example](../code/app/android/key.properties.example)
 - [ ] Build the release AAB from the release pipeline
+  - Local baseline done: `flutter build appbundle --release` now succeeds and produces `build/app/outputs/bundle/release/app-release.aab`
 - [x] Host the canonical Calculatrix privacy policy at `https://ccisne.dev/legal/calculatrix/privacy/` and point store metadata there
 
 ### Operational completion checks
