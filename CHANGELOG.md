@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-05-30
+
+First publication-preparation release after Stage 7, focused on hardening public
+distribution surfaces for the web and Windows delivery paths.
+
+### App
+
+- Finalized the public Windows desktop identity as `Calculatrix` with publisher
+	metadata aligned to `ccisne.dev`.
+- Added automated Windows release packaging based on the Flutter Windows bundle
+	plus an Inno Setup installer path for release assets.
+
+### Web
+
+- Established GitHub Pages as the first public publication target for the app.
+- Removed redundant local `/info/` and `/info/privacy/` pages after moving
+	canonical legal content to the publisher legal site.
+
+### Docs
+
+- Added a publication checklist grounded in verified deployment evidence.
+- Recorded the installer-format decision for the Windows Package Manager path.
+- Added a root MIT license surface for release-facing distribution metadata.
+
 ## [0.7.0] - 2026-05-21
 
 Closes Stage 7, Honest RPN Shell, as a coordinated repository release.

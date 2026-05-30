@@ -120,17 +120,23 @@ Outcome:
   - Chosen Windows identity baseline confirmed for this line
   - Final values applied in [../code/app/windows/CMakeLists.txt](../code/app/windows/CMakeLists.txt) and [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc)
   - `flutter build windows --release` revalidated and `FileVersionInfo` now reports `Calculatrix` / `ccisne.dev`
-- [ ] Step 2 - Choose installer format
-  - Recommended first path: Inno Setup `.exe` wrapping the existing Flutter Windows release bundle
-  - Defer `MSIX` until Microsoft Store identity and signing are being solved as part of the Store path
-  - Require silent install and uninstall support before continuing
-- [ ] Step 3 - Expose distribution license
-  - Add a public product-level license file at the repo root or other release-facing surface
-  - Keep the license reference consistent with the future winget manifest metadata
+- [x] Step 2 - Choose installer format
+  - Chosen first path: Inno Setup `.exe` wrapping the existing Flutter Windows release bundle
+  - Decision basis: WinGet supports `inno` as an installer type and understands its silent install behavior, while Flutter’s Windows docs explicitly present installers such as Inno Setup as a straightforward wrapper around the generated release bundle
+  - Constraint: this is the best-fit first choice for the current self-hosted WinGet path, not a claim that WinGet globally recommends Inno Setup over all other installer types
+  - Reference: see [../docs/research/winget-installer-format-2026.md](../docs/research/winget-installer-format-2026.md)
+- [x] Step 3 - Expose distribution license
+  - Added public product-level MIT license at [../LICENSE](../LICENSE)
+  - Keep future winget manifest license metadata aligned with this root license surface
 - [ ] Step 4 - Create Windows release pipeline
   - Build the Windows release bundle from GitHub Actions
   - Package the installer from the release bundle
-  - Upload the installer to a publisher-controlled HTTPS release location
+  - Automated first path: upload the installer and companion assets to the GitHub Release that triggered the workflow
+  - Implementation anchor: [../.github/workflows/windows-release.yml](../.github/workflows/windows-release.yml), [../release/windows/build-installer.ps1](../release/windows/build-installer.ps1), and [../release/windows/Calculatrix.iss](../release/windows/Calculatrix.iss)
+  - Authentication model: use the workflow-scoped built-in `GITHUB_TOKEN` to upload assets to the release that triggered the workflow; no separate PAT is required for this first automated path
+  - Future signing note: code signing is intentionally deferred, so no certificate secrets are required yet; if signing is added later, introduce dedicated repository secrets for the certificate payload and password
+  - Winget follow-up note: confirm during manifest authoring whether the GitHub Release asset URL is the final installer URL to publish or whether a different publisher-controlled release surface is required
+  - Validation still pending: run the workflow from a published GitHub release and confirm that the installer, portable zip, and `SHA256SUMS.txt` are attached successfully
 - [ ] Step 5 - Validate local installation behavior
   - Test install and uninstall for administrators and non-administrators
   - Test silent install and silent uninstall behavior for the chosen installer type

@@ -1,0 +1,126 @@
+name: Build Windows Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Resolve release version
+        shell: pwsh
+        run: |
+          $versionLine = Select-String -Path "code/app/pubspec.yaml" -Pattern '^version:\s*(.+)\s*$' | Select-Object -First 1
+
+          if ($null -eq $versionLine) {
+            throw "Could not find version in code/app/pubspec.yaml"
+          }
+
+          $pubspecVersion = $versionLine.Matches[0].Groups[1].Value.Trim()
+          $publicVersion = ($pubspecVersion -split '\+')[0]
+
+          if ("${{ github.event_name }}" -eq "release") {
+            $releaseTag = "${{ github.event.release.tag_name }}"
+            $normalizedTag = if ($releaseTag.StartsWith("v")) { $releaseTag.Substring(1) } else { $releaseTag }
+
+            if ($normalizedTag -ne $publicVersion) {
+              throw "Release tag '$releaseTag' does not match pubspec public version '$publicVersion'."
+            }
+          }
+
+          "CALCULATRIX_PUBLIC_VERSION=$publicVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Enable Windows desktop
+        working-directory: code/app
+        run: flutter config --enable-windows-desktop
+
+      - name: Install app dependencies
+        working-directory: code/app
+        run: flutter pub get
+
+      - name: Verify bundled Dart runtime
+        shell: pwsh
+        run: |
+          $dartPath = Join-Path $env:FLUTTER_ROOT "bin\cache\dart-sdk\bin\dart.exe"
+
+          if (-not (Test-Path $dartPath)) {
+            throw "Flutter bundled dart.exe is missing at $dartPath"
+          }
+
+          & $dartPath --version
+
+      - name: Build Windows release bundle
+        working-directory: code/app
+        run: flutter build windows --release
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $repoRoot = $PWD.Path
+          $outputDir = Join-Path $env:RUNNER_TEMP "windows-release"
+
+          .\release\windows\build-installer.ps1 `
+            -BuildDir (Join-Path $repoRoot "code/app/build/windows/x64/runner/Release") `
+            -OutputDir $outputDir `
+            -PublicVersion $env:CALCULATRIX_PUBLIC_VERSION
+
+      - name: Create portable zip and checksums
+        shell: pwsh
+        run: |
+          $outputDir = Join-Path $env:RUNNER_TEMP "windows-release"
+          $portableZip = Join-Path $outputDir "Calculatrix-windows-x64-$env:CALCULATRIX_PUBLIC_VERSION-portable.zip"
+          $checksumPath = Join-Path $outputDir "SHA256SUMS.txt"
+
+          New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+
+          if (Test-Path $portableZip) {
+            Remove-Item $portableZip -Force
+          }
+
+          Compress-Archive -Path "code/app/build/windows/x64/runner/Release\*" -DestinationPath $portableZip
+
+          Get-ChildItem $outputDir -File |
+            Sort-Object Name |
+            ForEach-Object {
+              $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              "$hash  $($_.Name)"
+            } |
+            Set-Content $checksumPath
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-assets
+          if-no-files-found: error
+          path: ${{ runner.temp }}/windows-release
+
+      - name: Upload assets to published release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $outputDir = Join-Path $env:RUNNER_TEMP "windows-release"
+
+          gh release upload "${{ github.event.release.tag_name }}" `
+            (Join-Path $outputDir "Calculatrix-windows-x64-$env:CALCULATRIX_PUBLIC_VERSION-portable.zip") `
+            (Join-Path $outputDir "Calculatrix-windows-x64-$env:CALCULATRIX_PUBLIC_VERSION-setup.exe") `
+            (Join-Path $outputDir "SHA256SUMS.txt") `
+            --clobber
