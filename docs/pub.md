@@ -148,9 +148,12 @@ Outcome:
   - Observed all-users install location: `C:\Program Files\Calculatrix\`
   - Observed all-users uninstall metadata: `DisplayVersion = 0.7.1`, `Publisher = ccisne.dev`, uninstall key `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\CcisneDev.Calculatrix_is1`
   - All-users silent uninstall passed and removed both the Program Files install directory and the HKLM uninstall key
-- [ ] Step 6 - Author the winget manifest
-  - Fill `PackageIdentifier`, `PackageVersion`, `Publisher`, `PackageName`, `InstallerUrl`, and `InstallerSha256`
-  - Keep `Publisher` and `PackageName` aligned with what Windows shows in Add / Remove Programs
+- [x] Step 6 - Author the winget manifest
+  - Local manifest authored at [../release/winget/manifests/c/CcisneDev/Calculatrix/0.7.1/CcisneDev.Calculatrix.yaml](../release/winget/manifests/c/CcisneDev/Calculatrix/0.7.1/CcisneDev.Calculatrix.yaml), [../release/winget/manifests/c/CcisneDev/Calculatrix/0.7.1/CcisneDev.Calculatrix.locale.en-US.yaml](../release/winget/manifests/c/CcisneDev/Calculatrix/0.7.1/CcisneDev.Calculatrix.locale.en-US.yaml), and [../release/winget/manifests/c/CcisneDev/Calculatrix/0.7.1/CcisneDev.Calculatrix.installer.yaml](../release/winget/manifests/c/CcisneDev/Calculatrix/0.7.1/CcisneDev.Calculatrix.installer.yaml)
+  - Chosen `PackageIdentifier`: `CcisneDev.Calculatrix`
+  - Chosen installer URL: `https://github.com/ccisnedev/calculatrix/releases/download/v0.7.1/Calculatrix-windows-x64-0.7.1-setup.exe`
+  - The installer manifest models both validated scopes using the same Inno Setup artifact with `/ALLUSERS` and `/CURRENTUSER`
+  - `PackageName` remains `Calculatrix`; `AppsAndFeaturesEntries` captures the actual Windows display name `Calculatrix version 0.7.1` observed during local install validation
 - [ ] Step 7 - Run submission validation
   - Run `winget validate` on the manifest
   - Run the `SandboxTest.ps1` flow from `microsoft/winget-pkgs`
@@ -158,7 +161,8 @@ Outcome:
 
 ### Operational completion checks
 
-- [ ] Local manifest validation passes
+- [x] Local manifest validation passes
+  - `winget validate --manifest .\release\winget\manifests\c\CcisneDev\Calculatrix\0.7.1` completed successfully
 - [x] Local silent install and uninstall tests pass for both current-user and all-users modes
 - [ ] The submission PR to `microsoft/winget-pkgs` is accepted
 
