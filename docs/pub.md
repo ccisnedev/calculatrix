@@ -23,7 +23,7 @@ This document turns the source-backed publication checklist into the execution p
   - Note: GitHub states that when publishing with a custom GitHub Actions workflow, a CNAME file is not required and any existing CNAME file is ignored. [G2]
 - [x] A shared publisher legal site now exists at `https://ccisne.dev/legal/` in [ccisnedev/legal](https://github.com/ccisnedev/legal), with the canonical Calculatrix privacy policy published at `https://ccisne.dev/legal/calculatrix/privacy/`.
 - [ ] Android still uses a placeholder package identity and debug signing in [../code/app/android/app/build.gradle.kts](../code/app/android/app/build.gradle.kts).
-- [ ] Windows runner metadata still uses placeholder publisher and product values in [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc).
+- [x] Windows runner metadata now uses the chosen public identity in [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc): `CompanyName=ccisne.dev`, `ProductName=Calculatrix`, and `OriginalFilename=Calculatrix.exe`.
 - [ ] Only one license file was found locally: [../code/core/LICENSE](../code/core/LICENSE).
 - [x] The canonical legal pages are served from `https://ccisne.dev/legal/`, including the live Calculatrix privacy policy at `https://ccisne.dev/legal/calculatrix/privacy/`.
 - [ ] No Windows installer packaging files were found locally for .msix, .appx, .appinstaller, .msi, .iss, or .wxs.
@@ -89,16 +89,58 @@ Outcome:
 
 ### Current repo gaps
 
+- [x] A local `flutter build windows --release` succeeds and produces a runnable Windows bundle rooted at `code/app/build/windows/x64/runner/Release/`.
+- [ ] The current Windows output is a portable directory containing `Calculatrix.exe`, `flutter_windows.dll`, and `data/`; it is not a supported winget installer package type by itself under [W1].
 - [ ] No installer packaging files were found locally for a supported Windows installer format.
-- [ ] Windows app metadata still uses placeholder values in [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc).
+- [ ] No release workflow or release asset publication path currently exists for Windows artifacts. The only local workflows are [../.github/workflows/ci.yml](../.github/workflows/ci.yml) and [../.github/workflows/pages-release.yml](../.github/workflows/pages-release.yml), and neither produces or uploads Windows release artifacts.
+- [ ] No GitHub Release currently exists for this repository, so there is no direct HTTPS publisher-hosted `InstallerURL` available for a winget manifest.
+- [x] Windows app metadata no longer uses placeholder values in [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc). A local release build now confirms `CompanyName=ccisne.dev`, `FileDescription=Calculatrix`, `ProductName=Calculatrix`, `InternalName=Calculatrix`, and `OriginalFilename=Calculatrix.exe`.
+- [ ] The current Windows release executable is not Authenticode-signed.
 - [ ] No root-level public license file was found; only [../code/core/LICENSE](../code/core/LICENSE) exists.
 
 ### Repo-owned execution tasks
 
-- [ ] Choose the Windows installer format to generate for the Flutter Windows app
-- [ ] Replace placeholder Windows publisher/product metadata in [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc)
+- [ ] Choose the Windows installer format to generate from the current portable Flutter Windows bundle
+- [x] Replace placeholder Windows publisher/product metadata in [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc)
 - [ ] Expose the public license consistently at the repo/distribution level
+- [ ] Introduce a Windows release path that builds the release bundle, packages an installer, and uploads it to an official publisher-controlled HTTPS location
 - [ ] Publish installer artifacts from the official release location over HTTPS
+
+### Chosen Windows identity baseline
+
+- Display publisher: `ccisne.dev`
+- Package identifier target: `CcisneDev.Calculatrix`
+- Product name: `Calculatrix`
+- Executable name: `Calculatrix.exe`
+- Rationale: keep the human-facing publisher aligned with the current public domain and normalize the winget identifier to an alphanumeric publisher stem that remains stable across GitHub, store metadata, and future upgrades.
+
+### Actionable execution order
+
+- [x] Step 1 - Freeze Windows identity
+  - Chosen Windows identity baseline confirmed for this line
+  - Final values applied in [../code/app/windows/CMakeLists.txt](../code/app/windows/CMakeLists.txt) and [../code/app/windows/runner/Runner.rc](../code/app/windows/runner/Runner.rc)
+  - `flutter build windows --release` revalidated and `FileVersionInfo` now reports `Calculatrix` / `ccisne.dev`
+- [ ] Step 2 - Choose installer format
+  - Recommended first path: Inno Setup `.exe` wrapping the existing Flutter Windows release bundle
+  - Defer `MSIX` until Microsoft Store identity and signing are being solved as part of the Store path
+  - Require silent install and uninstall support before continuing
+- [ ] Step 3 - Expose distribution license
+  - Add a public product-level license file at the repo root or other release-facing surface
+  - Keep the license reference consistent with the future winget manifest metadata
+- [ ] Step 4 - Create Windows release pipeline
+  - Build the Windows release bundle from GitHub Actions
+  - Package the installer from the release bundle
+  - Upload the installer to a publisher-controlled HTTPS release location
+- [ ] Step 5 - Validate local installation behavior
+  - Test install and uninstall for administrators and non-administrators
+  - Test silent install and silent uninstall behavior for the chosen installer type
+- [ ] Step 6 - Author the winget manifest
+  - Fill `PackageIdentifier`, `PackageVersion`, `Publisher`, `PackageName`, `InstallerUrl`, and `InstallerSha256`
+  - Keep `Publisher` and `PackageName` aligned with what Windows shows in Add / Remove Programs
+- [ ] Step 7 - Run submission validation
+  - Run `winget validate` on the manifest
+  - Run the `SandboxTest.ps1` flow from `microsoft/winget-pkgs`
+  - Prepare a single-version PR to `microsoft/winget-pkgs`
 
 ### Operational completion checks
 
