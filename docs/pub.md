@@ -153,12 +153,15 @@ Outcome:
   - Chosen `PackageIdentifier`: `CcisneDev.Calculatrix`
   - Chosen installer URL: `https://github.com/ccisnedev/calculatrix/releases/download/v0.7.1/Calculatrix-windows-x64-0.7.1-setup.exe`
   - The installer manifest models both validated scopes using the same Inno Setup artifact with `/ALLUSERS` and `/CURRENTUSER`
+  - The installer manifest now declares `Microsoft.VCRedist.2015+.x64` because the winget validation environment reported `STATUS_DLL_NOT_FOUND` when launching `Calculatrix.exe`
   - `PackageName` remains `Calculatrix`; `AppsAndFeaturesEntries` captures the actual Windows display name `Calculatrix version 0.7.1` observed during local install validation
 - [x] Step 7 - Run submission validation
   - `winget validate --manifest .\release\winget\manifests\c\CcisneDev\Calculatrix\0.7.1` completed successfully
   - `SandboxTest.ps1` from `microsoft/winget-pkgs` completed with exit code `0` against `release/winget/manifests/c/CcisneDev/Calculatrix/0.7.1/CcisneDev.Calculatrix.yaml`
   - Direct host execution of `winget install --manifest` is blocked on this machine because the client feature `LocalManifestFiles` is only enabled by administrators; the official sandbox flow above was used instead
   - Single-version submission PR opened: https://github.com/microsoft/winget-pkgs/pull/381654
+  - PR feedback then reported `STATUS_DLL_NOT_FOUND` for both machine and user scope launches; the corrective patch was to declare `Microsoft.VCRedist.2015+.x64` in the installer manifest and push the update to the PR branch
+  - `Needs-CLA` is still pending; the account owner must reply personally to the PR with the required CLA acceptance text
 
 ### Operational completion checks
 
