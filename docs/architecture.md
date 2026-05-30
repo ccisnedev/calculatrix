@@ -216,9 +216,10 @@ public channels reproducibly.
 	signed artifact lineage that can also feed `winget`.
 - Web delivery target: `flutter build web` published to `calculatrix.ccisne.dev`
 	from the same validated revision used for app artifacts.
-- Privacy policy, store listings, certificates/secrets, and release notes are
-	delivery assets adjacent to the repo; they do not belong to the semantic core
-	but they are required for public distribution.
+- Privacy policy and other public legal pages now live in the publisher legal
+	site at `https://ccisne.dev/legal/`; store listings, certificates/secrets,
+	and release notes remain delivery assets adjacent to the repo rather than part
+	of the semantic core, but they are required for public distribution.
 - The current repository state is still pre-distribution: CI runs Flutter app
 	analyze/test plus a web-build artifact, while store publication, Windows
 	packaging, `winget`, and custom-domain deployment are not yet automated.
