@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### RPN
+
+- `ENTER` with an empty draft now duplicates the top of the stack, as `ENTER`
+	does on the HP 50g with an empty command line. It does nothing on an empty
+	stack.
+- `⌫` with no draft and an empty stack no longer shows `Error`. The `DROP`
+	command itself still fails on an empty stack.
+
 ## [0.7.1] - 2026-05-30
 
 First publication-preparation release after Stage 7, focused on hardening public
