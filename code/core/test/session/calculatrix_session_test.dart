@@ -290,5 +290,29 @@ void main() {
       );
       expect(session.currentValue, Matrix.scalar(1));
     });
+
+    test('rpn enter without a draft duplicates the top like the HP 50g', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('5');
+      session.enter();
+
+      session.enter();
+
+      expect(
+        session.rpnStack,
+        orderedEquals(<Matrix>[Matrix.scalar(5), Matrix.scalar(5)]),
+      );
+      expect(session.currentValue, Matrix.scalar(5));
+      expect(session.hasError, isFalse);
+    });
+
+    test('rpn enter without a draft on an empty stack does nothing', () {
+      session.setMode(CalculatrixMode.rpn);
+
+      session.enter();
+
+      expect(session.rpnStackDepth, 0);
+      expect(session.hasError, isFalse);
+    });
   });
 }

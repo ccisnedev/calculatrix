@@ -277,7 +277,15 @@ class CalculatrixSession {
   }
 
   void enter() {
-    if (!isRpnMode || _rpnDraft.isEmpty) {
+    if (!isRpnMode) {
+      return;
+    }
+
+    // HP 50g: ENTER with an empty command line duplicates level 1.
+    if (_rpnDraft.isEmpty) {
+      if (_machine.depth > 0) {
+        dupRpn();
+      }
       return;
     }
 

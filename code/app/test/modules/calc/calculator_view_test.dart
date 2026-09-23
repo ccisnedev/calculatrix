@@ -606,6 +606,27 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('delete key on an empty stack does not show an error', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _tapCalculatorButton(tester, 'DELETE');
+
+      expect(find.text('Error'), findsNothing);
+      expect(find.text('Stack 0'), findsOneWidget);
+    });
+
+    testWidgets('enter without a draft duplicates the top like the HP 50g', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _tapCalculatorButton(tester, '7');
+      await _tapCalculatorButton(tester, 'ENTER');
+      await _tapCalculatorButton(tester, 'ENTER');
+
+      expect(find.text('Stack 2'), findsOneWidget);
+      expect(_rpnStackCard(1), findsOneWidget);
+      expect(find.text('Error'), findsNothing);
+    });
+
     testWidgets('infix editor enter pushes the draft result and returns to rpn', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
