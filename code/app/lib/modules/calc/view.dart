@@ -1353,7 +1353,7 @@ class _CalculatorViewState extends State<CalculatorView> {
         case 'DELETE':
           if (_controller.hasDraftDisplay) {
             _controller.backspace();
-          } else {
+          } else if (_controller.rpnStackDepth > 0) {
             _controller.dropRpn();
           }
         case 'C':
