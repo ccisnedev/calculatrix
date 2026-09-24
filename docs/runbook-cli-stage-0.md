@@ -33,7 +33,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D2 | The CLI uses `modular_cli_sdk` and `cli_router`, structured like `macss/code/cli`. | User, 2026-09-23 |
 | D3 | Every route is a query: no `--plan` or `--apply`. | User, 2026-09-23 |
 | D4 | Bare `cx` / `calculatrix` prints a logo and a short presentation. A Julia-style REPL replaces it in a later stage. | User, 2026-09-23 |
-| D5 | Command names are plain ASCII words that are easy to type. No `→`. When the word is short, use the whole word (`vector`, `matrix`). | User, 2026-09-23 |
+| D5 | Command names are plain ASCII words that are easy to type. No `→`. When the word is short, use the whole word (`vector`, `power`). | User, 2026-09-23 |
 | D6 | Matrix literals accept spaces as separators, in RPN and in infix: `[[0 -1] [1 0]]`. | User, 2026-09-23 |
 | D7 | One PR per step. | User, 2026-09-23 |
 | D8 | Negative numbers and quoted expressions must work without `--`. Fixed upstream in `cli_router` (issue ccisnedev/cli_router#4), not worked around in this repo. | User, 2026-09-23 |
@@ -44,6 +44,9 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D13 | Spaces everywhere: matrices are read and displayed as `[[0 -1] [1 0]]`, in the CLI and in the app. | User, Q4 |
 | D14 | Commands have aliases. The registry needs an alias mechanism; `^` is an alias of the power command. | User, Q5 |
 | D15 | `upgrade` and `uninstall` are queries, as in `macss` and `docmd`. They belong in a package of the `modular_cli_sdk` ecosystem, because every CLI needs them. | User, Q6 |
+| D16 | Command names that are not a single word use the cmdlet pattern `<verb>-<subject>`. | User, Q8 |
+| D17 | There is no `matrix` command: everything is a matrix. Two join commands build matrices: `join-rows` stacks along the rows axis (vertically) and `join-cols` joins along the columns axis (side by side), when the sizes fit. | User, Q8 |
+| D18 | `exp` is e^x, as on the HP. x^y is `power`, with aliases `pwr` and `^`. | User, Q9 |
 
 ## Command catalog (proposal)
 
@@ -69,7 +72,7 @@ Examples once the core command line exists:
 ```text
 cx rpn eval '2 2 ^ 1 +'                        5
 cx rpn eval '[[0 -1] [1 0]] det'               1
-cx rpn eval '0 -1 2 vector 1 0 2 vector 2 matrix'
+cx rpn eval '0 1 2 vector -1 0 2 vector join-cols'
                                                [[0 -1] [1 0]]
 ```
 
@@ -96,12 +99,15 @@ anyone; it is still recorded in `CHANGELOG.md`.
 | Calculatrix | HP 50g | Stack effect |
 |---|---|---|
 | `vector` | `→ARRY` (vector form) | `x1 ... xn n` gives the n x 1 column `[[x1] ... [xn]]` |
-| `matrix` | `→ROW` | `row1 ... rown n` gives the matrix with those rows (see Q8) |
+| `join-cols` | none (closest: `COL+`) | `A B` gives `[A B]`; A and B need the same number of rows |
+| `join-rows` | none (closest: `ROW+`) | `A B` gives A over B; A and B need the same number of columns |
 | `rows` | `ROW→` | `[[...]]` gives `[row1] ... [rown] n` |
-| power command, alias `^` | `^` | `x y` gives `x^y` (name: see Q9) |
+| `power`, aliases `pwr`, `^` | `^` | `x y` gives `x^y` |
+| `exp` | `EXP` | `x` gives e^x |
 
 Matching is case-insensitive. ASCII spellings of the HP names (`->ARRY`,
-`->ROW`, `ROW->`) are accepted as aliases for users coming from the HP.
+`ROW->`) are accepted as aliases for users coming from the HP. A row vector is
+`1 2 2 vector transpose`, or the literal `[[1 2]]`.
 
 ## Open questions
 
@@ -133,14 +139,14 @@ Matching is case-insensitive. ASCII spellings of the HP names (`->ARRY`,
   a query. In `macss` these two are commands, because they change the system.
   Proposal: follow D3, and have `uninstall` ask for confirmation.
 - [ ] **Q7. Release tags.** See "Publishing" below. Not answered yet.
-- [ ] **Q8. What does `matrix` take, now that a vector is a column?** On the
+- [x] **Q8. What does `matrix` take, now that a vector is a column?** On the
   HP, `→ROW` takes row vectors. With column vectors, the natural reading is
   `col1 ... coln n matrix` builds the matrix from columns (the HP has `→COL`
   for that). Options: (a) `matrix` builds from columns; (b) `matrix` builds
   from rows and each row is transposed; (c) two commands, `rows` and
   `columns`, like `→ROW` and `→COL`. With (a), `[[0 -1] [1 0]]` is
-  `0 1 2 vector -1 0 2 vector 2 matrix`.
-- [ ] **Q9. Name of the power command.** On the HP 50g, `EXP` is e^x, not
+  `0 1 2 vector -1 0 2 vector 2 matrix`. Answer: D17, no `matrix` command.
+- [x] **Q9. Name of the power command.** On the HP 50g, `EXP` is e^x, not
   power. Calling the power command `exp` would clash with that meaning, and
   with D12. Proposal: `power` (full word, D5) with alias `^`, and keep `exp`
   for e^x.
@@ -196,8 +202,8 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
 | S2 | calculatrix | CLI on `modular_cli_sdk`: banner, `version`, `rpn eval`, `infix eval`, `dev-install.ps1`. | S1 released |
 | S3a | modular_cli_sdk ecosystem | New package with `upgrade` and `uninstall` (D15). | Q10 |
 | S3 | calculatrix | Publishing: release workflow, app workflow guards, installers, ADR 0002 amendment, `upgrade` and `uninstall` from S3a. | S2, S3a |
-| S4 | calculatrix | Core: command line parser and command registry, `^`, `vector`, `matrix`, `rows`, space-separated matrix literals in RPN and infix. `rpn eval` and `rpn commands` use it. | S2 |
-| S5 | calculatrix | App: ENTER runs the command line, column 5 becomes delete, EVAL, ENTER, SPACE; `^` on the MATH page; `vector` and `matrix` keys on the MATRIX page. | S4 |
+| S4 | calculatrix | Core: command line parser and command registry with aliases, `power`, `vector`, `join-rows`, `join-cols`, `rows`, space-separated matrix literals in RPN and infix. `rpn eval` and `rpn commands` use it. | S2 |
+| S5 | calculatrix | App: ENTER runs the command line, column 5 becomes delete, EVAL, ENTER, SPACE; `power` on the MATH page; `vector`, `join-rows` and `join-cols` keys on the MATRIX page. | S4 |
 
 S3 and S4 can run in parallel after S2.
 
@@ -207,6 +213,7 @@ S3 and S4 can run in parallel after S2.
 |---|---|
 | 2026-09-23 | D1 to D9 above. |
 | 2026-09-23 | D10 to D15, from the answers to Q1 to Q6. |
+| 2026-09-23 | D16 to D18, from the answers to Q8 and Q9. |
 
 ## Progress log
 

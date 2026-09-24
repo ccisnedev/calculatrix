@@ -111,7 +111,8 @@ not a requirement for `1.0.0`.
         eigen commands); parity is judged by contract, not by name
   - [x] corresponding-source delivery in the compliance checklist
   - [x] build hooks raise the SDK floor of `calculatrix_giac` and the CLI
-- [ ] Open issue #2 "1.0.0 = HP 50g parity" with the definition above
+- [x] Open issue #2 "1.0.0 = HP 50g parity" with the definition above
+      (opened 2026-09-23)
 - [x] Add Stages 9 to 12 and the "1.0.0 gate" section to `docs/roadmap.md`
 - [x] Add a "Kernel seam (planned)" section to `docs/architecture.md`
 - [x] Fix the broken link to `docs/spec/stage_3_matrix_stack_machine.md` in
