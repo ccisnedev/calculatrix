@@ -47,6 +47,8 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D16 | Command names that are not a single word use the cmdlet pattern `<verb>-<subject>`. | User, Q8 |
 | D17 | There is no `matrix` command: everything is a matrix. Two join commands build matrices: `join-rows` stacks along the rows axis (vertically) and `join-cols` joins along the columns axis (side by side), when the sizes fit. | User, Q8 |
 | D18 | `exp` is e^x, as on the HP. x^y is `power`, with aliases `pwr` and `^`. | User, Q9 |
+| D19 | Each product in the repository has its own tag prefix. The CLI uses immutable `cli-vX.Y.Z` tags; the app keeps `vX.Y.Z`. `cx upgrade` filters releases by prefix and never uses `releases/latest`. | User, Q7 |
+| D20 | `upgrade` and `uninstall` come from a new ecosystem package, `modular_cli_installer`, shared by every CLI (`macss`, `docmd`, `cx`). | User, Q10 |
 
 ## Command catalog (proposal)
 
@@ -138,7 +140,7 @@ Matching is case-insensitive. ASCII spellings of the HP names (`->ARRY`,
 - [x] **Q6. Are `upgrade` and `uninstall` queries too?** D3 says every route is
   a query. In `macss` these two are commands, because they change the system.
   Proposal: follow D3, and have `uninstall` ask for confirmation.
-- [ ] **Q7. Release tags.** See "Publishing" below. Not answered yet.
+- [x] **Q7. Release tags.** See "Publishing" below. Answer: D19.
 - [x] **Q8. What does `matrix` take, now that a vector is a column?** On the
   HP, `→ROW` takes row vectors. With column vectors, the natural reading is
   `col1 ... coln n matrix` builds the matrix from columns (the HP has `→COL`
@@ -150,10 +152,11 @@ Matching is case-insensitive. ASCII spellings of the HP names (`->ARRY`,
   power. Calling the power command `exp` would clash with that meaning, and
   with D12. Proposal: `power` (full word, D5) with alias `^`, and keep `exp`
   for e^x.
-- [ ] **Q10. Name of the ecosystem package for `upgrade` and `uninstall`.**
+- [x] **Q10. Name of the ecosystem package for `upgrade` and `uninstall`.**
   It has to handle: the GitHub repository, a tag prefix (Q7), the asset name
   per platform, the install folder, and the alias shim. Proposal:
-  `modular_cli_release`.
+  `modular_cli_release`. Answer: D20, `modular_cli_installer`, since it
+  installs, upgrades, and uninstalls, and it does not publish releases.
 
 ## Publishing (dogfood)
 
@@ -189,7 +192,7 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
 - [ ] Guard the two app workflows with the tag filter.
 - [ ] `scripts/install.ps1` / `install.sh`: download the newest `cli-v*`
       release, install it, create `cx`, add it to `PATH`.
-- [ ] `cx upgrade` and `cx uninstall`, from the ecosystem package (D15, Q10).
+- [ ] `cx upgrade` and `cx uninstall`, from `modular_cli_installer` (D20).
 - [ ] Check that `cx` does not collide with an existing command on the
       machine (`Get-Command cx`).
 
@@ -200,7 +203,7 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
 | S0 | calculatrix | Pending from before: the ENTER/delete fix and the Phase 0 docs. | Nothing |
 | S1 | cli_router | Issue #4, PR #5: negative numbers and expressions are positionals. Release 0.1.1. | Nothing |
 | S2 | calculatrix | CLI on `modular_cli_sdk`: banner, `version`, `rpn eval`, `infix eval`, `dev-install.ps1`. | S1 released |
-| S3a | modular_cli_sdk ecosystem | New package with `upgrade` and `uninstall` (D15). | Q10 |
+| S3a | modular_cli_installer | New ecosystem package with `upgrade` and `uninstall` (D20). | Nothing |
 | S3 | calculatrix | Publishing: release workflow, app workflow guards, installers, ADR 0002 amendment, `upgrade` and `uninstall` from S3a. | S2, S3a |
 | S4 | calculatrix | Core: command line parser and command registry with aliases, `power`, `vector`, `join-rows`, `join-cols`, `rows`, space-separated matrix literals in RPN and infix. `rpn eval` and `rpn commands` use it. | S2 |
 | S5 | calculatrix | App: ENTER runs the command line, column 5 becomes delete, EVAL, ENTER, SPACE; `power` on the MATH page; `vector`, `join-rows` and `join-cols` keys on the MATRIX page. | S4 |
@@ -214,6 +217,7 @@ S3 and S4 can run in parallel after S2.
 | 2026-09-23 | D1 to D9 above. |
 | 2026-09-23 | D10 to D15, from the answers to Q1 to Q6. |
 | 2026-09-23 | D16 to D18, from the answers to Q8 and Q9. |
+| 2026-09-23 | D19 and D20, from the answers to Q7 and Q10. |
 
 ## Progress log
 
