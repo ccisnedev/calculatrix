@@ -220,11 +220,40 @@ public channels reproducibly.
 	site at `https://ccisne.dev/legal/`; store listings, certificates/secrets,
 	and release notes remain delivery assets adjacent to the repo rather than part
 	of the semantic core, but they are required for public distribution.
-- The current repository state is still pre-distribution: CI runs Flutter app
-	analyze/test plus a web-build artifact, while store publication, Windows
-	packaging, `winget`, and custom-domain deployment are not yet automated.
+- Current state: the web build is live at `calculatrix.ccisne.dev` through
+	`pages-release.yml`; `android-release.yml` builds the signed AAB and
+	`windows-release.yml` builds the installer and portable zip when a GitHub
+	release is published. Google Play is in closed testing; `winget` and the
+	Microsoft Store are not published yet.
 
-See [docs/spec/stage_3_matrix_stack_machine.md](docs/spec/stage_3_matrix_stack_machine.md) for the Stage 3 contract.
+The stack machine contract is part of
+[spec/calculatrix_core.md](spec/calculatrix_core.md).
+
+## Kernel Seam (planned)
+
+Planned for Stage 9 onward; see [runbook-1.0.0.md](runbook-1.0.0.md) and
+issue #1. Nothing in this section is implemented yet.
+
+- `package:calculatrix` owns the contract: the `Value` model, the
+	`CalculatrixKernel` interface, commands, the command registry, and a
+	conformance suite exported as `package:calculatrix/conformance.dart`.
+- `DartKernel` lives inside core under `lib/src/kernel/dart/` and is the
+	default. Core keeps working on its own, in pure Dart.
+- Other kernels are separate packages that implement the interface, named
+	`calculatrix_*`. The first is `calculatrix_giac` (`code/giac/`), an adapter
+	over Giac through a C shim, FFI on native and WASM on the web.
+- Core never depends on a kernel package. Consumers choose the kernel.
+- A command no selected kernel supports fails with
+	`UnsupportedCalculatrixOperationError`.
+- The command registry records name, HP 50g name, module, arity, label, and
+	supported kernels. The app module bar and the CLI aliases are generated
+	from it: one module is one button, one command is one button.
+- Decisions still open, each in its own ADR before code depends on it: the
+	kernel seam and execution model (ADR 0004), the value model and symbolic
+	values (ADR 0005, amends ADR 0003), licensing (ADR 0006), and an optional
+	`CompositeKernel` (ADR 0007).
+- Licensing: core stays MIT; `calculatrix_giac`, and the app and CLI from
+	their first Giac-linked release, are GPL-3.0-or-later.
 
 ## Cleanup Status
 
