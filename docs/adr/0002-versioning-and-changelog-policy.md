@@ -136,17 +136,23 @@ Each release entry should make clear whether it is:
 Release communication must avoid implying a new core semantic contract when the
 change only affects a consumer shell.
 
-### 8. Git tags start at the first public 1.0.0 release
+### 8. Git tags mark every public release, including `0.x`
 
-Pre-`1.0.0` coordinated milestones should not create or preserve git release
-tags.
+*Amended 2026-09-23.* The original rule kept the `0.x` line tag-free until
+`v1.0.0`. Public distribution made that rule obsolete: the Android and Windows
+release workflows run on `release: published` and name their artifacts from
+the release tag, and `v0.7.1` was already tagged and published on GitHub.
 
-- The repository may keep the `0.x` line tag-free while scope, numbering, and
-  historical grouping are still being refined.
-- If prerelease tags become misleading after history cleanup, delete them
-  instead of treating them as immutable release markers.
-- Begin git release tags with the first public `v1.0.0` release and continue
-  from there under normal SemVer expectations.
+- Every release published to a public channel (GitHub Releases, Google Play,
+  Microsoft Store, `winget`, the web deployment) gets a git tag `vX.Y.Z` on
+  the exact revision that was built.
+- The tag uses the visible version `X.Y.Z`. The Flutter build suffix `+N`
+  stays in `pubspec.yaml` and in the store metadata, not in the tag.
+- Tags of published releases are immutable: never move or delete them, even
+  before `1.0.0`. A fix ships as the next patch version.
+- Internal milestones that are not published may stay untagged.
+- History rewriting allowed by section 1 stops at the most recent published
+  tag.
 
 ## Consequences
 
@@ -162,13 +168,14 @@ tags.
 - Future automation can validate that stage-closing releases keep app/CLI/core
   versions synchronized when required.
 - Release discipline becomes stricter: every release must declare its scope,
-  update the appropriate changelog(s), and avoid premature git tags.
+  update the appropriate changelog(s), and tag the published revision.
 
 ## Follow-up Guidance
 
 - Keep `code/core/CHANGELOG.md` in sync with package-facing releases.
 - Keep the root `CHANGELOG.md` in sync with coordinated repository releases.
 - Use `docs/release-checklist.md` for release execution and automation targets.
-- Do not create repository release tags before the first public `v1.0.0`.
+- Tag every publicly released revision as `vX.Y.Z` and never move a published
+  tag (section 8).
 - If the repository adopts CI release automation, encode this ADR's rules in the
   workflow rather than relying on convention alone.

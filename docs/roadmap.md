@@ -1111,35 +1111,41 @@ distribution target.
 
 ### v0.7.x → v0.8.0
 
-- [ ] Publish the Flutter web build at `calculatrix.ccisne.dev` through GitHub
-  Actions
+- [x] Publish the Flutter web build at `calculatrix.ccisne.dev` through GitHub
+  Actions (`pages-release.yml`, on every push to `main`)
 - [ ] Publish the Windows release lineage through `winget`
 - [ ] Publish the Android app through Google Play from a signed release AAB
+  (signed AAB built by `android-release.yml`; the app is in closed testing,
+  production access not granted yet)
 - [ ] Publish the Windows app through Microsoft Store with a reproducible
   package identity and release packaging flow
 - [ ] Keep public distribution gated by the existing core/app/cli validation
-  matrix instead of ad-hoc local release steps
+  matrix instead of ad-hoc local release steps (the release workflows do not
+  run the tests yet)
 - [ ] Document the privacy policy, store metadata, release-channel contracts,
   and operator runbooks required by the public channels
 
 #### Initial analysis and blockers
 
-- [ ] Add custom-domain deployment wiring for `calculatrix.ccisne.dev`,
+- [x] Add custom-domain deployment wiring for `calculatrix.ccisne.dev`,
   including the hosting contract and promotion of `flutter build web` output
 - [x] Lock the canonical privacy-policy URL at `https://ccisne.dev/legal/calculatrix/privacy/` and keep release-facing collateral aligned with the shared publisher legal site
 - [ ] Introduce a release workflow separate from CI that builds tested Android,
-  Windows, and web artifacts from one validated revision
+  Windows, and web artifacts from one validated revision (separate
+  workflows exist: `android-release.yml` and `windows-release.yml` run on
+  `release: published`, `pages-release.yml` on push to `main`; they do not
+  share one validated revision yet)
 - [ ] Define the Windows packaging strategy (`MSIX` / Store package identity,
   signing, and artifact layout) before Microsoft Store and `winget`
-- [ ] Replace the Android `com.example.calculatrix_app` namespace and
-  `applicationId` with the final public identifier
-- [ ] Add Android release-signing inputs and GitHub Actions secrets for
-  Play-ready builds
+- [x] Replace the Android `com.example.calculatrix_app` namespace and
+  `applicationId` with the final public identifier (`dev.ccisne.calculatrix`)
+- [x] Add Android release-signing inputs and GitHub Actions secrets for
+  Play-ready builds (`android-release.yml`)
 
 ##### Execution Order
 
-- [ ] Step 1: lock the custom domain, canonical privacy-policy URL (`https://ccisne.dev/legal/calculatrix/privacy/`), and release wiring for the current web line
-- [ ] Step 2: deploy the web build to `calculatrix.ccisne.dev` from the release
+- [x] Step 1: lock the custom domain, canonical privacy-policy URL (`https://ccisne.dev/legal/calculatrix/privacy/`), and release wiring for the current web line
+- [x] Step 2: deploy the web build to `calculatrix.ccisne.dev` from the release
   pipeline on `v0.7.1` or the minimal follow-up `v0.7.x` patch required
 - [ ] Step 3: package Windows artifacts for signed installer lineage and
   `winget` consumption from the same validated release flow
@@ -1150,11 +1156,89 @@ distribution target.
 
 ### v0.8.0 — Stable Release
 
-- [ ] Public web deployment at `calculatrix.ccisne.dev`
+- [x] Public web deployment at `calculatrix.ccisne.dev`
 - [ ] Public Windows distribution through `winget`
 - [ ] Public Android distribution through Google Play
 - [ ] Public Windows distribution through Microsoft Store
 - [ ] Reproducible GitHub Actions release pipeline for tested app artifacts
+
+---
+
+## Road to 1.0.0: HP 50g parity
+
+`1.0.0` ships when Calculatrix reaches first parity with the HP 50g, proven at
+package level by contract (domain, normalization, output order, stack effect),
+not by command name. Each module is a button and each command is a button,
+through a command registry in core that the app and CLI read.
+
+The actionable checklist, with every task, rule, and decision, is
+[runbook-1.0.0.md](runbook-1.0.0.md). The stages below are its summary; the
+runbook is authoritative. Origin: issue #1 (Giac as the symbolic kernel).
+
+Before Stage 9: the parity specification (runbook Phase 1). A closed catalog
+of HP 50g commands classified `v1`, `later`, or `excluded`, and parity
+fixtures for every `v1` command.
+
+## Stage 9: "Kernel Seam and Command Registry" (0.8.x to 0.9.0)
+
+No behavior change; all existing tests stay green.
+
+- [ ] Reconcile the tolerance policy between
+  `docs/spec/calculatrix_mathematics.md` and `numeric_policy.dart`
+- [ ] ADR 0004: kernel seam, kernel selection, and execution model
+- [ ] ADR 0005: value model and symbolic values (amends ADR 0003)
+- [ ] `CalculatrixKernel` interface; current algorithms moved into
+  `DartKernel` inside core
+- [ ] Conformance suite exported by core, parametrized by kernel
+- [ ] `Value` hierarchy with `NumericMatrix`
+- [ ] Command registry; app module bar and CLI aliases generated from it
+- [ ] Reachability tests and parity report in CI
+
+## Stage 10: "Giac Spike on CLI" (0.9.x to 0.10.0)
+
+- [ ] ADR 0006: licensing
+- [ ] `calculatrix_giac` package (`code/giac/`): C shim, FFI bindings,
+  `GiacKernel`, build hooks
+- [ ] CLI flag `--kernel dart|giac`; conformance suite green on `GiacKernel`
+- [ ] Differential tests between `DartKernel` and `GiacKernel`
+- [ ] License change to GPL-3.0-or-later for app, CLI, and `calculatrix_giac`;
+  core stays MIT
+- [ ] Corresponding-source delivery for the CLI and Windows artifacts
+
+## Stage 11: "Exact and Symbolic Values" (0.10.x to 0.11.0)
+
+- [ ] ADR 0007: `CompositeKernel` go or no-go
+- [ ] Parser: `^`, exact literals, identifiers, symbolic matrix literals
+- [ ] Exact vs approximate mode (`→NUM`)
+- [ ] CAS commands (`SIMPLIFY`, `EXPAND`, `FACTOR`, `SUBST`, `SOLVE`, `∂`,
+  `∫`, `LIMIT`, `TAYLOR`, `CHARPOLY`, symbolic `DET` / `INV` / `TRACE`)
+- [ ] Text and LaTeX rendering in CLI and app
+
+## Stage 12: "All Platforms" (0.11.x to 0.12.0)
+
+- [ ] Giac on Android through the NDK
+- [ ] Giac WASM on the web, loaded lazily in a Web Worker
+- [ ] License compliance per platform before shipping it with Giac
+
+## Parity completion (0.13.0 and later)
+
+One stage per HP 50g menu group, in the order fixed by the catalog.
+
+## 1.0.0 gate
+
+- [ ] Every `v1` catalog command supported by at least one kernel, with its
+  fixtures green
+- [ ] Every contract difference with the HP 50g fixed, adapted, or documented
+- [ ] Reachability tests green; unexposed commands listed per consumer
+- [ ] Public API and error contract reviewed; migration guide from `0.x`
+- [ ] License compliance, including corresponding source, on every channel
+- [ ] Cut `1.0.0` on every channel
+
+## Dart kernel track (continuous)
+
+A pure Dart CAS inside `DartKernel`, MIT, verified against Giac as a black
+box under a clean-room policy. It runs in parallel from Stage 9 onward. Its
+order of difficulty and rules are in the runbook.
 
 ---
 
