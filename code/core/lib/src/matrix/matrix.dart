@@ -4121,7 +4121,32 @@ class Matrix {
             final double lySmall = _checkFiniteScalar(
               math.pow(lSmall, y).toDouble(),
             );
-            c1 = (lyBig - lySmall) / (lBig - lSmall);
+
+            // Round 12 correction, finding 5: even when the eigenvalues
+            // themselves are far apart (relativeGap large, so the branch
+            // above was not taken), pow(lBig, y) and pow(lSmall, y) can
+            // still round to the same double once y is astronomically
+            // small, since both collapse toward 1 regardless of how far
+            // apart lBig and lSmall are (e.g. lBig=2, lSmall=1, y=1e-20).
+            // The direct divided difference (lyBig - lySmall) /
+            // (lBig - lSmall) then collapses to exactly 0, losing the
+            // true, tiny, nonzero result. Detect that risk from the
+            // function values themselves (not the eigenvalues), and
+            // recover it with the same log1p/expm1 divided-difference
+            // identity the branch above already uses for close
+            // eigenvalues, but only when its own argument does not
+            // degenerate; an extreme eigenvalue ratio (Round 9
+            // correction, finding 1) still requires the direct form.
+            final double lyScale = math.max(lyBig.abs(), lySmall.abs());
+            final bool functionValueCancellationRisk =
+                lyScale != 0 &&
+                ((lyBig - lySmall).abs() / lyScale) < closeEigenvalueThreshold;
+            final double log1pArg = (lSmall - lBig) / lBig;
+            if (functionValueCancellationRisk && (1.0 + log1pArg) > 0) {
+              c1 = lyBig * _expm1(y * _log1p(log1pArg)) / (lSmall - lBig);
+            } else {
+              c1 = (lyBig - lySmall) / (lBig - lSmall);
+            }
 
             // Round 10 correction: same triangular exact closed form as
             // [_general2x2Exp] and [_general2x2Log], see
