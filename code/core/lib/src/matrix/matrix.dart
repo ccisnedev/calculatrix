@@ -3814,10 +3814,29 @@ class Matrix {
       final double l1 = eigen.lambda1;
       final double l2 = eigen.lambda2;
       if (l1 == l2) {
+        // Round 12 correction, finding 6: c0 = el - c1*l (c1 = el)
+        // materializes c1*l, which overflows once el sits near double's
+        // max even though every entry c0 actually feeds into
+        // (c0 + c1*a = el + c1*(a-l), c0 + c1*d = el + c1*(d-l)) stays
+        // finite, since (a-l) and (d-l) are the matrix's own,
+        // well-conditioned offsets from the repeated eigenvalue. Compute
+        // those offset products directly instead of going through the
+        // overflow-prone standalone c0, the same pattern already used
+        // for the complex-eigenvalue-pair power branch (Round 12
+        // correction, finding 4).
         final double l = l1;
         final double el = _checkFiniteScalar(math.exp(l));
         c1 = el;
-        c0 = el - (c1 * l);
+        final double entry00 = _checkFiniteScalar(el + (c1 * (a - l)));
+        final double entry11 = _checkFiniteScalar(el + (c1 * (d - l)));
+        final double entry01 = _checkFiniteScalar(c1 * b);
+        final double entry10 = _checkFiniteScalar(c1 * c);
+        return _checkFiniteMatrix(
+          Matrix(<List<double>>[
+            <double>[entry00, entry01],
+            <double>[entry10, entry11],
+          ]),
+        );
       } else {
         final double lLo = math.min(l1, l2);
         final double lHi = math.max(l1, l2);
