@@ -3917,8 +3917,35 @@ class Matrix {
         );
       }
       final double angle = math.atan2(w, m);
-      c1 = angle / w;
-      c0 = math.log(radius) - c1 * m;
+      final double logRadius = _checkFiniteScalar(math.log(radius));
+
+      // Round 12 correction, finding 10: c1 = angle/w materializes a
+      // standalone value that overflows once w sits at a far smaller
+      // scale than angle (bounded by pi), even though every entry it
+      // actually feeds into (c0 + c1*a = logRadius + c1*(a-m),
+      // c0 + c1*d = logRadius + c1*(d-m), c1*b, c1*c) is itself finite,
+      // since (a-m), (d-m), b and c all share the original matrix's own
+      // scale, the same scale w already sits at. Computing each ratio
+      // ((a-m)/w, (d-m)/w, b/w, c/w) first, before multiplying by angle,
+      // never forms that unrepresentable intermediate, mirroring the
+      // same pattern already used for power's complex-eigenvalue-pair
+      // branch (Round 12 correction, finding 4).
+      final double aMinusM = a - m;
+      final double dMinusM = d - m;
+      final double entry00 = _checkFiniteScalar(
+        logRadius + (angle * (aMinusM / w)),
+      );
+      final double entry11 = _checkFiniteScalar(
+        logRadius + (angle * (dMinusM / w)),
+      );
+      final double entry01 = _checkFiniteScalar(angle * (b / w));
+      final double entry10 = _checkFiniteScalar(angle * (c / w));
+      return _checkFiniteMatrix(
+        Matrix(<List<double>>[
+          <double>[entry00, entry01],
+          <double>[entry10, entry11],
+        ]),
+      );
     } else {
       final double l1 = eigen.lambda1;
       final double l2 = eigen.lambda2;
@@ -3937,8 +3964,28 @@ class Matrix {
             errorId: CalculatrixErrorId.logUndefined,
           );
         }
-        c1 = 1 / l;
-        c0 = math.log(l) - 1;
+        // Round 12 correction, finding 9: c1 = 1/l materializes a
+        // standalone value that overflows for a subnormal-scale
+        // repeated eigenvalue, even though every entry it actually
+        // feeds into (logL + (1/l)*(a-l), logL + (1/l)*(d-l), (1/l)*b,
+        // (1/l)*c) is itself finite, since (a-l), (d-l), b and c all
+        // share the repeated eigenvalue's own scale (a genuine Jordan
+        // coupling forces their magnitude down to roughly l's own).
+        // Computing each ratio ((a-l)/l, (d-l)/l, b/l, c/l) first, before
+        // adding logL, never forms that unrepresentable intermediate,
+        // mirroring the same pattern already used for power's
+        // repeated-eigenvalue branch (Round 12 correction, finding 8).
+        final double logL = _checkFiniteScalar(math.log(l));
+        final double entry00 = _checkFiniteScalar(logL + ((a - l) / l));
+        final double entry11 = _checkFiniteScalar(logL + ((d - l) / l));
+        final double entry01 = _checkFiniteScalar(b / l);
+        final double entry10 = _checkFiniteScalar(c / l);
+        return _checkFiniteMatrix(
+          Matrix(<List<double>>[
+            <double>[entry00, entry01],
+            <double>[entry10, entry11],
+          ]),
+        );
       } else {
         if (l1 == 0 || l2 == 0) {
           throw MatrixDomainError(
