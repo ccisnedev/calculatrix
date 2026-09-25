@@ -1964,12 +1964,35 @@ class Matrix {
     final double sqrtD = math.sqrt(discriminant);
     final double signM = m >= 0 ? 1.0 : -1.0;
     final double q = m + (signM * sqrtD);
-    final double lambda1 = q;
-    final double lambda2 = q == 0 ? m - (signM * sqrtD) : det / q;
+    final double lambda1 = rescale(q);
+
+    double lambda2;
+    if (q == 0) {
+      lambda2 = rescale(m - (signM * sqrtD));
+    } else {
+      // Round 11 correction, finding 2: `det` above is the determinant of
+      // the *scaled* block (`sa*sd - sb*sc`), and a matrix whose own
+      // entries already span a huge dynamic range (for example `a` around
+      // 1e200 and `d` around 1e-200, in the same block) has its
+      // smaller-magnitude entries driven to exactly 0 by the per-entry
+      // scaling above, before they are ever multiplied, even though the
+      // *unscaled* determinant (`a*d - b*c`) is perfectly representable
+      // and accurate (here, `1e200*1e-200 - b*c`, nowhere near overflow).
+      // Prefer that direct, unscaled determinant whenever it is finite:
+      // it is immune to this per-entry underflow and at least as
+      // accurate as the scaled one. Only fall back to the scaled,
+      // rescaled determinant when the direct product itself overflows,
+      // which is the case the scaling exists for in the first place (a
+      // uniformly huge matrix, where every entry shares one extreme
+      // scale rather than spanning one).
+      final double directDet = (a * d) - (b * c);
+      lambda2 = directDet.isFinite ? directDet / lambda1 : rescale(det / q);
+    }
+
     return (
       isComplex: false,
-      lambda1: rescale(lambda1),
-      lambda2: rescale(lambda2),
+      lambda1: lambda1,
+      lambda2: lambda2,
       m: rescale(m),
       w: 0,
     );
@@ -3517,6 +3540,69 @@ class Matrix {
     ]);
   }
 
+  /// Numerically stable two-point (Lagrange) reconstruction of `f(A)` for
+  /// a general, genuinely non-triangular 2x2 matrix (`b != 0` and
+  /// `c != 0`) whose two real eigenvalues [lBig] and [lSmall]
+  /// (`|lBig| >= |lSmall|`) are far enough apart that [_c0IPlusC1A]'s
+  /// `c0 + c1*A` reconstruction loses a diagonal entry that happens to
+  /// sit close to `lSmall` (round 11 correction, finding 3; the exactly
+  /// triangular case, `b == 0` or `c == 0`, already has its own exact
+  /// closed form in [_triangularClosedForm2x2]).
+  ///
+  /// `_c0IPlusC1A` anchors at `lBig`: `c0 = fBig - c1*lBig`, then every
+  /// entry is `c0 + c1*entry`. When `lBig` and `lSmall` differ by many
+  /// orders of magnitude and `f` also grows across that many orders of
+  /// magnitude (as [math.pow] does, unlike [math.log]'s compression),
+  /// `fBig` and `c1*lBig` are each individually `O(fBig)`, yet a
+  /// diagonal entry near `lSmall` needs their difference to land on
+  /// `fSmall`, many orders of magnitude smaller: `c1` would need on the
+  /// order of `log10(lBig/lSmall)` extra decimal digits of precision
+  /// beyond what a double holds for that cancellation to resolve
+  /// correctly, which is structurally impossible once the eigenvalue
+  /// ratio is large (e.g. `sqrt([[1e200,1],[1e-300,1e-200]])`'s
+  /// bottom-right entry: true value `~1e-100`, `c0 + c1*d` instead
+  /// returns `~1e-300`, off by 200 orders of magnitude).
+  ///
+  /// The Lagrange form evaluated directly at each diagonal entry `x`,
+  /// `f(x) ~= fBig*(x-lSmall)/(lBig-lSmall) + fSmall*(lBig-x)/(lBig-lSmall)`,
+  /// never needs that cancellation: for a diagonal entry close to
+  /// `lSmall`, `(x - lSmall)` is a genuinely small, honestly computed
+  /// quantity (not the residue of subtracting two huge numbers), so the
+  /// first term is honestly small and the second term evaluates to
+  /// nearly exactly `fSmall` with no cancellation at all; the symmetric
+  /// argument holds for a diagonal entry close to `lBig`. [c1] (the
+  /// already-computed, well-conditioned divided difference
+  /// `(fBig - fSmall) / (lBig - lSmall)`) is reused unchanged for the
+  /// off-diagonal entries, which never had a precision problem.
+  Matrix _lagrangeClosedForm2x2(
+    double fBig,
+    double fSmall,
+    double lBig,
+    double lSmall,
+    double c1,
+  ) {
+    final double a = _rows[0][0];
+    final double b = _rows[0][1];
+    final double c = _rows[1][0];
+    final double d = _rows[1][1];
+    final double denom = lBig - lSmall;
+
+    // Divide before multiplying: `(x - lSmall) / denom` and
+    // `(lBig - x) / denom` are each well-conditioned weights (close to 0
+    // or 1), but `fBig` or `fSmall` can individually approach double's
+    // max magnitude (e.g. `math.pow(lBig, y)` for a large `y`), so
+    // multiplying by the raw, unscaled `(x - lSmall)` or `(lBig - x)`
+    // first (each also up to `O(lBig)`) can overflow to `Infinity` even
+    // though the true, weight-scaled result is well within range.
+    double diagonal(double x) =>
+        (fBig * ((x - lSmall) / denom)) + (fSmall * ((lBig - x) / denom));
+
+    return Matrix(<List<double>>[
+      <double>[diagonal(a), c1 * b],
+      <double>[c1 * c, diagonal(d)],
+    ]);
+  }
+
   /// `sin(x) / x`, computed via a short Taylor series (`1 - x^2/6`) below
   /// `sqrt(machineEpsilon)` to avoid dividing two quantities that both
   /// vanish as `x -> 0`. Used by [_general2x2Exp]'s complex-eigenvalue-pair
@@ -3707,8 +3793,35 @@ class Matrix {
             errorId: CalculatrixErrorId.logUndefined,
           );
         }
-        c1 = _log1p((l1 - l2) / l2) / (l1 - l2);
-        c0 = math.log(l2) - c1 * l2;
+
+        // Round 11 correction, finding 1: `log1p((l1 - l2) / l2)` forms
+        // `(l1 - l2) / l2` unconditionally, which overflows to `Infinity`
+        // once `l1` and `l2` sit on wildly different scales (for example
+        // `l1` around 1e200 and `l2` around 1e-200, ratio far past
+        // double's ~1.8e308 range) even though the true divided
+        // difference of `log`, `(log l1 - log l2) / (l1 - l2)`, is
+        // perfectly finite there (log compresses both terms down to a
+        // range of a few hundred, at most). Mirror the same anchor and
+        // closeness threshold [_general2x2RealPower] already uses: the
+        // log1p form is only needed to avoid cancellation in
+        // `log(lBig) - log(lSmall)` when the two eigenvalues are close
+        // together; once they are well separated, that cancellation risk
+        // does not exist (the two logarithms are far apart too), so the
+        // direct divided difference is both safe and exact where the
+        // log1p form overflows.
+        final bool l1IsLarger = l1.abs() >= l2.abs();
+        final double lBig = l1IsLarger ? l1 : l2;
+        final double lSmall = l1IsLarger ? l2 : l1;
+        const double closeEigenvalueThreshold = 1.4901161193847656e-08;
+        final double relativeGap = (lBig - lSmall).abs() / lBig.abs();
+        if (relativeGap < closeEigenvalueThreshold) {
+          c1 = _log1p((lSmall - lBig) / lBig) / (lSmall - lBig);
+        } else {
+          final double logBig = math.log(lBig);
+          final double logSmall = math.log(lSmall);
+          c1 = (logBig - logSmall) / (lBig - lSmall);
+        }
+        c0 = math.log(lBig) - c1 * lBig;
 
         // Round 10 correction: same triangular exact closed form as
         // [_general2x2Exp], see [_triangularClosedForm2x2]'s doc comment.
@@ -3833,21 +3946,37 @@ class Matrix {
                 lyBig *
                 _expm1(y * _log1p((lSmall - lBig) / lBig)) /
                 (lSmall - lBig);
+            c0 = lyBig - c1 * lBig;
           } else {
             final double lySmall = _checkFiniteScalar(
               math.pow(lSmall, y).toDouble(),
             );
             c1 = (lyBig - lySmall) / (lBig - lSmall);
-          }
-          c0 = lyBig - c1 * lBig;
 
-          // Round 10 correction: same triangular exact closed form as
-          // [_general2x2Exp] and [_general2x2Log], see
-          // [_triangularClosedForm2x2]'s doc comment.
-          if (b == 0 || c == 0) {
-            final double fa = _checkFiniteScalar(math.pow(a, y).toDouble());
-            final double fd = _checkFiniteScalar(math.pow(d, y).toDouble());
-            return _checkFiniteMatrix(_triangularClosedForm2x2(fa, fd, c1));
+            // Round 10 correction: same triangular exact closed form as
+            // [_general2x2Exp] and [_general2x2Log], see
+            // [_triangularClosedForm2x2]'s doc comment.
+            if (b == 0 || c == 0) {
+              final double fa = _checkFiniteScalar(
+                math.pow(a, y).toDouble(),
+              );
+              final double fd = _checkFiniteScalar(
+                math.pow(d, y).toDouble(),
+              );
+              return _checkFiniteMatrix(
+                _triangularClosedForm2x2(fa, fd, c1),
+              );
+            }
+
+            // Round 11 correction, finding 3: a genuinely non-triangular
+            // matrix (both `b` and `c` nonzero) can still have one
+            // diagonal entry sitting close to `lSmall`, and `c0 + c1*A`
+            // loses that entry the same way it lost the exactly
+            // triangular case, see [_lagrangeClosedForm2x2]'s doc
+            // comment.
+            return _checkFiniteMatrix(
+              _lagrangeClosedForm2x2(lyBig, lySmall, lBig, lSmall, c1),
+            );
           }
         }
       }
