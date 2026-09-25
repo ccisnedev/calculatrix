@@ -167,4 +167,53 @@ void main() {
       );
     },
   );
+
+  group(
+    'Round 12, finding 4: general 2x2 power\'s complex-eigenvalue-pair '
+    'branch must not materialize c1 = rToY*sin(y*angle)/w as a standalone '
+    'value when w sits at a far different scale than rToY, since that '
+    'division alone can overflow (or underflow to exactly 0) even though '
+    'every product c1 actually feeds into (c1*b, c1*c, c1*(a-m)) is '
+    'itself finite and correctly scaled',
+    () {
+      // A=[[0,s],[-2s,0]]: trace 0, det = 0-s*(-2s) = 2*s^2 > 0 but the
+      // discriminant (halfDiff^2 - det, halfDiff=0) is -2*s^2 < 0, a
+      // genuine complex-conjugate eigenvalue pair +-i*s*sqrt(2), for any
+      // s. Reference (mpmath, dps=1200), independent of this
+      // implementation, via the exact eigendecomposition closed form.
+      test('s=1e-200: does not throw, matches the mpmath reference', () {
+        const double s = 1e-200;
+        final Matrix value = Matrix(<List<double>>[
+          <double>[0, s],
+          <double>[-2 * s, 0],
+        ]);
+
+        final Matrix result = value.power(Matrix.scalar(-1.5));
+
+        expectRelativelyClose(result.at(0, 0), -4.2044820762685727e+299);
+        expectRelativelyClose(result.at(0, 1), -2.9730177875068027e+299);
+        expectRelativelyClose(result.at(1, 0), 5.9460355750136053e+299);
+        expectRelativelyClose(result.at(1, 1), -4.2044820762685727e+299);
+      });
+
+      test(
+        's=1e200: recovers the true nonzero off-diagonal entries, not '
+        'an underflowed 0',
+        () {
+          const double s = 1e200;
+          final Matrix value = Matrix(<List<double>>[
+            <double>[0, s],
+            <double>[-2 * s, 0],
+          ]);
+
+          final Matrix result = value.power(Matrix.scalar(-1.5));
+
+          expectRelativelyClose(result.at(0, 0), -4.2044820762685727e-301);
+          expectRelativelyClose(result.at(0, 1), -2.9730177875068027e-301);
+          expectRelativelyClose(result.at(1, 0), 5.9460355750136053e-301);
+          expectRelativelyClose(result.at(1, 1), -4.2044820762685727e-301);
+        },
+      );
+    },
+  );
 }
