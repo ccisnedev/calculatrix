@@ -211,4 +211,35 @@ void main() {
       expect(values[2], closeTo(100, 1e-9));
     });
   });
+
+  group('Round 8, finding 7: the 2x2 eigenvalue path must not run the '
+      'whole-matrix power-of-two normalization before balancing b and c '
+      'individually', () {
+    test('eigenvalues() of [[0,1e200],[1e-200,0]] recovers +-1, not a '
+        'spurious {0,0} from b or c underflowing under a single shared '
+        'scale factor', () {
+      // True eigenvalues: trace 0, det = 0*0 - 1e200*1e-200 = -1, so
+      // lambda = +-sqrt(-det) = +-1 exactly. The whole-matrix power-of-two
+      // normalization picks one k from the matrix's infinity norm (1e200),
+      // dividing every entry by ~2^664: b (1e200) lands near 0.53, fine,
+      // but c (1e-200) lands near 5e-401, far below the smallest
+      // representable subnormal double (~4.9e-324), so it underflows to
+      // exactly 0 before the eigenvalue solver ever sees it, making
+      // det = 0 and the eigenvalues a wrongly repeated 0.
+      final Matrix matrix = Matrix(<List<double>>[
+        <double>[0, 1e200],
+        <double>[1e-200, 0],
+      ]);
+
+      final Matrix eigen = matrix.eigenvalues();
+      final List<double> values = List<double>.generate(
+        eigen.rowCount,
+        (int i) => eigen.at(i, 0),
+      )..sort();
+
+      expect(values.length, equals(2));
+      expect(values[0], closeTo(-1.0, 1e-9));
+      expect(values[1], closeTo(1.0, 1e-9));
+    });
+  });
 }
