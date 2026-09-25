@@ -1985,8 +1985,31 @@ class Matrix {
       // which is the case the scaling exists for in the first place (a
       // uniformly huge matrix, where every entry shares one extreme
       // scale rather than spanning one).
-      final double directDet = (a * d) - (b * c);
-      lambda2 = directDet.isFinite ? directDet / lambda1 : rescale(det / q);
+      // Round 12 correction, finding 2: `directDet.isFinite` alone is not
+      // enough to trust `directDet`. `a`/`d` (or `b`/`c`) can each be so
+      // small that their direct product underflows to exactly 0 (for
+      // example `a` and `d` both around 1e-200: `a*d` around 1e-400 is
+      // below the smallest representable subnormal double, ~4.94e-324),
+      // which is still a finite double, just a wrong one: it silently
+      // discards the true product's magnitude instead of ever producing
+      // `Infinity`. Name that failure explicitly: a factor pair that was
+      // itself genuinely nonzero (neither input is 0) but whose product
+      // rounds to exactly 0 has underflowed, and `directDet` cannot be
+      // trusted whenever either of its two products underflowed this way,
+      // even though the subtraction of the two (both exactly 0) is itself
+      // "finite". The scaled, rescaled `det / q` computed on the
+      // whole-block-normalized entries above has no such risk here: this
+      // whole block shares one extreme scale, so normalizing it first
+      // brings every entry back to a representable magnitude before any
+      // product is formed.
+      final double directAD = a * d;
+      final double directBC = b * c;
+      final bool directAdUnderflowed = a != 0 && d != 0 && directAD == 0;
+      final bool directBcUnderflowed = b != 0 && c != 0 && directBC == 0;
+      final double directDet = directAD - directBC;
+      final bool directDetReliable =
+          directDet.isFinite && !directAdUnderflowed && !directBcUnderflowed;
+      lambda2 = directDetReliable ? directDet / lambda1 : rescale(det / q);
     }
 
     return (
