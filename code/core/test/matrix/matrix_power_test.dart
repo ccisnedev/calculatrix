@@ -263,4 +263,69 @@ void main() {
       );
     });
   });
+
+  group('Matrix.power - owner decisions D34', () {
+    test(
+      'square non-scalar base with a non-square exponent is dimension-mismatch, for any base',
+      () {
+        final Matrix base = Matrix.identity(2);
+        final Matrix y = Matrix(<List<double>>[
+          <double>[1, 2],
+        ]);
+
+        expect(
+          () => base.power(y),
+          throwsA(
+            isA<MatrixShapeError>().having(
+              (MatrixShapeError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.dimensionMismatch,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'complex base with a square non-complex non-scalar exponent is ambiguous-power',
+      () {
+        final Matrix y = Matrix(<List<double>>[
+          <double>[1, 0],
+          <double>[0, 2],
+        ]);
+
+        expect(
+          () => Matrix.i.power(y),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.ambiguousPower,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'non-complex-form base with a non-positive real eigenvalue and a non-integer exponent is log-undefined',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[-1, 0],
+          <double>[0, 2],
+        ]);
+
+        expect(
+          () => base.power(Matrix.scalar(0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
+          ),
+        );
+      },
+    );
+  });
 }
