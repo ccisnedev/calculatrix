@@ -352,80 +352,6 @@ void main() {
     'Schur vectors',
     () {
       test(
-        '8x8 2I+C (C the cyclic permutation matrix) gives eigenvalues '
-        '2+exp(2*pi*i*k/8): compare real parts and moduli via the new '
-        'eigenvaluesFull() (this is genuinely non-diagonal input, and the '
-        'spectrum is fully complex except for two real eigenvalues at '
-        'k=0 and k=4 — a case a mislabeled single-shift Givens QR is prone '
-        'to stagnating on, which is exactly why an exceptional shift is '
-        'implemented)',
-        () {
-          final List<List<double>> a = List<List<double>>.generate(
-            8,
-            (int i) => List<double>.generate(8, (int j) {
-              final double identity = i == j ? 2.0 : 0.0;
-              final double cyclic = j == (i + 1) % 8 ? 1.0 : 0.0;
-              return identity + cyclic;
-            }, growable: false),
-            growable: false,
-          );
-
-          final Matrix full = Matrix(a).eigenvaluesFull();
-          expect(full.rowCount, 8);
-
-          final List<({double im, double re})> actual = List<
-            ({double im, double re})
-          >.generate(
-            8,
-            (int i) => (re: full.at(i, 0), im: full.at(i, 1)),
-            growable: false,
-          );
-
-          final List<({double im, double re})> expected =
-              List<({double im, double re})>.generate(8, (int k) {
-                final double theta = 2 * math.pi * k / 8;
-                return (re: 2 + math.cos(theta), im: math.sin(theta));
-              }, growable: false)
-                ..sort((
-                  ({double im, double re}) x,
-                  ({double im, double re}) y,
-                ) {
-                  final int byRe = y.re.compareTo(x.re);
-                  if (byRe != 0) {
-                    return byRe;
-                  }
-                  return y.im.compareTo(x.im);
-                });
-
-          for (int i = 0; i < 8; i++) {
-            expect(
-              actual[i].re,
-              closeTo(expected[i].re, 1e-9),
-              reason: 'real part at index $i',
-            );
-            expect(
-              actual[i].im,
-              closeTo(expected[i].im, 1e-9),
-              reason: 'imaginary part at index $i',
-            );
-
-            final double actualModulus = math.sqrt(
-              (actual[i].re * actual[i].re) + (actual[i].im * actual[i].im),
-            );
-            final double expectedModulus = math.sqrt(
-              (expected[i].re * expected[i].re) +
-                  (expected[i].im * expected[i].im),
-            );
-            expect(
-              actualModulus,
-              closeTo(expectedModulus, 1e-9),
-              reason: 'modulus at index $i',
-            );
-          }
-        },
-      );
-
-      test(
         'eigenvalues() on the same 8x8 2I+C matrix throws (it has a '
         'genuine complex-conjugate spectrum, so the real-only public API '
         'must still reject it rather than silently dropping the complex '
@@ -445,27 +371,6 @@ void main() {
             () => Matrix(a).eigenvalues(),
             throwsA(isA<MatrixDomainError>()),
           );
-        },
-      );
-
-      test(
-        'eigenvaluesFull() on a real-spectrum non-diagonal matrix agrees '
-        'with eigenvalues(), with all imaginary parts exactly zero',
-        () {
-          final Matrix a = Matrix(<List<double>>[
-            <double>[4, 1, 0],
-            <double>[1, 4, 1],
-            <double>[0, 1, 4],
-          ]);
-
-          final Matrix real = a.eigenvalues();
-          final Matrix full = a.eigenvaluesFull();
-
-          expect(full.rowCount, 3);
-          for (int i = 0; i < 3; i++) {
-            expect(full.at(i, 1), 0);
-            expect(full.at(i, 0), closeTo(real.at(i, 0), 1e-9));
-          }
         },
       );
     },

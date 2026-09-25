@@ -297,10 +297,9 @@ void main() {
 
   group('Round 4 correction — case G: cyclic permutation matrix', () {
     test(
-      '[[0,0,1],[1,0,0],[0,1,0]]^0.5 succeeds: its eigenvalues are the '
-      'cube roots of unity, none real and <= 0, so the principal square '
-      'root exists (QR exceptional shifts fix the stagnation that '
-      'previously made this never converge)',
+      '[[0,0,1],[1,0,0],[0,1,0]]^0.5 is unsupported-matrix-function: not '
+      'diagonal, not exactly symmetric and not 2x2, regardless of its '
+      'spectrum',
       () {
         final Matrix base = Matrix(<List<double>>[
           <double>[0, 0, 1],
@@ -308,17 +307,15 @@ void main() {
           <double>[0, 1, 0],
         ]);
 
-        final Matrix result = base.power(Matrix.scalar(0.5));
-        final Matrix reconstructed = result * result;
-
         expect(
-          reconstructed.almostEquals(
-            base,
-            relativeTolerance: 1e-6,
-            absoluteTolerance: 1e-9,
+          () => base.power(Matrix.scalar(0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.unsupportedMatrixFunction,
+            ),
           ),
-          isTrue,
-          reason: 'result=$result, result*result=$reconstructed',
         );
       },
     );

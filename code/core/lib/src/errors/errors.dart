@@ -14,7 +14,8 @@ enum CalculatrixErrorId {
   logUndefined('log-undefined'),
   ambiguousPower('ambiguous-power'),
   syntaxError('syntax-error'),
-  noConvergence('no-convergence');
+  noConvergence('no-convergence'),
+  unsupportedMatrixFunction('unsupported-matrix-function');
 
   const CalculatrixErrorId(this.id);
 
