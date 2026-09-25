@@ -216,4 +216,41 @@ void main() {
       );
     },
   );
+
+  group(
+    'Round 12, finding 5: general 2x2 power\'s far-apart-eigenvalue direct '
+    'divided difference (lyBig - lySmall) / (lBig - lSmall) collapses to '
+    'exactly 0 when the exponent y is astronomically small, even though '
+    'the eigenvalues themselves are nowhere near each other, because '
+    'pow(lBig, y) and pow(lSmall, y) both round to exactly 1.0',
+    () {
+      // A=[[2,1e20],[0,1]] is triangular (c=0), eigenvalues exactly 2 and
+      // 1 (relativeGap = 0.5, far above closeEigenvalueThreshold, so this
+      // does not take the existing log1p/expm1 "close eigenvalue" branch).
+      // With y=1e-20, pow(2,1e-20) and pow(1,1e-20) both round to exactly
+      // 1.0 in double precision, so the naive c1 = (lyBig - lySmall) /
+      // (lBig - lSmall) = 0 / 1 = 0 loses the true, tiny, nonzero divided
+      // difference entirely. Reference (mpmath, dps=60), independent of
+      // this implementation: c1 = 0.69314718055994530942 (the true
+      // divided difference y * ln(2) to first order, since
+      // d/dx[x^y] at y->0 collapses to the logarithmic mean).
+      test(
+        'power(1e-20) on [[2,1e20],[0,1]] recovers the true nonzero '
+        '(0,1) entry, not a false 0 from a collapsed direct subtraction',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[2, 1e20],
+            <double>[0, 1],
+          ]);
+
+          final Matrix result = value.power(Matrix.scalar(1e-20));
+
+          expectRelativelyClose(result.at(0, 0), 1.0);
+          expectRelativelyClose(result.at(0, 1), 0.69314718055994530942);
+          expect(result.at(1, 0), equals(0));
+          expectRelativelyClose(result.at(1, 1), 1.0);
+        },
+      );
+    },
+  );
 }
