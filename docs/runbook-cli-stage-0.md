@@ -71,6 +71,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D34 | From the Codex review of the design: (1) `power` follows the order of checks of the D25 table, by kinds, never by a numerical commutation test; (2) a matrix base with no real logarithm is `log-undefined` in this stage, and its representation is deferred; (3) `-h`/`--help` wins over `incomplete`, `missingArgument`, `missingRequiredOption` and the contract constraints, and loses to `unknownCommand`, `extraArgument` and the option errors (spec 8.6); (4) a failed step of `upgrade --apply` or `uninstall --apply`, or a failed release lookup, exits `1` (`ExitCode.genericError`) with the id `release-lookup-failed`, `download-failed` or `file-access-denied`; the run stops at that step, reports the steps done, and neither rolls back nor retries (spec section 6). | User, 2026-09-24 |
 | D33 | `modular_cli_sdk` gets a plugin system modeled on `modular_api` (`CliPlugin` with a manifest and `setup(host)`; the host registers routes and extension points, nothing else for now). `version`, `doctor`, `upgrade` and `uninstall` are standard plugins inside the SDK (`VersionPlugin`, `DoctorPlugin`, `InstallationPlugin`), like health and openapi in `modular_api`. Every plugin is registered explicitly with `cli.plugin(...)`. `DoctorPlugin` declares `doctor.checks`; `InstallationPlugin` requires it and contributes its checks. No `modular_cli_installer` package, no install plugin. Spec section 8.7. | User, 2026-09-24 (R18) |
 | D35 | From the Codex review of the core PR (calculatrix#7): an iterative method of the core (matrix exponential by scaling and squaring, square root, logarithm) that reaches its iteration cap without meeting its tolerance raises the new id `no-convergence` (65), never the unconverged value. Every intermediate result is checked for finiteness (`non-finite`). | Claude, 2026-09-25 |
+| D36 | One JSON error shape for every error: `{"error": {"id", "message", "exitCode", ...}}`, `id` in kebab-case (the SDK maps each router rejection kind to one id), extra fields only when they apply (`token`, `position`, `contract`, `details`). `isRetryable` is removed; `CommandException.exitCode` is required. Spec section 6. | User, 2026-09-25 |
 
 ## Command catalog (proposal)
 
@@ -322,5 +323,6 @@ S3 and S4 can run in parallel after S2.
   datajack, inquiry, linkedin_cli). The first rule in the issue ("any token
   with whitespace is positional") would have broken `--title='two words'`; the
   issue and the tests were corrected.
+- 2026-09-25: D36, one JSON error shape for every error (spec section 6).
 - 2026-09-25: D35, from the Codex review of PR #7: `no-convergence` added to
   the ids (spec R22).

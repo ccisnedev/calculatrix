@@ -285,16 +285,28 @@ POSIX standard; it is used because the SDK already emits `64`. `7` is the
 existing SDK convention and stays, because changing it would affect every
 consumer.
 
-**Domain errors** share exit code `65` and carry a structured id, so scripts
-branch on the id and not on the code. They are printed through the SDK's error
-output; with `--json`:
+**One JSON error shape (runbook D36).** With `--json`, every error, whether
+from the router, the SDK, a plugin or the core, is one object under `error`
+with the same three fields always present:
 
 ```json
 {"error": {"id": "stack-underflow", "message": "+ needs 2 arguments, the stack has 1",
-           "token": "+", "position": 3}}
+           "exitCode": 65, "token": "+", "position": 3}}
+{"error": {"id": "unknown-option", "message": "unknown option '--bogus'",
+           "exitCode": 7, "contract": {"...": "..."}}}
 ```
 
-`position` is the 1-based character offset of the token in the program.
+- `id` is always kebab-case. Usage errors use the SDK's fixed table, one id
+  per router rejection kind (`unknown-command`, `unknown-option`,
+  `missing-argument`, ...).
+- `exitCode` repeats the process exit code.
+- Other fields appear only when they apply: `token` and `position` for domain
+  errors, `contract` and `details` for usage errors. There is no
+  `isRetryable`.
+
+**Domain errors** share exit code `65` and carry a structured id, so scripts
+branch on the id and not on the code. `position` is the 1-based character
+offset of the token in the program.
 
 Ids: `unknown-word`, `stack-underflow`, `type-mismatch`, `dimension-mismatch`,
 `singular-matrix`, `non-finite`, `log-undefined`, `ambiguous-power`,
@@ -896,7 +908,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 ## 14. Decisions of the review of 2026-09-24
 
 Every question of the draft is closed. The user decided each one; the runbook
-records the ones that affect the whole stage (D25 to D35).
+records the ones that affect the whole stage (D25 to D36).
 
 | # | Topic | Decision |
 |---|---|---|
