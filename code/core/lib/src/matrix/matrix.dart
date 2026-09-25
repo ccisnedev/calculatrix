@@ -1721,28 +1721,40 @@ class Matrix {
   /// matters for [_general2x2Log] and the real branch of
   /// [_general2x2RealPower], both of which reject a negative real
   /// eigenvalue but accept any complex pair.
-  static ({bool isComplex, double lambda1, double lambda2})
+  ///
+  /// Uses the centered discriminant `halfDiff^2 + b*c` (with
+  /// `m = (a+d)/2`, `halfDiff = (a-d)/2`), not `trace^2 - 4*det`. The two
+  /// are algebraically identical (`trace^2 - 4*det = 4*(halfDiff^2+b*c)`),
+  /// but for entries around 1e8 or larger, `trace*trace` and `4*det` are
+  /// each individually rounded to the nearest double at a magnitude far
+  /// above the true discriminant, so their difference can lose most or
+  /// all of its significant digits. The centered form never separately
+  /// forms those large intermediate values, so it does not suffer this
+  /// cancellation. On the complex-pair branch, `m` and `w` (the rotation
+  /// frequency, `sqrt(-discriminant)`) are returned directly so callers
+  /// never need to recompute the discriminant themselves.
+  static ({bool isComplex, double lambda1, double lambda2, double m, double w})
   _exactRealEigen2x2(double a, double b, double c, double d) {
-    final double trace = a + d;
+    final double m = (a + d) / 2;
+    final double halfDiff = (a - d) / 2;
     final double det = (a * d) - (b * c);
-    final double discriminant = (trace * trace) - (4 * det);
+    final double discriminant = (halfDiff * halfDiff) + (b * c);
 
     if (discriminant < 0) {
-      return (isComplex: true, lambda1: 0, lambda2: 0);
+      final double w = math.sqrt(-discriminant);
+      return (isComplex: true, lambda1: 0, lambda2: 0, m: m, w: w);
     }
 
     if (discriminant == 0) {
-      final double repeated = trace / 2;
-      return (isComplex: false, lambda1: repeated, lambda2: repeated);
+      return (isComplex: false, lambda1: m, lambda2: m, m: m, w: 0);
     }
 
     final double sqrtD = math.sqrt(discriminant);
-    final double bCoefficient = -trace;
-    final double signB = bCoefficient >= 0 ? 1.0 : -1.0;
-    final double q = -(bCoefficient + (signB * sqrtD)) / 2;
+    final double signM = m >= 0 ? 1.0 : -1.0;
+    final double q = m + (signM * sqrtD);
     final double lambda1 = q;
-    final double lambda2 = q == 0 ? 0 : det / q;
-    return (isComplex: false, lambda1: lambda1, lambda2: lambda2);
+    final double lambda2 = q == 0 ? m - (signM * sqrtD) : det / q;
+    return (isComplex: false, lambda1: lambda1, lambda2: lambda2, m: m, w: 0);
   }
 
   LuDecomposition luDecomposition({
@@ -3193,16 +3205,15 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final ({bool isComplex, double lambda1, double lambda2}) eigen =
-        _exactRealEigen2x2(a, b, c, d);
+    final ({bool isComplex, double lambda1, double lambda2, double m, double w})
+    eigen = _exactRealEigen2x2(a, b, c, d);
 
     double c0;
     double c1;
     if (eigen.isComplex) {
-      final double m = (a + d) / 2;
+      final double m = eigen.m;
+      final double w = eigen.w;
       final double em = _checkFiniteScalar(math.exp(m));
-      final double discriminant = ((a + d) * (a + d)) - 4 * ((a * d) - (b * c));
-      final double w = math.sqrt(-discriminant) / 2;
       c1 = em * _sinOverX(w);
       c0 = em * math.cos(w) - c1 * m;
     } else {
@@ -3235,15 +3246,14 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final ({bool isComplex, double lambda1, double lambda2}) eigen =
-        _exactRealEigen2x2(a, b, c, d);
+    final ({bool isComplex, double lambda1, double lambda2, double m, double w})
+    eigen = _exactRealEigen2x2(a, b, c, d);
 
     double c0;
     double c1;
     if (eigen.isComplex) {
-      final double m = (a + d) / 2;
-      final double discriminant = ((a + d) * (a + d)) - 4 * ((a * d) - (b * c));
-      final double w = math.sqrt(-discriminant) / 2;
+      final double m = eigen.m;
+      final double w = eigen.w;
       final double radius = _hypot(m, w);
       if (!radius.isFinite) {
         throw MatrixDomainError(
@@ -3299,15 +3309,14 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final ({bool isComplex, double lambda1, double lambda2}) eigen =
-        _exactRealEigen2x2(a, b, c, d);
+    final ({bool isComplex, double lambda1, double lambda2, double m, double w})
+    eigen = _exactRealEigen2x2(a, b, c, d);
 
     double c0;
     double c1;
     if (eigen.isComplex) {
-      final double m = (a + d) / 2;
-      final double discriminant = ((a + d) * (a + d)) - 4 * ((a * d) - (b * c));
-      final double w = math.sqrt(-discriminant) / 2;
+      final double m = eigen.m;
+      final double w = eigen.w;
       final double radius = _hypot(m, w);
       if (!radius.isFinite) {
         throw MatrixDomainError(
