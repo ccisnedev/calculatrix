@@ -18,6 +18,7 @@ void main() {
         'log-undefined',
         'ambiguous-power',
         'syntax-error',
+        'no-convergence',
       });
     });
   });
@@ -54,5 +55,101 @@ void main() {
       expect(error.token, 'banana');
       expect(error, isA<CalculatrixError>());
     });
+  });
+
+  group('structured error ids at real throw sites (#5)', () {
+    test(
+      'addition of mismatched shapes carries dimension-mismatch',
+      () {
+        final Matrix a = Matrix(<List<double>>[
+          <double>[1, 2],
+        ]);
+        final Matrix b = Matrix(<List<double>>[
+          <double>[1],
+          <double>[2],
+        ]);
+
+        expect(
+          () => a + b,
+          throwsA(
+            isA<MatrixShapeError>().having(
+              (MatrixShapeError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.dimensionMismatch,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'every CalculatrixErrorId has at least one real operation that '
+      'raises it with a non-null errorId',
+      () {
+        final Map<CalculatrixErrorId, void Function()> representatives =
+            <CalculatrixErrorId, void Function()>{
+          CalculatrixErrorId.unknownWord: () =>
+              Calculatrix.evaluateRpn(<String>['banana']),
+          CalculatrixErrorId.stackUnderflow: () =>
+              Calculatrix.evaluateRpn(<String>['+']),
+          CalculatrixErrorId.typeMismatch: () =>
+              Matrix.identity(2) / Matrix.identity(2),
+          CalculatrixErrorId.dimensionMismatch: () => Matrix(<List<double>>[
+            <double>[1, 2],
+          ]) +
+              Matrix(<List<double>>[
+                <double>[1],
+                <double>[2],
+              ]),
+          CalculatrixErrorId.singularMatrix: () => Matrix(<List<double>>[
+            <double>[1, 2],
+            <double>[2, 4],
+          ]).inverse(),
+          CalculatrixErrorId.nonFinite: () =>
+              Matrix.scalar(10).power(Matrix.scalar(400)),
+          CalculatrixErrorId.logUndefined: () => Matrix.scalar(0).log(),
+          CalculatrixErrorId.ambiguousPower: () {
+            final Matrix base = Matrix(<List<double>>[
+              <double>[1, 1],
+              <double>[0, 1],
+            ]);
+            final Matrix y = Matrix(<List<double>>[
+              <double>[0, 1],
+              <double>[1, 0],
+            ]);
+            base.power(y);
+          },
+          CalculatrixErrorId.syntaxError: () =>
+              Calculatrix.evaluateInfix('1 2 +'),
+          CalculatrixErrorId.noConvergence: () => Matrix(<List<double>>[
+            <double>[2, 0],
+            <double>[0, 2],
+          ]).sqrt(maxIterations: 0),
+        };
+
+        expect(
+          representatives.keys.toSet(),
+          CalculatrixErrorId.values.toSet(),
+          reason: 'every declared error id must have a representative op',
+        );
+
+        for (final MapEntry<CalculatrixErrorId, void Function()> entry
+            in representatives.entries) {
+          CalculatrixErrorId? observedId;
+          try {
+            entry.value();
+            fail('expected ${entry.key} to throw, but nothing was thrown');
+          } on CalculatrixError catch (e) {
+            observedId = e.errorId;
+          }
+
+          expect(
+            observedId,
+            entry.key,
+            reason: 'representative op for ${entry.key} did not carry its id',
+          );
+        }
+      },
+    );
   });
 }
