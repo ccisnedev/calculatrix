@@ -11,8 +11,8 @@ documentation: https://pub.dev/documentation/calculatrix/latest
 environment:
   sdk: ^3.8.1
 
-# dependencies:
-  # path: ^1.8.0
+dependencies:
+  meta: ^1.16.0
 
 dev_dependencies:
   lints: ^5.0.0

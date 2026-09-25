@@ -1,4 +1,8 @@
 import 'package:calculatrix/calculatrix.dart';
+// debugCyclicJacobiSqrtWithSweepBudget is a @visibleForTesting seam (round
+// 9 correction, finding 5) hidden from the public calculatrix.dart barrel,
+// so it is imported directly from its src path instead.
+import 'package:calculatrix/src/matrix/matrix.dart' show debugCyclicJacobiSqrtWithSweepBudget;
 import 'package:test/test.dart';
 
 void main() {
