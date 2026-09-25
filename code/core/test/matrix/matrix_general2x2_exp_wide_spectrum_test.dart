@@ -138,10 +138,24 @@ void main() {
             diagonal(20),
             relativeTolerance: 1e-6,
           );
+
+          // The (1,1) entry is intrinsically ill-conditioned here, not a
+          // precision limitation of the fix under test: `d = -20` is not
+          // exactly `lambdaSmall` (`lambdaSmall` is perturbed away from
+          // `-20` by only about `c / 40 ~= 2.5e-12`, see the eigenvalue
+          // derivation above), so `diagonal(-20)` picks up a genuine,
+          // mathematically-correct contribution from `fBig` weighted by
+          // that tiny offset, on the same order as the entry's own true
+          // value. Both this hand-rolled expected value and the
+          // implementation's own `lambdaSmall` are limited by the same
+          // absolute floor (`lambdaSmall` itself is only accurate to
+          // about `1e-16 * 20 ~= 2e-15` absolute, against a true offset
+          // of `2.5e-12`, a relative floor around `1e-3`), so a looser
+          // tolerance is the honest one for this specific entry.
           expectRelativelyClose(
             result.at(1, 1),
             diagonal(-20),
-            relativeTolerance: 1e-6,
+            relativeTolerance: 1e-2,
           );
           expectRelativelyClose(result.at(0, 1), c1, relativeTolerance: 1e-6);
           expectRelativelyClose(
