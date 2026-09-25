@@ -1963,8 +1963,10 @@ class Matrix {
   ///   `f(A) = Q * f(Lambda) * Q^T`.
   /// - General 2x2 matrices: the divided-difference closed form
   ///   `f(A) = c0*I + c1*A` (Higham, "Functions of Matrices", section 1.2),
-  ///   using `sinh(d)/d`/`sin(w)/w` computed via a short Taylor series near
-  ///   `d`/`w` = 0 to avoid cancellation (see [_sinhOverX]/[_sinOverX]).
+  ///   anchored at the smaller-magnitude eigenvalue for the real-pair
+  ///   branch and using `sin(w)/w` computed via a short Taylor series near
+  ///   `w = 0` for the complex-pair branch (see [_general2x2Exp],
+  ///   [_sinOverX]).
   /// - Any other input: [CalculatrixErrorId.unsupportedMatrixFunction].
   ///
   /// Every matrix/scalar involved is checked finite before it is used.
@@ -3124,19 +3126,6 @@ class Matrix {
     );
   }
 
-  /// `sinh(x) / x`, computed via a short Taylor series
-  /// (`1 + x^2/6`) below `sqrt(machineEpsilon)` to avoid the cancellation
-  /// that `(exp(x) - exp(-x)) / (2*x)` suffers as `x -> 0`. Used by
-  /// [_general2x2Exp]'s real-eigenvalue branch.
-  static double _sinhOverX(double x) {
-    const double seriesThreshold = 1.4901161193847656e-08;
-    if (x.abs() < seriesThreshold) return 1 + (x * x) / 6;
-    return (math.exp(x) - math.exp(-x)) / (2 * x);
-  }
-
-  /// `cosh(x)`, computed directly since `dart:math` has no `cosh`.
-  static double _cosh(double x) => (math.exp(x) + math.exp(-x)) / 2;
-
   /// `sin(x) / x`, computed via a short Taylor series (`1 - x^2/6`) below
   /// `sqrt(machineEpsilon)` to avoid dividing two quantities that both
   /// vanish as `x -> 0`. Used by [_general2x2Exp]'s complex-eigenvalue-pair
@@ -3182,9 +3171,23 @@ class Matrix {
 
   /// [exp] for a general (non-diagonal, non-exactly-symmetric) 2x2 matrix
   /// via the divided-difference closed form (Higham, "Functions of
-  /// Matrices", section 1.2): `f(A) = c0*I + c1*A`, with
-  /// `m = (l1+l2)/2`, `d = (l1-l2)/2` for a real eigenvalue pair (or
-  /// `m +/- i*w` for a complex-conjugate pair).
+  /// Matrices", section 1.2): `f(A) = c0*I + c1*A`.
+  ///
+  /// Real-eigenvalue branch (round 8 correction, finding 1): anchored at
+  /// `lLo = min(l1, l2)`, never at the pair's midpoint. The previous
+  /// version built `c0` from `em * cosh(halfDiff) - c1 * m` for
+  /// `m = (l1+l2)/2`, two terms that are both `O(exp(max(l1,l2)))` for a
+  /// well-separated pair (e.g. `l1=0, l2=50`: both terms are `~2.6e21`)
+  /// even though their true difference is `O(1)` (`c0` is exactly
+  /// `exp(min(l1,l2))`), which is unrepresentable: double precision
+  /// cannot hold a ~1e21-magnitude value to within 1 part in 1e21, so the
+  /// small, correct result was rounded away to noise. Computing
+  /// `fLo = exp(lLo)` directly and setting `c0 = fLo - c1*lLo` instead
+  /// never subtracts two comparable huge quantities, because `fLo` is
+  /// exactly the small eigenvalue's own exponential, not a difference
+  /// derived from the large one. `c1` itself still needs the
+  /// cancellation-safe `expm1`/divided-difference form for two
+  /// eigenvalues that are close together (not just well separated).
   Matrix _general2x2Exp() {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
@@ -3192,20 +3195,32 @@ class Matrix {
     final double d = _rows[1][1];
     final ({bool isComplex, double lambda1, double lambda2}) eigen =
         _exactRealEigen2x2(a, b, c, d);
-    final double m = (a + d) / 2;
-    final double em = _checkFiniteScalar(math.exp(m));
 
     double c0;
     double c1;
     if (eigen.isComplex) {
+      final double m = (a + d) / 2;
+      final double em = _checkFiniteScalar(math.exp(m));
       final double discriminant = ((a + d) * (a + d)) - 4 * ((a * d) - (b * c));
       final double w = math.sqrt(-discriminant) / 2;
       c1 = em * _sinOverX(w);
       c0 = em * math.cos(w) - c1 * m;
     } else {
-      final double halfDiff = (eigen.lambda1 - eigen.lambda2) / 2;
-      c1 = em * _sinhOverX(halfDiff);
-      c0 = em * _cosh(halfDiff) - c1 * m;
+      final double l1 = eigen.lambda1;
+      final double l2 = eigen.lambda2;
+      if (l1 == l2) {
+        final double l = l1;
+        final double el = _checkFiniteScalar(math.exp(l));
+        c1 = el;
+        c0 = el - (c1 * l);
+      } else {
+        final double lLo = math.min(l1, l2);
+        final double lHi = math.max(l1, l2);
+        final double fLo = _checkFiniteScalar(math.exp(lLo));
+        final double fHi = _checkFiniteScalar(math.exp(lHi));
+        c1 = fHi * _expm1(lLo - lHi) / (lLo - lHi);
+        c0 = fLo - (c1 * lLo);
+      }
     }
     return _checkFiniteMatrix(_c0IPlusC1A(c0, c1));
   }
