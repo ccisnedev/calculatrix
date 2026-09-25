@@ -1908,6 +1908,34 @@ class Matrix {
       return (isComplex: false, lambda1: a, lambda2: d, m: (a + d) / 2, w: 0);
     }
 
+    // Round 12 correction, finding 3: balance `b` and `c` against each
+    // other by an exact power-of-two diagonal similarity transform before
+    // the whole-block magnitude scale below, the same fix already applied
+    // in [_eigenvalues2x2] (see its doc comment for the full derivation).
+    // A single block-wide scale factor is tuned to the block's own
+    // largest-magnitude entry; when `b` and `c` sit at wildly different
+    // scales from each other (for example `b` around 1e200, `c` around
+    // 1e-200), that one factor brings `b` down to a representable
+    // magnitude while driving `c` past the smallest representable
+    // subnormal double, underflowing it to exactly 0 before `b*c` is ever
+    // formed. The discriminant `halfDiff^2 + b*c` then sees a spuriously
+    // zeroed `b*c` term and misclassifies a genuine complex-conjugate pair
+    // (true discriminant `-1`, here) as a repeated real eigenvalue at the
+    // pair's mean. `D = diag(1, 2^k)`, `A' = D^-1 A D` leaves `a` and `d`
+    // unchanged and leaves the product `b*c` exactly unchanged too
+    // (`b' * c' = (b*2^k) * (c/2^k) = b*c`), so this balancing changes no
+    // eigenvalue, discriminant, `m` or `w`; it only avoids underflow in
+    // forming their intermediate product.
+    double balancedB = b;
+    double balancedC = c;
+    final double kBalance =
+        ((math.log(c.abs()) - math.log(b.abs())) / math.ln2) / 2;
+    final double kBalanceRounded = kBalance.roundToDouble();
+    if (kBalanceRounded != 0) {
+      balancedB = _scalarScaleByPowerOfTwo(b, kBalanceRounded);
+      balancedC = _scalarScaleByPowerOfTwo(c, -kBalanceRounded);
+    }
+
     // For a non-triangular block, the same extreme-scale problem can still
     // hit `halfDiff*halfDiff` and `b*c` (underflow) or `m`/`det` (overflow)
     // when every entry shares one huge or tiny scale. Scale the whole block
@@ -1917,22 +1945,22 @@ class Matrix {
     // by the same `2^k`).
     final double maxAbs = <double>[
       a.abs(),
-      b.abs(),
-      c.abs(),
+      balancedB.abs(),
+      balancedC.abs(),
       d.abs(),
     ].reduce(math.max);
 
     int k = 0;
     double sa = a;
-    double sb = b;
-    double sc = c;
+    double sb = balancedB;
+    double sc = balancedC;
     double sd = d;
     if (maxAbs != 0) {
       k = (math.log(maxAbs) / math.ln2).round();
       if (k != 0) {
         sa = _scalarScaleByPowerOfTwo(a, -k.toDouble());
-        sb = _scalarScaleByPowerOfTwo(b, -k.toDouble());
-        sc = _scalarScaleByPowerOfTwo(c, -k.toDouble());
+        sb = _scalarScaleByPowerOfTwo(balancedB, -k.toDouble());
+        sc = _scalarScaleByPowerOfTwo(balancedC, -k.toDouble());
         sd = _scalarScaleByPowerOfTwo(d, -k.toDouble());
       }
     }
