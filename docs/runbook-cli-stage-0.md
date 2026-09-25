@@ -4,8 +4,9 @@ Stage 0 turns `code/cli` into a real, installable CLI named `calculatrix` (alias
 `cx`), built on `modular_cli_sdk`, so it can be used every day (dogfood) before
 the shared command line lands in core and in the app.
 
-This file is for discussion first. Nothing in `code/cli` changes until the
-"Open questions" section is settled. Update it as work lands: tick the box, add
+This file is for discussion first. Nothing in `code/cli` changed until the
+"Open questions" section was settled; since 2026-09-24 every question is
+closed. Update it as work lands: tick the box, add
 the PR, and append a line to the progress log.
 
 Parent plan: `docs/runbook-1.0.0.md`. This stage is the first slice of Stage 9
@@ -15,11 +16,17 @@ Parent plan: `docs/runbook-1.0.0.md`. This stage is the first slice of Stage 9
 
 ```text
 cx                                   banner (later: a REPL with a live stack)
-cx rpn eval '-1 2 +'                 prints the stack after running the line
-cx infix eval '-1+2'                 prints the result
+cx eval rpn '-1 2 +'                 prints the stack after running the program
+cx '-1 2 +'                          shortcut for `cx eval rpn`
+cx eval infix '-1+2'                 prints the result
+cx eval rpn --json -f prog.rpn       options after the route, before the program
+cx commands show power               the encyclopedia entry of a command
 cx version
-cx upgrade
+cx doctor
+cx upgrade --plan | --apply
 ```
+
+The full design is in `docs/spec/calculatrix_cli.md` (D22).
 
 The CLI, the app, and the future REPL run the same thing: an RPN command line
 that is parsed into objects and then executed one object at a time against the
@@ -31,7 +38,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 |---|---|---|
 | D1 | The program is `calculatrix`, with `cx` as its alias. | User, 2026-09-23 |
 | D2 | The CLI uses `modular_cli_sdk` and `cli_router`, structured like `macss/code/cli`. | User, 2026-09-23 |
-| D3 | Every route is a query: no `--plan` or `--apply`. | User, 2026-09-23 |
+| D3 | Every route of the domain (`eval`, `commands`) and every maintenance route that changes nothing (`version`, `doctor`, `help`) is a query. `upgrade` and `uninstall` change the installation, so they are commands with `--plan` and `--apply` (D26). Amended 2026-09-24. | User, 2026-09-23 and 2026-09-24 |
 | D4 | Bare `cx` / `calculatrix` prints a logo and a short presentation. A Julia-style REPL replaces it in a later stage. | User, 2026-09-23 |
 | D5 | Command names are plain ASCII words that are easy to type. No `→`. When the word is short, use the whole word (`vector`, `power`). | User, 2026-09-23 |
 | D6 | Matrix literals accept spaces as separators, in RPN and in infix: `[[0 -1] [1 0]]`. | User, 2026-09-23 |
@@ -43,14 +50,30 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D12 | Follow the HP 50g style by default (stack display, behavior), unless the user decides a better option for a specific point. | User, Q3 |
 | D13 | Spaces everywhere: matrices are read and displayed as `[[0 -1] [1 0]]`, in the CLI and in the app. | User, Q4 |
 | D14 | Commands have aliases. The registry needs an alias mechanism; `^` is an alias of the power command. | User, Q5 |
-| D15 | `upgrade` and `uninstall` are queries, as in `macss` and `docmd`. They belong in a package of the `modular_cli_sdk` ecosystem, because every CLI needs them. | User, Q6 |
+| D15 | `upgrade` and `uninstall` belong in a package of the `modular_cli_sdk` ecosystem, because every CLI needs them. Corrected 2026-09-24: they are commands, not queries (D26). | User, Q6 and 2026-09-24 |
 | D16 | Command names that are not a single word use the cmdlet pattern `<verb>-<subject>`. | User, Q8 |
-| D17 | There is no `matrix` command: everything is a matrix. Two join commands build matrices: `join-rows` stacks along the rows axis (vertically) and `join-cols` joins along the columns axis (side by side), when the sizes fit. | User, Q8 |
+| D17 | There is no `matrix` command: everything is a matrix. Two commands build matrices: `append-rows` places B below A (same number of columns) and `append-cols` places B to the right of A (same number of rows). Renamed from `join-rows` / `join-cols` on 2026-09-24. | User, Q8 |
 | D18 | `exp` is e^x, as on the HP. x^y is `power`, with aliases `pwr` and `^`. | User, Q9 |
 | D19 | Each product in the repository has its own tag prefix. The CLI uses immutable `cli-vX.Y.Z` tags; the app keeps `vX.Y.Z`. `cx upgrade` filters releases by prefix and never uses `releases/latest`. | User, Q7 |
-| D20 | `upgrade` and `uninstall` come from a new ecosystem package, `modular_cli_installer`, shared by every CLI (`macss`, `docmd`, `cx`). | User, Q10 |
+| D20 | `upgrade` and `uninstall` come from a new ecosystem package, `modular_cli_installer`, shared by every CLI (`macss`, `docmd`, `cx`). Replaced on 2026-09-24 by D33: there is no such package. | User, Q10 |
+| D21 | Evaluation is its own module: `cx eval rpn <program>` and `cx eval infix <expression>`, with `--file` or `--stdin` as the other sources. The shortcut `cx <program>` is RPN only, takes one argument and no options. The global module holds only maintenance (`version`, `upgrade`, `uninstall`, `doctor`, `help`); `help`, `--help` and `-h` are provided by the SDK. Revised 2026-09-24; replaces `eval` in the global module with `--infix`. | User, 2026-09-24 |
+| D22 | The design is specified in `docs/spec/calculatrix_cli.md`: modules, grammar rules G1 to G12, route catalog, encyclopedia, declarative model, the upstream releases it needs and the closed decisions R1 to R17 of its section 14. That file supersedes the catalog below. | User, 2026-09-24 |
+| D23 | The CLI never guesses: an ambiguous invocation is rejected, never reinterpreted. No fallbacks, no undeclared defaults. | User, 2026-09-23 |
+| D24 | The shortcut and the grammar rest on `cli_router` 0.2.0 (trie resolution, typed lossless option schema, `onReject`) and `modular_cli_sdk` 0.6.0 (contracts with typed positionals and constraints, `shortcut`, help after resolution). Both are breaking releases with migration notes for the seven known consumers. | User, 2026-09-24 |
+| D25 | `power` computes `B^Y = exp(Y · log B)` on matrices, with the exponent a matrix too (`e πi ^` gives -1). The cases and their errors are the table in "Semantics of `power`" below. `X exp` equals `e X ^`, and `exp` stays. Closes Q5. | User, 2026-09-24 (R13) |
+| D26 | `upgrade` and `uninstall` are SDK commands: `--plan` shows the steps, `--apply` performs them, neither is a default, and there is no interactive prompt. They come from `InstallationPlugin` (D33); `cx` registers it with its repository, tag prefix, executable, alias and asset names. There is no `cx install`: the release script installs. | User, 2026-09-24 (R1, R11) |
+| D27 | The grammar is strict and POSIX: route, then options, then operands; flags are presence only (no `=value`, no negation); short options stand alone (no clusters, no attached values); stdin is read only with `--stdin`; the shortcut takes no options, not even globals; an empty program is error 7. Every rejected form can become valid later without breaking anyone. Spec rules G1 to G12. | User, 2026-09-24 (R2 to R7) |
+| D28 | Exit codes: `0` ok, `64` usage, `7` validation, `65` domain error (`ExitCode.dataError`, new in the SDK), `78` installation error found by `doctor` (`ExitCode.configError`, new in the SDK). `-q/--quiet` stays a global of the SDK and suppresses only progress messages. | User, 2026-09-24 (R9, R10) |
+| D29 | `append-cols` and `append-rows` have no aliases. Each registry entry has a list of search terms (`hcat`, `vcat`, `concatenate`), used by `cx commands search` and by the "did you mean" of `unknown-word`. | User, 2026-09-24 (R12) |
+| D30 | JSON of `eval` is `{"stack": [...]}`, level 1 last; a 1x1 matrix is a number, any other matrix an array of rows. Errors are `{"error": {"id", "message", "token", "position"}}`, with `position` 1-based. | User, 2026-09-24 (R16) |
+| D31 | `cx doctor` checks the binary on `PATH`, the alias `cx` and the newest `cli-v*` release. States ok, warning, error; a newer release and a failed lookup are warnings, printed, never skipped; exit 78 when any check is an error. The checks are contributions to the extension point `doctor.checks` (D33), and `macss` and `docmd` adopt them. | User, 2026-09-24 (R17) |
+| D32 | Not in this stage: `--trace` and `--show-rpn` (recorded in `docs/roadmap.md`, Stage 9). `CliRequest.flags` is removed in `cli_router` 0.2.0, with no deprecation period. | User, 2026-09-24 (R14, R15) |
+| D33 | `modular_cli_sdk` gets a plugin system modeled on `modular_api` (`CliPlugin` with a manifest and `setup(host)`; the host registers routes and extension points, nothing else for now). `version`, `doctor`, `upgrade` and `uninstall` are standard plugins inside the SDK (`VersionPlugin`, `DoctorPlugin`, `InstallationPlugin`), like health and openapi in `modular_api`. Every plugin is registered explicitly with `cli.plugin(...)`. `DoctorPlugin` declares `doctor.checks`; `InstallationPlugin` requires it and contributes its checks. No `modular_cli_installer` package, no install plugin. Spec section 8.7. | User, 2026-09-24 (R18) |
 
 ## Command catalog (proposal)
+
+Superseded by `docs/spec/calculatrix_cli.md` (D21, D22). Kept as the record of
+the first proposal.
 
 ### Global module
 
@@ -101,15 +124,51 @@ anyone; it is still recorded in `CHANGELOG.md`.
 | Calculatrix | HP 50g | Stack effect |
 |---|---|---|
 | `vector` | `→ARRY` (vector form) | `x1 ... xn n` gives the n x 1 column `[[x1] ... [xn]]` |
-| `join-cols` | none (closest: `COL+`) | `A B` gives `[A B]`; A and B need the same number of rows |
-| `join-rows` | none (closest: `ROW+`) | `A B` gives A over B; A and B need the same number of columns |
+| `append-cols` | none (closest: `COL+`) | `A B` gives `[A B]`; A and B need the same number of rows |
+| `append-rows` | none (closest: `ROW+`) | `A B` gives A over B; A and B need the same number of columns |
 | `rows` | `ROW→` | `[[...]]` gives `[row1] ... [rown] n` |
-| `power`, aliases `pwr`, `^` | `^` | `x y` gives `x^y` |
-| `exp` | `EXP` | `x` gives e^x |
+| `power`, aliases `pwr`, `^` | `^` | `B Y` gives `B^Y` (D25) |
+| `exp` | `EXP` | `X` gives e^X |
 
 Matching is case-insensitive. ASCII spellings of the HP names (`->ARRY`,
 `ROW->`) are accepted as aliases for users coming from the HP. A row vector is
-`1 2 2 vector transpose`, or the literal `[[1 2]]`.
+`1 2 2 vector transpose`, or the literal `[[1 2]]`. Search terms (D29) are
+not aliases: `hcat` finds `append-cols` in `cx commands search`, but it is not
+a word of the language.
+
+## Semantics of `power` (D25)
+
+Everything is a matrix (D11), so `power` is defined on matrices:
+`B^Y = exp(Y · log B)`, where `log` is the principal matrix logarithm
+(`Matrix.log()`) and `exp` the matrix exponential (`Matrix.exp()`). In the
+table, "scalar" means a 1x1 matrix, and "complex" means a 2x2 matrix of the
+form `[[a -b] [b a]]`, which is `a+bi` with `i = [[0 -1] [1 0]]` (roadmap
+Stage 6). Complex matrices commute with each other, so the order of the
+product `Y · log B` does not matter for them.
+
+| # | Base B | Exponent Y | Result | Example |
+|---|---|---|---|---|
+| 1 | scalar | scalar | real power. B < 0 with a non-integer Y gives the complex principal value, consistent with the square root of a negative number | `-4 0.5 ^` gives `[[0 -2] [2 0]]` |
+| 2 | scalar > 0 | square matrix | `exp(ln B · Y)` | `e πi ^` gives `[[-1 0] [0 -1]]` |
+| 3 | complex, or scalar < 0 | complex | `exp(Y · log B)` | `i i ^` gives `[[0.2079 0] [0 0.2079]]`, which is e^(-π/2) |
+| 4 | square | integer scalar | repeated multiplication; a negative integer uses the inverse; a singular B with a negative integer is `singular-matrix` | `[[1 1] [0 1]] 3 ^` gives `[[1 3] [0 1]]` |
+| 5 | square | non-integer scalar | `exp(y · log B)` | `[[2 0] [0 3]] 0.5 ^` gives `[[1.414 0] [0 1.732]]` |
+| 6 | square, not complex and not scalar | square, not scalar | `ambiguous-power`: `exp(Y log B)` and `exp(log B · Y)` differ when Y and log B do not commute. Case 3 is the exception | `[[1 1] [0 1]] [[0 1] [1 0]] ^`: `log B` is `[[0 1] [0 0]]`, and the two orders give `[[1 0] [0 2.7183]]` and `[[2.7183 0] [0 1]]` |
+| 7 | 0 | scalar | Y > 0 gives 0; `0 0 ^` gives 1; Y < 0 is `non-finite` | `0 -1 ^` |
+| 8 | 0, or a singular matrix, where the case needs `log B` | | `log-undefined` | `0 πi ^` |
+| 9 | not square | any | `dimension-mismatch` | `[[1 2]] 2 ^` |
+| 10 | scalar | not square | `dimension-mismatch` | `2 [[1 2]] ^` |
+| 11 | n x n | m x m, n ≠ m, neither scalar | `dimension-mismatch` | `[[1 0] [0 1]] [[1 0 0] [0 1 0] [0 0 1]] ^` |
+| 12 | scalar < 0 | square, not complex, not scalar | `ambiguous-power`: `log B` is complex (2x2) and does not match Y | `-2 [[1 0] [0 2]] ^`: `log -2` is `[[0.6931 -3.1416] [3.1416 0.6931]]`, which does not commute with Y |
+| 13 | any | any, when the result overflows | `non-finite` | `10 400 ^` (10^400 exceeds the largest double) |
+
+All errors exit with `65`. `ambiguous-power` and `log-undefined` are new ids;
+there is no `not-real` error, because the result of case 1 with a negative
+base is a complex matrix. `X exp` gives the same value as `e X ^`. The step
+S4 turns every row of this table into a core test, which also measures the
+precision of `Matrix.log()` on non-diagonal matrices (spec section 11,
+risk 5). The examples were checked on 2026-09-24 with Julia's `exp` and
+`log` of `LinearAlgebra`, rounded to 4 decimals.
 
 ## Open questions
 
@@ -129,17 +188,21 @@ Matching is case-insensitive. ASCII spellings of the HP names (`->ARRY`,
   1: [[0 -1] [1 0]]
   ```
 
-  `--json` (global option from the SDK) prints the stack as a JSON array.
+  `--json` (global option from the SDK) prints the stack as JSON. Amended
+  2026-09-24: the shape is `{"stack": [...]}` (D30).
 - [x] **Q4. Display format everywhere.** D6 makes spaces the input separator.
   Should `MatrixDisplayFormatter.compact` also print `[[0 -1] [1 0]]` instead of
   `[[0, -1], [1, 0]]`? That changes the app and the CLI tests.
-- [ ] **Q5. Scope of the power command.** Proposal: real to real power, and a square matrix
+- [x] **Q5. Scope of the power command.** Proposal: real to real power, and a square matrix
   to an integer power. To verify in the AUR: negative base with a non-integer
   exponent (complex result on the HP), and what the HP does with a matrix
-  power.
+  power. Answer: D25. The scope is wider than the proposal: the exponent can
+  be a matrix too, and a negative base gives a complex matrix, not an error.
 - [x] **Q6. Are `upgrade` and `uninstall` queries too?** D3 says every route is
   a query. In `macss` these two are commands, because they change the system.
-  Proposal: follow D3, and have `uninstall` ask for confirmation.
+  Proposal: follow D3, and have `uninstall` ask for confirmation. Answer
+  amended 2026-09-24: they are commands with `--plan` and `--apply`, and
+  `--apply` is the confirmation, with no interactive prompt (D26).
 - [x] **Q7. Release tags.** See "Publishing" below. Answer: D19.
 - [x] **Q8. What does `matrix` take, now that a vector is a column?** On the
   HP, `→ROW` takes row vectors. With column vectors, the natural reading is
@@ -157,6 +220,7 @@ Matching is case-insensitive. ASCII spellings of the HP names (`->ARRY`,
   per platform, the install folder, and the alias shim. Proposal:
   `modular_cli_release`. Answer: D20, `modular_cli_installer`, since it
   installs, upgrades, and uninstalls, and it does not publish releases.
+  Replaced on 2026-09-24: standard plugins inside the SDK (D33).
 
 ## Publishing (dogfood)
 
@@ -192,7 +256,10 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
 - [ ] Guard the two app workflows with the tag filter.
 - [ ] `scripts/install.ps1` / `install.sh`: download the newest `cli-v*`
       release, install it, create `cx`, add it to `PATH`.
-- [ ] `cx upgrade` and `cx uninstall`, from `modular_cli_installer` (D20).
+- [ ] `cx upgrade` and `cx uninstall` from `InstallationPlugin` (D26, D33),
+      as commands with `--plan` and `--apply`.
+- [ ] `cx version` and `cx doctor` from `VersionPlugin` and `DoctorPlugin`,
+      with the checks of `InstallationPlugin` (D31, D33).
 - [ ] Check that `cx` does not collide with an existing command on the
       machine (`Get-Command cx`).
 
@@ -202,11 +269,12 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
 |---|---|---|---|
 | S0 | calculatrix | Pending from before: the ENTER/delete fix and the Phase 0 docs. | Nothing |
 | S1 | cli_router | Issue #4, PR #5: negative numbers and expressions are positionals. Release 0.1.1. | Nothing |
-| S2 | calculatrix | CLI on `modular_cli_sdk`: banner, `version`, `rpn eval`, `infix eval`, `dev-install.ps1`. | S1 released |
-| S3a | modular_cli_installer | New ecosystem package with `upgrade` and `uninstall` (D20). | Nothing |
-| S3 | calculatrix | Publishing: release workflow, app workflow guards, installers, ADR 0002 amendment, `upgrade` and `uninstall` from S3a. | S2, S3a |
-| S4 | calculatrix | Core: command line parser and command registry with aliases, `power`, `vector`, `join-rows`, `join-cols`, `rows`, space-separated matrix literals in RPN and infix. `rpn eval` and `rpn commands` use it. | S2 |
-| S5 | calculatrix | App: ENTER runs the command line, column 5 becomes delete, EVAL, ENTER, SPACE; `power` on the MATH page; `vector`, `join-rows` and `join-cols` keys on the MATRIX page. | S4 |
+| S1b | cli_router, modular_cli_sdk | Releases 0.2.0 and 0.6.0 (D24), then migration of the consumers. | S1 released |
+| S2 | calculatrix | CLI on `modular_cli_sdk` 0.6.0: banner, `eval rpn`, `eval infix`, the shortcut, the grammar of spec section 4 with a test per row of spec section 13, `dev-install.ps1`. | S1b |
+| S3a | modular_cli_sdk | Plugin system and standard plugins (D33): `VersionPlugin`, `DoctorPlugin` with `doctor.checks` and exit 78, `InstallationPlugin` with `upgrade` and `uninstall` as commands (D26) and the release lookup by tag prefix (D31). `macss` and `docmd` replace their own routes with them. Can ship inside 0.6.0 or as 0.6.x. | S1b |
+| S3 | calculatrix | Publishing: release workflow, app workflow guards, installers, ADR 0002 amendment, the standard plugins from S3a. | S2, S3a |
+| S4 | calculatrix | Core: command line parser and command registry with aliases and search terms (D29), `power` on matrices with a test per row of the D25 table, the domain error ids of spec section 6, `vector`, `append-rows`, `append-cols`, `rows`, space-separated matrix literals in RPN and infix, the core fixes of spec section 10. `eval rpn` and `commands` use it. | S2 |
+| S5 | calculatrix | App: ENTER runs the command line, column 5 becomes delete, EVAL, ENTER, SPACE; `power` on the MATH page; `vector`, `append-rows` and `append-cols` keys on the MATRIX page. | S4 |
 
 S3 and S4 can run in parallel after S2.
 
@@ -218,6 +286,9 @@ S3 and S4 can run in parallel after S2.
 | 2026-09-23 | D10 to D15, from the answers to Q1 to Q6. |
 | 2026-09-23 | D16 to D18, from the answers to Q8 and Q9. |
 | 2026-09-23 | D19 and D20, from the answers to Q7 and Q10. |
+| 2026-09-24 | D21 to D24, the design of `docs/spec/calculatrix_cli.md`. |
+| 2026-09-24 | D25 to D32, from the review of the spec, decision by decision (spec section 14, R1 to R17). D3 and D15 corrected, Q5 closed, Q3 and Q6 amended. No open question remains. |
+| 2026-09-24 | D33, standard plugins in the SDK (spec R18). Replaces D20 and the package `modular_cli_installer`. Power table examples checked in Julia. |
 
 ## Progress log
 
