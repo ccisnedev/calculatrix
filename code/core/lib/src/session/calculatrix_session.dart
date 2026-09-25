@@ -730,6 +730,8 @@ class CalculatrixSession {
         return const MultiplyCommand();
       case RpnBinaryOperator.divide:
         return const DivideCommand();
+      case RpnBinaryOperator.power:
+        return const PowerCommand();
     }
   }
 

@@ -1,7 +1,7 @@
 import '../errors/errors.dart';
 import '../matrix/matrix.dart';
 
-enum RpnBinaryOperator { add, subtract, multiply, divide }
+enum RpnBinaryOperator { add, subtract, multiply, divide, power }
 
 enum RpnUnaryOperator { sqrt, percent }
 
@@ -148,6 +148,8 @@ class RpnEngine {
         result = left * right;
       case RpnBinaryOperator.divide:
         result = _divide(left, right);
+      case RpnBinaryOperator.power:
+        result = left.power(right);
     }
 
     _stack.add(result);

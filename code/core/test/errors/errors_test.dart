@@ -121,13 +121,16 @@ void main() {
           },
           CalculatrixErrorId.syntaxError: () =>
               Calculatrix.evaluateInfix('1 2 +'),
-          // Not diagonal (bypasses sqrt's exact-diagonal fast path) and
-          // not symmetric (bypasses its eigendecomposition fast path), so
-          // this reaches the general Newton loop, which with a zero
-          // iteration budget never gets a chance to converge.
+          // Not diagonal or triangular (bypasses sqrt's exact-diagonal and
+          // Bjorck-Hammarling fast paths) and defective — a repeated
+          // eigenvalue (2, 2) with only a 1-dimensional eigenspace, so
+          // [diagonalization] cannot produce an invertible eigenvector
+          // matrix and [_tryRealEigenSqrt] falls through — so this reaches
+          // the general Newton loop, which with a zero iteration budget
+          // never gets a chance to converge.
           CalculatrixErrorId.noConvergence: () => Matrix(<List<double>>[
-            <double>[2, 1],
-            <double>[0, 2],
+            <double>[3, 1],
+            <double>[-1, 1],
           ]).sqrt(maxIterations: 0),
         };
 
