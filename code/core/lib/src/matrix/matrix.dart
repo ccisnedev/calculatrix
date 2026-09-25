@@ -615,6 +615,127 @@ class Matrix {
     );
   }
 
+  /// Collects only the strictly real eigenvalues of this matrix, using the
+  /// same Hessenberg reduction plus shifted QR real-Schur pipeline as
+  /// [eigenvalues]. Unlike the public API, this never throws just because
+  /// the spectrum also contains a genuine complex-conjugate pair: such a
+  /// pair simply contributes no entries to the returned list.
+  ///
+  /// This is what [log] and [power] use to test the actual domain rule for
+  /// the principal logarithm, "some real eigenvalue is non-positive", which
+  /// must not be tripped up by an unrelated complex-conjugate pair sitting
+  /// elsewhere in the spectrum: a real matrix with no eigenvalue on the
+  /// closed negative real axis has a unique real principal logarithm even
+  /// when some of its other eigenvalues are complex.
+  List<double> _realEigenvaluesIgnoringComplexPairs({
+    required double absoluteTolerance,
+    int maxIterations = 200,
+  }) {
+    if (isScalar) {
+      return <double>[scalarValue];
+    }
+
+    if (rowCount == 2) {
+      final double a = _rows[0][0];
+      final double b = _rows[0][1];
+      final double c = _rows[1][0];
+      final double d = _rows[1][1];
+      final List<double> realEigenvaluesList = <double>[];
+      _solve2x2BlockIgnoringComplexPairs(
+        a,
+        b,
+        c,
+        d,
+        realEigenvaluesList,
+        absoluteTolerance,
+      );
+      return realEigenvaluesList;
+    }
+
+    final int n = rowCount;
+    final List<List<double>> h = _toHessenberg(absoluteTolerance);
+
+    int size = n;
+    final List<double> realEigenvaluesList = <double>[];
+
+    while (size > 2) {
+      int iterations = 0;
+      while (iterations < maxIterations) {
+        if (h[size - 1][size - 2].abs() <= absoluteTolerance) {
+          realEigenvaluesList.add(h[size - 1][size - 1]);
+          size--;
+          break;
+        }
+
+        if (size >= 3 && h[size - 2][size - 3].abs() <= absoluteTolerance) {
+          final double a = h[size - 2][size - 2];
+          final double b = h[size - 2][size - 1];
+          final double c = h[size - 1][size - 2];
+          final double d = h[size - 1][size - 1];
+          _solve2x2BlockIgnoringComplexPairs(
+            a,
+            b,
+            c,
+            d,
+            realEigenvaluesList,
+            absoluteTolerance,
+          );
+          size -= 2;
+          break;
+        }
+
+        final double a = h[size - 2][size - 2];
+        final double b = h[size - 2][size - 1];
+        final double c = h[size - 1][size - 2];
+        final double d = h[size - 1][size - 1];
+        final double shift = _wilkinsonShift(a, b, c, d);
+
+        for (int i = 0; i < size; i++) {
+          h[i][i] -= shift;
+        }
+
+        _qrStepGivens(h, size, absoluteTolerance);
+
+        for (int i = 0; i < size; i++) {
+          h[i][i] += shift;
+        }
+
+        iterations++;
+      }
+
+      if (iterations == maxIterations) {
+        throw MatrixDomainError(
+          'Eigenvalues did not converge for this matrix.',
+        );
+      }
+    }
+
+    if (size == 2) {
+      final double a = h[0][0];
+      final double b = h[0][1];
+      final double c = h[1][0];
+      final double d = h[1][1];
+      _solve2x2BlockIgnoringComplexPairs(
+        a,
+        b,
+        c,
+        d,
+        realEigenvaluesList,
+        absoluteTolerance,
+      );
+    } else if (size == 1) {
+      realEigenvaluesList.add(h[0][0]);
+    }
+
+    for (int i = 0; i < realEigenvaluesList.length; i++) {
+      if (realEigenvaluesList[i].abs() <= absoluteTolerance) {
+        realEigenvaluesList[i] = 0;
+      }
+    }
+
+    return realEigenvaluesList;
+  }
+
   Diagonalization diagonalization({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -1159,6 +1280,37 @@ class Matrix {
     eigenvaluesList.add((trace - sqrtD) / 2);
   }
 
+  /// Solves the eigenvalues of a 2x2 block and adds them to the list, only
+  /// when they are real. A block with a negative discriminant is a genuine
+  /// complex-conjugate pair and simply contributes nothing to the list,
+  /// rather than throwing: used where a complex pair elsewhere in the
+  /// spectrum must not by itself disqualify the real eigenvalues found in
+  /// other blocks (see [_realEigenvaluesIgnoringComplexPairs]).
+  static void _solve2x2BlockIgnoringComplexPairs(
+    double a,
+    double b,
+    double c,
+    double d,
+    List<double> realEigenvaluesList,
+    double absoluteTolerance,
+  ) {
+    final double trace = a + d;
+    final double det = (a * d) - (b * c);
+    double discriminant = (trace * trace) - (4 * det);
+
+    if (discriminant.abs() <= absoluteTolerance) {
+      discriminant = 0;
+    }
+
+    if (discriminant < 0) {
+      return;
+    }
+
+    final double sqrtD = math.sqrt(discriminant);
+    realEigenvaluesList.add((trace + sqrtD) / 2);
+    realEigenvaluesList.add((trace - sqrtD) / 2);
+  }
+
   /// Computes the Wilkinson shift from a trailing 2x2 block.
   static double _wilkinsonShift(
     double a,
@@ -1567,24 +1719,19 @@ class Matrix {
     }
 
     // Outside the scalar and complex-form (aI + bJ) subalgebras, the only
-    // representable results are real matrices, so the principal log is only
-    // defined when every eigenvalue is real and strictly positive. This
+    // representable results are real matrices. The principal log exists as
+    // long as no eigenvalue sits on the closed negative real axis, which for
+    // a real matrix means: no real eigenvalue is non-positive. A genuine
+    // complex-conjugate pair elsewhere in the spectrum never sits on the
+    // real axis, so it does not by itself make the log undefined; this
     // deliberately does not attempt a general complex-eigenvalue extension
-    // (per the owner's decision: "the only complex representation is
-    // a*I + b*J; do not add complex entries").
-    final Matrix eigenvalueColumn;
-    try {
-      eigenvalueColumn = eigenvalues(absoluteTolerance: absoluteTolerance);
-    } on MatrixDomainError {
-      throw MatrixDomainError(
-        'Logarithm is undefined: this matrix has complex eigenvalues and is '
-        'not in complex form (aI + bJ).',
-        errorId: CalculatrixErrorId.logUndefined,
-      );
-    }
+    // of the result (per the owner's decision: "the only complex
+    // representation is a*I + b*J; do not add complex entries").
+    final List<double> realEigenvalues = _realEigenvaluesIgnoringComplexPairs(
+      absoluteTolerance: absoluteTolerance,
+    );
 
-    for (int index = 0; index < rowCount; index++) {
-      final double eigenvalue = eigenvalueColumn.at(index, 0);
+    for (final double eigenvalue in realEigenvalues) {
       if (eigenvalue <= absoluteTolerance) {
         throw MatrixDomainError(
           'Logarithm is undefined for matrices with non-positive real '
