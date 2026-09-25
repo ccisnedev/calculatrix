@@ -68,6 +68,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D30 | JSON of `eval` is `{"stack": [...]}`, level 1 last; a 1x1 matrix is a number, any other matrix an array of rows. Errors are `{"error": {"id", "message", "token", "position"}}`, with `position` 1-based. | User, 2026-09-24 (R16) |
 | D31 | `cx doctor` checks the binary on `PATH`, the alias `cx` and the newest `cli-v*` release. States ok, warning, error; a newer release and a failed lookup are warnings, printed, never skipped; exit 78 when any check is an error. The checks are contributions to the extension point `doctor.checks` (D33), and `macss` and `docmd` adopt them. | User, 2026-09-24 (R17) |
 | D32 | Not in this stage: `--trace` and `--show-rpn` (recorded in `docs/roadmap.md`, Stage 9). `CliRequest.flags` is removed in `cli_router` 0.2.0, with no deprecation period. | User, 2026-09-24 (R14, R15) |
+| D34 | From the Codex review of the design: (1) `power` follows the order of checks of the D25 table, by kinds, never by a numerical commutation test; (2) a matrix base with no real logarithm is `log-undefined` in this stage, and its representation is deferred; (3) `-h`/`--help` wins over `incomplete`, `missingArgument`, `missingRequiredOption` and the contract constraints, and loses to `unknownCommand`, `extraArgument` and the option errors (spec 8.6); (4) a failed step of `upgrade --apply` or `uninstall --apply`, or a failed release lookup, exits `1` (`ExitCode.genericError`) with the id `release-lookup-failed`, `download-failed` or `file-access-denied`; the run stops at that step, reports the steps done, and neither rolls back nor retries (spec section 6). | User, 2026-09-24 |
 | D33 | `modular_cli_sdk` gets a plugin system modeled on `modular_api` (`CliPlugin` with a manifest and `setup(host)`; the host registers routes and extension points, nothing else for now). `version`, `doctor`, `upgrade` and `uninstall` are standard plugins inside the SDK (`VersionPlugin`, `DoctorPlugin`, `InstallationPlugin`), like health and openapi in `modular_api`. Every plugin is registered explicitly with `cli.plugin(...)`. `DoctorPlugin` declares `doctor.checks`; `InstallationPlugin` requires it and contributes its checks. No `modular_cli_installer` package, no install plugin. Spec section 8.7. | User, 2026-09-24 (R18) |
 
 ## Command catalog (proposal)
@@ -152,15 +153,34 @@ product `Y · log B` does not matter for them.
 | 2 | scalar > 0 | square matrix | `exp(ln B · Y)` | `e πi ^` gives `[[-1 0] [0 -1]]` |
 | 3 | complex, or scalar < 0 | complex | `exp(Y · log B)` | `i i ^` gives `[[0.2079 0] [0 0.2079]]`, which is e^(-π/2) |
 | 4 | square | integer scalar | repeated multiplication; a negative integer uses the inverse; a singular B with a negative integer is `singular-matrix` | `[[1 1] [0 1]] 3 ^` gives `[[1 3] [0 1]]` |
-| 5 | square | non-integer scalar | `exp(y · log B)` | `[[2 0] [0 3]] 0.5 ^` gives `[[1.4142 0] [0 1.7321]]`; `[[1 1] [0 1]] 0.5 ^` gives `[[1 0.5] [0 1]]`, with a base that is not diagonalizable |
-| 6 | square, not complex and not scalar | square, not scalar | `ambiguous-power`: `exp(Y log B)` and `exp(log B · Y)` differ when Y and log B do not commute. Case 3 is the exception | `[[1 1] [0 1]] [[0 1] [1 0]] ^`: `log B` is `[[0 1] [0 0]]`, and the two orders give `[[1 0] [0 2.7183]]` and `[[2.7183 0] [0 1]]` |
+| 5 | square | non-integer scalar | `exp(y · log B)`. A base that is not a scalar and not complex, with a real eigenvalue ≤ 0, is `log-undefined` (deferred, see below) | `[[2 0] [0 3]] 0.5 ^` gives `[[1.4142 0] [0 1.7321]]`; `[[1 1] [0 1]] 0.5 ^` gives `[[1 0.5] [0 1]]`, with a base that is not diagonalizable |
+| 6 | any other pair with Y not a scalar (order of checks, below) | square, not scalar | `ambiguous-power`: `exp(Y log B)` and `exp(log B · Y)` differ when Y and log B do not commute. Case 3 is the exception | `[[1 1] [0 1]] [[0 1] [1 0]] ^`: `log B` is `[[0 1] [0 0]]`, and the two orders give `[[1 0] [0 2.7183]]` and `[[2.7183 0] [0 1]]` |
 | 7 | 0 | scalar | Y > 0 gives 0; `0 0 ^` gives 1; Y < 0 is `non-finite` | `0 -1 ^` |
 | 8 | 0, or a singular matrix, where the case needs `log B` | | `log-undefined` | `0 πi ^` |
 | 9 | not square | any | `dimension-mismatch` | `[[1 2]] 2 ^` |
-| 10 | scalar | not square | `dimension-mismatch` | `2 [[1 2]] ^` |
+| 10 | any | not square | `dimension-mismatch` | `2 [[1 2]] ^`, `[[1 0] [0 1]] [[1 2]] ^` |
 | 11 | n x n | m x m, n ≠ m, neither scalar | `dimension-mismatch` | `[[1 0] [0 1]] [[1 0 0] [0 1 0] [0 0 1]] ^` |
 | 12 | scalar < 0 | square, not complex, not scalar | `ambiguous-power`: `log B` is complex (2x2) and does not match Y | `-2 [[1 0] [0 2]] ^`: `log -2` is `[[0.6931 -3.1416] [3.1416 0.6931]]`, which does not commute with Y |
 | 13 | any | any, when the result overflows | `non-finite` | `10 400 ^` (10^400 exceeds the largest double) |
+
+**Order of the checks.** The first rule that applies decides; the kinds of
+B and Y decide, never a numerical test of whether they commute:
+
+1. Dimensions: B is square (case 9), Y is square (case 10), and when neither
+   is a scalar both have the same size (case 11). Otherwise
+   `dimension-mismatch`.
+2. Y is a scalar: cases 1, 4, 5, 7, 8 and 13.
+3. Y is not a scalar: B is 0 is `log-undefined` (case 8); B scalar > 0 is
+   case 2; B complex or scalar < 0 with Y complex is case 3. Every other pair
+   is `ambiguous-power` (cases 6 and 12): `i [[1 0] [0 2]] ^` is
+   `ambiguous-power`.
+
+**Deferred: a matrix with no real logarithm.** `[[-1 0] [0 2]] 0.5 ^` has no
+real result: the base has a negative eigenvalue and is not of the complex
+form. In this stage it is `log-undefined`. A complex number is only
+`a·I + b·J`, with `J = [[0 -1] [1 0]]`; how to represent a matrix whose
+entries would be complex is to be studied (roadmap, Stage 9). Turning the
+error into a value later breaks no one.
 
 All errors exit with `65`. `ambiguous-power` and `log-undefined` are new ids;
 there is no `not-real` error, because the result of case 1 with a negative
@@ -289,6 +309,7 @@ S3 and S4 can run in parallel after S2.
 | 2026-09-24 | D21 to D24, the design of `docs/spec/calculatrix_cli.md`. |
 | 2026-09-24 | D25 to D32, from the review of the spec, decision by decision (spec section 14, R1 to R17). D3 and D15 corrected, Q5 closed, Q3 and Q6 amended. No open question remains. |
 | 2026-09-24 | D33, standard plugins in the SDK (spec R18). Replaces D20 and the package `modular_cli_installer`. Power table examples checked in Julia. |
+| 2026-09-24 | D34, from the Codex review of PR #6 (spec R19 to R21). |
 
 ## Progress log
 

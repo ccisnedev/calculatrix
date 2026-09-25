@@ -264,15 +264,21 @@ $ cx '5 [[0 -1] [1 0]]'
 - Numbers are JSON numbers. `Infinity` and `NaN` never appear: a non-finite
   value is the error `non-finite`.
 
-**Exit codes.** Five values, never mixed:
+**Exit codes.** Six values, never mixed:
 
 | Code | Name in the SDK | Meaning | Examples |
 |---|---|---|---|
 | `0` | `ExitCode.ok` | success | |
+| `1` | `ExitCode.genericError` | a step of `upgrade --apply` or `uninstall --apply` failed, or the release lookup of `upgrade` failed | no network, access denied |
 | `64` | `ExitCode.invalidUsage` | the invocation does not name a route (`EX_USAGE`) | unknown command, incomplete route, missing or extra operand |
 | `7` | `ExitCode.validationFailed` | the route is right, an option or a value is wrong (SDK convention) | unknown or misplaced option, missing value, repeated option, two program sources, empty program, file not found, `upgrade` without `--plan` or `--apply` |
 | `65` | `ExitCode.dataError` (new) | the program ran and failed (`EX_DATAERR`) | unknown RPN word, stack underflow, dimension mismatch, infix syntax error |
 | `78` | `ExitCode.configError` (new) | `doctor` found an error in the installation (`EX_CONFIG`) | alias `cx` points to another binary |
+
+A failed step carries one of the ids `release-lookup-failed`,
+`download-failed`, `file-access-denied`. The run stops at that step and
+reports the steps already done; it neither rolls back nor retries (runbook
+D34).
 
 `64`, `65` and `78` come from `sysexits.h` (BSD). It is a convention, not a
 POSIX standard; it is used because the SDK already emits `64`. `7` is the
@@ -596,7 +602,19 @@ Help is provided by the SDK: `--help`, `-h` and the route `cx help [<topic>]`.
 today the SDK rewrites argv before routing and does not honor `--`, so
 `cx eval rpn -- --help` shows help instead of evaluating the program `--help`.
 In 0.6.0 the SDK decides help after the router resolves the invocation, and
-`--` is honored. Help is part of the SDK core, not a plugin: it depends on the
+`--` is honored.
+
+**Precedence of help.** When `-h` or `--help` is among the options read
+before `--`, help wins over the rejections `incomplete`, `missingArgument`
+and `missingRequiredOption`, and over the contract constraints
+(`ExactlyOne`): `cx eval --help` shows the help of the `eval` module and
+`cx eval rpn --help` the help of the route, both with exit 0. Help loses to
+`unknownCommand`, `extraArgument` and every option error of 8.2, because
+then the invocation is malformed: `cx eval rpn --bogus --help` is
+`unknownOption`, 7. The router makes this possible because a rejection
+carries the literals consumed and the options parsed so far (8.5).
+
+Help is part of the SDK core, not a plugin: it depends on the
 parser (`-h`, `--`), and every CLI has it.
 
 ### 8.7 Plugins
@@ -865,6 +883,10 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx upgrade` | 7, needs `--plan` or `--apply` |
 | `cx upgrade --plan` | the steps, nothing changes, 0 |
 | `cx uninstall --apply` | removes the CLI, 0 |
+| `cx upgrade --apply`, no network | `release-lookup-failed`, 1; nothing changed |
+| `cx eval rpn --help` | help of the route, 0 (8.6) |
+| `cx commands show --help` | help of the route, 0 (8.6) |
+| `cx eval rpn --bogus --help` | `unknownOption`, 7 (8.6) |
 | `cx doctor`, all checks ok | 0 |
 | `cx doctor`, newer release or no network | warning printed, 0 |
 | `cx doctor`, alias `cx` points elsewhere | error printed, 78 |
@@ -874,7 +896,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 ## 14. Decisions of the review of 2026-09-24
 
 Every question of the draft is closed. The user decided each one; the runbook
-records the ones that affect the whole stage (D25 to D33).
+records the ones that affect the whole stage (D25 to D34).
 
 | # | Topic | Decision |
 |---|---|---|
@@ -896,3 +918,6 @@ records the ones that affect the whole stage (D25 to D33).
 | R16 | JSON of `eval` | `{"stack": [...]}`, level 1 last, 1x1 as a number, other matrices as rows. |
 | R17 | `doctor` | Local checks plus the newer-release check; states ok, warning, error; a failed lookup is a warning, never skipped; exit 78 on any error. |
 | R18 | Standard routes | `version`, `doctor`, `upgrade` and `uninstall` come from standard plugins inside `modular_cli_sdk` (8.7), registered explicitly; `doctor` gathers checks through the extension point `doctor.checks`. There is no `modular_cli_installer` package. |
+| R19 | `power`, closing the table | Order of checks by kinds; `i [[1 0] [0 2]] ^` is `ambiguous-power`; a non-square exponent is `dimension-mismatch` with any base (runbook D34). |
+| R20 | Help precedence | Wins over an incomplete route, a missing argument or option, and the constraints; loses to malformed invocations (8.6). |
+| R21 | Failure of `--apply` | Exit `1` with a structured id; stop at the failed step, no rollback, no retry (section 6). |
