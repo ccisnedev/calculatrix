@@ -1262,6 +1262,61 @@ class Matrix {
     return h;
   }
 
+  /// Cancellation-resistant real-eigenvalue solver for a 2x2 block with
+  /// characteristic polynomial lambda^2 - trace*lambda + det = 0.
+  ///
+  /// Two numerical hazards are handled deliberately:
+  ///
+  /// - Classifying the discriminant as zero (a repeated real root) rather
+  ///   than negative (a complex-conjugate pair) by comparing it against a
+  ///   *fixed* absolute tolerance is wrong at any matrix scale other than
+  ///   the one the tolerance happened to be tuned for: a block with tiny
+  ///   entries (e.g. all O(1e-8)) has a discriminant that is itself tiny
+  ///   even when it is genuinely, unambiguously negative, so an absolute
+  ///   floor like 1e-12 clamps it to 0 and manufactures a spurious
+  ///   repeated real eigenvalue. Comparing the discriminant's magnitude to
+  ///   `eps * (trace^2 + |det|)` instead scales the zero test to the
+  ///   block's own magnitude.
+  /// - Computing both roots as `(trace +/- sqrt(disc)) / 2` subtracts two
+  ///   nearly-equal quantities whenever the block has one eigenvalue much
+  ///   larger than the other (sqrt(disc) is then close to |trace|), which
+  ///   erases the smaller root to rounding noise. The standard stable
+  ///   quadratic formula avoids this: pick the root `q` that adds
+  ///   same-signed terms (so it never cancels), then recover the other
+  ///   root as `det / q`, a plain division that carries no cancellation
+  ///   error of its own.
+  static ({bool isComplex, double lambda1, double lambda2})
+  _stableRealEigen2x2(double a, double b, double c, double d) {
+    final double trace = a + d;
+    final double det = (a * d) - (b * c);
+    final double discriminant = (trace * trace) - (4 * det);
+
+    const double eps =
+        CalculatrixNumericPolicy.eigenvalueRoundingNoiseTolerance;
+    final double scale = (trace * trace) + det.abs();
+    final bool isZeroDiscriminant =
+        scale == 0 ? discriminant == 0 : discriminant.abs() <= eps * scale;
+
+    if (!isZeroDiscriminant && discriminant < 0) {
+      return (isComplex: true, lambda1: 0, lambda2: 0);
+    }
+
+    if (isZeroDiscriminant) {
+      final double repeated = trace / 2;
+      return (isComplex: false, lambda1: repeated, lambda2: repeated);
+    }
+
+    final double sqrtD = math.sqrt(discriminant);
+    // Characteristic polynomial in standard form a*x^2 + b*x + c with
+    // a = 1, b = -trace, c = det.
+    final double bCoefficient = -trace;
+    final double signB = bCoefficient >= 0 ? 1.0 : -1.0;
+    final double q = -(bCoefficient + (signB * sqrtD)) / 2;
+    final double lambda1 = q;
+    final double lambda2 = q == 0 ? 0 : det / q;
+    return (isComplex: false, lambda1: lambda1, lambda2: lambda2);
+  }
+
   /// Solves the eigenvalues of a 2x2 block and adds them to the list.
   /// Throws MatrixDomainError if the eigenvalues are complex.
   static void _solve2x2Block(
@@ -1272,23 +1327,17 @@ class Matrix {
     List<double> eigenvaluesList,
     double absoluteTolerance,
   ) {
-    final double trace = a + d;
-    final double det = (a * d) - (b * c);
-    double discriminant = (trace * trace) - (4 * det);
+    final ({bool isComplex, double lambda1, double lambda2}) result =
+        _stableRealEigen2x2(a, b, c, d);
 
-    if (discriminant.abs() <= absoluteTolerance) {
-      discriminant = 0;
-    }
-
-    if (discriminant < 0) {
+    if (result.isComplex) {
       throw MatrixDomainError(
         'Eigenvalues are undefined in the real domain for this matrix.',
       );
     }
 
-    final double sqrtD = math.sqrt(discriminant);
-    eigenvaluesList.add((trace + sqrtD) / 2);
-    eigenvaluesList.add((trace - sqrtD) / 2);
+    eigenvaluesList.add(result.lambda1);
+    eigenvaluesList.add(result.lambda2);
   }
 
   /// Solves the eigenvalues of a 2x2 block and adds them to the list, only
@@ -1305,21 +1354,15 @@ class Matrix {
     List<double> realEigenvaluesList,
     double absoluteTolerance,
   ) {
-    final double trace = a + d;
-    final double det = (a * d) - (b * c);
-    double discriminant = (trace * trace) - (4 * det);
+    final ({bool isComplex, double lambda1, double lambda2}) result =
+        _stableRealEigen2x2(a, b, c, d);
 
-    if (discriminant.abs() <= absoluteTolerance) {
-      discriminant = 0;
-    }
-
-    if (discriminant < 0) {
+    if (result.isComplex) {
       return;
     }
 
-    final double sqrtD = math.sqrt(discriminant);
-    realEigenvaluesList.add((trace + sqrtD) / 2);
-    realEigenvaluesList.add((trace - sqrtD) / 2);
+    realEigenvaluesList.add(result.lambda1);
+    realEigenvaluesList.add(result.lambda2);
   }
 
   /// Computes the Wilkinson shift from a trailing 2x2 block.
@@ -1610,11 +1653,6 @@ class Matrix {
     }
 
     Matrix current = Matrix.identity(rowCount);
-    final double targetNorm = scaledTarget._infinityNorm();
-    final double threshold = math.max(
-      absoluteTolerance,
-      relativeTolerance * math.max(targetNorm, 1),
-    );
 
     for (int iteration = 0; iteration < maxIterations; iteration++) {
       final Matrix inverseCurrent;
@@ -1628,11 +1666,25 @@ class Matrix {
       }
 
       final Matrix next = (current + (inverseCurrent * scaledTarget)).scale(0.5);
-      final double stepNorm = (next - current)._infinityNorm();
-      final double residualNorm = ((next * next) - scaledTarget)._infinityNorm();
+      // Entrywise-relative, not a single matrix-wide norm: a matrix whose
+      // entries (or eigenvalues) span many orders of magnitude has this
+      // Newton iteration converge at very different absolute rates per
+      // entry, and a norm dominated by the largest entry would let it mask
+      // a much smaller entry that has not converged yet.
+      final double stepDeviation = _maxRelativeEntryDeviation(
+        next,
+        current,
+        absoluteTolerance,
+      );
+      final double residualDeviation = _maxRelativeEntryDeviation(
+        next * next,
+        scaledTarget,
+        absoluteTolerance,
+      );
 
       current = next;
-      if (stepNorm <= threshold && residualNorm <= threshold) {
+      if (stepDeviation <= relativeTolerance &&
+          residualDeviation <= relativeTolerance) {
         return _checkFiniteMatrix(
           current.scale(math.pow(2.0, scalingSteps).toDouble()),
         );
@@ -1640,8 +1692,12 @@ class Matrix {
     }
 
     final Matrix result = current.scale(math.pow(2.0, scalingSteps).toDouble());
-    final double residualNorm = ((result * result) - this)._infinityNorm();
-    if (residualNorm <= math.max(absoluteTolerance, relativeTolerance * norm)) {
+    final double residualDeviation = _maxRelativeEntryDeviation(
+      result * result,
+      this,
+      absoluteTolerance,
+    );
+    if (residualDeviation <= relativeTolerance) {
       return _checkFiniteMatrix(result);
     }
 
@@ -1771,8 +1827,16 @@ class Matrix {
       absoluteTolerance: absoluteTolerance,
     );
 
+    // Deliberately gated on eigenvalueRoundingNoiseTolerance, not on the
+    // caller-supplied absoluteTolerance (default 1e-12): that parameter is
+    // calibrated for Hessenberg/QR convergence residuals, and is far too
+    // coarse to decide "is this real eigenvalue non-positive" — a matrix
+    // with O(1) entries can have a genuinely positive eigenvalue as small
+    // as 1e-13, which must not be treated as rounding noise just because
+    // it is smaller than 1e-12.
     for (final double eigenvalue in realEigenvalues) {
-      if (eigenvalue <= absoluteTolerance) {
+      if (eigenvalue <=
+          CalculatrixNumericPolicy.eigenvalueRoundingNoiseTolerance) {
         throw MatrixDomainError(
           'Logarithm is undefined for matrices with non-positive real '
           'eigenvalues.',
@@ -2410,6 +2474,42 @@ class Matrix {
     }
 
     return maxRowSum;
+  }
+
+  /// Worst-case entrywise relative deviation between [a] and [b]:
+  /// `max over i,j of |a[i][j]-b[i][j]| / max(|a[i][j]|, |b[i][j]|,
+  /// absoluteFloor)`.
+  ///
+  /// A single infinity-norm-of-the-difference check (`(a-b)._infinityNorm()
+  /// <= threshold`) is dominated entirely by whichever entry has the
+  /// largest magnitude: for a matrix whose entries (or, transitively, whose
+  /// eigenvalues) span many orders of magnitude, that lets a
+  /// fast-converging large-magnitude entry mask a much smaller-magnitude
+  /// entry that has barely converged at all, because the small entry's
+  /// absolute contribution never dominates the norm. Comparing each entry
+  /// to its own scale (with [absoluteFloor] guarding the near-zero case)
+  /// requires every entry to converge on its own terms.
+  static double _maxRelativeEntryDeviation(
+    Matrix a,
+    Matrix b,
+    double absoluteFloor,
+  ) {
+    double worst = 0;
+    for (int r = 0; r < a.rowCount; r++) {
+      for (int c = 0; c < a.columnCount; c++) {
+        final double av = a._rows[r][c];
+        final double bv = b._rows[r][c];
+        final double scale = math.max(
+          math.max(av.abs(), bv.abs()),
+          absoluteFloor,
+        );
+        final double relative = (av - bv).abs() / scale;
+        if (relative > worst) {
+          worst = relative;
+        }
+      }
+    }
+    return worst;
   }
 
   @override
