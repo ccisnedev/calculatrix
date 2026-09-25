@@ -100,4 +100,71 @@ void main() {
       );
     },
   );
+
+  group(
+    'Round 12, finding 3: general 2x2 eigensolver must balance b and c '
+    'against each other before the whole-block magnitude scale, mirroring '
+    '[Matrix._eigenvalues2x2]; a single block-wide power-of-two factor '
+    'tuned to the larger off-diagonal entry underflows the smaller one to '
+    'exactly 0, erasing a genuinely negative (complex-pair) discriminant',
+    () {
+      // A=[[0,1e200],[-1e-200,0]]: A^2 = -I exactly (b*c = -1 exactly), so
+      // the true eigenvalues are the complex pair +-i, never a repeated
+      // real 0. Reference for exp: since A^2 = -I, the matrix exponential
+      // series collapses to the closed form exp(A) = cos(1)*I + sin(1)*A
+      // exactly (an analytically derived identity, not this
+      // implementation's own output; math.cos/math.sin are Dart's
+      // standard trig functions, independent of the matrix code path
+      // under test).
+      test('exp() equals cos(1)*I + sin(1)*A, not the identity', () {
+        final Matrix value = Matrix(<List<double>>[
+          <double>[0, 1e200],
+          <double>[-1e-200, 0],
+        ]);
+
+        final Matrix result = value.exp();
+
+        expectRelativelyClose(result.at(0, 0), math.cos(1));
+        expectRelativelyClose(result.at(1, 1), math.cos(1));
+        expectRelativelyClose(result.at(0, 1), math.sin(1) * 1e200);
+        expectRelativelyClose(result.at(1, 0), math.sin(1) * -1e-200);
+      });
+
+      test('log() does not throw (genuine complex pair, never undefined)', () {
+        final Matrix value = Matrix(<List<double>>[
+          <double>[0, 1e200],
+          <double>[-1e-200, 0],
+        ]);
+
+        expect(() => value.log(), returnsNormally);
+        expect(value.log().at(0, 0).isFinite, isTrue);
+      });
+
+      test('sqrt() does not throw (genuine complex pair, never undefined)', () {
+        final Matrix value = Matrix(<List<double>>[
+          <double>[0, 1e200],
+          <double>[-1e-200, 0],
+        ]);
+
+        expect(() => value.sqrt(), returnsNormally);
+        expect(value.sqrt().at(0, 0).isFinite, isTrue);
+      });
+
+      test(
+        'power(0.5) does not throw (genuine complex pair, never undefined)',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[0, 1e200],
+            <double>[-1e-200, 0],
+          ]);
+
+          expect(() => value.power(Matrix.scalar(0.5)), returnsNormally);
+          expect(
+            value.power(Matrix.scalar(0.5)).at(0, 0).isFinite,
+            isTrue,
+          );
+        },
+      );
+    },
+  );
 }
