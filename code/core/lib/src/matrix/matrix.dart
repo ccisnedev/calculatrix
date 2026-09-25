@@ -4103,8 +4103,29 @@ class Matrix {
             errorId: CalculatrixErrorId.logUndefined,
           );
         }
+        // Round 12 correction, finding 8: c0 = pow(l,y) - c1*l
+        // materializes c1*l, which overflows once pow(l,y) sits near
+        // double's max even though every entry it actually feeds into
+        // (c0 + c1*a = fl + c1*(a-l), c0 + c1*d = fl + c1*(d-l)) stays
+        // finite, since (a-l) and (d-l) are the matrix's own,
+        // well-conditioned offsets from the repeated eigenvalue. Compute
+        // those offset products directly instead of going through the
+        // overflow-prone standalone c0, the same pattern already used
+        // for exp's repeated-eigenvalue branch (Round 12 correction,
+        // finding 6) and power's complex-eigenvalue-pair branch (Round
+        // 12 correction, finding 4).
+        final double fl = _checkFiniteScalar(math.pow(l, y).toDouble());
         c1 = _checkFiniteScalar(y * math.pow(l, y - 1).toDouble());
-        c0 = _checkFiniteScalar(math.pow(l, y).toDouble()) - c1 * l;
+        final double entry00 = _checkFiniteScalar(fl + (c1 * (a - l)));
+        final double entry11 = _checkFiniteScalar(fl + (c1 * (d - l)));
+        final double entry01 = _checkFiniteScalar(c1 * b);
+        final double entry10 = _checkFiniteScalar(c1 * c);
+        return _checkFiniteMatrix(
+          Matrix(<List<double>>[
+            <double>[entry00, entry01],
+            <double>[entry10, entry11],
+          ]),
+        );
       } else {
         if (l1 == 0 || l2 == 0) {
           if (rejectZeroEigenvalue || y < 0) {
@@ -4160,31 +4181,70 @@ class Matrix {
               math.pow(lSmall, y).toDouble(),
             );
 
-            // Round 12 correction, finding 5: even when the eigenvalues
-            // themselves are far apart (relativeGap large, so the branch
-            // above was not taken), pow(lBig, y) and pow(lSmall, y) can
-            // still round to the same double once y is astronomically
-            // small, since both collapse toward 1 regardless of how far
-            // apart lBig and lSmall are (e.g. lBig=2, lSmall=1, y=1e-20).
-            // The direct divided difference (lyBig - lySmall) /
-            // (lBig - lSmall) then collapses to exactly 0, losing the
-            // true, tiny, nonzero result. Detect that risk from the
-            // function values themselves (not the eigenvalues), and
-            // recover it with the same log1p/expm1 divided-difference
-            // identity the branch above already uses for close
-            // eigenvalues, but only when its own argument does not
-            // degenerate; an extreme eigenvalue ratio (Round 9
-            // correction, finding 1) still requires the direct form.
-            final double lyScale = math.max(lyBig.abs(), lySmall.abs());
-            final bool functionValueCancellationRisk =
-                lyScale != 0 &&
-                ((lyBig - lySmall).abs() / lyScale) < closeEigenvalueThreshold;
-            final double log1pArg = (lSmall - lBig) / lBig;
-            if (functionValueCancellationRisk && (1.0 + log1pArg) > 0) {
-              c1 = lyBig * _expm1(y * _log1p(log1pArg)) / (lSmall - lBig);
-            } else {
-              c1 = (lyBig - lySmall) / (lBig - lSmall);
-            }
+            // Round 12 correction, finding 5 (revised): even when the
+            // eigenvalues themselves are far apart (relativeGap large, so
+            // the branch above was not taken), pow(lBig, y) and
+            // pow(lSmall, y) can still round to the same double once y is
+            // astronomically small, since both collapse toward 1
+            // regardless of how far apart lBig and lSmall are (e.g.
+            // lBig=2, lSmall=1, y=1e-20; or, more subtly, lBig=1e200,
+            // lSmall=1e-200, y=1e-20, where both pow values round to
+            // exactly 1.0 even though the true divided difference is
+            // ~9.21e-218). The direct divided difference
+            // (lyBig - lySmall) / (lBig - lSmall) then collapses to
+            // exactly 0, losing that true, tiny, nonzero result.
+            //
+            // The first fix gated a log1p/expm1 recovery behind a
+            // "function value cancellation risk" heuristic, falling back
+            // to the broken direct form whenever that heuristic's own
+            // log1p argument degenerated (an extreme eigenvalue ratio
+            // rounds (lSmall-lBig)/lBig to exactly -1.0), which is
+            // exactly the coordinator's counterexample above: silently
+            // wrong again, just for a narrower set of inputs.
+            //
+            // This replacement is unconditional: no branch on any
+            // cancellation-risk heuristic at all. It rests on the exact
+            // identity lyBig - lySmall = lySmall * expm1(t), where
+            // t = y * logDiff and logDiff = ln(lBig) - ln(lSmall) is the
+            // (always well-conditioned; lBig and lSmall are each
+            // strictly positive here, the zero-eigenvalue case having
+            // already been routed to its own branch above) log
+            // difference between the two eigenvalues. logDiff and t
+            // themselves never overflow (math.log of any positive double
+            // is bounded in [-745, 709]), but expm1's own argument can:
+            // exp(x), and therefore expm1(x), overflows for x past
+            // ~709, exactly the failure this fix exists to remove, not
+            // reintroduce (a naive unconditional
+            // lySmall * expm1(y * logDiff) form overflows for, e.g.,
+            // lBig=1e300, lSmall=1e-300, y=1.02, where t ~ 1409).
+            //
+            // Since logDiff > 0 always (lBig has the strictly larger
+            // magnitude here, confirmed by relativeGap being above the
+            // close-eigenvalue threshold), t's sign always matches y's
+            // sign, and is used, not as a numerical cancellation
+            // heuristic, but as the deterministic choice of which
+            // already-known-finite anchor (lySmall or lyBig, both
+            // finite-checked above) to scale by, so that expm1 is always
+            // handed a non-positive argument, where it is always bounded
+            // in [-1, 0] and therefore can never overflow:
+            //   t <= 0 (y <= 0): lyBig - lySmall = lySmall * expm1(t)
+            //   t >  0 (y >  0): lyBig - lySmall = -lyBig * expm1(-t)
+            // (the second form follows the same identity applied from
+            // the other anchor: -lyBig*expm1(-t) = lyBig*(1-exp(-t)) =
+            // lyBig - lyBig*exp(-t) = lyBig - lySmall, using
+            // exp(-t) = (lSmall/lBig)^y). Either way, the product of a
+            // finite anchor with a [-1, 0]-bounded expm1 result is
+            // itself bounded by that anchor's own magnitude, so it can
+            // never overflow. The denominator (lBig - lSmall) is only
+            // divided in last, and is safe here because this is
+            // specifically the far-apart branch (relativeGap already
+            // confirmed not small by the check above).
+            final double logDiff = math.log(lBig) - math.log(lSmall);
+            final double t = y * logDiff;
+            final double numerator = t <= 0
+                ? lySmall * _expm1(t)
+                : -lyBig * _expm1(-t);
+            c1 = _checkFiniteScalar(numerator) / (lBig - lSmall);
 
             // Round 10 correction: same triangular exact closed form as
             // [_general2x2Exp] and [_general2x2Log], see
