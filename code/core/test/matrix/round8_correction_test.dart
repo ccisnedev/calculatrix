@@ -166,4 +166,49 @@ void main() {
       expect(matrix.isComplexForm, isFalse);
     });
   });
+
+  group('Round 8, finding 6: real Schur deflation must use the '
+      'Ahues-Tisseur two-stage criterion, not the single-stage basic test '
+      'alone', () {
+    test('eigenvalues() of a 3x3 upper Hessenberg matrix does not collapse '
+        'a genuinely separated near-defective 2x2 block into a repeated '
+        'root', () {
+      // Rows/columns 0-1 form a 2x2 block A = [[1, 1e10],[1e-16, 1]] whose
+      // true eigenvalues (trace 2, det 1 - 1e-6 = 0.999999) are 1.001 and
+      // 0.999, not a repeated 1. The subdiagonal entry h[1][0] = 1e-16 is
+      // tiny enough that the single-stage basic test
+      // |h[1][0]| <= eps*(|h[0][0]|+|h[1][1]|) = eps*2 =~ 4.44e-16 passes
+      // and wrongly deflates row 0 off as an isolated eigenvalue of
+      // exactly 1, even though the huge superdiagonal entry h[0][1] = 1e10
+      // means row 0 and row 1 are still genuinely, significantly coupled.
+      // The Ahues-Tisseur refinement also weighs h[0][1] (via
+      // AB = max(|h10|,|h01|)) and the equal-diagonal gap (via
+      // BB = min(|h11|, |h00-h11|) = 0 here), which correctly rejects this
+      // deflation and forces real QR iteration on the full 3x3, recovering
+      // the true 1.001/0.999 pair. Row/column 2 (h[2][1] = 5, h[2][2] =
+      // 100) is a well-separated third eigenvalue whose own subdiagonal is
+      // nowhere near negligible, so the search reaches h[1][0] at all.
+      //
+      // This matrix is block lower triangular (h[0][2] = h[1][2] = 0), so
+      // its true spectrum is exactly the union of A's eigenvalues and
+      // {100}, independent of h[2][1], by the determinant of a block
+      // triangular matrix factoring along the block diagonal.
+      final Matrix matrix = Matrix(<List<double>>[
+        <double>[1, 1e10, 0],
+        <double>[1e-16, 1, 0],
+        <double>[0, 5, 100],
+      ]);
+
+      final Matrix eigen = matrix.eigenvalues();
+      final List<double> values = List<double>.generate(
+        eigen.rowCount,
+        (int i) => eigen.at(i, 0),
+      )..sort();
+
+      expect(values.length, equals(3));
+      expect(values[0], closeTo(0.999, 1e-9));
+      expect(values[1], closeTo(1.001, 1e-9));
+      expect(values[2], closeTo(100, 1e-9));
+    });
+  });
 }
