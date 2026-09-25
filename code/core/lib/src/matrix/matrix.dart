@@ -185,11 +185,27 @@ class Matrix {
   /// A 2×2 matrix is in complex form iff `M[0,0] == M[1,1]` and
   /// `M[0,1] == -M[1,0]`, which is necessary and sufficient for the matrix
   /// to belong to the subalgebra `{aI + bJ}` isomorphic to ℂ.
+  ///
+  /// Both equalities are tested scale-relative, never against a fixed
+  /// absolute floor: a fixed floor (e.g. [CalculatrixNumericPolicy.
+  /// defaultAbsoluteTolerance], 1e-12) is wrong by construction at any
+  /// scale far below it — `diag(1e-20, 2e-20)` has diagonal entries that
+  /// truly differ, but a 1e-12 floor calls them equal and misclassifies
+  /// this real diagonal matrix as complex form, which then fails a
+  /// downstream "is the magnitude zero" check meant for genuine zero
+  /// matrices. `M[0,0] == M[1,1]` is instead tested against
+  /// `4 * u * max(|M[0,0]|, |M[1,1]|)` (u = double's unit roundoff, see
+  /// [CalculatrixNumericPolicy.machineEpsilon]), and `M[0,1] == -M[1,0]`
+  /// against `4 * u * ‖M‖∞` (the whole matrix's own scale, since the
+  /// off-diagonal pair can be exactly zero on one or both sides).
   bool get isComplexForm {
     if (rowCount != 2 || columnCount != 2) return false;
-    final double tol = CalculatrixNumericPolicy.defaultAbsoluteTolerance;
-    return (_rows[0][0] - _rows[1][1]).abs() < tol &&
-        (_rows[0][1] + _rows[1][0]).abs() < tol;
+    const double u = CalculatrixNumericPolicy.machineEpsilon;
+    final double diagonalTolerance =
+        4 * u * math.max(_rows[0][0].abs(), _rows[1][1].abs());
+    final double offDiagonalTolerance = 4 * u * _infinityNorm();
+    return (_rows[0][0] - _rows[1][1]).abs() <= diagonalTolerance &&
+        (_rows[0][1] + _rows[1][0]).abs() <= offDiagonalTolerance;
   }
 
   /// The real part of a complex-form matrix: the `a` in `aI + bJ`.
@@ -1634,6 +1650,44 @@ class Matrix {
       return Matrix.scalar(math.sqrt(source));
     }
 
+    // Exact-diagonal fast path: for a diagonal matrix, sqrt decouples into
+    // an independent scalar Newton sqrt per diagonal entry (dart:math's
+    // math.sqrt, exact to the last ULP), so there is no coupling between
+    // entries and therefore no need to run — or to devise a convergence
+    // test for — the general Denman-Beavers Newton iteration below at all.
+    // This matters specifically for a diagonal matrix whose entries span
+    // many orders of magnitude (e.g. diag(1, 1e20)): the general loop's
+    // uniform matrix-wide scaling step (scaling every entry by the same
+    // power of 4 to bring the whole matrix's norm under control) leaves
+    // the *smallest* entry's target value many orders of magnitude below
+    // the largest, and no single norm-based or even entrywise-relative
+    // convergence test reliably captures that every entry has actually
+    // converged without either being fooled by the dominant entry or
+    // becoming unreachable for the tiny one. Computing each entry's sqrt
+    // directly sidesteps the problem rather than working around it.
+    if (_isExactlyDiagonal()) {
+      final List<List<double>> resultRows = List<List<double>>.generate(
+        rowCount,
+        (int r) => List<double>.generate(
+          columnCount,
+          (int c) {
+            if (r != c) return 0.0;
+            final double value = _rows[r][c];
+            if (value < 0) {
+              throw MatrixDomainError(
+                'Square root is undefined for this matrix in the real '
+                'domain.',
+              );
+            }
+            return math.sqrt(value);
+          },
+          growable: false,
+        ),
+        growable: false,
+      );
+      return _checkFiniteMatrix(Matrix(resultRows));
+    }
+
     final double norm = _infinityNorm();
     if (norm == 0) {
       return Matrix(
@@ -1645,6 +1699,33 @@ class Matrix {
       );
     }
 
+    final bool inputIsSymmetric = _isApproximatelySymmetric();
+
+    // Symmetric fast path: for a symmetric matrix, the eigenvalue
+    // perturbation bound is roughly `eps * ‖A‖` regardless of the
+    // matrix's own condition number (Weyl's inequality) — unlike the
+    // Denman-Beavers Newton iteration below, whose achievable accuracy on
+    // `S` degrades with the *condition number* of A (a symmetric positive
+    // definite matrix with condition ~2.5e7, e.g. eigenvalues ~5 and
+    // ~2e-7, amplifies Newton's rounding error far more than it amplifies
+    // eigenvalue extraction error). So for a symmetric input, computing
+    // the eigendecomposition A = P D P^T and forming
+    // S = P * diag(sqrt(d_i)) * P^T is both more accurate and avoids the
+    // Newton iteration's own numerical-instability failure modes for
+    // ill-conditioned inputs entirely. This is attempted first and its
+    // result verified against the same residual check the Newton loop
+    // uses below; if the check fails (e.g. because the eigenvectors
+    // themselves are ill-conditioned, as can happen for near-degenerate
+    // eigenvalue clusters), this falls through to the Newton loop rather
+    // than trusting an unverified result.
+    final Matrix? symmetricEigenSqrt = _trySymmetricEigenSqrt(
+      relativeTolerance: relativeTolerance,
+      absoluteTolerance: absoluteTolerance,
+    );
+    if (symmetricEigenSqrt != null) {
+      return symmetricEigenSqrt;
+    }
+
     Matrix scaledTarget = this;
     int scalingSteps = 0;
     while (scaledTarget._infinityNorm() > 4) {
@@ -1653,52 +1734,97 @@ class Matrix {
     }
 
     Matrix current = Matrix.identity(rowCount);
+    double bestResidualDeviation = double.infinity;
+    Matrix bestCandidate = current;
 
     for (int iteration = 0; iteration < maxIterations; iteration++) {
       final Matrix inverseCurrent;
       try {
         inverseCurrent = current._inverse(absoluteTolerance: absoluteTolerance);
       } on MatrixDomainError {
-        throw MatrixDomainError(
-          'Square root is undefined for this matrix in the real domain.',
-          errorId: CalculatrixErrorId.noConvergence,
-        );
+        // A singular (or numerically indistinguishable from singular)
+        // intermediate iterate does not, by itself, mean the true square
+        // root does not exist or was not already well approximated: for a
+        // genuinely ill-conditioned input (e.g. condition ~2.5e7), the
+        // Newton map X <- 0.5*(X + X^-1*A) can lose symmetry to rounding
+        // error after enough iterations and diverge in magnitude well
+        // *after* passing arbitrarily close to the true root — the best
+        // iterate seen so far (tracked below) is very likely already a
+        // numerically correct answer at that point. So this stops the
+        // loop and falls through to the same best-candidate acceptance
+        // check used when the iteration budget is exhausted, rather than
+        // discarding a good earlier iterate just because a later one blew
+        // up; only if no iterate ever got close enough does that check
+        // fall through to the genuine "did not converge" error below.
+        break;
       }
 
-      final Matrix next = (current + (inverseCurrent * scaledTarget)).scale(0.5);
-      // Entrywise-relative, not a single matrix-wide norm: a matrix whose
-      // entries (or eigenvalues) span many orders of magnitude has this
-      // Newton iteration converge at very different absolute rates per
-      // entry, and a norm dominated by the largest entry would let it mask
-      // a much smaller entry that has not converged yet.
-      final double stepDeviation = _maxRelativeEntryDeviation(
-        next,
-        current,
-        absoluteTolerance,
-      );
-      final double residualDeviation = _maxRelativeEntryDeviation(
-        next * next,
-        scaledTarget,
-        absoluteTolerance,
-      );
+      Matrix next = (current + (inverseCurrent * scaledTarget)).scale(0.5);
+      if (inputIsSymmetric) {
+        next = (next + next.transpose()).scale(0.5);
+      }
+
+      // Norm-relative, not entrywise: this general loop only ever runs on
+      // a genuinely coupled (non-diagonal) matrix now that the diagonal
+      // case is handled above, and for such a matrix the Newton iteration
+      // X <- 0.5*(X + X^-1*A) amplifies rounding error by roughly the
+      // matrix's own condition number. Demanding an entrywise-relative
+      // deviation as tight as [relativeTolerance] (1e-10 by default) is
+      // provably unreachable once condition * machine-epsilon exceeds it
+      // — e.g. a symmetric positive-definite matrix with condition number
+      // ~2.5e7 already limits the achievable relative accuracy to roughly
+      // 2.5e7 * 2.22e-16 =~ 5.5e-9, comfortably above 1e-10.
+      //
+      // The loop deliberately does not try to detect a convergence
+      // "plateau" and stop early: Newton's method for a matrix/scalar far
+      // from its own scale (e.g. a target eigenvalue of 1e-20 starting
+      // from the identity's eigenvalue of 1) spends its first several
+      // iterations in a linear-convergence descent phase where the step
+      // size stays roughly *constant* (it keeps roughly halving the
+      // distance-to-target, not the absolute step) before quadratic
+      // convergence takes over near the root — a naive "step stopped
+      // shrinking" test fires immediately during that phase and cuts the
+      // iteration off long before it has actually converged. Instead,
+      // every iterate's residual is tracked and the best one seen across
+      // the whole run — never just whichever happened to be last — is
+      // what gets checked for acceptance below.
+      final double stepDeviation =
+          (next - current)._infinityNorm() /
+          math.max(current._infinityNorm(), absoluteTolerance);
+      final double residualDeviation =
+          (next * next - scaledTarget)._infinityNorm() /
+          math.max(scaledTarget._infinityNorm(), absoluteTolerance);
+
+      if (residualDeviation < bestResidualDeviation) {
+        bestResidualDeviation = residualDeviation;
+        bestCandidate = next;
+      }
 
       current = next;
+
       if (stepDeviation <= relativeTolerance &&
           residualDeviation <= relativeTolerance) {
-        return _checkFiniteMatrix(
-          current.scale(math.pow(2.0, scalingSteps).toDouble()),
-        );
+        break;
       }
     }
 
-    final Matrix result = current.scale(math.pow(2.0, scalingSteps).toDouble());
-    final double residualDeviation = _maxRelativeEntryDeviation(
-      result * result,
-      this,
-      absoluteTolerance,
+    // The acceptance floor is the *looser* of the caller's own
+    // [relativeTolerance] and [CalculatrixNumericPolicy.
+    // sqrtResidualAcceptanceTolerance]: a well-conditioned input already
+    // converges far tighter than either, so this never loosens what such
+    // an input actually achieves; it only stops an ill-conditioned-but-
+    // genuinely-real-square-rootable input from being rejected merely for
+    // not reaching a precision double-precision arithmetic cannot deliver
+    // for it (see the doc comment above).
+    final double acceptanceTolerance = math.max(
+      relativeTolerance,
+      CalculatrixNumericPolicy.sqrtResidualAcceptanceTolerance,
     );
-    if (residualDeviation <= relativeTolerance) {
-      return _checkFiniteMatrix(result);
+
+    if (bestResidualDeviation <= acceptanceTolerance) {
+      return _checkFiniteMatrix(
+        bestCandidate.scale(math.pow(2.0, scalingSteps).toDouble()),
+      );
     }
 
     throw MatrixDomainError(
@@ -1823,25 +1949,60 @@ class Matrix {
     // deliberately does not attempt a general complex-eigenvalue extension
     // of the result (per the owner's decision: "the only complex
     // representation is a*I + b*J; do not add complex entries").
-    final List<double> realEigenvalues = _realEigenvaluesIgnoringComplexPairs(
-      absoluteTolerance: absoluteTolerance,
-    );
+    //
+    // Triangular matrices (including diagonal ones) get a dedicated,
+    // tolerance-free path: their eigenvalues ARE their diagonal entries,
+    // exactly, by definition of the characteristic polynomial of a
+    // triangular matrix — no QR iteration, no discriminant, no rounding to
+    // second-guess. This matters because no *fixed* tolerance can gate a
+    // diagonal entry correctly at every scale: `eigenvalueRoundingNoiseTolerance`
+    // (1e-14) would wrongly reject a genuinely positive diagonal entry as
+    // small as 4e-16 or 1e-18, and no single fixed floor can be tight
+    // enough for those yet loose enough for an O(1) matrix's own rounding
+    // noise.
+    if (_isExactlyTriangular()) {
+      for (int i = 0; i < rowCount; i++) {
+        if (_rows[i][i] <= 0) {
+          throw MatrixDomainError(
+            'Logarithm is undefined for matrices with non-positive real '
+            'eigenvalues.',
+            errorId: CalculatrixErrorId.logUndefined,
+          );
+        }
+      }
+    } else {
+      final List<double> realEigenvalues =
+          _realEigenvaluesIgnoringComplexPairs(
+            absoluteTolerance: absoluteTolerance,
+          );
 
-    // Deliberately gated on eigenvalueRoundingNoiseTolerance, not on the
-    // caller-supplied absoluteTolerance (default 1e-12): that parameter is
-    // calibrated for Hessenberg/QR convergence residuals, and is far too
-    // coarse to decide "is this real eigenvalue non-positive" — a matrix
-    // with O(1) entries can have a genuinely positive eigenvalue as small
-    // as 1e-13, which must not be treated as rounding noise just because
-    // it is smaller than 1e-12.
-    for (final double eigenvalue in realEigenvalues) {
-      if (eigenvalue <=
-          CalculatrixNumericPolicy.eigenvalueRoundingNoiseTolerance) {
-        throw MatrixDomainError(
-          'Logarithm is undefined for matrices with non-positive real '
-          'eigenvalues.',
-          errorId: CalculatrixErrorId.logUndefined,
-        );
+      // For a non-triangular matrix, eigenvalues are *computed* (Hessenberg
+      // reduction plus shifted QR, or the stable 2x2 quadratic formula),
+      // so unlike the triangular case above they do carry rounding noise
+      // from that pipeline and a real zero eigenvalue can come back as a
+      // tiny nonzero double. The floor below is scale-relative
+      // (`8 * n * u * ‖A‖∞`, u = double's unit roundoff, n = matrix size)
+      // rather than fixed, so it tracks the matrix's own scale instead of
+      // rejecting genuinely tiny-but-real eigenvalues (as a fixed floor
+      // like eigenvalueRoundingNoiseTolerance did) or accepting rounding
+      // noise as real for a huge-scale matrix.
+      const double u = CalculatrixNumericPolicy.machineEpsilon;
+      final double zeroFloor = 8 * rowCount * u * _infinityNorm();
+      for (final double eigenvalue in realEigenvalues) {
+        if (eigenvalue <= 0) {
+          throw MatrixDomainError(
+            'Logarithm is undefined for matrices with non-positive real '
+            'eigenvalues.',
+            errorId: CalculatrixErrorId.logUndefined,
+          );
+        }
+        if (eigenvalue <= zeroFloor) {
+          throw MatrixDomainError(
+            'Logarithm is undefined because an eigenvalue is '
+            'indistinguishable from zero at double precision.',
+            errorId: CalculatrixErrorId.logUndefined,
+          );
+        }
       }
     }
 
@@ -2476,40 +2637,147 @@ class Matrix {
     return maxRowSum;
   }
 
-  /// Worst-case entrywise relative deviation between [a] and [b]:
-  /// `max over i,j of |a[i][j]-b[i][j]| / max(|a[i][j]|, |b[i][j]|,
-  /// absoluteFloor)`.
-  ///
-  /// A single infinity-norm-of-the-difference check (`(a-b)._infinityNorm()
-  /// <= threshold`) is dominated entirely by whichever entry has the
-  /// largest magnitude: for a matrix whose entries (or, transitively, whose
-  /// eigenvalues) span many orders of magnitude, that lets a
-  /// fast-converging large-magnitude entry mask a much smaller-magnitude
-  /// entry that has barely converged at all, because the small entry's
-  /// absolute contribution never dominates the norm. Comparing each entry
-  /// to its own scale (with [absoluteFloor] guarding the near-zero case)
-  /// requires every entry to converge on its own terms.
-  static double _maxRelativeEntryDeviation(
-    Matrix a,
-    Matrix b,
-    double absoluteFloor,
-  ) {
-    double worst = 0;
-    for (int r = 0; r < a.rowCount; r++) {
-      for (int c = 0; c < a.columnCount; c++) {
-        final double av = a._rows[r][c];
-        final double bv = b._rows[r][c];
-        final double scale = math.max(
-          math.max(av.abs(), bv.abs()),
-          absoluteFloor,
-        );
-        final double relative = (av - bv).abs() / scale;
-        if (relative > worst) {
-          worst = relative;
-        }
+  /// Whether this square matrix is exactly upper triangular, exactly lower
+  /// triangular, or both (diagonal) — checked with a plain `== 0`, not a
+  /// tolerance. This is deliberately exact: it exists to give
+  /// [log]/[power] a route to read a triangular matrix's eigenvalues
+  /// straight off the diagonal, with no discriminant, no QR iteration, and
+  /// therefore no rounding noise to second-guess with a tolerance in the
+  /// first place. A matrix whose off-triangular entries are merely *close*
+  /// to zero (not exactly zero) does not qualify — it goes through the
+  /// general eigenvalue pipeline instead, where the rounding it does carry
+  /// is handled by a scale-relative floor.
+  bool _isExactlyTriangular() {
+    bool isUpper = true;
+    bool isLower = true;
+
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = 0; c < columnCount; c++) {
+        if (r == c) continue;
+        if (r > c && _rows[r][c] != 0) isLower = false;
+        if (r < c && _rows[r][c] != 0) isUpper = false;
+      }
+      if (!isUpper && !isLower) return false;
+    }
+
+    return isUpper || isLower;
+  }
+
+  /// Whether every off-diagonal entry of this square matrix is exactly
+  /// zero — checked with a plain `== 0`, not a tolerance, for the same
+  /// reason as [_isExactlyTriangular]: it exists to give [sqrt] a route to
+  /// compute each diagonal entry's root independently (a decoupled scalar
+  /// Newton sqrt per entry), which needs no convergence tolerance to
+  /// reason about in the first place because it carries no cross-entry
+  /// rounding coupling at all.
+  bool _isExactlyDiagonal() {
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = 0; c < columnCount; c++) {
+        if (r != c && _rows[r][c] != 0) return false;
       }
     }
-    return worst;
+    return true;
+  }
+
+  /// Whether this square matrix is symmetric to within double-precision
+  /// rounding noise: `|A[i][j] - A[j][i]| <= 4*u*max(|A[i][j]|, |A[j][i]|)`
+  /// for every pair, the same scale-relative pattern used by
+  /// [isComplexForm] (a fixed absolute tolerance would be wrong at every
+  /// scale but the one it was tuned for). A plain `==` check is
+  /// deliberately not used here: a matrix produced by a prior symmetric
+  /// computation (e.g. [sqrt]'s own eigendecomposition fast path, `P *
+  /// diag(...) * Pᵀ`) is symmetric *up to rounding* but essentially never
+  /// bit-for-bit symmetric, and both call sites below need to recognize
+  /// that as symmetric to remain effective across chained calls (e.g.
+  /// [log]'s repeated squarings-and-square-roots).
+  ///
+  /// Used by [sqrt]'s Newton loop for two purposes: to gate the
+  /// eigendecomposition fast path (only meaningful for a symmetric
+  /// matrix, whose true square root is itself symmetric), and to
+  /// re-symmetrize every Newton iterate (`0.5*(X + Xᵀ)`), projecting it
+  /// back onto that manifold each step. Without the latter, a small
+  /// asymmetric rounding perturbation orthogonal to a near-singular
+  /// direction gets amplified by the iteration's own matrix inverse and
+  /// compounds across iterations — for an ill-conditioned input this can
+  /// blow the iterate up in magnitude well after it already passed close
+  /// to the true root, long before [maxIterations] is reached.
+  bool _isApproximatelySymmetric() {
+    const double u = CalculatrixNumericPolicy.machineEpsilon;
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = r + 1; c < columnCount; c++) {
+        final double x = _rows[r][c];
+        final double y = _rows[c][r];
+        final double tolerance = 4 * u * math.max(x.abs(), y.abs());
+        if ((x - y).abs() > tolerance) return false;
+      }
+    }
+    return true;
+  }
+
+  /// Attempts [sqrt] via eigendecomposition for a symmetric matrix, or
+  /// returns `null` if this matrix is not exactly symmetric, has any
+  /// negative eigenvalue (the real square root is undefined; the caller
+  /// falls through to the Newton loop, which raises the appropriate
+  /// domain error), or the reconstructed candidate fails its own residual
+  /// check (e.g. a near-degenerate eigenvalue cluster made the computed
+  /// eigenvectors themselves inaccurate). See the call site in [sqrt] for
+  /// why this is preferred over Denman-Beavers Newton iteration whenever
+  /// it applies.
+  Matrix? _trySymmetricEigenSqrt({
+    required double relativeTolerance,
+    required double absoluteTolerance,
+  }) {
+    if (!_isApproximatelySymmetric()) {
+      return null;
+    }
+
+    final Diagonalization eigen;
+    try {
+      eigen = diagonalization(absoluteTolerance: absoluteTolerance);
+    } on MatrixDomainError {
+      return null;
+    }
+
+    final int n = rowCount;
+    final List<double> sqrtLambdas = List<double>.filled(n, 0);
+    for (int i = 0; i < n; i++) {
+      final double lambda = eigen.d.at(i, i);
+      if (lambda < 0) {
+        return null;
+      }
+      sqrtLambdas[i] = math.sqrt(lambda);
+    }
+
+    final Matrix diagSqrt = Matrix(
+      List<List<double>>.generate(
+        n,
+        (int r) => List<double>.generate(
+          n,
+          (int c) => r == c ? sqrtLambdas[r] : 0,
+          growable: false,
+        ),
+        growable: false,
+      ),
+    );
+
+    // P should be orthogonal (eigenvectors of a symmetric matrix), so
+    // P^T approximates P^-1 without the extra numerical work — and error
+    // — of an explicit inversion.
+    final Matrix candidate = eigen.p * diagSqrt * eigen.p.transpose();
+
+    final double residualDeviation =
+        (candidate * candidate - this)._infinityNorm() /
+        math.max(_infinityNorm(), absoluteTolerance);
+    final double acceptanceTolerance = math.max(
+      relativeTolerance,
+      CalculatrixNumericPolicy.sqrtResidualAcceptanceTolerance,
+    );
+
+    if (residualDeviation > acceptanceTolerance) {
+      return null;
+    }
+
+    return _checkFiniteMatrix(candidate);
   }
 
   @override
