@@ -737,7 +737,7 @@ void main() {
         'symmetric and not 2x2 is unsupported-matrix-function',
         () {
           // Eigenvalues: -0.37 and 5.37 (from the [[1,2],[3,4]] block)
-          // and 1 (from the trailing diagonal entry) — but the matrix is
+          // and 1 (from the trailing diagonal entry), but the matrix is
           // outside the supported classes regardless of its spectrum.
           final Matrix base = Matrix(<List<double>>[
             <double>[1, 2, 0],

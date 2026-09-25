@@ -1,9 +1,9 @@
 // Round 7 correction (#5 continued): exp, log, sqrt and the real
 // non-integer matrix power are restricted to five supported input classes
 // (scalar, complex form a*I+b*J, diagonal, exact-equality symmetric via
-// cyclic Jacobi — Golub & Van Loan 8.5 — and general 2x2 via a stable
-// divided-difference closed form — Higham, "Functions of Matrices" (2008),
-// section 1.2). Any other square input raises `unsupported-matrix-function`
+// cyclic Jacobi (Golub & Van Loan 8.5) and general 2x2 via a stable
+// divided-difference closed form (Higham, "Functions of Matrices" (2008),
+// section 1.2)). Any other square input raises `unsupported-matrix-function`
 // instead of falling back to a general iterative algorithm. Integer powers,
 // `inverse()` and `eigenvalues()` are unaffected and keep working for every
 // square matrix.
@@ -13,7 +13,7 @@ import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Round 7 — diagonal class: entrywise, 1e-14 relative', () {
+  group('Round 7, diagonal class: entrywise, 1e-14 relative', () {
     test('exp of a diagonal matrix is entrywise exp within 1e-14 relative', () {
       final Matrix result = Matrix(<List<double>>[
         <double>[1, 0, 0],
@@ -84,7 +84,7 @@ void main() {
   });
 
   group(
-    'Round 7 — symmetric class (exact equality): cyclic Jacobi eigen'
+    'Round 7, symmetric class (exact equality): cyclic Jacobi eigen'
     'decomposition (Golub & Van Loan 8.5), 1e-13 residual',
     () {
       test('[[2,1],[1,2]]^0.5 squares back to [[2,1],[1,2]] within 1e-13', () {
@@ -198,7 +198,7 @@ void main() {
   );
 
   group(
-    'Round 7 — general 2x2: stable divided-difference closed form '
+    'Round 7, general 2x2: stable divided-difference closed form '
     '(Higham 2008, section 1.2)',
     () {
       test(
@@ -294,7 +294,7 @@ void main() {
   );
 
   group(
-    'Round 7 — outside the five supported classes: unsupported-matrix-'
+    'Round 7, outside the five supported classes: unsupported-matrix-'
     'function',
     () {
       final Matrix jordanBlock = Matrix(<List<double>>[

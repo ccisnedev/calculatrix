@@ -138,7 +138,7 @@ void main() {
                 0,
               ),
           // Not scalar, complex-form, diagonal or exactly symmetric, and not
-          // 2×2 either — no supported closed form applies.
+          // 2x2 either: no supported closed form applies.
           CalculatrixErrorId.unsupportedMatrixFunction: () => Matrix(<List<double>>[
             <double>[1, 1, 0],
             <double>[0, 1, 1],
