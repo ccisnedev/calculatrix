@@ -1484,9 +1484,22 @@ class Matrix {
   /// eigenvalues, 2x2 diagonal blocks for complex-conjugate pairs. `Q` is
   /// orthogonal — the accumulated Schur vectors.
   ///
-  /// Deflation test (round 5 correction, kept): the LAPACK criterion
-  /// `|h[i][i-1]| <= eps*(|h[i-1][i-1]| + |h[i][i]|)`, scale-relative
-  /// rather than a fixed absolute floor.
+  /// Deflation test (round 8 correction, finding 6): the LAPACK DLAHQR
+  /// two-stage small-subdiagonal criterion (Ahues and Tisseur, LAWN 122,
+  /// 1997), not the single-stage `|h[i][i-1]| <= eps*(|h[i-1][i-1]| +
+  /// |h[i][i]|)` test alone. The single-stage test only weighs the
+  /// subdiagonal entry against the two adjacent diagonal magnitudes; it
+  /// never looks at the matching superdiagonal entry or the gap between
+  /// the diagonal entries, so a genuinely coupled 2x2 block can pass as
+  /// negligible purely because its subdiagonal happens to be tiny, even
+  /// when its superdiagonal is huge (an actual repeated-1-instead-of-
+  /// 1.001/0.999 misread was reproduced this way). The refinement only
+  /// ever narrows what the basic test accepts: it takes `AB = max(|h[l]
+  /// [l-1]|, |h[l-1][l]|)`, `BA = min(...)`, `AA = max(|h[l][l]|, |h[l-1]
+  /// [l-1]-h[l][l]|)`, `BB = min(...)`, `S = AA+AB`, and only confirms
+  /// deflation when `BA*(AB/S) <= max(smlnum, eps*(BB*(AA/S)))`, where
+  /// `smlnum` is a safe-minimum floor scaled to the active block's size so
+  /// the comparison never divides by an underflowed `S`.
   ///
   /// Exceptional shift (round 4 correction, case G's remedy, adapted to
   /// the double-shift form used here): every 11th QR step taken without a
@@ -1507,6 +1520,11 @@ class Matrix {
     final List<List<double>> q = hessenberg.q;
 
     const double eps = CalculatrixNumericPolicy.machineEpsilon;
+    // Smallest normalized positive double: the LAPACK DLAHQR safe-minimum
+    // floor below, scaled by the active block's size, stands in for
+    // DLAMCH('Safe minimum') so the refined test's division by `s` never
+    // trips on an underflowed denominator.
+    const double safeMinimum = 2.2250738585072014e-308;
     final int maxIterations = 30 * n;
     int iterationsSinceDeflation = 0;
 
@@ -1514,9 +1532,33 @@ class Matrix {
     while (hi > 0) {
       int lo = hi;
       while (lo > 0) {
-        final bool negligible =
-            h[lo][lo - 1].abs() <=
-            eps * (h[lo - 1][lo - 1].abs() + h[lo][lo].abs());
+        final double h10 = h[lo][lo - 1].abs();
+        final double h00 = h[lo - 1][lo - 1].abs();
+        final double h11 = h[lo][lo].abs();
+
+        bool negligible = h10 <= eps * (h00 + h11);
+        if (negligible) {
+          // Ahues and Tisseur (LAWN 122, 1997) refinement: the basic test
+          // above ignores the matching superdiagonal entry and the gap
+          // between the diagonal entries, so confirm with the stronger
+          // two-sided bound before actually treating h[lo][lo-1] as zero.
+          final double h01 = h[lo - 1][lo].abs();
+          final double ab = math.max(h10, h01);
+          final double ba = math.min(h10, h01);
+          final double diagGap = (h[lo - 1][lo - 1] - h[lo][lo]).abs();
+          final double aa = math.max(h[lo][lo].abs(), diagGap);
+          final double bb = math.min(h[lo][lo].abs(), diagGap);
+          final double s = aa + ab;
+          if (s == 0) {
+            negligible = true;
+          } else {
+            final double activeSize = (hi - lo + 1).toDouble();
+            final double smlnum = safeMinimum * (activeSize / eps);
+            negligible =
+                ba * (ab / s) <= math.max(smlnum, eps * (bb * (aa / s)));
+          }
+        }
+
         if (negligible) {
           h[lo][lo - 1] = 0;
           break;
