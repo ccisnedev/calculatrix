@@ -3604,10 +3604,31 @@ class Matrix {
           final double lBig = l1IsLarger ? l1 : l2;
           final double lSmall = l1IsLarger ? l2 : l1;
           final double lyBig = _checkFiniteScalar(math.pow(lBig, y).toDouble());
-          c1 =
-              lyBig *
-              _expm1(y * _log1p((lSmall - lBig) / lBig)) /
-              (lSmall - lBig);
+
+          // Round 9 correction, finding 1: (lSmall-lBig)/lBig rounds to
+          // exactly -1.0 once lSmall is negligible next to lBig (their
+          // difference already loses lSmall entirely before the division
+          // even runs), which sends log1p to -Infinity and collapses the
+          // whole divided difference to c1=1, c0=0, i.e. the input matrix
+          // returned unchanged, or to a non-finite result. The log1p/expm1
+          // form is only needed to avoid cancellation in f(lBig)-f(lSmall)
+          // when the two eigenvalues are close together; when they are
+          // well separated (relativeGap not small) that cancellation risk
+          // does not exist, so the direct divided difference is both safe
+          // and exact where the log1p form breaks down.
+          const double closeEigenvalueThreshold = 1.4901161193847656e-08;
+          final double relativeGap = (lBig - lSmall).abs() / lBig.abs();
+          if (relativeGap < closeEigenvalueThreshold) {
+            c1 =
+                lyBig *
+                _expm1(y * _log1p((lSmall - lBig) / lBig)) /
+                (lSmall - lBig);
+          } else {
+            final double lySmall = _checkFiniteScalar(
+              math.pow(lSmall, y).toDouble(),
+            );
+            c1 = (lyBig - lySmall) / (lBig - lSmall);
+          }
           c0 = lyBig - c1 * lBig;
         }
       }
