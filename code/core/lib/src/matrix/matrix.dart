@@ -1611,6 +1611,7 @@ class Matrix {
       } on MatrixDomainError {
         throw MatrixDomainError(
           'Square root is undefined for this matrix in the real domain.',
+          errorId: CalculatrixErrorId.noConvergence,
         );
       }
 
@@ -1620,27 +1621,33 @@ class Matrix {
 
       current = next;
       if (stepNorm <= threshold && residualNorm <= threshold) {
-        return current.scale(math.pow(2, scalingSteps).toDouble());
+        return _checkFiniteMatrix(
+          current.scale(math.pow(2.0, scalingSteps).toDouble()),
+        );
       }
     }
 
-    final Matrix result = current.scale(math.pow(2, scalingSteps).toDouble());
+    final Matrix result = current.scale(math.pow(2.0, scalingSteps).toDouble());
     final double residualNorm = ((result * result) - this)._infinityNorm();
     if (residualNorm <= math.max(absoluteTolerance, relativeTolerance * norm)) {
-      return result;
+      return _checkFiniteMatrix(result);
     }
 
     throw MatrixDomainError(
       'Square root did not converge for this matrix in the real domain.',
+      errorId: CalculatrixErrorId.noConvergence,
     );
   }
 
-  /// Computes the matrix exponential via Taylor series.
+  /// Computes the matrix exponential via scaling and squaring.
   ///
-  /// For a square matrix A, expm(A) = I + A + A²/2! + A³/3! + ...
-  /// For pure imaginary matrices θ·J (where J = i), this yields:
-  /// expm(θ·J) = [[cos(θ), -sin(θ)], [sin(θ), cos(θ)]] (rotation matrix).
-  /// Truncates at 50 terms for numerical stability.
+  /// For a square matrix A, expm(A) = I + A + A²/2! + A³/3! + ..., but that
+  /// series only converges quickly for a small ‖A‖. For a large ‖A‖, this
+  /// first halves A repeatedly (A/2^k, chosen so ‖A/2^k‖ <= 0.5) until the
+  /// Taylor series converges quickly and accurately, sums the series there,
+  /// then squares the result k times: expm(A) = expm(A/2^k)^(2^k). A series
+  /// that still fails to converge within the iteration budget raises
+  /// `no-convergence` rather than silently returning an inaccurate result.
   Matrix exp({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -1652,23 +1659,44 @@ class Matrix {
       return Matrix.scalar(math.exp(scalarValue));
     }
 
+    Matrix scaledTarget = this;
+    int scalingSteps = 0;
+    while (scaledTarget._infinityNorm() > 0.5) {
+      scaledTarget = scaledTarget.scale(0.5);
+      scalingSteps++;
+    }
+
     // Taylor series: expm(A) = I + A + A²/2! + A³/3! + ...
     Matrix result = Matrix.identity(rowCount);
     Matrix term = Matrix.identity(rowCount);
     double factorial = 1;
+    bool converged = false;
 
-    for (int n = 1; n <= 50; n++) {
+    const int maxTerms = 200;
+    for (int n = 1; n <= maxTerms; n++) {
       factorial *= n;
-      term = term * this;
+      term = term * scaledTarget;
       result = result + term.scale(1 / factorial);
 
       // Check convergence: if term norm is small enough, stop
       if (term._infinityNorm() / factorial < absoluteTolerance) {
+        converged = true;
         break;
       }
     }
 
-    return result;
+    if (!converged) {
+      throw MatrixDomainError(
+        'Matrix exponential series did not converge.',
+        errorId: CalculatrixErrorId.noConvergence,
+      );
+    }
+
+    for (int i = 0; i < scalingSteps; i++) {
+      result = _checkFiniteMatrix(result * result);
+    }
+
+    return _checkFiniteMatrix(result);
   }
 
   /// Computes the principal matrix logarithm.
@@ -1777,6 +1805,14 @@ class Matrix {
       squarings++;
     }
 
+    if ((current - identity)._infinityNorm() > residualTarget) {
+      throw MatrixDomainError(
+        'Matrix logarithm did not converge while scaling toward the '
+        'identity.',
+        errorId: CalculatrixErrorId.noConvergence,
+      );
+    }
+
     final Matrix residual = current - identity;
     Matrix term = residual;
     Matrix sum = residual;
@@ -1785,17 +1821,26 @@ class Matrix {
       relativeTolerance * math.max(residual._infinityNorm(), 1),
     );
 
+    bool converged = false;
     for (int k = 2; k <= maxSeriesTerms; k++) {
       term = term * residual;
       final double coefficient = k.isOdd ? 1.0 / k : -1.0 / k;
       sum = sum + term.scale(coefficient);
 
       if (term._infinityNorm() / k < seriesTolerance) {
+        converged = true;
         break;
       }
     }
 
-    return sum.scale(math.pow(2, squarings).toDouble());
+    if (!converged) {
+      throw MatrixDomainError(
+        'Matrix logarithm Mercator series did not converge.',
+        errorId: CalculatrixErrorId.noConvergence,
+      );
+    }
+
+    return _checkFiniteMatrix(sum.scale(math.pow(2.0, squarings).toDouble()));
   }
 
   /// Computes `this ^ exponent` (issue #5, power semantics table D25/D34).
@@ -1861,7 +1906,7 @@ class Matrix {
 
     // Square, non-scalar base.
     if (integerExponent) {
-      return _integerMatrixPower(y.round());
+      return _integerMatrixPower(y);
     }
 
     final Matrix scaled = log().scale(y);
@@ -1914,20 +1959,41 @@ class Matrix {
     );
   }
 
-  /// Integer power of a square, non-scalar matrix via repeated
-  /// multiplication (or repeated multiplication of the inverse, for a
-  /// negative exponent).
-  Matrix _integerMatrixPower(int exponent) {
+  /// Integer power of a square, non-scalar matrix via exponentiation by
+  /// squaring (or by squaring the inverse, for a negative exponent).
+  ///
+  /// [exponent] is taken and driven entirely as a `double` (never rounded
+  /// or negated through `int`): `int` on the native VM is a wrapping
+  /// 64-bit type, so `exponent.round()`/`.abs()` silently clamp or
+  /// overflow for magnitudes near or beyond 2^63 (e.g. the minimum 64-bit
+  /// int negated overflows back to itself). A `double` has no such trap —
+  /// every finite double is an exact dyadic rational, so halving it via
+  /// `count / 2` and reading its parity via `count % 2` stay exact for any
+  /// whole-number magnitude a double can represent, which is exactly what
+  /// binary exponentiation needs. `count` reaches 0 in O(log2(|exponent|))
+  /// iterations even for exponents like 1e30, instead of the O(|exponent|)
+  /// iterations a naive repeated-multiplication loop would need (which
+  /// would never finish for such an exponent). Each squaring/multiplication
+  /// step is finiteness-checked so an overflowing result raises
+  /// `non-finite` instead of silently returning `Infinity` entries.
+  Matrix _integerMatrixPower(double exponent) {
     if (exponent == 0) {
       return Matrix.identity(rowCount);
     }
 
-    final Matrix base = exponent < 0 ? _inverse() : this;
-    final int count = exponent.abs();
+    final bool negative = exponent < 0;
+    Matrix base = negative ? _inverse() : this;
+    double count = negative ? -exponent : exponent;
 
     Matrix result = Matrix.identity(rowCount);
-    for (int i = 0; i < count; i++) {
-      result = result * base;
+    while (count > 0) {
+      if (count % 2 == 1) {
+        result = _checkFiniteMatrix(result * base);
+      }
+      count = (count / 2).floorToDouble();
+      if (count > 0) {
+        base = _checkFiniteMatrix(base * base);
+      }
     }
     return result;
   }
