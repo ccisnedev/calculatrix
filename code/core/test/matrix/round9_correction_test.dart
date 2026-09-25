@@ -327,4 +327,77 @@ void main() {
       );
     },
   );
+
+  group(
+    'Round 9, finding 4: power() must reject a zero eigenvalue with a '
+    'non-integer exponent, restoring runbook D25 case 5 / issue #5 '
+    'amendment D34',
+    () {
+      test(
+        'general 2x2 (triangular, non-diagonal, non-symmetric): a zero '
+        'eigenvalue with a positive power raises log-undefined',
+        () {
+          // Upper triangular with b=1, c=0: not diagonal (b!=0) and not
+          // exactly symmetric (b!=c), so this goes through the general
+          // 2x2 closed form, whose eigenvalues are its diagonal entries
+          // 0 and 9.
+          final Matrix base = Matrix(<List<double>>[
+            <double>[0, 1],
+            <double>[0, 9],
+          ]);
+
+          expect(
+            () => base.power(Matrix.scalar(0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.logUndefined,
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'sqrt() itself is unaffected: the same general 2x2 zero-eigenvalue '
+        'matrix still returns 0^0.5 = 0 through sqrt()',
+        () {
+          final Matrix base = Matrix(<List<double>>[
+            <double>[0, 1],
+            <double>[0, 9],
+          ]);
+
+          final Matrix result = base.sqrt();
+
+          expect(result.at(0, 0), 0);
+          expect(result.at(1, 0), 0);
+          expect(result.at(1, 1), closeTo(3, 1e-13));
+          // c0*I + c1*A with c1 = 9^(0.5-1) = 1/3, c0 = 0, so the
+          // off-diagonal entry is b/3.
+          expect(result.at(0, 1), closeTo(1 / 3, 1e-13));
+        },
+      );
+
+      test(
+        'diagonal: a zero eigenvalue with a negative power still raises '
+        'log-undefined (unaffected: already strict before this finding)',
+        () {
+          expect(
+            () => Matrix(<List<double>>[
+              <double>[0, 0],
+              <double>[0, 9],
+            ]).power(Matrix.scalar(-0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.logUndefined,
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
 }

@@ -566,44 +566,53 @@ void main() {
     );
 
     test(
+      // Round 9 correction, finding 4: restores runbook D25 case 5 / issue
+      // #5 amendment D34, which this file's own round 7 correction had
+      // regressed. power() (unlike sqrt()) must reject a zero eigenvalue
+      // with a non-integer exponent as log-undefined outright, regardless
+      // of the sign of the exponent: 0^0.5 is not "fine" for power() even
+      // though sqrt() itself still accepts it.
       'an exact zero real eigenvalue from a diagonal matrix with a '
-      'positive power is fine: 0^0.5 = 0',
+      'positive power raises log-undefined',
       () {
         final Matrix base = Matrix(<List<double>>[
           <double>[0, 0],
           <double>[0, 1],
         ]);
 
-        final Matrix result = base.power(Matrix.scalar(0.5));
-
         expect(
-          result.almostEquals(base, absoluteTolerance: 1e-13),
-          isTrue,
+          () => base.power(Matrix.scalar(0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
+          ),
         );
       },
     );
 
     test(
+      // Round 9 correction, finding 4: same restoration as above, for the
+      // exactly-symmetric class.
       'an exact zero real eigenvalue from a singular exactly-symmetric '
-      'matrix with a positive power is fine',
+      'matrix with a positive power raises log-undefined',
       () {
         final Matrix base = Matrix(<List<double>>[
           <double>[1, 1],
           <double>[1, 1],
         ]);
 
-        final Matrix result = base.power(Matrix.scalar(0.5));
-        final double c = 1 / math.sqrt(2);
-
         expect(
-          result.almostEquals(
-            Matrix(<List<double>>[
-              <double>[c, c],
-              <double>[c, c],
-            ]),
-            relativeTolerance: 1e-13,
+          () => base.power(Matrix.scalar(0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
           ),
-          isTrue,
         );
       },
     );
