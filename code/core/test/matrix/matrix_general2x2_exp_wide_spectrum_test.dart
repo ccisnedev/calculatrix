@@ -119,27 +119,33 @@ void main() {
       );
 
       test(
-        'moderately separated [[20,1],[1e-10,-20]]: independently '
-        'eigendecomposed by hand (trace 0, det -400-1e-10, so '
-        'lambda = +/- sqrt(400 + 1e-10)) and checked against the direct '
-        'two-point closed form, not against any helper the implementation '
-        'shares',
+        'moderately separated [[20,1],[1e-10,-20]]: checked against an '
+        'independent high-precision (mpmath, dps=60) eigendecomposition, '
+        'not a double-precision hand-rolled formula sharing this fix\'s own '
+        'cancellation risk',
         () {
           // trace = a + d = 20 + (-20) = 0.
           // det = a*d - b*c = -400 - 1e-10.
           // Characteristic polynomial lambda^2 - trace*lambda + det = 0
           // reduces (trace == 0) to lambda^2 = -det = 400 + 1e-10.
-          final double lambdaBig = math.sqrt(400 + 1e-10);
-          final double lambdaSmall = -lambdaBig;
-          final double fBig = math.exp(lambdaBig);
-          final double fSmall = math.exp(lambdaSmall);
-          final double denom = lambdaBig - lambdaSmall;
-          final double c1 = (fBig - fSmall) / denom;
-          // Two-point (Lagrange) form evaluated at each diagonal entry,
-          // written out independently of _lagrangeClosedForm2x2.
-          double diagonal(double x) =>
-              fBig * ((x - lambdaSmall) / denom) +
-              fSmall * ((lambdaBig - x) / denom);
+          //
+          // Round 12 correction, finding 1: an earlier version of this
+          // test computed its own reference in plain double precision via
+          // `lambdaSmall = -sqrt(400 + 1e-10)` and then `x - lambdaSmall`
+          // directly, under the claim that `1e-10` is well within double
+          // precision's relative resolution against `400` so that
+          // subtraction would carry no cancellation. That claim is false:
+          // `x - lambdaSmall` is a subtraction of two ~20-magnitude
+          // doubles down to a ~2.5e-12 result, which is exactly the
+          // cancellation pattern this fix targets, and it loses enough
+          // precision to be wrong by a relative 4.4e-4 (verified against
+          // mpmath). The reference below instead comes directly from
+          // mpmath at dps=60, independent of any double-precision
+          // subtraction of nearby eigenvalues.
+          const double expected00 = 485165195.4109728681329196;
+          const double expected01 = 12129129.88527356358117632;
+          const double expected10 = 0.001212912988527356358117632;
+          const double expected11 = 0.00003032488586680444718134013;
 
           final Matrix value = Matrix(<List<double>>[
             <double>[20, 1],
@@ -148,35 +154,10 @@ void main() {
 
           final Matrix result = value.exp();
 
-          expectRelativelyClose(
-            result.at(0, 0),
-            diagonal(20),
-            relativeTolerance: 1e-6,
-          );
-
-          // Round 12 correction, finding 1: `lambdaSmall` here is computed
-          // as `-sqrt(400 + 1e-10)`, which is NOT the same double as
-          // `-20`: unlike the `700`/`1e-300` case above, `1e-10` is well
-          // within double precision's relative resolution against `400`
-          // (`1e-10 / 400 ~= 2.5e-13`, far above the ~2.2e-16 machine
-          // epsilon floor), so this hand-rolled `lambdaSmall` already
-          // carries its true offset from `-20` to full double precision,
-          // with no cancellation anywhere in its own derivation. This is
-          // therefore a tight, not loosened, check: once the
-          // implementation stops losing that same offset internally, it
-          // should match this reference to close to full double
-          // precision, not just 1e-2.
-          expectRelativelyClose(
-            result.at(1, 1),
-            diagonal(-20),
-            relativeTolerance: 1e-9,
-          );
-          expectRelativelyClose(result.at(0, 1), c1, relativeTolerance: 1e-6);
-          expectRelativelyClose(
-            result.at(1, 0),
-            c1 * 1e-10,
-            relativeTolerance: 1e-6,
-          );
+          expectRelativelyClose(result.at(0, 0), expected00);
+          expectRelativelyClose(result.at(1, 1), expected11);
+          expectRelativelyClose(result.at(0, 1), expected01);
+          expectRelativelyClose(result.at(1, 0), expected10);
         },
       );
     },
