@@ -69,18 +69,28 @@ void main() {
       },
     );
 
-    test('a diagonal zero entry with a positive power is fine: 0^p = 0', () {
-      final Matrix result = Matrix(<List<double>>[
-        <double>[0, 0],
-        <double>[0, 9],
-      ]).power(Matrix.scalar(0.5));
-
-      expect(result.at(0, 0), 0);
-      expect(
-        (result.at(1, 1) - 3).abs() / 3,
-        lessThanOrEqualTo(1e-14),
-      );
-    });
+    test(
+      // Round 9 correction, finding 4: restores runbook D25 case 5 / issue
+      // #5 amendment D34. power() must reject a zero eigenvalue with a
+      // non-integer exponent as log-undefined, unlike sqrt() (which still
+      // accepts 0^0.5 = 0 through this same diagonal class).
+      'a diagonal zero entry with a positive power raises log-undefined',
+      () {
+        expect(
+          () => Matrix(<List<double>>[
+            <double>[0, 0],
+            <double>[0, 9],
+          ]).power(Matrix.scalar(0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
+          ),
+        );
+      },
+    );
   });
 
   group(
@@ -175,22 +185,29 @@ void main() {
       );
 
       test(
+        // Round 9 correction, finding 4: restores runbook D25 case 5 /
+        // issue #5 amendment D34. power() must reject a zero eigenvalue
+        // with a non-integer exponent as log-undefined, unlike sqrt()
+        // (which still accepts this exact matrix through this same
+        // exactly-symmetric class: 0^0.5 = 0 carries through the eigen
+        // decomposition for sqrt(), just not for power()).
         'a singular exactly-symmetric matrix with a zero eigenvalue and a '
-        'positive power is fine (0^p = 0 carries through the eigen'
-        'decomposition)',
+        'positive power raises log-undefined',
         () {
           final Matrix base = Matrix(<List<double>>[
             <double>[1, 1],
             <double>[1, 1],
           ]);
 
-          final Matrix result = base.power(Matrix.scalar(0.5));
-          final Matrix reconstructed = result * result;
-
           expect(
-            reconstructed.almostEquals(base, absoluteTolerance: 1e-13),
-            isTrue,
-            reason: 'result=$result, result*result=$reconstructed',
+            () => base.power(Matrix.scalar(0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.logUndefined,
+              ),
+            ),
           );
         },
       );
