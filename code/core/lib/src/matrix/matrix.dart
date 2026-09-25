@@ -2897,14 +2897,27 @@ class Matrix {
   /// [_cyclicJacobiEigendecomposition] both as the finiteness guard before
   /// its sweep loop runs and as the scale against which convergence is
   /// judged.
+  ///
+  /// Scales by the matrix's own [_maxAbsEntry] before squaring. Squaring an
+  /// individual entry directly overflows once that entry exceeds about
+  /// 1.34e154 (`sqrt(double.maxFinite)`), even though the true Frobenius
+  /// norm of a matrix containing it can be far below `double.maxFinite`
+  /// and perfectly representable. Dividing every entry by the largest one
+  /// first keeps every squared term at most `1.0` before the sum is scaled
+  /// back up, so this never overflows unless the true norm itself would.
   double _frobeniusNorm() {
+    final double scale = _maxAbsEntry();
+    if (scale == 0) {
+      return 0;
+    }
     double sumSquares = 0;
     for (final List<double> row in _rows) {
       for (final double value in row) {
-        sumSquares += value * value;
+        final double scaled = value / scale;
+        sumSquares += scaled * scaled;
       }
     }
-    return math.sqrt(sumSquares);
+    return scale * math.sqrt(sumSquares);
   }
 
   /// Cyclic Jacobi eigendecomposition of an exactly symmetric matrix (Golub
@@ -2950,6 +2963,12 @@ class Matrix {
 
     const double convergenceTolerance = CalculatrixNumericPolicy.machineEpsilon;
     bool converged = frobeniusNormOriginal == 0;
+    // Jacobi rotations are orthogonal similarity transforms, so every
+    // entry of [a] stays bounded by frobeniusNormOriginal throughout every
+    // sweep. Scaling the per-sweep off-diagonal sum of squares by the same
+    // value avoids the overflow-on-squaring problem [_frobeniusNorm]'s own
+    // doc comment describes, for the same huge-entry inputs.
+    final double sweepScale = frobeniusNormOriginal == 0 ? 1 : frobeniusNormOriginal;
 
     for (int sweep = 0; sweep < maxSweeps && !converged; sweep++) {
       for (int p = 0; p < n - 1; p++) {
@@ -2999,10 +3018,13 @@ class Matrix {
       double offDiagonalSumSquares = 0;
       for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-          if (i != j) offDiagonalSumSquares += a[i][j] * a[i][j];
+          if (i != j) {
+            final double scaled = a[i][j] / sweepScale;
+            offDiagonalSumSquares += scaled * scaled;
+          }
         }
       }
-      final double offDiagonalNorm = math.sqrt(offDiagonalSumSquares);
+      final double offDiagonalNorm = sweepScale * math.sqrt(offDiagonalSumSquares);
       converged = offDiagonalNorm <= convergenceTolerance * frobeniusNormOriginal;
     }
 
