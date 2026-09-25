@@ -391,5 +391,69 @@ void main() {
       final Matrix result = Calculatrix.evaluateRpn(<String>['2', '3', '^']);
       expect(result, Matrix.scalar(8));
     });
+
+    test('bug: a non-finite entry in a matrix literal is a non-finite domain error (#5)', () {
+      expect(
+        () => Calculatrix.evaluateRpn(<String>['[[1e999]]']),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.nonFinite,
+          ),
+        ),
+      );
+    });
+
+    test(
+      'bug: a non-finite entry inside a multi-row matrix literal is also a '
+      'non-finite domain error (#5)',
+      () {
+        expect(
+          () => Calculatrix.evaluateRpn(<String>['[[1,2],[1e999,4]]']),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.nonFinite,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'bug: an incomplete exponent in infix is a syntax error, not '
+      'unknown-word (#5)',
+      () {
+        expect(
+          () => Calculatrix.evaluateInfix('1e'),
+          throwsA(
+            isA<ExpressionSyntaxError>().having(
+              (ExpressionSyntaxError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.syntaxError,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'pin: a bare radicand immediately followed by percent is ambiguous '
+      'and stays a syntax error (do not change this)',
+      () {
+        expect(
+          () => Calculatrix.evaluateInfix('√9%'),
+          throwsA(
+            isA<ExpressionSyntaxError>().having(
+              (ExpressionSyntaxError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.syntaxError,
+            ),
+          ),
+        );
+      },
+    );
   });
 }
