@@ -73,6 +73,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D35 | From the Codex review of the core PR (calculatrix#7): an iterative method of the core (matrix exponential by scaling and squaring, square root, logarithm) that reaches its iteration cap without meeting its tolerance raises the new id `no-convergence` (65), never the unconverged value. Every intermediate result is checked for finiteness (`non-finite`). | Claude, 2026-09-25 |
 | D36 | One JSON error shape for every error: `{"error": {"id", "message", "exitCode", ...}}`, `id` in kebab-case (the SDK maps each router rejection kind to one id), extra fields only when they apply (`token`, `position`, `contract`, `details`). `isRetryable` is removed; `CommandException.exitCode` is required. Spec section 6. | User, 2026-09-25 |
 | D37 | From the Codex review of the core PR (calculatrix#7): `exp`, `log`, `sqrt` and a non-integer real power are defined on exactly five classes of matrix: a scalar, the complex form `a·I + b·J`, an exactly diagonal matrix, an exactly symmetric matrix (cyclic Jacobi eigendecomposition) and a general 2x2 matrix (closed form `c0·I + c1·A`). Any other matrix raises the new id `unsupported-matrix-function` (65); the core never approximates outside these classes. The only iterative method left is the cyclic Jacobi sweep, whose cap is the source of `no-convergence` (D35). A general `n x n` algorithm is future work. | User, 2026-09-25 |
+| D38 | From the Codex review of the core PR (calculatrix#7), rounds 7 and 8: `exp`, `log`, `sqrt` and a non-integer real power declare their precision range. Every nonzero entry of the matrix and every nonzero computed eigenvalue must have a magnitude between `1e-150` and `1e150`; zero entries are allowed. A matrix outside that range raises the new id `matrix-out-of-precision-range` (65), and the message names the offending entry or eigenvalue. Inside the range the result has a normwise relative error (Frobenius) of at most `1e-12`; a single entry that is tiny next to the norm of the result is not guaranteed componentwise. Integer powers are not affected. | User, 2026-09-25 |
 
 ## Command catalog (proposal)
 
@@ -186,7 +187,8 @@ entries would be complex is to be studied (roadmap, Stage 9). Turning the
 error into a value later breaks no one.
 
 All errors exit with `65`. `ambiguous-power`, `log-undefined`,
-`no-convergence` (D35) and `unsupported-matrix-function` (D37) are new ids;
+`no-convergence` (D35), `unsupported-matrix-function` (D37) and
+`matrix-out-of-precision-range` (D38) are new ids;
 there is no `not-real` error, because the result of case 1 with a negative
 base is a complex matrix. `X exp` gives the same value as `e X ^`. The step
 S4 turns every row of this table into a core test, which also measures the
@@ -324,6 +326,8 @@ S3 and S4 can run in parallel after S2.
   datajack, inquiry, linkedin_cli). The first rule in the issue ("any token
   with whitespace is positional") would have broken `--title='two words'`; the
   issue and the tests were corrected.
+- 2026-09-25: D38, from the Codex review of PR #7: declared precision range for
+  matrix functions, `matrix-out-of-precision-range` added to the ids (spec R24).
 - 2026-09-25: D37, from the Codex review of PR #7: matrix functions limited to
   five classes, `unsupported-matrix-function` added to the ids (spec R23).
 - 2026-09-25: D36, one JSON error shape for every error (spec section 6).
