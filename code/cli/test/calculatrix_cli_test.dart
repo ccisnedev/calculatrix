@@ -190,5 +190,39 @@ void main() {
         contains('Division by zero scalar is undefined'),
       );
     });
+
+    test('bug: command mode never falls back to infix for an unrecognized token', () async {
+      final ProcessResult invalid = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', 'command', '2 -3'],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(invalid.exitCode, isNonZero);
+      expect(invalid.stdout.toString(), isNot(contains('X0: [[-1]]')));
+      expect(invalid.stdout.toString(), contains('Unknown word'));
+    });
+
+    test('bug: a genuinely unknown command-mode token is unknown-word, not a crash', () async {
+      final ProcessResult invalid = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', 'command', 'banana'],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(invalid.exitCode, isNonZero);
+      expect(invalid.stdout.toString(), contains('Unknown word'));
+    });
+
+    test('bug: a non-finite numeric literal fails cleanly instead of crashing', () async {
+      final ProcessResult overflow = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', 'rpn', '1e999'],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(overflow.exitCode, isNonZero);
+      expect(overflow.exitCode, isNot(255));
+    });
   });
 }
