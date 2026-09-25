@@ -70,6 +70,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D32 | Not in this stage: `--trace` and `--show-rpn` (recorded in `docs/roadmap.md`, Stage 9). `CliRequest.flags` is removed in `cli_router` 0.2.0, with no deprecation period. | User, 2026-09-24 (R14, R15) |
 | D34 | From the Codex review of the design: (1) `power` follows the order of checks of the D25 table, by kinds, never by a numerical commutation test; (2) a matrix base with no real logarithm is `log-undefined` in this stage, and its representation is deferred; (3) `-h`/`--help` wins over `incomplete`, `missingArgument`, `missingRequiredOption` and the contract constraints, and loses to `unknownCommand`, `extraArgument` and the option errors (spec 8.6); (4) a failed step of `upgrade --apply` or `uninstall --apply`, or a failed release lookup, exits `1` (`ExitCode.genericError`) with the id `release-lookup-failed`, `download-failed` or `file-access-denied`; the run stops at that step, reports the steps done, and neither rolls back nor retries (spec section 6). | User, 2026-09-24 |
 | D33 | `modular_cli_sdk` gets a plugin system modeled on `modular_api` (`CliPlugin` with a manifest and `setup(host)`; the host registers routes and extension points, nothing else for now). `version`, `doctor`, `upgrade` and `uninstall` are standard plugins inside the SDK (`VersionPlugin`, `DoctorPlugin`, `InstallationPlugin`), like health and openapi in `modular_api`. Every plugin is registered explicitly with `cli.plugin(...)`. `DoctorPlugin` declares `doctor.checks`; `InstallationPlugin` requires it and contributes its checks. No `modular_cli_installer` package, no install plugin. Spec section 8.7. | User, 2026-09-24 (R18) |
+| D35 | From the Codex review of the core PR (calculatrix#7): an iterative method of the core (matrix exponential by scaling and squaring, square root, logarithm) that reaches its iteration cap without meeting its tolerance raises the new id `no-convergence` (65), never the unconverged value. Every intermediate result is checked for finiteness (`non-finite`). | Claude, 2026-09-25 |
 
 ## Command catalog (proposal)
 
@@ -182,7 +183,8 @@ form. In this stage it is `log-undefined`. A complex number is only
 entries would be complex is to be studied (roadmap, Stage 9). Turning the
 error into a value later breaks no one.
 
-All errors exit with `65`. `ambiguous-power` and `log-undefined` are new ids;
+All errors exit with `65`. `ambiguous-power`, `log-undefined` and
+`no-convergence` (D35) are new ids;
 there is no `not-real` error, because the result of case 1 with a negative
 base is a complex matrix. `X exp` gives the same value as `e X ^`. The step
 S4 turns every row of this table into a core test, which also measures the
@@ -320,3 +322,5 @@ S3 and S4 can run in parallel after S2.
   datajack, inquiry, linkedin_cli). The first rule in the issue ("any token
   with whitespace is positional") would have broken `--title='two words'`; the
   issue and the tests were corrected.
+- 2026-09-25: D35, from the Codex review of PR #7: `no-convergence` added to
+  the ids (spec R22).

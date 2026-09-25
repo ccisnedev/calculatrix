@@ -298,7 +298,7 @@ output; with `--json`:
 
 Ids: `unknown-word`, `stack-underflow`, `type-mismatch`, `dimension-mismatch`,
 `singular-matrix`, `non-finite`, `log-undefined`, `ambiguous-power`,
-`syntax-error` (infix only). The ids belong to the core; the CLI only renders
+`no-convergence`, `syntax-error` (infix only). The ids belong to the core; the CLI only renders
 them. The semantics of `power`, the source of `log-undefined` and
 `ambiguous-power`, are in the runbook (D25).
 
@@ -896,7 +896,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 ## 14. Decisions of the review of 2026-09-24
 
 Every question of the draft is closed. The user decided each one; the runbook
-records the ones that affect the whole stage (D25 to D34).
+records the ones that affect the whole stage (D25 to D35).
 
 | # | Topic | Decision |
 |---|---|---|
@@ -921,3 +921,4 @@ records the ones that affect the whole stage (D25 to D34).
 | R19 | `power`, closing the table | Order of checks by kinds; `i [[1 0] [0 2]] ^` is `ambiguous-power`; a non-square exponent is `dimension-mismatch` with any base (runbook D34). |
 | R20 | Help precedence | Wins over an incomplete route, a missing argument or option, and the constraints; loses to malformed invocations (8.6). |
 | R21 | Failure of `--apply` | Exit `1` with a structured id; stop at the failed step, no rollback, no retry (section 6). |
+| R22 | `no-convergence` | An iterative method (matrix exponential, square root, logarithm) that does not reach its tolerance within its cap raises `no-convergence` (65); it never returns the unconverged value (runbook D35). |
