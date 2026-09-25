@@ -3467,6 +3467,56 @@ class Matrix {
     );
   }
 
+  /// Exact closed form for a triangular general 2x2 matrix `[[a,b],[c,d]]`
+  /// with `b == 0` or `c == 0`, used by [_general2x2Exp], [_general2x2Log]
+  /// and [_general2x2RealPower]'s distinct-real-eigenvalue branches in
+  /// place of [_c0IPlusC1A]'s `c0*I + c1*A` reconstruction.
+  ///
+  /// For a triangular matrix, `f(A)` is known exactly (Higham, "Functions
+  /// of Matrices", Theorem 4.11 / section 4.5): for upper triangular
+  /// `[[a,b],[0,d]]`, `f(A) = [[f(a), b*dd],[0, f(d)]]`, where `dd` is the
+  /// divided difference `(f(a)-f(d))/(a-d)` (or `f'(a)` when `a == d`,
+  /// handled separately, before this is ever called); lower triangular is
+  /// the transpose analogue, `f(A) = [[f(a),0],[c*dd, f(d)]]`. This
+  /// method is only ever called for a matrix that is not exactly diagonal
+  /// (that class is routed to [_diagonalRealFunction] before any general
+  /// 2x2 path is reached), so exactly one of `b`/`c` is the genuine zero
+  /// whenever it is called, and a single formula
+  /// `[[fa, b*dd],[c*dd, fd]]` covers both orientations: whichever of
+  /// `b`/`c` is the true zero contributes exactly 0 on its own.
+  ///
+  /// [fa] and [fd] must be computed by the caller directly from `a` and
+  /// `d` (e.g. `math.exp(a)`, `math.exp(d)`), never derived by adding a
+  /// correction to an anchor value the way [_c0IPlusC1A]'s
+  /// `c0*I + c1*A` does. That anchor-plus-correction form is what loses a
+  /// small diagonal entry: for the distinct-real-eigenvalue branches,
+  /// `c0` is built as `f(anchor) - c1*anchor`, and the non-anchor diagonal
+  /// entry is then `c0 + c1*other = f(anchor) - c1*(anchor - other)`,
+  /// subtracting two quantities that are each `O(f(anchor))` to recover a
+  /// target that can be many orders of magnitude smaller (e.g.
+  /// `[[4,1],[0,1e-18]]^0.5`: anchor `f(4)=2`, target `f(1e-18)=1e-9`,
+  /// `c1*(anchor-other) ~ 2`, so the ~1e-9 target is computed as a
+  /// difference of two ~2-magnitude values and loses essentially all of
+  /// its significant digits; at a wider spread, e.g. the diagonal entries
+  /// of a `1e200`/`1e-200` pair, the same subtraction can even overflow or
+  /// cancel to a non-finite or wildly wrong result). Reading `f(a)` and
+  /// `f(d)` directly from their own scalar functions has no such
+  /// subtraction: each diagonal entry is exact to the scalar function's
+  /// own rounding, regardless of how far apart `a` and `d` are in
+  /// magnitude.
+  Matrix _triangularClosedForm2x2(
+    double fa,
+    double fd,
+    double dividedDifference,
+  ) {
+    final double b = _rows[0][1];
+    final double c = _rows[1][0];
+    return Matrix(<List<double>>[
+      <double>[fa, b * dividedDifference],
+      <double>[c * dividedDifference, fd],
+    ]);
+  }
+
   /// `sin(x) / x`, computed via a short Taylor series (`1 - x^2/6`) below
   /// `sqrt(machineEpsilon)` to avoid dividing two quantities that both
   /// vanish as `x -> 0`. Used by [_general2x2Exp]'s complex-eigenvalue-pair
@@ -3587,6 +3637,16 @@ class Matrix {
         final double fHi = _checkFiniteScalar(math.exp(lHi));
         c1 = fHi * _expm1(lLo - lHi) / (lLo - lHi);
         c0 = fLo - (c1 * lLo);
+
+        // Round 10 correction: an exactly triangular block (`b == 0` or
+        // `c == 0`) is routed to the exact closed form directly, see
+        // [_triangularClosedForm2x2]'s doc comment for why `c0*I + c1*A`
+        // loses the small diagonal entry here.
+        if (b == 0 || c == 0) {
+          final double fa = _checkFiniteScalar(math.exp(a));
+          final double fd = _checkFiniteScalar(math.exp(d));
+          return _checkFiniteMatrix(_triangularClosedForm2x2(fa, fd, c1));
+        }
       }
     }
     return _checkFiniteMatrix(_c0IPlusC1A(c0, c1));
@@ -3649,6 +3709,14 @@ class Matrix {
         }
         c1 = _log1p((l1 - l2) / l2) / (l1 - l2);
         c0 = math.log(l2) - c1 * l2;
+
+        // Round 10 correction: same triangular exact closed form as
+        // [_general2x2Exp], see [_triangularClosedForm2x2]'s doc comment.
+        if (b == 0 || c == 0) {
+          final double fa = _checkFiniteScalar(math.log(a));
+          final double fd = _checkFiniteScalar(math.log(d));
+          return _checkFiniteMatrix(_triangularClosedForm2x2(fa, fd, c1));
+        }
       }
     }
     return _checkFiniteMatrix(_c0IPlusC1A(c0, c1));
@@ -3772,6 +3840,15 @@ class Matrix {
             c1 = (lyBig - lySmall) / (lBig - lSmall);
           }
           c0 = lyBig - c1 * lBig;
+
+          // Round 10 correction: same triangular exact closed form as
+          // [_general2x2Exp] and [_general2x2Log], see
+          // [_triangularClosedForm2x2]'s doc comment.
+          if (b == 0 || c == 0) {
+            final double fa = _checkFiniteScalar(math.pow(a, y).toDouble());
+            final double fd = _checkFiniteScalar(math.pow(d, y).toDouble());
+            return _checkFiniteMatrix(_triangularClosedForm2x2(fa, fd, c1));
+          }
         }
       }
     }
