@@ -266,7 +266,14 @@ void main() {
             reconstructed.almostEquals(
               base,
               relativeTolerance: 1e-6,
-              absoluteTolerance: 0,
+              // The matrix's own scale is ~1e-200, so an entry that should
+              // reconstruct to exactly 0 (the zero diagonal) legitimately
+              // lands somewhere far below that scale rather than at bit-
+              // exact 0; a relative-only comparison against a true 0 can
+              // never be satisfied regardless of how good the answer is,
+              // so the absolute floor is scaled to the matrix itself
+              // rather than left at the (much larger) global default.
+              absoluteTolerance: 1e-200 * 1e-6,
             ),
             isTrue,
             reason:

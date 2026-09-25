@@ -1893,18 +1893,70 @@ class Matrix {
   /// never need to recompute the discriminant themselves.
   static ({bool isComplex, double lambda1, double lambda2, double m, double w})
   _exactRealEigen2x2(double a, double b, double c, double d) {
-    final double m = (a + d) / 2;
-    final double halfDiff = (a - d) / 2;
-    final double det = (a * d) - (b * c);
-    final double discriminant = (halfDiff * halfDiff) + (b * c);
+    // Round 9 correction, finding 3: an exactly-triangular 2x2 block's
+    // eigenvalues are its diagonal entries, exactly, by definition (same
+    // reasoning as the whole-matrix triangular fast path in [eigenvalues]).
+    // Returning them directly avoids computing `halfDiff*halfDiff` at all,
+    // which is what underflows to exactly 0 at extreme scale (e.g. `a` and
+    // `d` both ~1e-200, whose half-difference is ~1e-200 and squares to
+    // ~1e-400, below the smallest representable subnormal double),
+    // spuriously classifying two genuinely distinct eigenvalues as a
+    // repeated one at their mean.
+    if (b == 0 || c == 0) {
+      return (isComplex: false, lambda1: a, lambda2: d, m: (a + d) / 2, w: 0);
+    }
+
+    // For a non-triangular block, the same extreme-scale problem can still
+    // hit `halfDiff*halfDiff` and `b*c` (underflow) or `m`/`det` (overflow)
+    // when every entry shares one huge or tiny scale. Scale the whole block
+    // by the power of two nearest its own largest-magnitude entry, solve on
+    // that scaled block, then rescale the results back (eigenvalues, `m`
+    // and `w` all carry the same units as the entries, so all three scale
+    // by the same `2^k`).
+    final double maxAbs = <double>[
+      a.abs(),
+      b.abs(),
+      c.abs(),
+      d.abs(),
+    ].reduce(math.max);
+
+    int k = 0;
+    double sa = a;
+    double sb = b;
+    double sc = c;
+    double sd = d;
+    if (maxAbs != 0) {
+      k = (math.log(maxAbs) / math.ln2).round();
+      if (k != 0) {
+        sa = _scalarScaleByPowerOfTwo(a, -k.toDouble());
+        sb = _scalarScaleByPowerOfTwo(b, -k.toDouble());
+        sc = _scalarScaleByPowerOfTwo(c, -k.toDouble());
+        sd = _scalarScaleByPowerOfTwo(d, -k.toDouble());
+      }
+    }
+
+    final double m = (sa + sd) / 2;
+    final double halfDiff = (sa - sd) / 2;
+    final double det = (sa * sd) - (sb * sc);
+    final double discriminant = (halfDiff * halfDiff) + (sb * sc);
+
+    double rescale(double value) =>
+        k == 0 ? value : _scalarScaleByPowerOfTwo(value, k.toDouble());
 
     if (discriminant < 0) {
       final double w = math.sqrt(-discriminant);
-      return (isComplex: true, lambda1: 0, lambda2: 0, m: m, w: w);
+      return (
+        isComplex: true,
+        lambda1: 0,
+        lambda2: 0,
+        m: rescale(m),
+        w: rescale(w),
+      );
     }
 
     if (discriminant == 0) {
-      return (isComplex: false, lambda1: m, lambda2: m, m: m, w: 0);
+      final double lambda = rescale(m);
+      return (isComplex: false, lambda1: lambda, lambda2: lambda, m: lambda, w: 0);
     }
 
     final double sqrtD = math.sqrt(discriminant);
@@ -1912,7 +1964,13 @@ class Matrix {
     final double q = m + (signM * sqrtD);
     final double lambda1 = q;
     final double lambda2 = q == 0 ? m - (signM * sqrtD) : det / q;
-    return (isComplex: false, lambda1: lambda1, lambda2: lambda2, m: m, w: 0);
+    return (
+      isComplex: false,
+      lambda1: rescale(lambda1),
+      lambda2: rescale(lambda2),
+      m: rescale(m),
+      w: 0,
+    );
   }
 
   LuDecomposition luDecomposition({
