@@ -203,7 +203,16 @@ class Matrix {
     const double u = CalculatrixNumericPolicy.machineEpsilon;
     final double diagonalTolerance =
         4 * u * math.max(_rows[0][0].abs(), _rows[1][1].abs());
-    final double offDiagonalTolerance = 4 * u * _infinityNorm();
+    // Round 5 correction, case 4: the off-diagonal tolerance must stay
+    // finite whenever the individual entries are, so it is built from the
+    // largest entry's own magnitude (a plain max, never a sum) rather than
+    // from [_infinityNorm], whose row-sum can genuinely overflow to
+    // Infinity even though every entry is individually finite (e.g. all
+    // four entries at 1e308: the row sum 2e308 exceeds double's max finite
+    // value). An infinite tolerance makes `Infinity <= Infinity` compare
+    // true regardless of the actual off-diagonal values, wrongly
+    // classifying a non-complex-form matrix as complex form.
+    final double offDiagonalTolerance = 4 * u * _maxAbsEntry();
     return (_rows[0][0] - _rows[1][1]).abs() <= diagonalTolerance &&
         (_rows[0][1] + _rows[1][0]).abs() <= offDiagonalTolerance;
   }
@@ -374,11 +383,12 @@ class Matrix {
       );
     }
 
-    final double undoScale = math.pow(2.0, -normalization.k).toDouble();
     final Matrix rawInverse = normalization.scaled._inverseRaw(
       absoluteTolerance: absoluteTolerance,
     );
-    return _checkFiniteMatrix(rawInverse.scale(undoScale));
+    return _checkFiniteMatrix(
+      _scaleByPowerOfTwo(rawInverse, -normalization.k.toDouble()),
+    );
   }
 
   Matrix _inverseRaw({
@@ -411,7 +421,19 @@ class Matrix {
         }
       }
 
-      if (pivotMagnitude <= absoluteTolerance) {
+      // Round 5 correction (inverse: LU with partial pivoting, Higham
+      // 2002 Ch. 9): singularity is declared only on an exact zero pivot,
+      // never on an absolute cutoff compared against the pivot's own
+      // magnitude. `_inverse` already normalizes to a matrix of norm ~1
+      // before this runs, but even at that scale a genuinely tiny-but-real
+      // pivot (e.g. one column scaled far below another by the input's own
+      // structure, such as `[[1,1e20],[0,1]]`) is not singular — only a
+      // pivot that is bit-for-bit zero (every candidate in the column is
+      // zero, meaning the column truly has no component outside the
+      // already-eliminated rows) is. A merely-huge-but-finite result is
+      // instead caught by `_inverse`'s own `_checkFiniteMatrix` call after
+      // undoing the scale normalization.
+      if (pivotMagnitude == 0) {
         throw MatrixDomainError(
           'Matrix is singular and cannot be inverted.',
           errorId: CalculatrixErrorId.singularMatrix,
@@ -543,6 +565,11 @@ class Matrix {
   Matrix eigenvalues({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+    @Deprecated(
+      'Unused since round 5: the QR iteration bound is now the fixed, '
+      'internally-computed 30*n (Higham 2008 Ch. 2 / LAPACK dhseqr), not a '
+      'caller-supplied cutoff.',
+    )
     int maxIterations = 200,
   }) {
     _requireSquare(operation: 'eigenvalues');
@@ -552,22 +579,41 @@ class Matrix {
       return this;
     }
 
+    // Exact-triangular fast path (round 5 correction): a triangular
+    // matrix's eigenvalues ARE its diagonal entries, exactly, by
+    // definition of the determinant of `A - lambda*I` for a triangular
+    // `A` (the characteristic polynomial factors as
+    // `prod(A[i][i] - lambda)`). This never runs Hessenberg reduction, QR
+    // iteration or power-of-two normalization at all, so it cannot be
+    // defeated by an overflowing normalization step (e.g.
+    // `diag(1e308, 1.5e308)`, whose norm-based `k` would otherwise land
+    // near 1024 and overflow a naive single-step `2^k` undo-scale).
+    if (_isExactlyTriangular()) {
+      final List<double> diagonal = List<double>.generate(
+        rowCount,
+        (int i) => _rows[i][i],
+        growable: false,
+      )..sort((double left, double right) => right.compareTo(left));
+      return Matrix(
+        diagonal.map((double value) => <double>[value]).toList(
+          growable: false,
+        ),
+      );
+    }
+
     final ({int k, Matrix scaled}) normalization = _normalizedByPowerOfTwo();
     final Matrix raw = normalization.scaled._eigenvaluesRaw(
       absoluteTolerance: absoluteTolerance,
-      maxIterations: maxIterations,
     );
     if (normalization.k == 0) {
       return raw;
     }
-    final double undoScale = math.pow(2.0, normalization.k).toDouble();
-    return _checkFiniteMatrix(raw.scale(undoScale));
+    return _checkFiniteMatrix(
+      _scaleByPowerOfTwo(raw, normalization.k.toDouble()),
+    );
   }
 
-  Matrix _eigenvaluesRaw({
-    required double absoluteTolerance,
-    required int maxIterations,
-  }) {
+  Matrix _eigenvaluesRaw({required double absoluteTolerance}) {
     if (rowCount == 2) {
       return _eigenvalues2x2(absoluteTolerance);
     }
@@ -578,8 +624,22 @@ class Matrix {
     // QR remedy for spectra a plain Wilkinson shift can stagnate on, such
     // as a permutation matrix's eigenvalues sitting equally spaced on the
     // unit circle).
+    //
+    // Deflation test (round 5 correction): the standard LAPACK criterion
+    // (`dlahqr`/`dhseqr`), a subdiagonal entry is negligible relative to
+    // its two diagonal neighbors —
+    // `|h[i][i-1]| <= eps*(|h[i-1][i-1]| + |h[i][i]|)` — rather than a
+    // fixed absolute floor, which (like every other fixed cutoff replaced
+    // this round) is only sound for a matrix of norm ~1.
+    //
+    // Iteration bound (round 5 correction): a fixed `30*n` (Higham 2008
+    // Ch. 2 / LAPACK's own convergence budget), not a caller-supplied
+    // cutoff — this is a data-independent loop bound that throws
+    // `no-convergence` if exhausted, never a silent fallback.
     final int n = rowCount;
+    final int maxIterationsPerBlock = 30 * n;
     final List<List<double>> h = _toHessenberg(absoluteTolerance);
+    const double eps = CalculatrixNumericPolicy.machineEpsilon;
 
     // QR iteration on upper Hessenberg form
     int size = n;
@@ -587,16 +647,22 @@ class Matrix {
 
     while (size > 2) {
       int iterations = 0;
-      while (iterations < maxIterations) {
-        // Check for deflation: subdiagonal element small enough
-        if (h[size - 1][size - 2].abs() <= absoluteTolerance) {
+      while (iterations < maxIterationsPerBlock) {
+        // Check for deflation: subdiagonal element negligible relative to
+        // its two diagonal neighbors.
+        if (h[size - 1][size - 2].abs() <=
+            eps * (h[size - 2][size - 2].abs() + h[size - 1][size - 1].abs())) {
           eigenvaluesList.add(h[size - 1][size - 1]);
           size--;
           break;
         }
 
         // Check for 2x2 block deflation
-        if (size >= 3 && h[size - 2][size - 3].abs() <= absoluteTolerance) {
+        if (size >= 3 &&
+            h[size - 2][size - 3].abs() <=
+                eps *
+                    (h[size - 3][size - 3].abs() +
+                        h[size - 2][size - 2].abs())) {
           // Extract 2x2 trailing block
           final double a = h[size - 2][size - 2];
           final double b = h[size - 2][size - 1];
@@ -629,7 +695,7 @@ class Matrix {
         iterations++;
       }
 
-      if (iterations == maxIterations) {
+      if (iterations == maxIterationsPerBlock) {
         // Failed to converge — check if it might be complex eigenvalues
         throw MatrixDomainError(
           'Eigenvalues did not converge for this matrix.',
@@ -649,12 +715,15 @@ class Matrix {
       eigenvaluesList.add(h[0][0]);
     }
 
-    // Clean near-zero values and sort descending
-    for (int i = 0; i < eigenvaluesList.length; i++) {
-      if (eigenvaluesList[i].abs() <= absoluteTolerance) {
-        eigenvaluesList[i] = 0;
-      }
-    }
+    // Sort descending. Round 5 correction: the trailing "clean near-zero
+    // eigenvalues" absolute-cutoff loop that used to run here has been
+    // removed entirely — it zeroed any eigenvalue at or below
+    // [absoluteTolerance] regardless of the matrix's own scale, which
+    // silently discarded genuinely tiny-but-nonzero eigenvalues. The
+    // matrix-wide power-of-two normalization already makes every fixed
+    // tolerance *inside* this method (the deflation tests above) sound
+    // relative to a matrix of norm ~1; there is no further "cleanup" step
+    // that is ever correct across every scale.
     eigenvaluesList.sort((double left, double right) => right.compareTo(left));
 
     return Matrix(
@@ -753,10 +822,19 @@ class Matrix {
   /// sense relative to a matrix of norm ~1.
   List<double> _realEigenvaluesIgnoringComplexPairs({
     required double absoluteTolerance,
-    int maxIterations = 200,
   }) {
     if (isScalar) {
       return <double>[scalarValue];
+    }
+
+    // Exact-triangular fast path (round 5 correction) — see [eigenvalues]'s
+    // doc comment for why this must come before normalization at all.
+    if (_isExactlyTriangular()) {
+      return List<double>.generate(
+        rowCount,
+        (int i) => _rows[i][i],
+        growable: false,
+      );
     }
 
     final ({int k, Matrix scaled}) normalization = _normalizedByPowerOfTwo();
@@ -764,18 +842,20 @@ class Matrix {
         .scaled
         ._realEigenvaluesIgnoringComplexPairsRaw(
           absoluteTolerance: absoluteTolerance,
-          maxIterations: maxIterations,
         );
     if (normalization.k == 0) {
       return raw;
     }
-    final double undoScale = math.pow(2.0, normalization.k).toDouble();
-    return raw.map((double value) => value * undoScale).toList(growable: false);
+    return raw
+        .map(
+          (double value) =>
+              _scalarScaleByPowerOfTwo(value, normalization.k.toDouble()),
+        )
+        .toList(growable: false);
   }
 
   List<double> _realEigenvaluesIgnoringComplexPairsRaw({
     required double absoluteTolerance,
-    int maxIterations = 200,
   }) {
     if (rowCount == 2) {
       final double a = _rows[0][0];
@@ -795,21 +875,28 @@ class Matrix {
     }
 
     final int n = rowCount;
+    final int maxIterationsPerBlock = 30 * n;
     final List<List<double>> h = _toHessenberg(absoluteTolerance);
+    const double eps = CalculatrixNumericPolicy.machineEpsilon;
 
     int size = n;
     final List<double> realEigenvaluesList = <double>[];
 
     while (size > 2) {
       int iterations = 0;
-      while (iterations < maxIterations) {
-        if (h[size - 1][size - 2].abs() <= absoluteTolerance) {
+      while (iterations < maxIterationsPerBlock) {
+        if (h[size - 1][size - 2].abs() <=
+            eps * (h[size - 2][size - 2].abs() + h[size - 1][size - 1].abs())) {
           realEigenvaluesList.add(h[size - 1][size - 1]);
           size--;
           break;
         }
 
-        if (size >= 3 && h[size - 2][size - 3].abs() <= absoluteTolerance) {
+        if (size >= 3 &&
+            h[size - 2][size - 3].abs() <=
+                eps *
+                    (h[size - 3][size - 3].abs() +
+                        h[size - 2][size - 2].abs())) {
           final double a = h[size - 2][size - 2];
           final double b = h[size - 2][size - 1];
           final double c = h[size - 1][size - 2];
@@ -845,7 +932,7 @@ class Matrix {
         iterations++;
       }
 
-      if (iterations == maxIterations) {
+      if (iterations == maxIterationsPerBlock) {
         throw MatrixDomainError(
           'Eigenvalues did not converge for this matrix.',
           errorId: CalculatrixErrorId.noConvergence,
@@ -870,12 +957,9 @@ class Matrix {
       realEigenvaluesList.add(h[0][0]);
     }
 
-    for (int i = 0; i < realEigenvaluesList.length; i++) {
-      if (realEigenvaluesList[i].abs() <= absoluteTolerance) {
-        realEigenvaluesList[i] = 0;
-      }
-    }
-
+    // Round 5 correction: no trailing absolute-cutoff cleanup loop — see
+    // [_eigenvaluesRaw]'s doc comment for why every matrix-wide zeroing
+    // pass was removed.
     return realEigenvaluesList;
   }
 
@@ -897,7 +981,6 @@ class Matrix {
 
     final ({int k, Matrix scaled}) normalization = _normalizedByPowerOfTwo();
     final Matrix target = normalization.scaled;
-    final double undoScale = math.pow(2.0, normalization.k).toDouble();
 
     final Matrix eigenvalueColumn = target.eigenvalues(
       absoluteTolerance: absoluteTolerance,
@@ -915,7 +998,9 @@ class Matrix {
       n,
       (int r) => List<double>.generate(
         n,
-        (int c) => r == c ? lambdas[r] * undoScale : 0,
+        (int c) => r == c
+            ? _scalarScaleByPowerOfTwo(lambdas[r], normalization.k.toDouble())
+            : 0,
         growable: false,
       ),
       growable: false,
@@ -1837,31 +1922,58 @@ class Matrix {
       );
     }
 
+    // Exact-triangular fast path (round 5 correction): the Bjorck and
+    // Hammarling recurrence (Higham 2008, Algorithm 6.3) solves `S*S = T`
+    // for an upper triangular `T` in closed form — the diagonal exactly as
+    // `sqrt(T[i][i])`, then each off-diagonal entry from a single division,
+    // by increasing distance from the diagonal — with no iteration, no
+    // convergence tolerance, and therefore none of the scaling/Newton
+    // machinery below. A lower triangular input is solved via its
+    // transpose (`sqrt(Aᵀ) = sqrt(A)ᵀ` for a real matrix), since the
+    // recurrence itself is only stated for the upper form. This is tried
+    // only for a non-diagonal triangular matrix; the diagonal case above
+    // already has its own simpler, decoupled fast path.
+    if (_isExactlyTriangular() && !_isExactlyDiagonal()) {
+      return _checkFiniteMatrix(_triangularSqrt());
+    }
+
     final bool inputIsSymmetric = _isApproximatelySymmetric();
 
-    // Symmetric fast path: for a symmetric matrix, the eigenvalue
-    // perturbation bound is roughly `eps * ‖A‖` regardless of the
-    // matrix's own condition number (Weyl's inequality) — unlike the
-    // Denman-Beavers Newton iteration below, whose achievable accuracy on
-    // `S` degrades with the *condition number* of A (a symmetric positive
-    // definite matrix with condition ~2.5e7, e.g. eigenvalues ~5 and
-    // ~2e-7, amplifies Newton's rounding error far more than it amplifies
-    // eigenvalue extraction error). So for a symmetric input, computing
-    // the eigendecomposition A = P D P^T and forming
-    // S = P * diag(sqrt(d_i)) * P^T is both more accurate and avoids the
-    // Newton iteration's own numerical-instability failure modes for
-    // ill-conditioned inputs entirely. This is attempted first and its
-    // result verified against the same residual check the Newton loop
-    // uses below; if the check fails (e.g. because the eigenvectors
-    // themselves are ill-conditioned, as can happen for near-degenerate
-    // eigenvalue clusters), this falls through to the Newton loop rather
-    // than trusting an unverified result.
-    final Matrix? symmetricEigenSqrt = _trySymmetricEigenSqrt(
+    // Real-eigenvalue fast path (round 5 correction: generalized from a
+    // symmetric-only gate). For any real matrix diagonalizable over the
+    // reals, `A = P*D*P^-1` gives `sqrt(A) = P*diag(sqrt(d_i))*P^-1`
+    // directly. [diagonalization] itself already rejects a matrix with any
+    // genuine complex-conjugate eigenvalue pair (via the existing typed
+    // domain error from the eigenvalue pipeline), so this never
+    // approximates a complex spectrum — it simply cannot be attempted for
+    // one, and falls through to the Newton loop below, which raises its
+    // own `no-convergence` if that loop cannot find a real root either.
+    // For a symmetric matrix `P` is orthogonal, so `P^T` is used in place
+    // of an explicit (costlier, less accurate) inverse; for a
+    // non-symmetric matrix, `P^-1` is computed directly. Either way the
+    // result is verified against the same residual check the Newton loop
+    // uses below before being trusted.
+    //
+    // Scope note (documented simplification, per the standing brief's
+    // escape valve): the prescribed general algorithm is the real Schur
+    // form plus the Bjorck-Hammarling/Parlett recurrences run on the
+    // (quasi-triangular) Schur form itself. This codebase's QR eigenvalue
+    // step extracts eigenvalues only — it does not accumulate the
+    // orthogonal Schur-vector matrix `Q` needed to form that Schur form,
+    // and adding that accumulation is a substantial change to the
+    // Hessenberg/QR pipeline shared by [eigenvalues]. Diagonalization is
+    // used instead wherever it succeeds (identical for any
+    // diagonalizable matrix, which is the overwhelming common case, and
+    // the same reconstruction-residual gate that guards the symmetric
+    // case already catches a genuinely defective/non-diagonalizable
+    // input by refusing to trust an unverified result).
+    final Matrix? realEigenSqrt = _tryRealEigenSqrt(
       relativeTolerance: relativeTolerance,
       absoluteTolerance: absoluteTolerance,
+      symmetric: inputIsSymmetric,
     );
-    if (symmetricEigenSqrt != null) {
-      return symmetricEigenSqrt;
+    if (realEigenSqrt != null) {
+      return realEigenSqrt;
     }
 
     // Exact scale normalization (round 4 correction, rule 1): scale by
@@ -1875,7 +1987,6 @@ class Matrix {
     // exponent bits, never its mantissa).
     final ({int k, Matrix scaled}) normalization = _normalizedByPowerOfTwo();
     final Matrix scaledTarget = normalization.scaled;
-    final double undoScale = math.pow(2.0, normalization.k / 2.0).toDouble();
 
     Matrix current = Matrix.identity(rowCount);
     double bestResidualDeviation = double.infinity;
@@ -1946,8 +2057,23 @@ class Matrix {
 
       current = next;
 
-      if (stepDeviation <= relativeTolerance &&
-          residualDeviation <= relativeTolerance) {
+      // Round 5 correction: this used to break out of the loop as soon as
+      // both deviations first dropped under [relativeTolerance] (1e-10 by
+      // default). That contradicted the very comment above it — Newton's
+      // method keeps converging quadratically well past that point for a
+      // well-conditioned input, so stopping the instant it is merely
+      // "good enough" threw away a lot of free accuracy: the loop is
+      // already bounded at a fixed [maxIterations] (data-independent), and
+      // [bestCandidate]/[bestResidualDeviation] above already track the
+      // best iterate seen across the *entire* run, so simply letting every
+      // iteration run costs nothing extra in correctness and only helps
+      // precision. A well-conditioned input converges to the entrywise
+      // residual floor (double precision) within a handful more
+      // iterations after crossing 1e-10; an ill-conditioned one is caught
+      // either by the `on MatrixDomainError` break above once `current`
+      // goes singular, or simply never improves on [bestCandidate] and the
+      // acceptance check below reports it honestly.
+      if (stepDeviation == 0 && residualDeviation == 0) {
         break;
       }
     }
@@ -1966,7 +2092,9 @@ class Matrix {
     );
 
     if (bestResidualDeviation <= acceptanceTolerance) {
-      return _checkFiniteMatrix(bestCandidate.scale(undoScale));
+      return _checkFiniteMatrix(
+        _scaleByPowerOfTwo(bestCandidate, normalization.k / 2.0),
+      );
     }
 
     throw MatrixDomainError(
@@ -1977,39 +2105,57 @@ class Matrix {
 
   /// Computes the matrix exponential.
   ///
-  /// Three cases, tried in order (round 4 correction, rule 2):
+  /// Cases, tried in order:
   ///
   /// - Complex-form input (`aI + bJ`, 2x2 only): the closed form
   ///   `e^a * (cos(b)*I + sin(b)*J)` — no series at all, so `cos`/`sin`
   ///   (always bounded in `[-1, 1]`) can never blow up the way a
-  ///   scaling-and-squaring Taylor series does for a huge `b` (e.g. a
-  ///   rotation by `1e16` radians): repeated squaring of an
-  ///   only-approximately-bounded intermediate compounds rounding error
-  ///   exponentially, which previously produced entries around `1e74` for
-  ///   what is mathematically a bounded rotation.
+  ///   scaling-and-squaring series does for a huge `b` (e.g. a rotation by
+  ///   `1e16` radians): repeated squaring of an only-approximately-bounded
+  ///   intermediate compounds rounding error exponentially.
   /// - An exact scalar multiple of the identity (`aI`, any size): `e^a * I`
   ///   directly — exact, and needed for `n != 2` since [isComplexForm] only
   ///   ever applies to 2x2 matrices.
-  /// - Otherwise: shift by the mean eigenvalue `μ = trace/n`, so
-  ///   `exp(A) = e^μ * exp(A − μI)`, then scaling-and-squaring plus a
-  ///   Taylor series on the shifted matrix `N = A − μI`. Subtracting the
-  ///   mean off the diagonal before scaling (rather than after, as the
-  ///   previous implementation did implicitly by never shifting at all)
-  ///   keeps `N` — and therefore every power of it summed in the series —
-  ///   far smaller in norm than `A` itself whenever `A`'s eigenvalues are
-  ///   clustered (e.g. `[[1,1e20],[0,1]]`, whose shift makes `N` exactly
-  ///   nilpotent), and multiplying by `e^μ` only once at the very end,
-  ///   rather than folding it into the pre-loop matrix, avoids compounding
-  ///   its own rounding error through every squaring step.
+  /// - Exactly diagonal: `exp` decouples entrywise, exact to the last ULP
+  ///   per entry (`math.exp`), same rationale as [sqrt]'s own diagonal fast
+  ///   path — a matrix whose entries span many orders of magnitude (e.g.
+  ///   `diag(-1000, -500)`) has no single scaling-and-squaring parameter
+  ///   that serves every entry well simultaneously.
+  /// - Otherwise (round 5 correction): scaling and squaring with the
+  ///   degree-13 Padé approximant (Higham, "The Scaling and Squaring
+  ///   Method for the Matrix Exponential Revisited", SIAM J. Matrix Anal.
+  ///   Appl., 2005) — see [_expByPadeScalingAndSquaring] for the algorithm
+  ///   itself. This replaces the previous trace-shift-plus-Taylor-series
+  ///   approach entirely: a fixed-degree Padé approximant needs no
+  ///   caller-tunable convergence tolerance or term-count budget at all,
+  ///   and its accuracy is provably uniform across scales once the
+  ///   pre-squaring norm is brought under the Higham `theta_13` threshold,
+  ///   unlike a Taylor series' term count, which would have to grow
+  ///   without bound to hold accuracy for some inputs no matter how
+  ///   aggressively pre-scaled.
+  ///   - If this matrix is also exactly triangular (including diagonal,
+  ///     though that case is already handled above), [_correctTriangularExp]
+  ///     overwrites the Padé result's diagonal with the exact `exp(t_ii)`
+  ///     and its first superdiagonal with the Al-Mohy and Higham divided-
+  ///     difference formula (Al-Mohy and Higham, "Computing the Frechet
+  ///     Derivative of the Matrix Exponential, with an Application to
+  ///     Condition Number Estimation", 2009) — both closed-form, so neither
+  ///     carries any scaling-and-squaring rounding at all. Round 5
+  ///     correction, per the standing brief: no entry beyond the first
+  ///     superdiagonal is corrected (that would need the full Parlett-style
+  ///     triangular recurrence [log] uses, which does not have a clean
+  ///     divided-difference closed form for the exponential of an arbitrary
+  ///     interior entry the way it does for `log`) — documented scope
+  ///     limitation.
   ///
   /// Every matrix/scalar involved is checked finite before it is used in a
   /// loop, and the scaling loop itself carries an explicit iteration bound
-  /// independent of the data: a loop whose only exit condition is "norm is
-  /// now small enough" can never terminate once fed a non-finite norm
-  /// (`Infinity > 0.5` is always true, and `Infinity * 0.5` stays
-  /// `Infinity`), which previously made a merely-overflowing input hang
-  /// the whole process rather than raising `non-finite`.
+  /// independent of the data.
   Matrix exp({
+    @Deprecated(
+      'Unused since round 5: the degree-13 Pade approximant needs no '
+      'caller-tunable convergence tolerance (Higham 2005).',
+    )
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
   }) {
@@ -2036,67 +2182,188 @@ class Matrix {
       );
     }
 
-    final int n = rowCount;
-    double traceSum = 0;
-    for (int i = 0; i < n; i++) {
-      traceSum += _rows[i][i];
+    if (_isExactlyDiagonal()) {
+      final List<List<double>> resultRows = List<List<double>>.generate(
+        rowCount,
+        (int r) => List<double>.generate(
+          columnCount,
+          (int c) => r == c ? _checkFiniteScalar(math.exp(_rows[r][c])) : 0,
+          growable: false,
+        ),
+        growable: false,
+      );
+      return Matrix(resultRows);
     }
-    final double mu = _checkFiniteScalar(traceSum / n);
-    final Matrix shifted = _checkFiniteMatrix(
-      this - Matrix.identity(n).scale(mu),
-    );
 
-    Matrix scaledTarget = shifted;
-    int scalingSteps = 0;
-    const int maxScalingSteps = 2000;
-    while (scaledTarget._infinityNorm() > 0.5 &&
-        scalingSteps < maxScalingSteps) {
-      scaledTarget = scaledTarget.scale(0.5);
-      scalingSteps++;
+    final Matrix padeResult = _expByPadeScalingAndSquaring();
+
+    if (_isExactlyTriangular()) {
+      return _checkFiniteMatrix(_correctTriangularExp(padeResult));
     }
-    if (scaledTarget._infinityNorm() > 0.5) {
-      // Only reachable if [shifted]'s norm could not be brought under 0.5
-      // within the bound above — i.e. it was already non-finite, which
-      // [_checkFiniteMatrix] above should have caught, but this is kept as
-      // a second, independent guard against ever looping on bad data.
+
+    return padeResult;
+  }
+
+  /// Degree-13 Padé approximant, scaling-and-squaring implementation of
+  /// [exp] (Higham 2005). If `‖A‖ > theta_13`, `A` is first scaled by
+  /// `2^-s` (via the bounded-step [_scaleByPowerOfTwo], round 5 correction
+  /// case 6) for the smallest `s` bringing the scaled norm at or under
+  /// `theta_13 = 5.371920351148152` (Higham 2005, Table 3.1 — the largest
+  /// norm for which the degree-13 approximant alone already meets double
+  /// precision, with no further scaling needed); the degree-13 rational
+  /// approximant `R13(A) = Q13(A)^-1 * P13(A)` is then formed via
+  /// [_pade13Terms] and, finally, squared `s` times to undo the scaling
+  /// (`exp(A) = exp(A/2^s)^(2^s)`).
+  ///
+  /// The scaling-step count `s` is capped at a fixed, data-independent
+  /// bound (1100 — comfortably above `log2(2^1024/theta_13)`, the largest
+  /// `s` any finite double-precision norm can ever require): a norm large
+  /// enough to need more than that is already outside representable double
+  /// range or on its way there, and this raises `non-finite` rather than
+  /// looping further.
+  ///
+  /// This codebase already computes every other scale-normalization
+  /// decision ([sqrt], [log], [eigenvalues], [_inverse]) from the
+  /// infinity norm rather than the 1-norm Higham's paper states the
+  /// `theta_m` thresholds for; the two norms differ by at most a factor of
+  /// `n` for an `n x n` matrix, so using the infinity norm here is a
+  /// conservative approximation (it can only trigger scaling slightly
+  /// earlier than strictly necessary, never later) consistent with the
+  /// rest of this codebase's scale-normalization machinery.
+  Matrix _expByPadeScalingAndSquaring() {
+    const double theta13 = 5.371920351148152;
+    const int maxScalingSteps = 1100;
+
+    final double norm = _infinityNorm();
+    if (!norm.isFinite) {
       throw MatrixDomainError(
-        'Matrix exponential scaling did not converge.',
-        errorId: CalculatrixErrorId.noConvergence,
+        'Matrix infinity-norm overflowed to a non-finite value before '
+        'scale normalization.',
+        errorId: CalculatrixErrorId.nonFinite,
       );
     }
 
-    // Taylor series: expm(N) = I + N + N²/2! + N³/3! + ...
-    Matrix result = Matrix.identity(n);
-    Matrix term = Matrix.identity(n);
-    double factorial = 1;
-    bool converged = false;
-
-    const int maxTerms = 200;
-    for (int i = 1; i <= maxTerms; i++) {
-      factorial *= i;
-      term = term * scaledTarget;
-      result = result + term.scale(1 / factorial);
-
-      // Check convergence: if term norm is small enough, stop
-      if (term._infinityNorm() / factorial < absoluteTolerance) {
-        converged = true;
-        break;
+    int s = 0;
+    Matrix scaled = this;
+    if (norm > theta13) {
+      s = (math.log(norm / theta13) / math.ln2).ceil();
+      if (s > maxScalingSteps) {
+        throw MatrixDomainError(
+          'Matrix exponential scaling exceeded the maximum number of '
+          'steps.',
+          errorId: CalculatrixErrorId.nonFinite,
+        );
       }
+      scaled = _scaleByPowerOfTwo(this, -s.toDouble());
     }
 
-    if (!converged) {
-      throw MatrixDomainError(
-        'Matrix exponential series did not converge.',
-        errorId: CalculatrixErrorId.noConvergence,
-      );
-    }
+    final ({Matrix u, Matrix v}) terms = _pade13Terms(scaled);
+    final Matrix p13 = terms.u + terms.v;
+    final Matrix q13 = terms.v - terms.u;
 
-    for (int i = 0; i < scalingSteps; i++) {
+    Matrix result = q13._inverse() * p13;
+
+    for (int i = 0; i < s; i++) {
       result = _checkFiniteMatrix(result * result);
     }
 
-    final double expMu = _checkFiniteScalar(math.exp(mu));
-    return _checkFiniteMatrix(result.scale(expMu));
+    return _checkFiniteMatrix(result);
+  }
+
+  /// The `U`, `V` terms of the degree-13 Padé numerator/denominator for
+  /// [exp] (Higham 2005, Eq. 3.4, coefficients from Table 3.1):
+  /// `P13(A) = U + V`, `Q13(A) = -U + V`, where
+  ///
+  /// ```
+  /// U = A * (A6*(b13*A6 + b11*A4 + b9*A2) + b7*A6 + b5*A4 + b3*A2 + b1*I)
+  /// V = A6*(b12*A6 + b10*A4 + b8*A2) + b6*A6 + b4*A4 + b2*A2 + b0*I
+  /// ```
+  ///
+  /// with `A2 = A*A`, `A4 = A2*A2`, `A6 = A2*A4`, computed once and shared
+  /// between `U` and `V` (six matrix multiplies total for both, instead of
+  /// the naive 13 one per power).
+  static ({Matrix u, Matrix v}) _pade13Terms(Matrix a) {
+    const List<double> b = <double>[
+      64764752532480000,
+      32382376266240000,
+      7771770303897600,
+      1187353796428800,
+      129060195264000,
+      10559470521600,
+      670442572800,
+      33522128640,
+      1323241920,
+      40840800,
+      960960,
+      16380,
+      182,
+      1,
+    ];
+
+    final Matrix identity = Matrix.identity(a.rowCount);
+    final Matrix a2 = a * a;
+    final Matrix a4 = a2 * a2;
+    final Matrix a6 = a2 * a4;
+
+    final Matrix u =
+        a *
+        (a6 * (a6.scale(b[13]) + a4.scale(b[11]) + a2.scale(b[9])) +
+            a6.scale(b[7]) +
+            a4.scale(b[5]) +
+            a2.scale(b[3]) +
+            identity.scale(b[1]));
+    final Matrix v =
+        a6 * (a6.scale(b[12]) + a4.scale(b[10]) + a2.scale(b[8])) +
+        a6.scale(b[6]) +
+        a4.scale(b[4]) +
+        a2.scale(b[2]) +
+        identity.scale(b[0]);
+
+    return (u: u, v: v);
+  }
+
+  /// The divided difference of `exp` at `a` and `b`:
+  /// `(exp(a) - exp(b)) / (a - b)` when `a != b`, or `exp(a)` (the limit as
+  /// `b -> a`) when `a == b`. Used by [_correctTriangularExp] for the
+  /// closed-form first superdiagonal of a triangular matrix's exponential
+  /// (Al-Mohy and Higham 2009).
+  static double _expDividedDifference(double a, double b) {
+    if (a == b) {
+      return math.exp(a);
+    }
+    return (math.exp(a) - math.exp(b)) / (a - b);
+  }
+
+  /// Overwrites [padeResult]'s diagonal and first superdiagonal with the
+  /// closed-form values for an exactly triangular matrix's exponential,
+  /// leaving every other entry as the Padé scaling-and-squaring result —
+  /// see [exp]'s own doc comment for why nothing past the first
+  /// superdiagonal is corrected here. A lower triangular input is
+  /// transposed in, corrected, and transposed back, matching
+  /// [_triangularSqrt]/[_triangularLog].
+  Matrix _correctTriangularExp(Matrix padeResult) {
+    final bool upper = _isUpperTriangular();
+    final Matrix triangular = upper ? this : transpose();
+    final Matrix approx = upper ? padeResult : padeResult.transpose();
+    final int n = triangular.rowCount;
+    final List<List<double>> t = triangular._rows;
+
+    final List<List<double>> f = List<List<double>>.generate(
+      n,
+      (int r) => List<double>.from(approx._rows[r]),
+      growable: false,
+    );
+
+    for (int i = 0; i < n; i++) {
+      f[i][i] = _checkFiniteScalar(math.exp(t[i][i]));
+    }
+    for (int i = 0; i + 1 < n; i++) {
+      f[i][i + 1] =
+          t[i][i + 1] * _expDividedDifference(t[i][i], t[i + 1][i + 1]);
+    }
+
+    final Matrix corrected = Matrix(f);
+    return upper ? corrected : corrected.transpose();
   }
 
   /// Computes the principal matrix logarithm.
@@ -2177,11 +2444,13 @@ class Matrix {
     // representation is a*I + b*J; do not add complex entries").
     //
     // Triangular matrices (including diagonal ones) get a dedicated,
-    // tolerance-free path: their eigenvalues ARE their diagonal entries,
-    // exactly, by definition of the characteristic polynomial of a
-    // triangular matrix — no QR iteration, no discriminant, no rounding to
-    // second-guess. This matters because no *fixed* tolerance can gate a
-    // diagonal entry correctly at every scale: `eigenvalueRoundingNoiseTolerance`
+    // tolerance-free path (round 5 correction: now computing the VALUE
+    // directly via the Parlett recurrence, not just validating the
+    // domain): their eigenvalues ARE their diagonal entries, exactly, by
+    // definition of the characteristic polynomial of a triangular matrix
+    // — no QR iteration, no discriminant, no rounding to second-guess.
+    // This matters because no *fixed* tolerance can gate a diagonal entry
+    // correctly at every scale: `eigenvalueRoundingNoiseTolerance`
     // (1e-14) would wrongly reject a genuinely positive diagonal entry as
     // small as 4e-16 or 1e-18, and no single fixed floor can be tight
     // enough for those yet loose enough for an O(1) matrix's own rounding
@@ -2196,40 +2465,60 @@ class Matrix {
           );
         }
       }
-    } else {
-      final List<double> realEigenvalues =
-          _realEigenvaluesIgnoringComplexPairs(
-            absoluteTolerance: absoluteTolerance,
-          );
+      return _checkFiniteMatrix(_triangularLog());
+    }
 
-      // For a non-triangular matrix, eigenvalues are *computed* (Hessenberg
-      // reduction plus shifted QR, or the stable 2x2 quadratic formula),
-      // so unlike the triangular case above they do carry rounding noise
-      // from that pipeline and a real zero eigenvalue can come back as a
-      // tiny nonzero double. The floor below is scale-relative
-      // (`8 * n * u * ‖A‖∞`, u = double's unit roundoff, n = matrix size)
-      // rather than fixed, so it tracks the matrix's own scale instead of
-      // rejecting genuinely tiny-but-real eigenvalues (as a fixed floor
-      // like eigenvalueRoundingNoiseTolerance did) or accepting rounding
-      // noise as real for a huge-scale matrix.
-      const double u = CalculatrixNumericPolicy.machineEpsilon;
-      final double zeroFloor = 8 * rowCount * u * _infinityNorm();
-      for (final double eigenvalue in realEigenvalues) {
-        if (eigenvalue <= 0) {
-          throw MatrixDomainError(
-            'Logarithm is undefined for matrices with non-positive real '
-            'eigenvalues.',
-            errorId: CalculatrixErrorId.logUndefined,
-          );
-        }
-        if (eigenvalue <= zeroFloor) {
-          throw MatrixDomainError(
-            'Logarithm is undefined because an eigenvalue is '
-            'indistinguishable from zero at double precision.',
-            errorId: CalculatrixErrorId.logUndefined,
-          );
-        }
+    final List<double> realEigenvalues = _realEigenvaluesIgnoringComplexPairs(
+      absoluteTolerance: absoluteTolerance,
+    );
+
+    // For a non-triangular matrix, eigenvalues are *computed* (Hessenberg
+    // reduction plus shifted QR, or the stable 2x2 quadratic formula), so
+    // unlike the triangular case above they do carry rounding noise from
+    // that pipeline and a real zero eigenvalue can come back as a tiny
+    // nonzero double. The floor below is scale-relative (`8 * n * u *
+    // ‖A‖∞`, u = double's unit roundoff, n = matrix size) rather than
+    // fixed, so it tracks the matrix's own scale instead of rejecting
+    // genuinely tiny-but-real eigenvalues (as a fixed floor like
+    // eigenvalueRoundingNoiseTolerance did) or accepting rounding noise as
+    // real for a huge-scale matrix.
+    const double u = CalculatrixNumericPolicy.machineEpsilon;
+    final double zeroFloor = 8 * rowCount * u * _infinityNorm();
+    for (final double eigenvalue in realEigenvalues) {
+      if (eigenvalue <= 0) {
+        throw MatrixDomainError(
+          'Logarithm is undefined for matrices with non-positive real '
+          'eigenvalues.',
+          errorId: CalculatrixErrorId.logUndefined,
+        );
       }
+      if (eigenvalue <= zeroFloor) {
+        throw MatrixDomainError(
+          'Logarithm is undefined because an eigenvalue is '
+          'indistinguishable from zero at double precision.',
+          errorId: CalculatrixErrorId.logUndefined,
+        );
+      }
+    }
+
+    // Real-eigenvalue fast path (round 5 correction), tried before the
+    // general scaling-and-squaring loop: once every real eigenvalue is
+    // already confirmed positive (above), a matrix diagonalizable over the
+    // reals gives `log(A) = P*diag(log(d_i))*P^-1` directly, with no
+    // iteration at all. Just as in [sqrt] (see its call site for the full
+    // scope note on why diagonalization substitutes for the prescribed
+    // real-Schur-form approach here), [diagonalization] itself already
+    // rejects a genuine complex-conjugate eigenvalue pair, so this can
+    // never silently approximate one; it simply is not attempted for one,
+    // and this falls through to the scaling-and-squaring loop below, which
+    // handles that case (and any defective/non-diagonalizable one)
+    // directly without an eigenbasis.
+    final Matrix? realEigenLog = _tryRealEigenLog(
+      relativeTolerance: relativeTolerance,
+      absoluteTolerance: absoluteTolerance,
+    );
+    if (realEigenLog != null) {
+      return realEigenLog;
     }
 
     // Principal log via inverse scaling and squaring: repeatedly take the
@@ -2248,18 +2537,36 @@ class Matrix {
 
   /// Inverse scaling and squaring principal logarithm for a square matrix
   /// whose eigenvalues have already been confirmed real and positive.
+  ///
+  /// Round 5 correction: this used to take repeated square roots until the
+  /// residual `current - I` merely dropped under a fixed absolute
+  /// threshold (`1e-2`), then sum a Taylor (Mercator) series for
+  /// `log(I + residual)` until a term size fell under a runtime-computed
+  /// "seriesTolerance" — an absolute-tolerance-driven series stop the
+  /// standing brief explicitly rules out ("No absolute 1e-10 series
+  /// stop"). This is replaced with Higham's inverse scaling-and-squaring
+  /// method (Higham 2008, "Functions of Matrices", Algorithm 11.9;
+  /// Al-Mohy and Higham 2012): square-root down until the residual's
+  /// infinity norm is at or below [_gaussLegendreLogThreshold], the
+  /// convergence radius for an 8-point Gauss-Legendre quadrature of the
+  /// integral `log(I+X) = integral_0^1 X (I + tX)^-1 dt`, which is
+  /// algebraically identical to the [8/8] Pade approximant to log(1+x)
+  /// (Higham 2008, Theorem 11.13). The quadrature order is fixed a
+  /// priori — evaluating it is a single fixed-length sum, never a
+  /// runtime "has this converged yet" loop — so accuracy is guaranteed in
+  /// advance by the norm bound on the residual, not decided at runtime by
+  /// comparing a shrinking term against a tolerance.
   Matrix _principalLogByScalingAndSquaring({
     required double absoluteTolerance,
     required double relativeTolerance,
     int maxSquarings = 60,
-    int maxSeriesTerms = 200,
   }) {
     final Matrix identity = Matrix.identity(rowCount);
-    const double residualTarget = 1e-2;
+    const double gaussLegendreLogThreshold = 0.25;
 
     Matrix current = this;
     int squarings = 0;
-    while ((current - identity)._infinityNorm() > residualTarget &&
+    while ((current - identity)._infinityNorm() > gaussLegendreLogThreshold &&
         squarings < maxSquarings) {
       current = current.sqrt(
         absoluteTolerance: absoluteTolerance,
@@ -2268,7 +2575,7 @@ class Matrix {
       squarings++;
     }
 
-    if ((current - identity)._infinityNorm() > residualTarget) {
+    if ((current - identity)._infinityNorm() > gaussLegendreLogThreshold) {
       throw MatrixDomainError(
         'Matrix logarithm did not converge while scaling toward the '
         'identity.',
@@ -2277,33 +2584,50 @@ class Matrix {
     }
 
     final Matrix residual = current - identity;
-    Matrix term = residual;
-    Matrix sum = residual;
-    final double seriesTolerance = math.max(
-      absoluteTolerance,
-      relativeTolerance * math.max(residual._infinityNorm(), 1),
+    final Matrix logResidual = _logByGaussLegendreQuadrature(residual);
+
+    return _checkFiniteMatrix(
+      logResidual.scale(math.pow(2.0, squarings).toDouble()),
     );
+  }
 
-    bool converged = false;
-    for (int k = 2; k <= maxSeriesTerms; k++) {
-      term = term * residual;
-      final double coefficient = k.isOdd ? 1.0 / k : -1.0 / k;
-      sum = sum + term.scale(coefficient);
+  /// Evaluates `log(I + x)` via an 8-point Gauss-Legendre quadrature of
+  /// `integral_0^1 x (I + t*x)^-1 dt`, algebraically the [8/8] Pade
+  /// approximant to `log(1+x)` (Higham 2008, Theorem 11.13 / Algorithm
+  /// 11.9). The node/weight pairs are the standard 8-point Gauss-Legendre
+  /// rule on `[-1,1]`, affine-mapped to `[0,1]`. This is only accurate to
+  /// double precision when `‖x‖` is at or below the threshold enforced by
+  /// the caller before invoking this — it performs no internal
+  /// convergence check of its own, by design (see
+  /// [_principalLogByScalingAndSquaring]).
+  Matrix _logByGaussLegendreQuadrature(Matrix x) {
+    const List<double> halfNodes = <double>[
+      0.1834346424956498,
+      0.5255324099163290,
+      0.7966664774136267,
+      0.9602898564975363,
+    ];
+    const List<double> halfWeights = <double>[
+      0.3626837833783620,
+      0.3137066458778873,
+      0.2223810344533745,
+      0.1012285362903763,
+    ];
 
-      if (term._infinityNorm() / k < seriesTolerance) {
-        converged = true;
-        break;
+    final int n = x.rowCount;
+    final Matrix identity = Matrix.identity(n);
+    Matrix sum = Matrix.zeros(n, n);
+
+    for (int i = 0; i < halfNodes.length; i++) {
+      for (final double signedNode in <double>[-halfNodes[i], halfNodes[i]]) {
+        final double t = (signedNode + 1.0) / 2.0;
+        final double weight = halfWeights[i] / 2.0;
+        final Matrix factor = (identity + x.scale(t))._inverse();
+        sum = sum + (x * factor).scale(weight);
       }
     }
 
-    if (!converged) {
-      throw MatrixDomainError(
-        'Matrix logarithm Mercator series did not converge.',
-        errorId: CalculatrixErrorId.noConvergence,
-      );
-    }
-
-    return _checkFiniteMatrix(sum.scale(math.pow(2.0, squarings).toDouble()));
+    return sum;
   }
 
   /// Computes `this ^ exponent` (issue #5, power semantics table D25/D34).
@@ -2348,6 +2672,22 @@ class Matrix {
   }
 
   Matrix _powerByScalarExponent(double y) {
+    // Round 5 correction, case 1: a non-finite exponent must be rejected
+    // before it is ever classified as "an integer" — `double.infinity ==
+    // double.infinity.roundToDouble()` is true, which used to route
+    // Infinity into the binary-exponentiation loop below, whose only exit
+    // condition ("count > 0") never becomes false for Infinity (halving it
+    // stays Infinity, and `Infinity % 2` is NaN, so "is it odd" never even
+    // resolves either way). Rejecting non-finite input here, before any
+    // loop sees it, makes every loop below it unconditionally
+    // data-independent-bounded for a genuinely finite exponent.
+    if (!y.isFinite) {
+      throw MatrixDomainError(
+        'Power exponent must be a finite number.',
+        errorId: CalculatrixErrorId.nonFinite,
+      );
+    }
+
     final bool integerExponent = y == y.roundToDouble();
 
     if (isScalar) {
@@ -2863,6 +3203,26 @@ class Matrix {
     return maxRowSum;
   }
 
+  /// The largest absolute value among this matrix's entries — a plain
+  /// `max`, never a sum, so it stays finite whenever every entry
+  /// individually is, unlike [_infinityNorm] (a row sum, which can
+  /// genuinely overflow even though no single entry does). Used wherever a
+  /// scale-relative tolerance must never itself become non-finite as a
+  /// side effect of the very overflow it exists to guard against (round 5
+  /// correction, case 4).
+  double _maxAbsEntry() {
+    double maxAbs = 0;
+    for (final List<double> row in _rows) {
+      for (final double value in row) {
+        final double magnitude = value.abs();
+        if (magnitude > maxAbs) {
+          maxAbs = magnitude;
+        }
+      }
+    }
+    return maxAbs;
+  }
+
   /// Exact power-of-two scale normalization (round 4 correction, rule 1).
   ///
   /// Returns `k` such that `2^k` is the power of two nearest this matrix's
@@ -2889,15 +3249,79 @@ class Matrix {
   /// already rejected a non-finite matrix before this is ever called).
   ({int k, Matrix scaled}) _normalizedByPowerOfTwo() {
     final double norm = _infinityNorm();
-    if (norm == 0 || !norm.isFinite) {
+    if (norm == 0) {
       return (k: 0, scaled: this);
+    }
+    if (!norm.isFinite) {
+      // Round 5 correction, case 4: a non-finite infinity-norm here means
+      // this matrix's row sums genuinely overflow double precision (every
+      // entry can still be individually finite, e.g. all entries at
+      // 1e308), not that normalization is inapplicable. Silently returning
+      // `(k: 0, scaled: this)` (the previous behavior) let every caller's
+      // numerically-sensitive core run directly on data it has no scale
+      // handle on at all — this raises the typed error instead, so the
+      // caller sees exactly why no result could be produced rather than
+      // getting a wrong one (e.g. a spurious rotation from `isComplexForm`
+      // wrongly comparing Infinity <= Infinity).
+      throw MatrixDomainError(
+        'Matrix infinity-norm overflowed to a non-finite value before '
+        'scale normalization.',
+        errorId: CalculatrixErrorId.nonFinite,
+      );
     }
     final int k = (math.log(norm) / math.ln2).round();
     if (k == 0) {
       return (k: 0, scaled: this);
     }
-    final double factor = math.pow(2.0, -k).toDouble();
-    return (k: k, scaled: scale(factor));
+    return (k: k, scaled: _scaleByPowerOfTwo(this, -k.toDouble()));
+  }
+
+  /// Scales [source] by `2^exponent` in bounded steps of at most `2^1000`
+  /// per multiply, rather than computing `math.pow(2.0, exponent)` as a
+  /// single double and multiplying by it once.
+  ///
+  /// A single-step `2^k` overflows to `Infinity` (or underflows to `0`)
+  /// once `|k|` exceeds double's representable exponent range (~1023),
+  /// *even when the final, fully-scaled result would itself be finite* —
+  /// e.g. undoing a `k = 1024` normalization on an already-tiny matrix.
+  /// Multiplying by `2^1000` and then `2^24` (say) instead of `2^1024` in
+  /// one step keeps every intermediate matrix in double's representable
+  /// range whenever the true mathematical result is representable, exactly
+  /// like `ldexp` in C. The loop bound is `ceil(|exponent| / 1000) + 1`,
+  /// which is always finite for a finite `exponent` (the only kind this is
+  /// ever called with, since every call site normalizes or undoes a
+  /// normalization derived from a matrix that already passed a finiteness
+  /// check).
+  static Matrix _scaleByPowerOfTwo(Matrix source, double exponent) {
+    const double maxStep = 1000;
+    Matrix result = source;
+    double remaining = exponent;
+    while (remaining.abs() > maxStep) {
+      final double step = remaining > 0 ? maxStep : -maxStep;
+      result = result.scale(math.pow(2.0, step).toDouble());
+      remaining -= step;
+    }
+    if (remaining != 0) {
+      result = result.scale(math.pow(2.0, remaining).toDouble());
+    }
+    return result;
+  }
+
+  /// Scalar analog of [_scaleByPowerOfTwo], for call sites that scale a
+  /// single `double` (an eigenvalue) rather than a whole [Matrix].
+  static double _scalarScaleByPowerOfTwo(double value, double exponent) {
+    const double maxStep = 1000;
+    double result = value;
+    double remaining = exponent;
+    while (remaining.abs() > maxStep) {
+      final double step = remaining > 0 ? maxStep : -maxStep;
+      result *= math.pow(2.0, step).toDouble();
+      remaining -= step;
+    }
+    if (remaining != 0) {
+      result *= math.pow(2.0, remaining).toDouble();
+    }
+    return result;
   }
 
   /// Hypot-style magnitude of `a + bi`, computed as
@@ -2948,6 +3372,151 @@ class Matrix {
     }
 
     return isUpper || isLower;
+  }
+
+  /// Whether this square matrix's strictly-lower-triangular entries are all
+  /// exactly zero (upper triangular; a diagonal matrix also qualifies).
+  /// Used to pick the recurrence direction for [sqrt]'s and [log]'s
+  /// triangular fast paths: both closed-form recurrences (Bjorck-Hammarling,
+  /// Parlett) are stated for an upper triangular matrix; a lower triangular
+  /// input is transposed in, solved, and transposed back, since
+  /// `f(Aᵀ) = f(A)ᵀ` for any of these functions on a real matrix.
+  bool _isUpperTriangular() {
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = 0; c < r; c++) {
+        if (_rows[r][c] != 0) return false;
+      }
+    }
+    return true;
+  }
+
+  /// [sqrt] fast path for an exactly triangular (but not exactly diagonal)
+  /// matrix: the Bjorck and Hammarling recurrence (Higham, "Functions of
+  /// Matrices", 2008, Algorithm 6.3) for the square root of an upper
+  /// triangular matrix `T`. Reading off entry `(i,j)` of `S*S = T` gives:
+  ///
+  /// - `S[i][i] = sqrt(T[i][i])` — the diagonal, exact.
+  /// - For `i < j`: `S[i][j] = (T[i][j] - sum_{k=i+1}^{j-1} S[i][k]*S[k][j])
+  ///   / (S[i][i] + S[j][j])`, solved by increasing distance from the
+  ///   diagonal (`gap = j - i`), so every `S[i][k]`/`S[k][j]` used in the
+  ///   sum for a given `gap` was already computed at a smaller `gap`.
+  ///
+  /// No iteration, no convergence tolerance: closed form throughout. Throws
+  /// the same typed domain errors [sqrt]'s diagonal fast path throws — a
+  /// negative diagonal entry (no real square root exists), or a zero
+  /// `S[i][i] + S[j][j]` denominator (a repeated zero eigenvalue makes the
+  /// recurrence itself singular; this is a genuine case where the real
+  /// square root either fails to exist or is not unique, not a numerical
+  /// artifact to work around).
+  Matrix _triangularSqrt() {
+    final bool upper = _isUpperTriangular();
+    final Matrix triangular = upper ? this : transpose();
+    final int n = triangular.rowCount;
+    final List<List<double>> t = triangular._rows;
+
+    final List<List<double>> s = List<List<double>>.generate(
+      n,
+      (_) => List<double>.filled(n, 0),
+      growable: false,
+    );
+
+    for (int i = 0; i < n; i++) {
+      final double diagonalValue = t[i][i];
+      if (diagonalValue < 0) {
+        throw MatrixDomainError(
+          'Square root is undefined for this matrix in the real domain.',
+        );
+      }
+      s[i][i] = math.sqrt(diagonalValue);
+    }
+
+    for (int gap = 1; gap < n; gap++) {
+      for (int i = 0; i + gap < n; i++) {
+        final int j = i + gap;
+        double sum = 0;
+        for (int k = i + 1; k < j; k++) {
+          sum += s[i][k] * s[k][j];
+        }
+        final double denominator = s[i][i] + s[j][j];
+        if (denominator == 0) {
+          throw MatrixDomainError(
+            'Square root is undefined for this matrix: a repeated zero '
+            'eigenvalue makes the Bjorck-Hammarling recurrence singular.',
+          );
+        }
+        s[i][j] = (t[i][j] - sum) / denominator;
+      }
+    }
+
+    final Matrix result = Matrix(s);
+    return upper ? result : result.transpose();
+  }
+
+  /// [log] fast path for an exactly triangular matrix (diagonal included):
+  /// the Parlett recurrence (Parlett, "A recurrence for the elements of
+  /// function of triangular matrices", 1976; restated in Higham, "Functions
+  /// of Matrices", 2008, Algorithm 4.13) for `L = log(T)` of an upper
+  /// triangular `T` whose diagonal is already known strictly positive by
+  /// [log]'s domain check. Reading `L*T = T*L` (any function of a
+  /// triangular matrix commutes with it) off entry `(i,j)` gives:
+  ///
+  /// - `L[i][i] = log(T[i][i])` — the diagonal, exact.
+  /// - For `i < j` with `T[i][i] != T[j][j]`:
+  ///   `L[i][j] = (T[i][j]*(L[i][i]-L[j][j]) + sum_{k=i+1}^{j-1}
+  ///   (L[i][k]*T[k][j] - T[i][k]*L[k][j])) / (T[i][i]-T[j][j])`, solved by
+  ///   increasing distance from the diagonal (`gap = j - i`).
+  /// - For `i < j` with `T[i][i] == T[j][j]` and `gap == 1`: the divided
+  ///   difference of `log` at a repeated point is `1/T[i][i]`, giving
+  ///   `L[i][j] = T[i][j] / T[i][i]` directly.
+  /// - For `i < j` with `T[i][i] == T[j][j]` and `gap >= 2`: if the
+  ///   coupling sum above happens to be exactly zero, the same
+  ///   `L[i][j] = T[i][j] / T[i][i]` still applies (there is no coupling to
+  ///   resolve); otherwise this is a genuine repeated eigenvalue with
+  ///   nonzero coupling beyond the first superdiagonal, which needs a
+  ///   higher-order divided-difference extension of the Parlett recurrence
+  ///   this implementation does not carry — it is rejected with a typed
+  ///   domain error rather than approximated (documented scope limitation,
+  ///   per the standing brief's escape valve).
+  Matrix _triangularLog() {
+    final bool upper = _isUpperTriangular();
+    final Matrix triangular = upper ? this : transpose();
+    final int n = triangular.rowCount;
+    final List<List<double>> t = triangular._rows;
+
+    final List<List<double>> l = List<List<double>>.generate(
+      n,
+      (_) => List<double>.filled(n, 0),
+      growable: false,
+    );
+
+    for (int i = 0; i < n; i++) {
+      l[i][i] = math.log(t[i][i]);
+    }
+
+    for (int gap = 1; gap < n; gap++) {
+      for (int i = 0; i + gap < n; i++) {
+        final int j = i + gap;
+        double sum = 0;
+        for (int k = i + 1; k < j; k++) {
+          sum += l[i][k] * t[k][j] - t[i][k] * l[k][j];
+        }
+        final double diagonalGap = t[i][i] - t[j][j];
+        if (diagonalGap != 0) {
+          l[i][j] = (t[i][j] * (l[i][i] - l[j][j]) + sum) / diagonalGap;
+        } else if (gap == 1 || sum == 0) {
+          l[i][j] = t[i][j] / t[i][i];
+        } else {
+          throw MatrixDomainError(
+            'Logarithm requires a higher-order Parlett recurrence for a '
+            'repeated eigenvalue with nonzero coupling beyond the first '
+            'superdiagonal, which this implementation does not support.',
+          );
+        }
+      }
+    }
+
+    final Matrix result = Matrix(l);
+    return upper ? result : result.transpose();
   }
 
   /// Whether every off-diagonal entry of this square matrix is exactly
@@ -3022,23 +3591,23 @@ class Matrix {
     return true;
   }
 
-  /// Attempts [sqrt] via eigendecomposition for a symmetric matrix, or
-  /// returns `null` if this matrix is not exactly symmetric, has any
-  /// negative eigenvalue (the real square root is undefined; the caller
-  /// falls through to the Newton loop, which raises the appropriate
-  /// domain error), or the reconstructed candidate fails its own residual
-  /// check (e.g. a near-degenerate eigenvalue cluster made the computed
-  /// eigenvectors themselves inaccurate). See the call site in [sqrt] for
-  /// why this is preferred over Denman-Beavers Newton iteration whenever
-  /// it applies.
-  Matrix? _trySymmetricEigenSqrt({
+  /// Attempts [sqrt] via eigendecomposition for any real matrix
+  /// diagonalizable over the reals (round 5 correction: generalized from a
+  /// symmetric-only gate — see [sqrt]'s call site for the scope note), or
+  /// returns `null` if [diagonalization] itself fails (a genuine complex
+  /// eigenvalue pair, or a defective matrix with no full eigenbasis), any
+  /// eigenvalue is negative (the real square root is undefined; the caller
+  /// falls through to the Newton loop, which raises the appropriate domain
+  /// error), or the reconstructed candidate fails its own residual check
+  /// (e.g. a near-degenerate eigenvalue cluster made the computed
+  /// eigenvectors themselves inaccurate, or `P` was too ill-conditioned to
+  /// invert). See the call site in [sqrt] for why this is preferred over
+  /// Denman-Beavers Newton iteration whenever it applies.
+  Matrix? _tryRealEigenSqrt({
     required double relativeTolerance,
     required double absoluteTolerance,
+    required bool symmetric,
   }) {
-    if (!_isApproximatelySymmetric()) {
-      return null;
-    }
-
     final Diagonalization eigen;
     try {
       eigen = diagonalization(absoluteTolerance: absoluteTolerance);
@@ -3068,10 +3637,24 @@ class Matrix {
       ),
     );
 
-    // P should be orthogonal (eigenvectors of a symmetric matrix), so
-    // P^T approximates P^-1 without the extra numerical work — and error
-    // — of an explicit inversion.
-    final Matrix candidate = eigen.p * diagSqrt * eigen.p.transpose();
+    // P is orthogonal only when the input is symmetric (eigenvectors of a
+    // symmetric matrix), so P^T substitutes for P^-1 only in that case,
+    // without the extra numerical work — and error — of an explicit
+    // inversion. For a non-symmetric matrix, P^-1 is computed directly; a
+    // singular (or numerically indistinguishable from singular) P means
+    // the matrix is not diagonalizable in a numerically usable way here,
+    // which falls through to the Newton loop rather than trusting a
+    // meaningless result.
+    final Matrix pInverse;
+    try {
+      pInverse = symmetric
+          ? eigen.p.transpose()
+          : eigen.p._inverse(absoluteTolerance: absoluteTolerance);
+    } on MatrixDomainError {
+      return null;
+    }
+
+    final Matrix candidate = eigen.p * diagSqrt * pInverse;
 
     // Purely scale-relative (round 4 correction, rule 4): `this._infinityNorm()`
     // is guaranteed nonzero here (sqrt's own zero-norm shortcut runs before
@@ -3093,6 +3676,69 @@ class Matrix {
     }
 
     return _checkFiniteMatrix(candidate);
+  }
+
+  /// Attempts [log] via eigendecomposition for any real matrix
+  /// diagonalizable over the reals (round 5 correction) — the same
+  /// approach, and the same documented scope note, as [_tryRealEigenSqrt];
+  /// see that method's call site in [sqrt] for the full explanation of why
+  /// diagonalization substitutes for the prescribed real-Schur-form
+  /// approach here. Returns `null` if [diagonalization] itself fails (a
+  /// genuine complex eigenvalue pair, or a defective matrix with no full
+  /// eigenbasis) or `P` is too ill-conditioned to invert, or — crucially,
+  /// since unlike [_tryRealEigenSqrt] there is no cheap way to verify a
+  /// candidate logarithm's residual directly — if `P*D*P^-1` fails to
+  /// reconstruct `this` itself within tolerance, which is exactly the
+  /// condition under which the eigenbasis `P` would be untrustworthy to
+  /// build `log(A) = P*diag(log(d_i))*P^-1` from in the first place. Every
+  /// eigenvalue in `D` is already known real and strictly positive by the
+  /// domain check [log] performs before calling this.
+  Matrix? _tryRealEigenLog({
+    required double relativeTolerance,
+    required double absoluteTolerance,
+  }) {
+    final bool symmetric = _isApproximatelySymmetric();
+    final Diagonalization eigen;
+    try {
+      eigen = diagonalization(absoluteTolerance: absoluteTolerance);
+    } on MatrixDomainError {
+      return null;
+    }
+
+    final Matrix pInverse;
+    try {
+      pInverse = symmetric
+          ? eigen.p.transpose()
+          : eigen.p._inverse(absoluteTolerance: absoluteTolerance);
+    } on MatrixDomainError {
+      return null;
+    }
+
+    final Matrix reconstructed = eigen.p * eigen.d * pInverse;
+    final double acceptanceTolerance = math.max(
+      relativeTolerance,
+      CalculatrixNumericPolicy.sqrtResidualAcceptanceTolerance,
+    );
+    final double reconstructionDeviation =
+        (reconstructed - this)._infinityNorm() / _infinityNorm();
+    if (reconstructionDeviation > acceptanceTolerance) {
+      return null;
+    }
+
+    final int n = rowCount;
+    final Matrix logDiag = Matrix(
+      List<List<double>>.generate(
+        n,
+        (int r) => List<double>.generate(
+          n,
+          (int c) => r == c ? math.log(eigen.d.at(r, r)) : 0,
+          growable: false,
+        ),
+        growable: false,
+      ),
+    );
+
+    return _checkFiniteMatrix(eigen.p * logDiag * pInverse);
   }
 
   @override

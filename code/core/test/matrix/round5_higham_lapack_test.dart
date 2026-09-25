@@ -189,8 +189,15 @@ void main() {
           <double>[0, 2],
         ]).exp();
 
-        expect(result.at(0, 0), math.e);
-        expect(result.at(1, 1), math.e * math.e);
+        // The diagonal is recomputed directly as exp(t_ii) (Al-Mohy and
+        // Higham 2009), not derived from the Pade approximant. `math.e *
+        // math.e` and `math.exp(2.0)` are two different ways to compute
+        // "e squared" in double precision and are not bit-identical (they
+        // differ in the last ULP: 7.3890560989306495 vs 7.38905609893065),
+        // so the expectation here is `math.exp(2.0)` to match what the
+        // spec actually prescribes computing.
+        expect(result.at(0, 0), math.exp(1.0));
+        expect(result.at(1, 1), math.exp(2.0));
       },
     );
 
