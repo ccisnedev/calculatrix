@@ -4008,8 +4008,44 @@ class Matrix {
       }
       final double angle = math.atan2(w, m);
       final double rToY = _checkFiniteScalar(math.pow(radius, y).toDouble());
-      c1 = rToY * math.sin(y * angle) / w;
-      c0 = rToY * math.cos(y * angle) - c1 * m;
+      final double rToYSin = rToY * math.sin(y * angle);
+      final double rToYCos = rToY * math.cos(y * angle);
+
+      // Round 12 correction, finding 4: `c1 = rToY*sin(y*angle)/w`, then
+      // every entry as `c0 + c1*A` for `c0 = rToY*cos(y*angle) - c1*m`,
+      // materializes `c1` itself as a standalone value, even though the
+      // only quantities anything downstream actually needs are `c1*b`,
+      // `c1*c` and `c1*(a-m)`/`c1*(d-m)`. `rToY` alone can already sit
+      // within a few orders of magnitude of double's max or min (`radius`
+      // raised to `y` controls that, independent of `w`), while `w`, `b`,
+      // `c` and `a-m`/`d-m` all share the original matrix's own, possibly
+      // far tinier or huger, scale: dividing `rToY*sin(y*angle)` by `w`
+      // first can overflow to `Infinity`, or underflow to exactly 0, even
+      // though the true `b`/`c`/`(a-m)`-scaled products are perfectly
+      // representable (e.g. `[[0,1e-200],[-2e-200,0]]^-1.5`: true `(0,1)`
+      // entry is `~-2.97e299`, but `c1` alone would need to be
+      // `~-2.97e499`, past double's range entirely). Computing `b/w`,
+      // `c/w` and `(a-m)/w`/`(d-m)/w` first instead, before multiplying
+      // by `rToY*sin(y*angle)`, never forms that unrepresentable
+      // intermediate: each ratio is well-conditioned (comparable
+      // matrix-scale quantities divided by each other), and the result is
+      // exactly the same mathematical entry, just reordered.
+      final double aMinusM = a - m;
+      final double dMinusM = d - m;
+      final double entry00 = _checkFiniteScalar(
+        rToYCos + (rToYSin * (aMinusM / w)),
+      );
+      final double entry11 = _checkFiniteScalar(
+        rToYCos + (rToYSin * (dMinusM / w)),
+      );
+      final double entry01 = _checkFiniteScalar(rToYSin * (b / w));
+      final double entry10 = _checkFiniteScalar(rToYSin * (c / w));
+      return _checkFiniteMatrix(
+        Matrix(<List<double>>[
+          <double>[entry00, entry01],
+          <double>[entry10, entry11],
+        ]),
+      );
     } else {
       final double l1 = eigen.lambda1;
       final double l2 = eigen.lambda2;
