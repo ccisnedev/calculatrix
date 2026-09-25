@@ -242,4 +242,38 @@ void main() {
       expect(values[1], closeTo(1.0, 1e-9));
     });
   });
+
+  group('Round 8, finding 8: general 2x2 real-power divided difference must '
+      'anchor at the larger-magnitude eigenvalue, not always lambda2', () {
+    test('power(1.5) of a general 2x2 with a huge eigenvalue ratio succeeds '
+        'instead of wrongly throwing nonFinite from a 0*Infinity product',
+        () {
+      // Eigenvalues are approximately 1 (l1) and 1e-300 (l2). Anchoring
+      // the divided difference at l2 (the previous, always-l2 behavior)
+      // computes l2^1.5, which underflows to exactly 0, and separately
+      // computes expm1(y*log1p((l1-l2)/l2)), whose argument is huge
+      // (l1/l2 ~ 1e300) and whose expm1 result overflows to Infinity, so
+      // their product is 0*Infinity = NaN. Anchoring at l1 (the
+      // larger-magnitude eigenvalue) instead computes l1^1.5 = 1 (finite,
+      // no underflow) and expm1(y*log1p((l2-l1)/l1)), whose argument is
+      // safely close to -1, which never overflows. Since l2 is negligible
+      // next to l1, the true result is (to double precision) simply A
+      // itself: A^1.5 has eigenvalues 1^1.5=1 and (~0)^1.5=~0, so c0=~0
+      // and c1=~1 in the c0*I + c1*A closed form.
+      final Matrix matrix = Matrix(<List<double>>[
+        <double>[1, 1e-160],
+        <double>[2e-160, 1e-300],
+      ]);
+
+      final Matrix result = matrix.power(Matrix.scalar(1.5));
+
+      expect(result.at(0, 0).isFinite, isTrue);
+      expect(result.at(0, 1).isFinite, isTrue);
+      expect(result.at(1, 0).isFinite, isTrue);
+      expect(result.at(1, 1).isFinite, isTrue);
+      expect(result.at(0, 0), closeTo(1.0, 1e-6));
+      expect(result.at(0, 1), closeTo(1e-160, 1e-165));
+      expect(result.at(1, 0), closeTo(2e-160, 1e-165));
+    });
+  });
 }
