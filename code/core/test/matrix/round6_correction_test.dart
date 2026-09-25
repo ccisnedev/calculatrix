@@ -1,5 +1,5 @@
 // Round 6 Codex correction: 12 issues found in round 4, 4 fixed here under
-// strict TDD (items 4, 10, 6, 7, 11 — see the coordinator's task for exact
+// strict TDD (items 4, 10, 6, 7, 11: see the coordinator's task for exact
 // wording). The exp/log/sqrt scope decision for general and triangular
 // matrices (items covered elsewhere in round 4) is explicitly OUT of scope
 // for this file and is not touched.
@@ -15,7 +15,7 @@ import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Round 6 — item 4: inverse finiteness on every path', () {
+  group('Round 6, item 4: inverse finiteness on every path', () {
     test(
       '[[1e-310,0],[0,1]].inverse() raises non-finite (1/1e-310 overflows '
       'the diagonal fast path: 1e-310 is subnormal, so 1/1e-310 ~ 1e310, '
@@ -60,7 +60,7 @@ void main() {
   });
 
   group(
-    'Round 6 — item 4 (CLI crash path): no uncaught toInt on non-finite '
+    'Round 6, item 4 (CLI crash path): no uncaught toInt on non-finite '
     'values',
     () {
       test(
@@ -132,7 +132,7 @@ void main() {
     },
   );
 
-  group('Round 6 — item 10: inverse without global normalization', () {
+  group('Round 6, item 10: inverse without global normalization', () {
     test(
       'diag(1e200,1e-200).inverse() gives diag(1e-200,1e200), not a false '
       '"singular matrix" (the previous global power-of-two normalization '
@@ -222,7 +222,7 @@ void main() {
   });
 
   group(
-    'Round 6 — items 6 and 11: Francis double-shift QR with no absolute '
+    'Round 6, items 6 and 11: Francis double-shift QR with no absolute '
     'subdiagonal cutoff',
     () {
       test(
@@ -320,7 +320,7 @@ void main() {
     },
   );
 
-  group('Round 6 — item 7: scaled 2x2 eigenvalue solver, no absolute zeroing', () {
+  group('Round 6, item 7: scaled 2x2 eigenvalue solver, no absolute zeroing', () {
     test('[[0,1e20],[1e-20,0]].eigenvalues() gives exactly {1,-1}', () {
       final Matrix result = Matrix(<List<double>>[
         <double>[0, 1e20],
@@ -348,7 +348,7 @@ void main() {
   });
 
   group(
-    'Round 6 — item 11: real Francis double-shift QR on Hessenberg form, '
+    'Round 6, item 11: real Francis double-shift QR on Hessenberg form, '
     'Schur vectors',
     () {
       test(

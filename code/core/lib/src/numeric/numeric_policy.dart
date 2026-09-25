@@ -11,7 +11,7 @@ class CalculatrixNumericPolicy {
   /// relative tolerances throughout the eigenvalue/kind-classification
   /// pipeline are expressed as a small integer multiple of this constant
   /// times the relevant magnitude (a matrix norm, or the larger of two
-  /// compared entries), rather than as a fixed absolute floor — a fixed
+  /// compared entries), rather than as a fixed absolute floor: a fixed
   /// floor is wrong by construction at any scale other than the one it was
   /// tuned for (see [eigenvalueRoundingNoiseTolerance] and the doc comments
   /// on `Matrix.isComplexForm` and `Matrix.log` for the specific formulas).
@@ -47,7 +47,7 @@ class CalculatrixNumericPolicy {
   /// [defaultRelativeTolerance] (1e-10). A symmetric positive-definite
   /// matrix with condition number ~2.5e7 (e.g. eigenvalues ~5 and ~2e-7)
   /// already limits achievable accuracy to roughly
-  /// `2.5e7 * 2.22e-16 =~ 5.5e-9`, above 1e-10 — demanding 1e-10 there
+  /// `2.5e7 * 2.22e-16 =~ 5.5e-9`, above 1e-10: demanding 1e-10 there
   /// would reject a numerically correct principal square root because no
   /// double-precision computation of it can ever be that precise. 1e-8
   /// gives headroom above that bound for condition numbers up into the

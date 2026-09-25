@@ -331,7 +331,7 @@ class Calculatrix {
         }
         // Tracked as a count, not a boolean (round 4 correction, case H):
         // consecutive prefix functions (e.g. `√√(16)`) each push their own
-        // pending obligation onto the *same* frame — a boolean can only
+        // pending obligation onto the *same* frame: a boolean can only
         // ever remember whether *some* function is pending, not how many,
         // so a nested `(...)` group that resolves one of them (see below)
         // would wrongly erase all of them at once.
@@ -347,7 +347,7 @@ class Calculatrix {
           );
         }
         // Only the *immediately* preceding function is parenthesized by
-        // this group (`f(...)` makes `f` no longer bare) — any further
+        // this group (`f(...)` makes `f` no longer bare): any further
         // pending functions stacked on this same frame from before it
         // (e.g. the outer `√` in `√√(16)`) remain pending across the
         // nested group and must still be resolved once it closes.
@@ -369,7 +369,7 @@ class Calculatrix {
           frames.removeLast();
           // The just-closed group is itself a complete operand for
           // whatever pending function(s) remain on the parent frame (e.g.
-          // the outer `√` in `√√(16)`) — resolve it exactly as an operand
+          // the outer `√` in `√√(16)`), resolve it exactly as an operand
           // token would, so a further bare operator after it is still
           // rejected.
           final _InfixValidationFrame parent = frames.last;
@@ -632,7 +632,7 @@ class _NumberScanResult {
 
 class _InfixValidationFrame {
   // A count, not a boolean, because consecutive prefix functions (e.g.
-  // `√√(16)`) stack more than one pending obligation on the same frame —
+  // `√√(16)`) stack more than one pending obligation on the same frame:
   // see the round 4 correction (case H) doc comments at the call sites in
   // [Calculatrix._validateInfixTokens].
   int pendingFunctionCount = 0;

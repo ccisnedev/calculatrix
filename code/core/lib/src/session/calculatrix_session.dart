@@ -922,7 +922,7 @@ class CalculatrixSession {
 
   // Round 6 correction (item 4): `double.toInt()` throws for a non-finite
   // value ("Infinity or NaN toInt"). This was reachable from the CLI's
-  // command mode through the RPN stack — e.g. pushing `1e300*1e300`
+  // command mode through the RPN stack, e.g. pushing `1e300*1e300`
   // (which overflows to `Infinity`; ordinary matrix multiply does not
   // check finiteness by design) and then reading `rpnTopLiteral` or
   // `rpnStackLiterals`, both of which serialize through

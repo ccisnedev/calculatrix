@@ -19,7 +19,7 @@ import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Round 4 correction — case A: exp scale-relative fixes', () {
+  group('Round 4 correction, case A: exp scale-relative fixes', () {
     test(
       'A1: e^[[1,1e20],[0,1]] = [[e, e*1e20],[0,e]] exactly (mean-eigenvalue '
       'shift makes the shifted matrix exactly nilpotent)',
@@ -69,7 +69,7 @@ void main() {
     );
   });
 
-  group('Round 4 correction — case B: must not hang (run isolate-guarded)', () {
+  group('Round 4 correction, case B: must not hang (run isolate-guarded)', () {
     test(
       'B1: 10^[[1e308,0],[0,0]] raises non-finite quickly instead of '
       'hanging (ln(10)*1e308 overflows to Infinity; a loop whose only '
@@ -136,7 +136,7 @@ void main() {
     );
   });
 
-  group('Round 4 correction — case C: tiny-scale sqrt/power', () {
+  group('Round 4 correction, case C: tiny-scale sqrt/power', () {
     test(
       'C1: sqrt([[2e-30,1e-30],[1e-30,2e-30]]) is not the zero matrix; '
       'matches the exact eigen-based closed form',
@@ -197,7 +197,7 @@ void main() {
     );
   });
 
-  group('Round 4 correction — case D: tiny-scale eigenvalues no longer '
+  group('Round 4 correction, case D: tiny-scale eigenvalues no longer '
       'zeroed', () {
     test(
       '[[2e-14,1e-14,0],[1e-14,2e-14,0],[0,0,3e-14]]^0.5 succeeds '
@@ -237,7 +237,7 @@ void main() {
     );
   });
 
-  group('Round 4 correction — case E: tiny-scale log-complex-form', () {
+  group('Round 4 correction, case E: tiny-scale log-complex-form', () {
     test(
       '[[1e-20,0],[0,1e-20]]^0.5 = 1e-10*I, not a wrong log-undefined '
       '(1e-20 is genuinely nonzero, just far below the old fixed '
@@ -266,7 +266,7 @@ void main() {
     );
   });
 
-  group('Round 4 correction — case F: tiny-scale inverse', () {
+  group('Round 4 correction, case F: tiny-scale inverse', () {
     test(
       '[[1e-20,0],[0,2e-20]]^-1 = diag(1e20, 5e19), not a wrong '
       'singular-matrix (the pivot cutoff was an absolute 1e-12 floor, far '
@@ -295,7 +295,7 @@ void main() {
     );
   });
 
-  group('Round 4 correction — case G: cyclic permutation matrix', () {
+  group('Round 4 correction, case G: cyclic permutation matrix', () {
     test(
       '[[0,0,1],[1,0,0],[0,1,0]]^0.5 is unsupported-matrix-function: not '
       'diagonal, not exactly symmetric and not 2x2, regardless of its '
@@ -321,7 +321,7 @@ void main() {
     );
   });
 
-  group('Round 4 correction — case H: nested bare function arguments', () {
+  group('Round 4 correction, case H: nested bare function arguments', () {
     test(
       '√√(16)+1 is a syntax error (a pending-function stack, not a '
       'boolean, is needed to track that the OUTER √ is still bare once '

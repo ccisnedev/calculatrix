@@ -348,14 +348,14 @@ class Matrix {
     );
   }
 
-  /// Computes the inverse directly on this matrix's own entries — no
+  /// Computes the inverse directly on this matrix's own entries, no
   /// global power-of-two normalization (round 6 correction, item 10: a
   /// *single* scale factor `c = 2^k` is wrong for a matrix whose entries
   /// themselves span a huge dynamic range, e.g. `diag(1e200, 1e-200)`.
   /// Undoing one global `k` chosen from the matrix's infinity norm (~1e200
   /// here) shrinks the *other* entry (1e-200) by the same factor, which
-  /// can underflow it to exact zero — turning a perfectly invertible
-  /// diagonal matrix into a false "singular" result — or, for a matrix
+  /// can underflow it to exact zero, turning a perfectly invertible
+  /// diagonal matrix into a false "singular" result, or, for a matrix
   /// like `diag(1e160, 1e-160)`, overflow the rescale-back step to
   /// `Infinity` even though the true inverse is representable in double
   /// precision. Both hazards are specific to a *global* normalization
@@ -606,7 +606,7 @@ class Matrix {
   /// `c = 2^k` nearest `‖A‖`. Every deflation check and eigenvalue-cleanup
   /// cutoff inside [_eigenvaluesRaw] compares against the fixed
   /// [absoluteTolerance] (1e-12 by default), which is only ever a sound
-  /// floor when the matrix it is applied to has norm ~1 — exactly what
+  /// floor when the matrix it is applied to has norm ~1, exactly what
   /// `normalized` guarantees regardless of `A`'s own scale. Without this,
   /// a tiny-scale matrix (e.g. eigenvalues ~1e-14) has every genuine
   /// subdiagonal/eigenvalue entry wrongly zeroed by a cutoff many orders
@@ -690,7 +690,7 @@ class Matrix {
     // disclosed implementation-detail deviation (explicit-form shift
     // steps rather than hand-coded implicit bulge-chasing).
     //
-    // A complex-conjugate pair anywhere in the spectrum throws — this is
+    // A complex-conjugate pair anywhere in the spectrum throws: this is
     // the real-only public contract [eigenvalues] has always had.
     final ({List<List<double>> t, List<List<double>> q}) schur =
         _realSchurDecomposition();
@@ -787,7 +787,7 @@ class Matrix {
   /// Normalize-then-undo wrapper (round 4 correction, rule 1): the
   /// eigenvector Gaussian elimination below has its own pivot/free-column
   /// cutoffs against [absoluteTolerance], which are only sound for a
-  /// matrix of norm ~1 — exactly the same defect [_inverseRaw] and
+  /// matrix of norm ~1, exactly the same defect [_inverseRaw] and
   /// [_eigenvaluesRaw] had. Eigenvectors are scale-invariant (the null
   /// space of `(cA - cλI) = c(A - λI)` is identical to that of `A - λI`),
   /// so the elimination is done entirely on the normalized matrix with its
@@ -1344,7 +1344,7 @@ class Matrix {
       }
     }
 
-    // Structurally exact zero below the subdiagonal — see doc comment.
+    // Structurally exact zero below the subdiagonal, see doc comment.
     for (int i = 2; i < n; i++) {
       for (int j = 0; j < i - 1; j++) {
         h[i][j] = 0;
@@ -1356,7 +1356,7 @@ class Matrix {
 
   /// Builds the Householder vector that reflects [w] onto a multiple of
   /// the first standard basis vector, or `null` if [w] is already exactly
-  /// zero (no reflection needed — an exact structural fact, not an
+  /// zero (no reflection needed: an exact structural fact, not an
   /// absolute-cutoff judgment call).
   static List<double>? _householderVector(List<double> w) {
     final int len = w.length;
@@ -1401,7 +1401,7 @@ class Matrix {
   /// `Ha`'s own entries) that Algorithm 7.5.1 uses to avoid ever forming
   /// `M`. The Implicit Q Theorem (G&VL, Theorem 7.4.2) guarantees these
   /// produce the same next Hessenberg iterate (up to column sign) for an
-  /// unreduced Hessenberg `Ha` — and, because `Ha` is Hessenberg, `Ha^2`
+  /// unreduced Hessenberg `Ha`, and, because `Ha` is Hessenberg, `Ha^2`
   /// (and so `M`) has lower bandwidth exactly 2, which means a *plain*,
   /// unmodified Householder QR sweep of `M` automatically produces
   /// reflectors confined to 3 (then 2, then 1) consecutive rows, i.e. it
@@ -1556,7 +1556,7 @@ class Matrix {
   ///
   /// `T` is quasi-upper-triangular: 1x1 diagonal blocks for real
   /// eigenvalues, 2x2 diagonal blocks for complex-conjugate pairs. `Q` is
-  /// orthogonal — the accumulated Schur vectors.
+  /// orthogonal: the accumulated Schur vectors.
   ///
   /// Deflation test (round 8 correction, finding 6): the LAPACK DLAHQR
   /// two-stage small-subdiagonal criterion (Ahues and Tisseur, LAWN 122,
@@ -1583,7 +1583,7 @@ class Matrix {
   /// eigenvalues sitting equally spaced on the unit circle).
   ///
   /// Iteration bound: `30*n` total QR steps taken without an intervening
-  /// deflation (Higham 2008 Ch. 2 / LAPACK's own convergence budget) — a
+  /// deflation (Higham 2008 Ch. 2 / LAPACK's own convergence budget): a
   /// data-independent loop bound that throws `no-convergence` if
   /// exhausted, never a silent fallback.
   ({List<List<double>> t, List<List<double>> q}) _realSchurDecomposition() {
@@ -1649,7 +1649,7 @@ class Matrix {
 
       if (hi - lo == 1) {
         // An unreduced 2x2 trailing block: a valid Schur block either way
-        // (real pair or complex-conjugate pair) — leave it and deflate.
+        // (real pair or complex-conjugate pair), leave it and deflate.
         hi -= 2;
         iterationsSinceDeflation = 0;
         continue;
@@ -1687,23 +1687,23 @@ class Matrix {
       // the order of a few ULPs in entries that are structurally exactly
       // zero for a Hessenberg matrix (`h[i][j]` for `i > j+1`), because the
       // dense QR of `M` and the full-width similarity transform it drives
-      // — applied across every row and column of the *whole* working
+      // (applied across every row and column of the *whole* working
       // matrix, not just the local `[lo, hi]` block, so that a similarity
-      // transform on a sub-block stays correct for the matrix as a whole
-      // — do not themselves know about the band. This reaches beyond the
+      // transform on a sub-block stays correct for the matrix as a whole)
+      // do not themselves know about the band. This reaches beyond the
       // active block too: a row below `hi` that was already deflated
       // (its own sub-subdiagonal entries columns `lo..hi` explicitly
       // zeroed by an earlier deflation) gets touched again by this step's
       // right-multiply across all `n` rows, turning what was an exact
       // zero back into a few-ULP residue. Left alone, that noise would
       // make [_schurEigenvalues]'s exact-zero block-boundary test wrongly
-      // read two adjacent Schur blocks as fused into one larger block —
+      // read two adjacent Schur blocks as fused into one larger block:
       // this is exactly what round 6's own probe against a 5x5 symmetric
       // tridiagonal matrix caught: three eigenvalues collapsed to one
       // repeated (wrong) value where two isolated blocks should have
       // stayed separate. Re-imposing the structural zero across the
-      // *entire* matrix here — unconditional, not a tolerance comparison,
-      // since these entries are exactly zero in exact arithmetic — keeps
+      // *entire* matrix here (unconditional, not a tolerance comparison,
+      // since these entries are exactly zero in exact arithmetic) keeps
       // that invariant true after every step, the same way
       // [_hessenbergWithSchurVectors] establishes it once at the start.
       for (int row = 2; row < n; row++) {
@@ -1719,7 +1719,7 @@ class Matrix {
   /// Reads the full spectrum (real and complex) off a real-Schur
   /// quasi-triangular matrix [t] (round 6 correction, item 11), scanning
   /// its 1x1 and 2x2 diagonal blocks. A 2x2 block's eigenvalues are found
-  /// via [_stableRealEigen2x2] — if complex, both conjugates are reported.
+  /// via [_stableRealEigen2x2]. If complex, both conjugates are reported.
   static List<({double im, double re})> _schurEigenvalues(
     List<List<double>> t,
   ) {
@@ -1824,7 +1824,7 @@ class Matrix {
   /// classify a raw, directly-supplied 2x2 block, computing the
   /// discriminant in a single step from the user's own entries. There, a
   /// small-but-genuinely-negative discriminant (for example, from
-  /// individually tiny off-diagonal entries) is not rounding noise — it is
+  /// individually tiny off-diagonal entries) is not rounding noise: it is
   /// the correct answer, and swallowing it as "zero" misclassifies a real
   /// complex-conjugate pair as a repeated real eigenvalue. That distinction
   /// matters for [_general2x2Log] and the real branch of
@@ -2076,7 +2076,7 @@ class Matrix {
   ///
   /// - Scalars (1x1): `e^v` directly.
   /// - Complex-form input (`aI + bJ`, 2x2 only): the closed form
-  ///   `e^a * (cos(b)*I + sin(b)*J)` — no series at all, so `cos`/`sin`
+  ///   `e^a * (cos(b)*I + sin(b)*J)`, no series at all, so `cos`/`sin`
   ///   (always bounded in `[-1, 1]`) can never blow up the way a
   ///   scaling-and-squaring series does for a huge `b` (e.g. a rotation by
   ///   `1e16` radians): repeated squaring of an only-approximately-bounded
@@ -2278,7 +2278,7 @@ class Matrix {
 
   Matrix _powerByScalarExponent(double y) {
     // Round 5 correction, case 1: a non-finite exponent must be rejected
-    // before it is ever classified as "an integer" — `double.infinity ==
+    // before it is ever classified as "an integer": `double.infinity ==
     // double.infinity.roundToDouble()` is true, which used to route
     // Infinity into the binary-exponentiation loop below, whose only exit
     // condition ("count > 0") never becomes false for Infinity (halving it
@@ -2386,7 +2386,7 @@ class Matrix {
   /// or negated through `int`): `int` on the native VM is a wrapping
   /// 64-bit type, so `exponent.round()`/`.abs()` silently clamp or
   /// overflow for magnitudes near or beyond 2^63 (e.g. the minimum 64-bit
-  /// int negated overflows back to itself). A `double` has no such trap —
+  /// int negated overflows back to itself). A `double` has no such trap:
   /// every finite double is an exact dyadic rational, so halving it via
   /// `count / 2` and reading its parity via `count % 2` stay exact for any
   /// whole-number magnitude a double can represent, which is exactly what
@@ -2820,7 +2820,7 @@ class Matrix {
     return maxRowSum;
   }
 
-  /// The largest absolute value among this matrix's entries — a plain
+  /// The largest absolute value among this matrix's entries: a plain
   /// `max`, never a sum, so it stays finite whenever every entry
   /// individually is, unlike [_infinityNorm] (a row sum, which can
   /// genuinely overflow even though no single entry does). Used wherever a
@@ -2852,7 +2852,7 @@ class Matrix {
   /// numerically-sensitive core on `scaled` rather than `this`, then undo
   /// this scaling analytically on the result (`sqrt(cA) = sqrt(c) *
   /// sqrt(A)`, `log(cA) = log(c)*I + log(A)`, `inv(cA) = inv(A) / c`,
-  /// `eig(cA) = c * eig(A)`, for `c = 2^k`) — so every *internal*
+  /// `eig(cA) = c * eig(A)`, for `c = 2^k`), so every *internal*
   /// comparison against [CalculatrixNumericPolicy.defaultAbsoluteTolerance]
   /// deep inside those algorithms (a pivot cutoff, a deflation check, an
   /// eigenvalue-near-zero cleanup) is implicitly relative to this matrix's
@@ -2876,7 +2876,7 @@ class Matrix {
       // 1e308), not that normalization is inapplicable. Silently returning
       // `(k: 0, scaled: this)` (the previous behavior) let every caller's
       // numerically-sensitive core run directly on data it has no scale
-      // handle on at all — this raises the typed error instead, so the
+      // handle on at all. This raises the typed error instead, so the
       // caller sees exactly why no result could be produced rather than
       // getting a wrong one (e.g. a spurious rotation from `isComplexForm`
       // wrongly comparing Infinity <= Infinity).
@@ -2899,8 +2899,8 @@ class Matrix {
   ///
   /// A single-step `2^k` overflows to `Infinity` (or underflows to `0`)
   /// once `|k|` exceeds double's representable exponent range (~1023),
-  /// *even when the final, fully-scaled result would itself be finite* —
-  /// e.g. undoing a `k = 1024` normalization on an already-tiny matrix.
+  /// *even when the final, fully-scaled result would itself be finite*
+  /// (e.g. undoing a `k = 1024` normalization on an already-tiny matrix).
   /// Multiplying by `2^1000` and then `2^24` (say) instead of `2^1024` in
   /// one step keeps every intermediate matrix in double's representable
   /// range whenever the true mathematical result is representable, exactly
@@ -2948,7 +2948,7 @@ class Matrix {
   /// (`sqrt(double.maxFinite)`) even though the true magnitude is still
   /// finite (round 4 correction, case B: `a=1e200` overflows `a*a` to
   /// `Infinity` well before the true magnitude `1e200` itself is anywhere
-  /// near double's range) — and can equally underflow the *ratio* of two
+  /// near double's range), and can equally underflow the *ratio* of two
   /// tiny values to 0 when both are subnormal. Dividing by the larger
   /// magnitude first keeps every intermediate value between 0 and
   /// `sqrt(2)`, so this only overflows when the true magnitude itself is
@@ -2966,13 +2966,13 @@ class Matrix {
   }
 
   /// Whether this square matrix is exactly upper triangular, exactly lower
-  /// triangular, or both (diagonal) — checked with a plain `== 0`, not a
+  /// triangular, or both (diagonal), checked with a plain `== 0`, not a
   /// tolerance. This is deliberately exact: it exists to give
   /// [log]/[power] a route to read a triangular matrix's eigenvalues
   /// straight off the diagonal, with no discriminant, no QR iteration, and
   /// therefore no rounding noise to second-guess with a tolerance in the
   /// first place. A matrix whose off-triangular entries are merely *close*
-  /// to zero (not exactly zero) does not qualify — it goes through the
+  /// to zero (not exactly zero) does not qualify. It goes through the
   /// general eigenvalue pipeline instead, where the rounding it does carry
   /// is handled by a scale-relative floor.
   bool _isExactlyTriangular() {
@@ -2992,7 +2992,7 @@ class Matrix {
   }
 
   /// Whether every off-diagonal entry of this square matrix is exactly
-  /// zero — checked with a plain `== 0`, not a tolerance, for the same
+  /// zero, checked with a plain `== 0`, not a tolerance, for the same
   /// reason as [_isExactlyTriangular]: it exists to give [sqrt] a route to
   /// compute each diagonal entry's root independently (a decoupled scalar
   /// Newton sqrt per entry), which needs no convergence tolerance to
@@ -3057,7 +3057,7 @@ class Matrix {
   ///
   /// Convergence is judged by the off-diagonal Frobenius norm relative to
   /// the matrix's own (constant) Frobenius norm, against
-  /// [CalculatrixNumericPolicy.machineEpsilon] — never an absolute
+  /// [CalculatrixNumericPolicy.machineEpsilon], never an absolute
   /// threshold, so this is equally sound at any scale. The sweep count is
   /// bounded by [maxSweeps] (data-independent); exceeding it without
   /// converging raises [CalculatrixErrorId.noConvergence] rather than
@@ -3174,7 +3174,7 @@ class Matrix {
   }
 
   /// Applies [f] entrywise to this exactly diagonal matrix's diagonal,
-  /// zeroing every off-diagonal entry — the shared building block for
+  /// zeroing every off-diagonal entry: the shared building block for
   /// [exp]/[log]/[sqrt]/[power]'s diagonal-matrix class.
   Matrix _diagonalRealFunction(double Function(double value) f) {
     final List<List<double>> resultRows = List<List<double>>.generate(
@@ -3190,7 +3190,7 @@ class Matrix {
   }
 
   /// Applies [f] to each eigenvalue found by [_cyclicJacobiEigendecomposition]
-  /// and reconstructs `f(A) = Q * f(Lambda) * Qᵀ` — the shared building
+  /// and reconstructs `f(A) = Q * f(Lambda) * Qᵀ`: the shared building
   /// block for [exp]/[log]/[sqrt]/[power]'s exactly-symmetric-matrix class.
   Matrix _symmetricRealFunction(
     double Function(double value) f, {

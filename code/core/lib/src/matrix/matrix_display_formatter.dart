@@ -63,7 +63,7 @@ class MatrixDisplayFormatter {
 
     // Round 6 correction (item 4): `double.toInt()` throws for a
     // non-finite value ("Infinity or NaN toInt"), so a non-finite `value`
-    // must never reach it — it falls through to `toStringAsPrecision`
+    // must never reach it: it falls through to `toStringAsPrecision`
     // below, whose formatting already renders "Infinity"/"-Infinity"/"NaN"
     // safely for a non-finite double.
     if (value.isFinite &&

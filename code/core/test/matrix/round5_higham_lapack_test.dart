@@ -12,7 +12,7 @@ import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Round 5 — case 1: non-finite power exponent must not hang', () {
+  group('Round 5, case 1: non-finite power exponent must not hang', () {
     test(
       'identity ^ Infinity raises non-finite quickly instead of hanging '
       '(roundToDouble() classifies Infinity as "an integer", and halving '
@@ -54,7 +54,7 @@ void main() {
   });
 
   group(
-    'Round 5 — case 4: overflowing infinity-norm must not misclassify '
+    'Round 5, case 4: overflowing infinity-norm must not misclassify '
     'complex form',
     () {
       test(
@@ -85,7 +85,7 @@ void main() {
     },
   );
 
-  group('Round 5 — case 9: PowerCommand checks arity before popping', () {
+  group('Round 5, case 9: PowerCommand checks arity before popping', () {
     test(
       'PowerCommand on a 1-deep stack raises stack-underflow and leaves '
       'the stack as [2], not empty (arity must be checked before any pop, '
@@ -110,7 +110,7 @@ void main() {
     );
   });
 
-  group('Round 5 — case 6: power-of-two scaling by bounded steps', () {
+  group('Round 5, case 6: power-of-two scaling by bounded steps', () {
     test(
       '[[2e-320,1e-320],[0,2e-320]].sqrt() does not hang or underflow to '
       'the zero matrix (general 2x2 with a repeated positive eigenvalue, '
@@ -147,7 +147,7 @@ void main() {
     );
   });
 
-  group('Round 5 — eigenvalues: Hessenberg + Francis double-shift QR', () {
+  group('Round 5, eigenvalues: Hessenberg + Francis double-shift QR', () {
     test('triangular input returns its diagonal exactly: diag(1,2,1e20)', () {
       final Matrix result = Matrix(<List<double>>[
         <double>[1, 0, 0],
@@ -165,7 +165,7 @@ void main() {
     });
   });
 
-  group('Round 5 — inverse: LU with partial pivoting', () {
+  group('Round 5, inverse: LU with partial pivoting', () {
     test('[[1,1e20],[0,1]]^-1 = [[1,-1e20],[0,1]] exactly', () {
       final Matrix result = Matrix(<List<double>>[
         <double>[1, 1e20],
@@ -179,7 +179,7 @@ void main() {
     });
   });
 
-  group('Round 5 — exp: degree-13 Pade scaling and squaring (Higham 2005)', () {
+  group('Round 5, exp: degree-13 Pade scaling and squaring (Higham 2005)', () {
     test(
       '[[1,1e20],[0,2]] exp has diagonal e and e^2 within 1e-13 relative '
       '(general-2x2 divided-difference closed form, Higham 1.2)',
@@ -192,7 +192,7 @@ void main() {
         // The general-2x2 divided-difference formula (f(A) = c0*I + c1*A)
         // has no diagonal-overwrite step, so its diagonal entries are not
         // bit-identical to a direct `math.exp()` call even though they are
-        // mathematically equal to it — hence a tight relative tolerance
+        // mathematically equal to it, hence a tight relative tolerance
         // instead of exact equality.
         expect(
           (result.at(0, 0) - math.exp(1.0)).abs() / math.exp(1.0),
@@ -243,7 +243,7 @@ void main() {
   });
 
   group(
-    'Round 5 — sqrt/log accuracy: tight relative error for diagonal and '
+    'Round 5, sqrt/log accuracy: tight relative error for diagonal and '
     'triangular input',
     () {
       test(
