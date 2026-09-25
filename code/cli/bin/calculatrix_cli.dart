@@ -318,7 +318,7 @@ String _formatCommandResults(CalculatrixMachine machine) {
 }
 
 Matrix _parseOperandLiteral(String token) {
-  return Calculatrix.evaluateInfix(token);
+  return Calculatrix.evaluateRpn(<String>[token]);
 }
 
 int _parseSingleIntArgument(String token, {required String prefix}) {
