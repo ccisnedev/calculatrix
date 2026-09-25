@@ -100,4 +100,89 @@ void main() {
       });
     },
   );
+
+  group(
+    'Round 9, finding 2: symmetric 2x2 eigenvalues must not overflow or '
+    'underflow at extreme uniform scale',
+    () {
+      // Eigenvalues of [[1,1],[1,2]] are (3+-sqrt(5))/2, exactly; scaling
+      // every entry by s scales both eigenvalues by s (eig(sA) = s*eig(A)).
+      final double sqrt5 = math.sqrt(5);
+      final double larger = (3 + sqrt5) / 2;
+      final double smaller = (3 - sqrt5) / 2;
+
+      test(
+        '[[1e200,1e200],[1e200,2e200]] does not overflow to NaN',
+        () {
+          final Matrix result = Matrix(<List<double>>[
+            <double>[1e200, 1e200],
+            <double>[1e200, 2e200],
+          ]).eigenvalues();
+
+          final double expectedLarger = larger * 1e200;
+          final double expectedSmaller = smaller * 1e200;
+
+          expect(result.at(0, 0).isFinite, isTrue);
+          expect(result.at(1, 0).isFinite, isTrue);
+          expect(
+            result.at(0, 0),
+            closeTo(expectedLarger, expectedLarger.abs() * 1e-9),
+          );
+          expect(
+            result.at(1, 0),
+            closeTo(expectedSmaller, expectedSmaller.abs() * 1e-9),
+          );
+        },
+      );
+
+      test(
+        '[[1e-200,1e-200],[1e-200,2e-200]] does not underflow to a wrong '
+        'repeated value',
+        () {
+          final Matrix result = Matrix(<List<double>>[
+            <double>[1e-200, 1e-200],
+            <double>[1e-200, 2e-200],
+          ]).eigenvalues();
+
+          final double expectedLarger = larger * 1e-200;
+          final double expectedSmaller = smaller * 1e-200;
+
+          expect(result.at(0, 0).isFinite, isTrue);
+          expect(result.at(1, 0).isFinite, isTrue);
+          expect(
+            result.at(0, 0),
+            closeTo(expectedLarger, expectedLarger.abs() * 1e-9),
+          );
+          expect(
+            result.at(1, 0),
+            closeTo(expectedSmaller, expectedSmaller.abs() * 1e-9),
+          );
+          // The bug this finding describes returns a repeated 1.5e-200 for
+          // both roots (the discriminant underflowed to exactly 0): guard
+          // against that specific regression directly.
+          expect(result.at(0, 0), isNot(closeTo(1.5e-200, 1e-210)));
+        },
+      );
+
+      test(
+        'the existing opposite-scale off-diagonal case still reports +-1, '
+        'not a spurious repeated 0',
+        () {
+          final Matrix result = Matrix(<List<double>>[
+            <double>[0, 1e200],
+            <double>[1e-200, 0],
+          ]).eigenvalues();
+
+          final List<double> values = <double>[
+            result.at(0, 0),
+            result.at(1, 0),
+          ]..sort();
+
+          expect(values.length, 2);
+          expect(values[0], closeTo(-1, 1e-9));
+          expect(values[1], closeTo(1, 1e-9));
+        },
+      );
+    },
+  );
 }
