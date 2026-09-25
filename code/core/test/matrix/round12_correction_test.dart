@@ -281,4 +281,42 @@ void main() {
       });
     },
   );
+
+  group(
+    'Round 12, finding 7: general 2x2 log\'s "far apart" relativeGap '
+    'threshold sits too close to sqrt(machine epsilon), so a pair of '
+    'eigenvalues whose relative gap is just barely above that threshold '
+    'still suffers meaningful cancellation in the direct '
+    '(log(lBig) - log(lSmall)) / (lBig - lSmall) divided difference',
+    () {
+      // A=[[1e200,1e200],[0,9.999999850839375e199]]: triangular,
+      // eigenvalues lBig=1e200, lSmall=9.999999850839375e199.
+      // relativeGap = (lBig-lSmall)/lBig ~= 1.4916062468187247e-08, just
+      // above closeEigenvalueThreshold (sqrt(machine epsilon) ~=
+      // 1.4901161193847656e-08), so this takes the direct branch, whose
+      // absolute rounding error (~machine epsilon * |log(lBig)|, since
+      // log(lBig) and log(lSmall) are each independently rounded to
+      // ~0.5ulp) is comparable to the true difference
+      // log(lBig)-log(lSmall) (~1.4916e-08 in this case), losing most of
+      // c1's significant digits. Reference (mpmath, dps=60), independent
+      // of this implementation.
+      test(
+        'log() recovers the true (0,1) entry to near machine precision, '
+        'not a value with a 1e-6-scale relative error from cancellation',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[1e200, 1e200],
+            <double>[0, 9.999999850839375e199],
+          ]);
+
+          final Matrix result = value.log();
+
+          expectRelativelyClose(result.at(0, 0), 460.5170185988091368);
+          expectRelativelyClose(result.at(0, 1), 1.0000000074580313242);
+          expect(result.at(1, 0), equals(0));
+          expectRelativelyClose(result.at(1, 1), 460.51701858389307419);
+        },
+      );
+    },
+  );
 }
