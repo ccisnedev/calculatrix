@@ -79,4 +79,37 @@ void main() {
       expect(result.at(1, 1), closeTo(expected11, expected11.abs() * 1e-6));
     });
   });
+
+  group('Round 8, finding 3: Frobenius norm must scale before squaring to '
+      'avoid spurious overflow', () {
+    test('sqrt() succeeds for a symmetric matrix whose entries individually '
+        'overflow when squared but whose true norm is finite', () {
+      // 1e200 squared is 1e400, which overflows double (max ~1.8e308), even
+      // though the true Frobenius norm (about 1.41e200) is well within
+      // double's finite range. A Frobenius norm that sums unscaled squares
+      // wrongly reports a non-finite norm and refuses to run the Jacobi
+      // eigendecomposition at all.
+      final Matrix matrix = Matrix(<List<double>>[
+        <double>[1e200, 5],
+        <double>[5, 1e200],
+      ]);
+
+      final Matrix result = matrix.sqrt();
+
+      expect(result.at(0, 0).isFinite, isTrue);
+      expect(result.at(0, 1).isFinite, isTrue);
+      expect(result.at(1, 0).isFinite, isTrue);
+      expect(result.at(1, 1).isFinite, isTrue);
+
+      // A single unit-in-the-last-place near 1e200 is about 2e184, far
+      // larger than the original off-diagonal entry (5), so the residual
+      // check only requires the off-diagonal entries to stay small relative
+      // to the dominant 1e200 scale, not to reproduce 5 exactly.
+      final Matrix squared = result * result;
+      expect(squared.at(0, 0), closeTo(1e200, 1e200 * 1e-6));
+      expect(squared.at(0, 1), closeTo(0, 1e195));
+      expect(squared.at(1, 0), closeTo(0, 1e195));
+      expect(squared.at(1, 1), closeTo(1e200, 1e200 * 1e-6));
+    });
+  });
 }
