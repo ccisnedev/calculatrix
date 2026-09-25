@@ -767,8 +767,43 @@ class Matrix {
       }
     }
 
+    // Round 9 correction, finding 2: the b/c balancing above only protects
+    // the off-diagonal pair against each other; it does nothing for a
+    // uniformly huge or uniformly tiny block (all four entries at the same
+    // extreme scale), where `trace*trace` inside [_stableRealEigen2x2]
+    // still overflows to Infinity (Infinity - Infinity = NaN) or `det`
+    // underflows to exactly 0, misclassifying the discriminant as zero.
+    // Scale the whole balanced block by the power of two nearest its own
+    // largest-magnitude entry (applied after the b/c balance: doing it
+    // before would undo that balance's own protection, underflowing `c` in
+    // the existing `[[0,1e200],[1e-200,0]]` case back to 0), solve on the
+    // scaled block, then rescale the resulting roots back. This is an exact
+    // similarity-free rescaling (`eig(cA) = c*eig(A)`), so it changes no
+    // eigenvalue's true value, only which magnitudes the solver sees.
+    final double maxAbs = <double>[
+      a.abs(),
+      balancedB.abs(),
+      balancedC.abs(),
+      d.abs(),
+    ].reduce(math.max);
+
+    int k = 0;
+    double scaledA = a;
+    double scaledB = balancedB;
+    double scaledC = balancedC;
+    double scaledD = d;
+    if (maxAbs != 0) {
+      k = (math.log(maxAbs) / math.ln2).round();
+      if (k != 0) {
+        scaledA = _scalarScaleByPowerOfTwo(a, -k.toDouble());
+        scaledB = _scalarScaleByPowerOfTwo(balancedB, -k.toDouble());
+        scaledC = _scalarScaleByPowerOfTwo(balancedC, -k.toDouble());
+        scaledD = _scalarScaleByPowerOfTwo(d, -k.toDouble());
+      }
+    }
+
     final ({bool isComplex, double lambda1, double lambda2}) solved =
-        _stableRealEigen2x2(a, balancedB, balancedC, d);
+        _stableRealEigen2x2(scaledA, scaledB, scaledC, scaledD);
 
     if (solved.isComplex) {
       throw MatrixDomainError(
@@ -776,7 +811,21 @@ class Matrix {
       );
     }
 
-    final List<double> values = <double>[solved.lambda1, solved.lambda2]
+    final double lambda1 = k == 0
+        ? solved.lambda1
+        : _scalarScaleByPowerOfTwo(solved.lambda1, k.toDouble());
+    final double lambda2 = k == 0
+        ? solved.lambda2
+        : _scalarScaleByPowerOfTwo(solved.lambda2, k.toDouble());
+
+    if (!lambda1.isFinite || !lambda2.isFinite) {
+      throw MatrixDomainError(
+        'Result is not a finite number.',
+        errorId: CalculatrixErrorId.nonFinite,
+      );
+    }
+
+    final List<double> values = <double>[lambda1, lambda2]
       ..sort((double left, double right) => right.compareTo(left));
 
     return Matrix(
