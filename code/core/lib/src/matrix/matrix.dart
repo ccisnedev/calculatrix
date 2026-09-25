@@ -3111,14 +3111,26 @@ class Matrix {
 
   /// Shared dispatcher for a real non-integer matrix power `A^y`, used by
   /// both [sqrt] (`y == 0.5`) and [_powerByScalarExponent]'s general
-  /// non-integer case. Tries the diagonal, exactly-symmetric and general
-  /// 2x2 closed forms in order, and raises
+  /// non-integer case. Tries the complex-form, diagonal, exactly-symmetric
+  /// and general 2x2 closed forms in order, and raises
   /// [CalculatrixErrorId.unsupportedMatrixFunction] for anything else.
+  ///
+  /// The complex-form check must run before the general 2x2 closed form
+  /// (round 8 correction, finding 4), mirroring [exp] and [log]: the
+  /// general 2x2 eigenvalue classification squares the off-diagonal entry
+  /// as part of its discriminant, which underflows to exactly zero for a
+  /// complex-form matrix whose imaginary part is nonzero but tiny relative
+  /// to its real part, misclassifying it as a repeated real eigenvalue and
+  /// wrongly rejecting a negative real part that the complex form itself
+  /// has no trouble with.
   Matrix _matrixRealPower(
     double y, {
     required int maxSweeps,
     required String operation,
   }) {
+    if (isComplexForm) {
+      return _complexFormRealPower(y);
+    }
     if (_isExactlyDiagonal()) {
       return _diagonalRealFunction((double v) => _realScalarPower(v, y));
     }
@@ -3132,6 +3144,42 @@ class Matrix {
       return _general2x2RealPower(y);
     }
     throw _unsupportedMatrixFunction(operation);
+  }
+
+  /// [_matrixRealPower] for a complex-form matrix (`aI + bJ`), via the
+  /// polar form `z^y = r^y * (cos(y*theta) + i*sin(y*theta))`, where
+  /// `r = sqrt(a^2+b^2)`, `theta = atan2(b, a)`. A zero magnitude raised to
+  /// a non-positive power is [CalculatrixErrorId.logUndefined]; any other
+  /// nonzero magnitude is defined for every real `y`, regardless of the
+  /// sign of `a`.
+  Matrix _complexFormRealPower(double y) {
+    final double a = realPart;
+    final double b = imagPart;
+
+    if (a == 0 && b == 0) {
+      if (y > 0) {
+        return Matrix.complex(0, 0);
+      }
+      throw MatrixDomainError(
+        'A zero magnitude cannot be raised to a non-positive real power in '
+        'the complex domain.',
+        errorId: CalculatrixErrorId.logUndefined,
+      );
+    }
+
+    final double radius = _hypot(a, b);
+    if (!radius.isFinite) {
+      throw MatrixDomainError(
+        'Matrix power magnitude overflowed to a non-finite value.',
+        errorId: CalculatrixErrorId.nonFinite,
+      );
+    }
+    final double angle = math.atan2(b, a);
+    final double rToY = _checkFiniteScalar(math.pow(radius, y).toDouble());
+    final double newAngle = y * angle;
+    return _checkFiniteMatrix(
+      Matrix.complex(rToY * math.cos(newAngle), rToY * math.sin(newAngle)),
+    );
   }
 
   /// Builds `c0*I + c1*A`, the Hermite-interpolation / divided-difference
