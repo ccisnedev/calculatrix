@@ -132,7 +132,7 @@ class Calculatrix {
     }
 
     if (decoded is num) {
-      return Matrix.scalar(decoded.toDouble());
+      return Matrix.scalar(_checkFiniteLiteralEntry(decoded, token));
     }
 
     if (decoded is! List) {
@@ -143,12 +143,19 @@ class Calculatrix {
     }
 
     if (decoded.isEmpty) {
-      throw MatrixShapeError('Matrix literal cannot be empty.');
+      throw MatrixShapeError(
+        'Matrix literal cannot be empty.',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
     }
 
     if (decoded.every((dynamic item) => item is num)) {
       return Matrix(<List<double>>[
-        decoded.map((dynamic item) => (item as num).toDouble()).toList(),
+        decoded
+            .map(
+              (dynamic item) => _checkFiniteLiteralEntry(item as num, token),
+            )
+            .toList(),
       ]);
     }
 
@@ -169,12 +176,27 @@ class Calculatrix {
             errorId: CalculatrixErrorId.syntaxError,
           );
         }
-        parsedRow.add(item.toDouble());
+        parsedRow.add(_checkFiniteLiteralEntry(item, token));
       }
       rows.add(parsedRow);
     }
 
     return Matrix(rows);
+  }
+
+  /// Guards a decoded matrix-literal entry against non-finite values
+  /// (`Infinity`, `-Infinity`, `NaN`) so a literal like `1e999` never
+  /// silently becomes an infinite matrix entry; it raises `non-finite`
+  /// instead.
+  static double _checkFiniteLiteralEntry(num item, String token) {
+    final double value = item.toDouble();
+    if (!value.isFinite) {
+      throw MatrixDomainError(
+        'Matrix literal contains a non-finite value: $token',
+        errorId: CalculatrixErrorId.nonFinite,
+      );
+    }
+    return value;
   }
 
   static List<String> _tokenizeInfix(String expression) {
@@ -191,7 +213,7 @@ class Calculatrix {
 
       if (_isSignedNumberStart(expression, index, tokens)) {
         final _NumberScanResult scan = _scanNumber(expression, index);
-        tokens.add(scan.token);
+        tokens.add(_requireParseableNumberToken(scan.token));
         index = scan.nextIndex;
         continue;
       }
@@ -236,7 +258,7 @@ class Calculatrix {
 
       if (_isNumberStart(char)) {
         final _NumberScanResult scan = _scanNumber(expression, index);
-        tokens.add(scan.token);
+        tokens.add(_requireParseableNumberToken(scan.token));
         index = scan.nextIndex;
         continue;
       }
@@ -248,6 +270,24 @@ class Calculatrix {
     }
 
     return tokens;
+  }
+
+  /// Rejects a scanned number token that is not a parseable double (for
+  /// example `1e`, an exponent marker with no exponent digits) right at
+  /// tokenize time, with `syntax-error`. Without this, an unparseable
+  /// number token would otherwise reach the RPN compiler as an opaque
+  /// operand and surface as the wrong id (`unknown-word`) instead of the
+  /// syntax error it actually is; this check is infix-only; RPN's own
+  /// token compiler already validates numeric literals independently.
+  static String _requireParseableNumberToken(String token) {
+    if (double.tryParse(token) == null) {
+      throw ExpressionSyntaxError(
+        'Invalid numeric literal: $token',
+        errorId: CalculatrixErrorId.syntaxError,
+        token: token,
+      );
+    }
+    return token;
   }
 
   static void _validateInfixTokens(List<String> tokens) {
