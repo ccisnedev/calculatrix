@@ -123,14 +123,20 @@ void main() {
           CalculatrixErrorId.syntaxError: () =>
               Calculatrix.evaluateInfix('1 2 +'),
           // Exactly symmetric, so sqrt() takes the cyclic Jacobi
-          // eigendecomposition path (Golub & Van Loan 8.5). With a
-          // `maxSweeps` budget of 0 the sweep loop never runs, so the
-          // post-loop off-diagonal-norm convergence check fails
+          // eigendecomposition path (Golub & Van Loan 8.5). sqrt() itself
+          // has no public sweep budget parameter (round 8 correction,
+          // finding 11), so this goes through the testing-only debug seam
+          // with a sweep budget of 0, meaning the sweep loop never runs, so
+          // the post-loop off-diagonal-norm convergence check fails
           // deterministically.
-          CalculatrixErrorId.noConvergence: () => Matrix(<List<double>>[
-            <double>[2, 1],
-            <double>[1, 2],
-          ]).sqrt(maxSweeps: 0),
+          CalculatrixErrorId.noConvergence: () =>
+              debugCyclicJacobiSqrtWithSweepBudget(
+                Matrix(<List<double>>[
+                  <double>[2, 1],
+                  <double>[1, 2],
+                ]),
+                0,
+              ),
           // Not scalar, complex-form, diagonal or exactly symmetric, and not
           // 2×2 either — no supported closed form applies.
           CalculatrixErrorId.unsupportedMatrixFunction: () => Matrix(<List<double>>[

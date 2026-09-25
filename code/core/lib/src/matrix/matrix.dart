@@ -2050,7 +2050,7 @@ class Matrix {
   /// - General 2x2 matrices: the divided-difference closed form
   ///   `f(A) = c0*I + c1*A` (Higham, "Functions of Matrices", section 1.2).
   /// - Any other input: [CalculatrixErrorId.unsupportedMatrixFunction].
-  Matrix sqrt({int maxSweeps = 50}) {
+  Matrix sqrt() {
     _requireSquare(operation: 'square root');
     _checkFiniteMatrix(this);
 
@@ -2062,7 +2062,11 @@ class Matrix {
       return Matrix.scalar(math.sqrt(source));
     }
 
-    return _matrixRealPower(0.5, maxSweeps: maxSweeps, operation: 'square root');
+    return _matrixRealPower(
+      0.5,
+      maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
+      operation: 'square root',
+    );
   }
 
   /// Computes the matrix exponential.
@@ -2113,7 +2117,10 @@ class Matrix {
     }
 
     if (_isExactlySymmetric()) {
-      return _symmetricRealFunction((double v) => math.exp(v), maxSweeps: 50);
+      return _symmetricRealFunction(
+        (double v) => math.exp(v),
+        maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
+      );
     }
 
     if (rowCount == 2) {
@@ -2218,7 +2225,7 @@ class Matrix {
           );
         }
         return math.log(v);
-      }, maxSweeps: 50);
+      }, maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps);
     }
 
     if (rowCount == 2) {
@@ -2310,7 +2317,11 @@ class Matrix {
       return _integerMatrixPower(y);
     }
 
-    return _matrixRealPower(y, maxSweeps: 50, operation: 'real matrix power');
+    return _matrixRealPower(
+      y,
+      maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
+      operation: 'real matrix power',
+    );
   }
 
   Matrix _powerByMatrixExponent(Matrix exponent) {
@@ -3640,4 +3651,25 @@ class Matrix {
 
     return true;
   }
+}
+
+/// Testing-only seam for exercising [CalculatrixErrorId.noConvergence] on
+/// [Matrix.sqrt]'s exactly-symmetric-matrix path.
+///
+/// Behaves exactly like calling `sqrt()` on an exactly symmetric [matrix],
+/// except the cyclic Jacobi sweep budget is the caller-supplied
+/// [maxSweeps] instead of the fixed production budget,
+/// [CalculatrixNumericPolicy.jacobiMaxSweeps]. `sqrt` itself does not
+/// expose this budget as a public parameter (round 8 correction, finding
+/// 11): no legitimate finite, well-posed symmetric input needs a budget
+/// other than the production one, so exposing it there would only invite
+/// a caller to silently trade accuracy for speed with no real benefit.
+/// This function exists solely so a test can supply a matrix and a tiny
+/// budget (for example 0 sweeps) and deterministically observe
+/// noConvergence, without changing what `sqrt` itself accepts.
+Matrix debugCyclicJacobiSqrtWithSweepBudget(Matrix matrix, int maxSweeps) {
+  return matrix._symmetricRealFunction(
+    (double v) => matrix._realScalarPower(v, 0.5),
+    maxSweeps: maxSweeps,
+  );
 }
