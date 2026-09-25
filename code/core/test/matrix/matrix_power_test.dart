@@ -327,5 +327,44 @@ void main() {
         );
       },
     );
+
+    test(
+      'non-complex-form base with a complex-conjugate eigenvalue pair and a '
+      'non-integer exponent is well-defined',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[1, -2],
+          <double>[0.5, 1],
+        ]);
+
+        final Matrix half = base.power(Matrix.scalar(0.5));
+        final Matrix squared = half.power(Matrix.scalar(2));
+
+        expect(squared.almostEquals(base, absoluteTolerance: 1e-9), isTrue);
+      },
+    );
+
+    test(
+      'non-complex-form base with a complex-conjugate eigenvalue pair and a '
+      'non-positive real eigenvalue is log-undefined',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[0, -1, 0],
+          <double>[1, 0, 0],
+          <double>[0, 0, -2],
+        ]);
+
+        expect(
+          () => base.power(Matrix.scalar(0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
+          ),
+        );
+      },
+    );
   });
 }

@@ -41,6 +41,41 @@ void main() {
       expect(roundTrip.almostEquals(diagonal, absoluteTolerance: 1e-8), isTrue);
     });
 
+    test(
+      'log and exp are inverse on a real matrix with a complex-conjugate '
+      'eigenvalue pair',
+      () {
+        final Matrix value = Matrix(<List<double>>[
+          <double>[1, -2],
+          <double>[0.5, 1],
+        ]);
+
+        final Matrix roundTrip = value.log().exp();
+        expect(
+          roundTrip.almostEquals(value, absoluteTolerance: 1e-9),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'log exists for a 3x3 matrix with a rotation block and a positive '
+      'real eigenvalue',
+      () {
+        final Matrix value = Matrix(<List<double>>[
+          <double>[0, -1, 0],
+          <double>[1, 0, 0],
+          <double>[0, 0, 2],
+        ]);
+
+        final Matrix roundTrip = value.log().exp();
+        expect(
+          roundTrip.almostEquals(value, absoluteTolerance: 1e-9),
+          isTrue,
+        );
+      },
+    );
+
     test('rejects log for non-square matrix', () {
       final Matrix value = Matrix(<List<double>>[
         <double>[1, 2, 3],
