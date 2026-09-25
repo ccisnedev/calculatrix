@@ -28,7 +28,10 @@ class RpnEngine {
 
   Matrix dup() {
     if (_stack.isEmpty) {
-      throw RpnStackUnderflowError('Cannot dup from an empty RPN stack.');
+      throw RpnStackUnderflowError(
+        'Cannot dup from an empty RPN stack.',
+        errorId: CalculatrixErrorId.stackUnderflow,
+      );
     }
 
     final Matrix top = _stack.last;
@@ -38,7 +41,10 @@ class RpnEngine {
 
   Matrix drop() {
     if (_stack.isEmpty) {
-      throw RpnStackUnderflowError('Cannot drop from an empty RPN stack.');
+      throw RpnStackUnderflowError(
+        'Cannot drop from an empty RPN stack.',
+        errorId: CalculatrixErrorId.stackUnderflow,
+      );
     }
 
     return _stack.removeLast();
@@ -48,6 +54,7 @@ class RpnEngine {
     if (_stack.length < 2) {
       throw RpnStackUnderflowError(
         'Swap requires at least two values in the stack.',
+        errorId: CalculatrixErrorId.stackUnderflow,
       );
     }
 
@@ -61,6 +68,7 @@ class RpnEngine {
     if (_stack.length < 2) {
       throw RpnStackUnderflowError(
         'Over requires at least two values in the stack.',
+        errorId: CalculatrixErrorId.stackUnderflow,
       );
     }
 
@@ -98,7 +106,10 @@ class RpnEngine {
 
   Matrix peek() {
     if (_stack.isEmpty) {
-      throw RpnStackUnderflowError('Cannot peek from an empty RPN stack.');
+      throw RpnStackUnderflowError(
+        'Cannot peek from an empty RPN stack.',
+        errorId: CalculatrixErrorId.stackUnderflow,
+      );
     }
 
     return _stack.last;
@@ -106,7 +117,10 @@ class RpnEngine {
 
   Matrix pop() {
     if (_stack.isEmpty) {
-      throw RpnStackUnderflowError('Cannot pop from an empty RPN stack.');
+      throw RpnStackUnderflowError(
+        'Cannot pop from an empty RPN stack.',
+        errorId: CalculatrixErrorId.stackUnderflow,
+      );
     }
 
     return _stack.removeLast();
@@ -116,6 +130,7 @@ class RpnEngine {
     if (_stack.length < 2) {
       throw RpnStackUnderflowError(
         'A binary operation requires at least two values.',
+        errorId: CalculatrixErrorId.stackUnderflow,
       );
     }
 
@@ -142,6 +157,7 @@ class RpnEngine {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError(
         'A unary operation requires at least one value.',
+        errorId: CalculatrixErrorId.stackUnderflow,
       );
     }
 
@@ -179,7 +195,10 @@ class RpnEngine {
     }
 
     if (_stack.isEmpty) {
-      throw RpnStackUnderflowError('Stack is empty.');
+      throw RpnStackUnderflowError(
+        'Stack is empty.',
+        errorId: CalculatrixErrorId.stackUnderflow,
+      );
     }
 
     if (indexFromTop > _stack.length) {

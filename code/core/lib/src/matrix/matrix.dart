@@ -358,7 +358,10 @@ class Matrix {
       }
 
       if (pivotMagnitude <= absoluteTolerance) {
-        throw MatrixDomainError('Matrix is singular and cannot be inverted.');
+        throw MatrixDomainError(
+          'Matrix is singular and cannot be inverted.',
+          errorId: CalculatrixErrorId.singularMatrix,
+        );
       }
 
       if (pivotRow != pivotColumn) {
@@ -1528,6 +1531,8 @@ class Matrix {
   Matrix log({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+    double relativeTolerance =
+        CalculatrixNumericPolicy.defaultRelativeTolerance,
   }) {
     _requireSquare(operation: 'logarithm');
 
@@ -1536,6 +1541,7 @@ class Matrix {
       if (source == 0) {
         throw MatrixDomainError(
           'Logarithm is undefined for zero in the real domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
       if (source > 0) {
@@ -1552,6 +1558,7 @@ class Matrix {
       if (radius <= absoluteTolerance) {
         throw MatrixDomainError(
           'Logarithm is undefined for zero magnitude in the complex domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
 
@@ -1559,29 +1566,247 @@ class Matrix {
       return Matrix.complex(math.log(radius), angle);
     }
 
-    final Diagonalization decomposition = diagonalization(
-      absoluteTolerance: absoluteTolerance,
-    );
-
-    final List<List<double>> logDiagonal = List<List<double>>.generate(
-      rowCount,
-      (int row) => List<double>.filled(rowCount, 0, growable: false),
-      growable: false,
-    );
-
-    for (int index = 0; index < rowCount; index++) {
-      final double eigenvalue = decomposition.d.at(index, index);
-      if (eigenvalue <= absoluteTolerance) {
-        throw MatrixDomainError(
-          'Logarithm is undefined for matrices with non-positive eigenvalues '
-          'in the real domain.',
-        );
-      }
-      logDiagonal[index][index] = math.log(eigenvalue);
+    // Outside the scalar and complex-form (aI + bJ) subalgebras, the only
+    // representable results are real matrices, so the principal log is only
+    // defined when every eigenvalue is real and strictly positive. This
+    // deliberately does not attempt a general complex-eigenvalue extension
+    // (per the owner's decision: "the only complex representation is
+    // a*I + b*J; do not add complex entries").
+    final Matrix eigenvalueColumn;
+    try {
+      eigenvalueColumn = eigenvalues(absoluteTolerance: absoluteTolerance);
+    } on MatrixDomainError {
+      throw MatrixDomainError(
+        'Logarithm is undefined: this matrix has complex eigenvalues and is '
+        'not in complex form (aI + bJ).',
+        errorId: CalculatrixErrorId.logUndefined,
+      );
     }
 
-    final Matrix p = decomposition.p;
-    return p * Matrix(logDiagonal) * p.inverse();
+    for (int index = 0; index < rowCount; index++) {
+      final double eigenvalue = eigenvalueColumn.at(index, 0);
+      if (eigenvalue <= absoluteTolerance) {
+        throw MatrixDomainError(
+          'Logarithm is undefined for matrices with non-positive real '
+          'eigenvalues.',
+          errorId: CalculatrixErrorId.logUndefined,
+        );
+      }
+    }
+
+    // Principal log via inverse scaling and squaring: repeatedly take the
+    // matrix square root (Denman-Beavers Newton iteration, valid for any
+    // matrix without eigenvalues on the non-positive real axis, including
+    // defective/non-diagonalizable ones) until the result is close to the
+    // identity, then sum the Mercator series on the near-identity residual,
+    // then rescale by 2^k. This avoids diagonalization entirely, so it also
+    // handles matrices with repeated eigenvalues and no full eigenbasis
+    // (e.g. a Jordan block), where an eigendecomposition-based log fails.
+    return _principalLogByScalingAndSquaring(
+      absoluteTolerance: absoluteTolerance,
+      relativeTolerance: relativeTolerance,
+    );
+  }
+
+  /// Inverse scaling and squaring principal logarithm for a square matrix
+  /// whose eigenvalues have already been confirmed real and positive.
+  Matrix _principalLogByScalingAndSquaring({
+    required double absoluteTolerance,
+    required double relativeTolerance,
+    int maxSquarings = 60,
+    int maxSeriesTerms = 200,
+  }) {
+    final Matrix identity = Matrix.identity(rowCount);
+    const double residualTarget = 1e-2;
+
+    Matrix current = this;
+    int squarings = 0;
+    while ((current - identity)._infinityNorm() > residualTarget &&
+        squarings < maxSquarings) {
+      current = current.sqrt(
+        absoluteTolerance: absoluteTolerance,
+        relativeTolerance: relativeTolerance,
+      );
+      squarings++;
+    }
+
+    final Matrix residual = current - identity;
+    Matrix term = residual;
+    Matrix sum = residual;
+    final double seriesTolerance = math.max(
+      absoluteTolerance,
+      relativeTolerance * math.max(residual._infinityNorm(), 1),
+    );
+
+    for (int k = 2; k <= maxSeriesTerms; k++) {
+      term = term * residual;
+      final double coefficient = k.isOdd ? 1.0 / k : -1.0 / k;
+      sum = sum + term.scale(coefficient);
+
+      if (term._infinityNorm() / k < seriesTolerance) {
+        break;
+      }
+    }
+
+    return sum.scale(math.pow(2, squarings).toDouble());
+  }
+
+  /// Computes `this ^ exponent` (issue #5, power semantics table D25/D34).
+  ///
+  /// The checks run strictly by kind, never by a numerical commutation
+  /// test: dimensions first (base and exponent both square; when neither is
+  /// scalar they must be the same size), then by whether the exponent is
+  /// scalar, then by sign/complex-form. Every combination the table does
+  /// not cover raises a typed domain error (`ambiguous-power`,
+  /// `log-undefined`, `dimension-mismatch`, `non-finite` or
+  /// `singular-matrix`) rather than guessing a result: no fallbacks, no
+  /// silent defaults.
+  Matrix power(Matrix exponent) {
+    if (!isSquare) {
+      throw MatrixShapeError(
+        'Power base must be square, found ${rowCount}x${columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+
+    if (!exponent.isSquare) {
+      throw MatrixShapeError(
+        'Power exponent must be square, found '
+        '${exponent.rowCount}x${exponent.columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+
+    if (!isScalar && !exponent.isScalar && rowCount != exponent.rowCount) {
+      throw MatrixShapeError(
+        'Power base ${rowCount}x$rowCount and exponent '
+        '${exponent.rowCount}x${exponent.rowCount} must be the same size.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+
+    if (exponent.isScalar) {
+      return _powerByScalarExponent(exponent.scalarValue);
+    }
+
+    return _powerByMatrixExponent(exponent);
+  }
+
+  Matrix _powerByScalarExponent(double y) {
+    final bool integerExponent = y == y.roundToDouble();
+
+    if (isScalar) {
+      final double b = scalarValue;
+
+      if (integerExponent || b >= 0) {
+        // Integer exponent (any base) and non-negative base use ordinary
+        // real exponentiation directly; this also yields the 0^y cases
+        // (0^0 = 1, 0^positive = 0, 0^negative = +Infinity) for free.
+        return Matrix.scalar(_checkFiniteScalar(math.pow(b, y).toDouble()));
+      }
+
+      // b < 0, non-integer exponent: complex principal value via
+      // B^Y = exp(Y * log(B)), where log(B) is the complex principal log
+      // this class already gives negative scalars.
+      final Matrix scaled = log().scale(y);
+      return _checkFiniteMatrix(scaled.exp());
+    }
+
+    // Square, non-scalar base.
+    if (integerExponent) {
+      return _integerMatrixPower(y.round());
+    }
+
+    final Matrix scaled = log().scale(y);
+    return _checkFiniteMatrix(scaled.exp());
+  }
+
+  Matrix _powerByMatrixExponent(Matrix exponent) {
+    if (isScalar) {
+      final double b = scalarValue;
+
+      if (b == 0) {
+        throw MatrixDomainError(
+          '0 raised to a matrix power requires log(0), which is undefined.',
+          errorId: CalculatrixErrorId.logUndefined,
+        );
+      }
+
+      if (b > 0) {
+        final Matrix scaled = exponent.scale(math.log(b));
+        return _checkFiniteMatrix(scaled.exp());
+      }
+
+      // b < 0: only defined when the exponent is also a complex number
+      // (aI + bJ), since complex numbers commute and the branch of
+      // log(B) is then unambiguous.
+      if (exponent.isComplexForm) {
+        final Matrix product = log() * exponent;
+        return _checkFiniteMatrix(product.exp());
+      }
+
+      throw MatrixDomainError(
+        'A negative scalar base raised to a non-complex matrix exponent is '
+        'ambiguous: the branch of the logarithm is not determined.',
+        errorId: CalculatrixErrorId.ambiguousPower,
+      );
+    }
+
+    // Square, non-scalar base with a square, non-scalar exponent: only the
+    // complex-form (aI + bJ) subalgebra commutes unconditionally, so it is
+    // the only pairing with an unambiguous result.
+    if (isComplexForm && exponent.isComplexForm) {
+      final Matrix product = log() * exponent;
+      return _checkFiniteMatrix(product.exp());
+    }
+
+    throw MatrixDomainError(
+      'A matrix base raised to a matrix exponent is ambiguous outside the '
+      'scalar, positive-scalar-base and complex-form cases.',
+      errorId: CalculatrixErrorId.ambiguousPower,
+    );
+  }
+
+  /// Integer power of a square, non-scalar matrix via repeated
+  /// multiplication (or repeated multiplication of the inverse, for a
+  /// negative exponent).
+  Matrix _integerMatrixPower(int exponent) {
+    if (exponent == 0) {
+      return Matrix.identity(rowCount);
+    }
+
+    final Matrix base = exponent < 0 ? _inverse() : this;
+    final int count = exponent.abs();
+
+    Matrix result = Matrix.identity(rowCount);
+    for (int i = 0; i < count; i++) {
+      result = result * base;
+    }
+    return result;
+  }
+
+  static double _checkFiniteScalar(double value) {
+    if (!value.isFinite) {
+      throw MatrixDomainError(
+        'Result is not a finite number.',
+        errorId: CalculatrixErrorId.nonFinite,
+      );
+    }
+    return value;
+  }
+
+  static Matrix _checkFiniteMatrix(Matrix matrix) {
+    for (int row = 0; row < matrix.rowCount; row++) {
+      for (int column = 0; column < matrix.columnCount; column++) {
+        if (!matrix.at(row, column).isFinite) {
+          throw MatrixDomainError(
+            'Result is not a finite number.',
+            errorId: CalculatrixErrorId.nonFinite,
+          );
+        }
+      }
+    }
+    return matrix;
   }
 
   /// Computes a matrix-first singular value decomposition.

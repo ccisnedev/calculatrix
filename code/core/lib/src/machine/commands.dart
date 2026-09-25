@@ -95,6 +95,17 @@ final class DivideCommand extends CalculatrixCommand {
   }
 }
 
+final class PowerCommand extends CalculatrixCommand {
+  const PowerCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix exponent = engine.pop();
+    final Matrix base = engine.pop();
+    engine.push(base.power(exponent));
+  }
+}
+
 final class AppendRowCommand extends CalculatrixCommand {
   const AppendRowCommand();
 
