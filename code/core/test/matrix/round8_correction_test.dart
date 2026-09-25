@@ -322,4 +322,47 @@ void main() {
       expect(maxResidual, lessThan(1e-4));
     });
   });
+
+  group('Round 8, finding 10: a positive scalar base raised to a matrix '
+      'exponent must classify the exponent\'s own supported '
+      'matrix-function class before scaling it by log(base)', () {
+    test('base^exponent throws unsupportedMatrixFunction for a 3x3 '
+        'non-diagonal, non-symmetric exponent whose off-diagonal entries '
+        'underflow to exactly zero only after being scaled by log(base)',
+        () {
+      // base = 1 + 2^-52 (the smallest double strictly greater than 1),
+      // so log(base) is about 2.22e-16, the smallest nonzero magnitude a
+      // scaling factor derived this way can have. exponent's off-diagonal
+      // entries are 1e-310, 2e-310, and so on: genuinely nonzero, valid
+      // subnormal doubles, making exponent a genuine 3x3 non-diagonal,
+      // non-symmetric matrix, which is not one of the five supported
+      // matrix-function classes (scalar, complex-form, diagonal, exactly
+      // symmetric, general 2x2). But entry * log(base) (about 1e-310 *
+      // 2.22e-16 =~ 2.22e-326) is below the smallest representable
+      // subnormal double (about 4.9e-324), so every off-diagonal entry of
+      // the scaled copy underflows to exactly 0, making the scaled copy
+      // look exactly diagonal even though exponent itself never was.
+      // Classifying the scaled copy instead of exponent itself wrongly
+      // accepts this input and returns a number, instead of throwing the
+      // typed error that exponent's own true, unscaled structure calls
+      // for.
+      final double base = 1.0000000000000002;
+      final Matrix exponent = Matrix(<List<double>>[
+        <double>[1, 1e-310, 3e-310],
+        <double>[2e-310, 2, 4e-310],
+        <double>[5e-310, 6e-310, 3],
+      ]);
+
+      expect(
+        () => Matrix.scalar(base).power(exponent),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.unsupportedMatrixFunction,
+          ),
+        ),
+      );
+    });
+  });
 }
