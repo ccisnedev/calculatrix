@@ -3512,9 +3512,28 @@ class Matrix {
           c1 = _checkFiniteScalar(math.pow(lOther, y - 1).toDouble());
           c0 = 0;
         } else {
-          final double ly2 = _checkFiniteScalar(math.pow(l2, y).toDouble());
-          c1 = ly2 * _expm1(y * _log1p((l1 - l2) / l2)) / (l1 - l2);
-          c0 = ly2 - c1 * l2;
+          // Round 8 correction, finding 8: anchor the divided difference
+          // at whichever eigenvalue has the larger magnitude, not always
+          // l2. Anchoring at a far-smaller-magnitude eigenvalue makes
+          // lSmall^y prone to underflowing to exactly 0 while the paired
+          // expm1(y*log1p((lBig-lSmall)/lSmall)) term, whose argument
+          // scales with lBig/lSmall, is prone to overflowing to Infinity,
+          // so their product is 0*Infinity = NaN. Anchoring at the
+          // larger-magnitude eigenvalue instead keeps lBig^y away from
+          // underflow and keeps the expm1 argument's sign safely bounded
+          // (log1p((lSmall-lBig)/lBig) is always > -1, so its expm1 result
+          // never overflows). This is the same linear interpolant through
+          // (l1, l1^y) and (l2, l2^y) either way, just computed from the
+          // other end.
+          final bool l1IsLarger = l1.abs() >= l2.abs();
+          final double lBig = l1IsLarger ? l1 : l2;
+          final double lSmall = l1IsLarger ? l2 : l1;
+          final double lyBig = _checkFiniteScalar(math.pow(lBig, y).toDouble());
+          c1 =
+              lyBig *
+              _expm1(y * _log1p((lSmall - lBig) / lBig)) /
+              (lSmall - lBig);
+          c0 = lyBig - c1 * lBig;
         }
       }
     }
