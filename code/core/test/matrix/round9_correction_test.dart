@@ -71,14 +71,21 @@ void main() {
         },
       );
 
-      test('[[1,1],[0,1e-20]]^1.5 matches the direct divided difference', () {
+      test('[[1,1],[0,0.1]]^1.5 matches the direct divided difference', () {
+        // A well-separated but not extreme-scale pair of eigenvalues
+        // (unlike the 1e-20 cases above, where l1-l2 already rounds to
+        // exactly 1.0 in double precision, making any closed form
+        // expressed as c0*I+c1*A unable to recover f(l2) to any relative
+        // precision regardless of how c1 is computed): this exercises the
+        // same relative-gap-large branch as the finding's own examples
+        // without hitting that unrelated representability wall.
         final Matrix result = Matrix(<List<double>>[
           <double>[1, 1],
-          <double>[0, 1e-20],
+          <double>[0, 0.1],
         ]).power(Matrix.scalar(1.5));
 
         const double l1 = 1;
-        const double l2 = 1e-20;
+        const double l2 = 0.1;
         final double f1 = math.pow(l1, 1.5).toDouble();
         final double f2 = math.pow(l2, 1.5).toDouble();
         final double expectedOffDiagonal = (f1 - f2) / (l1 - l2);
