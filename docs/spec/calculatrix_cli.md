@@ -310,7 +310,7 @@ offset of the token in the program.
 
 Ids: `unknown-word`, `stack-underflow`, `type-mismatch`, `dimension-mismatch`,
 `singular-matrix`, `non-finite`, `log-undefined`, `ambiguous-power`,
-`no-convergence`, `syntax-error` (infix only). The ids belong to the core; the CLI only renders
+`no-convergence`, `unsupported-matrix-function`, `syntax-error` (infix only). The ids belong to the core; the CLI only renders
 them. The semantics of `power`, the source of `log-undefined` and
 `ambiguous-power`, are in the runbook (D25).
 
@@ -908,7 +908,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 ## 14. Decisions of the review of 2026-09-24
 
 Every question of the draft is closed. The user decided each one; the runbook
-records the ones that affect the whole stage (D25 to D36).
+records the ones that affect the whole stage (D25 to D37).
 
 | # | Topic | Decision |
 |---|---|---|
@@ -934,3 +934,4 @@ records the ones that affect the whole stage (D25 to D36).
 | R20 | Help precedence | Wins over an incomplete route, a missing argument or option, and the constraints; loses to malformed invocations (8.6). |
 | R21 | Failure of `--apply` | Exit `1` with a structured id; stop at the failed step, no rollback, no retry (section 6). |
 | R22 | `no-convergence` | An iterative method (matrix exponential, square root, logarithm) that does not reach its tolerance within its cap raises `no-convergence` (65); it never returns the unconverged value (runbook D35). |
+| R23 | `unsupported-matrix-function` | `exp`, `log`, `sqrt` and a non-integer real power accept a scalar, the complex form, a diagonal, a symmetric or a 2x2 matrix; any other matrix raises `unsupported-matrix-function` (65), never an approximation (runbook D37). |
