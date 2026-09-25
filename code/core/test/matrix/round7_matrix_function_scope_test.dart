@@ -367,13 +367,18 @@ void main() {
     },
   );
 
-  group('Round 7 — sqrt() exposes maxSweeps for Jacobi convergence testing', () {
+  group('Round 7, round 8 finding 11: sqrt() has no public maxSweeps '
+      'parameter; Jacobi convergence is tested through the debug seam '
+      'instead', () {
     test('a zero sweep budget on a symmetric matrix is no-convergence', () {
       expect(
-        () => Matrix(<List<double>>[
-          <double>[2, 1],
-          <double>[1, 2],
-        ]).sqrt(maxSweeps: 0),
+        () => debugCyclicJacobiSqrtWithSweepBudget(
+          Matrix(<List<double>>[
+            <double>[2, 1],
+            <double>[1, 2],
+          ]),
+          0,
+        ),
         throwsA(
           isA<MatrixDomainError>().having(
             (MatrixDomainError e) => e.errorId,

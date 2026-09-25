@@ -57,6 +57,21 @@ class CalculatrixNumericPolicy {
   /// this or the caller's own `relativeTolerance` regardless.
   static const double sqrtResidualAcceptanceTolerance = 1e-8;
 
+  /// Sweep budget for [Matrix]'s cyclic Jacobi eigendecomposition (Golub
+  /// and Van Loan, "Matrix Computations", section 8.5), used by the
+  /// exactly-symmetric-matrix branch of `sqrt`, `exp`, `log` and `power`.
+  ///
+  /// Cyclic Jacobi converges quadratically once off-diagonal entries are
+  /// small, so 50 sweeps is far more than any legitimate finite,
+  /// well-posed symmetric input needs; exceeding this budget without
+  /// converging raises [CalculatrixErrorId.noConvergence] instead of
+  /// returning an under-converged result. Not a public parameter on any of
+  /// those methods (round 8 correction, finding 11): a caller cannot pick
+  /// a smaller budget and get a faster but less accurate answer, since
+  /// there is no such tradeoff to make here, only convergence or a typed
+  /// error.
+  static const int jacobiMaxSweeps = 50;
+
   static bool nearlyEqual(
     double a,
     double b, {
