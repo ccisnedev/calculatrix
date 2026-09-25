@@ -609,4 +609,154 @@ void main() {
       },
     );
   });
+
+  group(
+    'Matrix.power - scale-relative eigenvalue classification (round 3 '
+    'correction)',
+    () {
+      test(
+        'two tiny diagonal entries that are equal-looking under an '
+        'absolute tolerance but not under a scale-relative one succeed',
+        () {
+          // diag(1e-20, 2e-20): under the old fixed-absolute-tolerance
+          // isComplexForm check (1e-12), these two entries looked equal
+          // and the matrix was misclassified as complex form aI+bJ,
+          // wrongly raising "zero magnitude" log-undefined. Scale-
+          // relatively, 1e-20 and 2e-20 are not remotely equal.
+          final Matrix base = Matrix(<List<double>>[
+            <double>[1e-20, 0],
+            <double>[0, 2e-20],
+          ]);
+          final Matrix result = base.power(Matrix.scalar(0.5));
+
+          expect(result.at(0, 0), closeTo(math.sqrt(1e-20), 1e-4 * 1e-10));
+          expect(result.at(1, 1), closeTo(math.sqrt(2e-20), 1e-4 * 1.4e-10));
+        },
+      );
+
+      test(
+        'a tiny-scale upper triangular (non-diagonal) matrix with equal '
+        'diagonal entries succeeds, not misclassified as complex form',
+        () {
+          final Matrix base = Matrix(<List<double>>[
+            <double>[1e-20, 1e-20],
+            <double>[0, 1e-20],
+          ]);
+          final Matrix result = base.power(Matrix.scalar(0.5));
+          final Matrix roundTrip = result * result;
+
+          double maxAbsoluteDeviation = 0;
+          for (int r = 0; r < 2; r++) {
+            for (int c = 0; c < 2; c++) {
+              maxAbsoluteDeviation = math.max(
+                maxAbsoluteDeviation,
+                (roundTrip.at(r, c) - base.at(r, c)).abs(),
+              );
+            }
+          }
+          expect(maxAbsoluteDeviation / 1e-20, lessThan(1e-6));
+        },
+      );
+
+      test(
+        'a genuinely positive diagonal entry far below the old fixed '
+        'eigenvalue-rounding-noise floor still succeeds',
+        () {
+          // diag(4e-16, 1): 4e-16 is below the old fixed 1e-14
+          // eigenvalueRoundingNoiseTolerance, but it is an exact
+          // diagonal entry of a triangular matrix, not rounding noise.
+          final Matrix base = Matrix(<List<double>>[
+            <double>[4e-16, 0],
+            <double>[0, 1],
+          ]);
+          final Matrix result = base.power(Matrix.scalar(0.5));
+
+          expect(result.at(0, 0), closeTo(math.sqrt(4e-16), 1e-4 * 2e-8));
+          expect(result.at(1, 1), closeTo(1, 1e-9));
+        },
+      );
+
+      test(
+        'a 3x3 diagonal matrix with one entry far below the old fixed '
+        'eigenvalue-rounding-noise floor still succeeds',
+        () {
+          final Matrix base = Matrix(<List<double>>[
+            <double>[2, 0, 0],
+            <double>[0, 1e-18, 0],
+            <double>[0, 0, 3],
+          ]);
+          final Matrix result = base.power(Matrix.scalar(0.5));
+
+          expect(result.at(0, 0), closeTo(math.sqrt(2), 1e-6));
+          expect(result.at(1, 1), closeTo(math.sqrt(1e-18), 1e-4 * 1e-9));
+          expect(result.at(2, 2), closeTo(math.sqrt(3), 1e-6));
+        },
+      );
+
+      test(
+        'a symmetric positive definite matrix that is nearly singular '
+        '(condition ~2.5e7) succeeds instead of raising no-convergence '
+        'with a contradictory "is undefined" message',
+        () {
+          final Matrix base = Matrix(<List<double>>[
+            <double>[1, 2],
+            <double>[2, 4.000001],
+          ]);
+          final Matrix result = base.power(Matrix.scalar(0.5));
+          final Matrix roundTrip = result * result;
+
+          expect(
+            roundTrip.almostEquals(base, relativeTolerance: 1e-6),
+            isTrue,
+          );
+        },
+      );
+
+      test(
+        'a tiny-scale negative diagonal entry keeps raising log-undefined',
+        () {
+          final Matrix base = Matrix(<List<double>>[
+            <double>[-1e-20, 0],
+            <double>[0, 1],
+          ]);
+
+          expect(
+            () => base.power(Matrix.scalar(0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.logUndefined,
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'a block-triangular matrix with a negative real eigenvalue on the '
+        'diagonal block keeps raising log-undefined',
+        () {
+          // Eigenvalues: -0.37 and 5.37 (from the [[1,2],[3,4]] block)
+          // and 1 (from the trailing diagonal entry).
+          final Matrix base = Matrix(<List<double>>[
+            <double>[1, 2, 0],
+            <double>[3, 4, 0],
+            <double>[0, 0, 1],
+          ]);
+
+          expect(
+            () => base.power(Matrix.scalar(0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.logUndefined,
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
 }
