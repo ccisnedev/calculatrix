@@ -121,8 +121,12 @@ void main() {
           },
           CalculatrixErrorId.syntaxError: () =>
               Calculatrix.evaluateInfix('1 2 +'),
+          // Not diagonal (bypasses sqrt's exact-diagonal fast path) and
+          // not symmetric (bypasses its eigendecomposition fast path), so
+          // this reaches the general Newton loop, which with a zero
+          // iteration budget never gets a chance to converge.
           CalculatrixErrorId.noConvergence: () => Matrix(<List<double>>[
-            <double>[2, 0],
+            <double>[2, 1],
             <double>[0, 2],
           ]).sqrt(maxIterations: 0),
         };
