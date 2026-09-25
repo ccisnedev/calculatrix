@@ -146,4 +146,24 @@ void main() {
       expect(result.at(1, 0).abs(), closeTo(1, 1e-9));
     });
   });
+
+  group('Round 8, finding 5: isComplexForm must use exact equality, not a '
+      'scale-relative tolerance', () {
+    test('a large Jordan block is not misclassified as complex form', () {
+      // Diagonal entries equal (-1e20 == -1e20), but the off-diagonal pair
+      // is 1 and 0, genuinely not negatives of each other. The current
+      // scale-relative tolerance (4 * machineEpsilon * the matrix's own
+      // largest entry, about 8.88e4 at this scale) is far larger than the
+      // true off-diagonal gap of 1, so it wrongly calls this complex form.
+      // This is a genuine Jordan block for the repeated eigenvalue -1e20
+      // (b=1, c=0: not diagonalizable), which has no real or complex-form
+      // square root in this package's supported closed forms.
+      final Matrix matrix = Matrix(<List<double>>[
+        <double>[-1e20, 1],
+        <double>[0, -1e20],
+      ]);
+
+      expect(matrix.isComplexForm, isFalse);
+    });
+  });
 }
