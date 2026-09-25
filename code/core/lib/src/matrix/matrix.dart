@@ -3580,7 +3580,7 @@ class Matrix {
           if (y < 0) {
             throw MatrixDomainError(
               'A zero eigenvalue cannot be raised to a negative real power.',
-              errorId: CalculatrixErrorId.nonFinite,
+              errorId: CalculatrixErrorId.logUndefined,
             );
           }
           final double lOther = l1 == 0 ? l2 : l1;
