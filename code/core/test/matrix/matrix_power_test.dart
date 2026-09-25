@@ -367,4 +367,92 @@ void main() {
       },
     );
   });
+
+  group('Matrix.power - numerical robustness (#5)', () {
+    test(
+      'a tiny non-integer exponent on a matrix with huge diagonal '
+      'magnitudes stays near the identity',
+      () {
+        // log() must not overflow while scaling and squaring down from
+        // 1e40-magnitude eigenvalues; the sqrt() scaling factor used
+        // internally must be computed as a floating point power, not an
+        // integer one that silently overflows.
+        final Matrix base = Matrix(<List<double>>[
+          <double>[1e40, 0],
+          <double>[0, 2e40],
+        ]);
+        final Matrix result = base.power(Matrix.scalar(1e-18));
+
+        expect(
+          result.almostEquals(Matrix.identity(2), absoluteTolerance: 1e-9),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'integer exponent that overflows the double range is non-finite',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[1e200, 0],
+          <double>[0, 1e200],
+        ]);
+
+        expect(
+          () => base.power(Matrix.scalar(2)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.nonFinite,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'the minimum 64-bit integer exponent terminates quickly and is exact '
+      '(exponentiation by squaring, not int abs/round on the exponent)',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[1, 1],
+          <double>[0, 1],
+        ]);
+        final Matrix result = base.power(Matrix.scalar(-9223372036854775808));
+
+        expect(
+          result.almostEquals(
+            Matrix(<List<double>>[
+              <double>[1, -9223372036854775808.0],
+              <double>[0, 1],
+            ]),
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'a large but not overflowing positive integer exponent gives the '
+      'exact finite result for a unipotent base',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[1, 1],
+          <double>[0, 1],
+        ]);
+        final Matrix result = base.power(Matrix.scalar(1e30));
+
+        expect(
+          result.almostEquals(
+            Matrix(<List<double>>[
+              <double>[1, 1e30],
+              <double>[0, 1],
+            ]),
+          ),
+          isTrue,
+        );
+      },
+    );
+  });
 }
