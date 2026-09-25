@@ -48,6 +48,52 @@ void main() {
       final Matrix zero = Matrix.zeros(3, 3);
       expect(zero.exp(), Matrix.identity(3));
     });
+
+    test(
+      'exp of a large diagonal matrix matches the scalar exponential via '
+      'scaling and squaring (#5)',
+      () {
+        // A fixed-length Taylor series diverges for an argument this large;
+        // scaling and squaring must be used instead.
+        final Matrix large = Matrix(<List<double>>[
+          <double>[100 * math.log(2), 0],
+          <double>[0, 100 * math.log(2)],
+        ]);
+        final Matrix result = large.exp();
+        // Note: math.pow(2, 100) (int base) would silently wrap through
+        // Dart's 64-bit int arithmetic and produce 0; the double base
+        // below is required to get the correct value.
+        final double expected = math.pow(2.0, 100).toDouble();
+
+        expect(
+          result.almostEquals(
+            Matrix(<List<double>>[
+              <double>[expected, 0],
+              <double>[0, expected],
+            ]),
+            relativeTolerance: 1e-9,
+            absoluteTolerance: 0,
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'exp of a large pure rotation matrix wraps correctly via scaling and '
+      'squaring (#5)',
+      () {
+        // 20.5*pi*i is well past the range where 50 fixed Taylor terms
+        // converge; e^(i*20.5*pi) = e^(i*0.5*pi) = i.
+        final Matrix large = Matrix.i.scale(20.5 * math.pi);
+        final Matrix result = large.exp();
+
+        expect(
+          result.almostEquals(Matrix.i, absoluteTolerance: 1e-9),
+          isTrue,
+        );
+      },
+    );
   });
 
   group('Euler\'s formula via matrix exponential', () {
