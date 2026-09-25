@@ -1193,6 +1193,17 @@ No behavior change; all existing tests stay green.
 - [ ] `Value` hierarchy with `NumericMatrix`
 - [ ] Command registry; app module bar and CLI aliases generated from it
 - [ ] Reachability tests and parity report in CI
+- [ ] CLI `--trace` for `cx eval rpn`: the stack after each object of the
+  program. Needs its own design (text and JSON shape, how it combines with
+  errors). Until then it is an unknown option, error 7
+  (`docs/spec/calculatrix_cli.md`, R14)
+- [ ] CLI `--show-rpn` for `cx eval infix`: the RPN program the infix
+  expression compiles to. Depends on infix compiling into the RPN command
+  line (runbook CLI Stage 0, catalog notes); unknown option until then
+- [ ] Study: the power of a matrix with no real logarithm
+  (`[[-1 0] [0 2]] 0.5 ^`). A complex number is `a·I + b·J`; how to
+  represent a matrix whose entries would be complex is open. Until then it
+  is `log-undefined` (runbook CLI Stage 0, D34)
 
 ## Stage 10: "Giac Spike on CLI" (0.9.x to 0.10.0)
 
