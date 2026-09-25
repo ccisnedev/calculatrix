@@ -623,6 +623,20 @@ class Matrix {
       );
     }
 
+    // Round 8 correction, finding 7: the 2x2 case bypasses the whole-matrix
+    // normalization below entirely and goes straight to [_eigenvalues2x2],
+    // which does its own local, exact power-of-two balancing of `b` and
+    // `c` individually (see that method's doc comment). A single shared
+    // scale factor derived from the whole matrix's infinity norm is wrong
+    // here in a way balancing avoids: for `[[0,1e200],[1e-200,0]]`, the
+    // one factor that brings 1e200 down to O(1) drives 1e-200 down past
+    // the smallest representable subnormal double, underflowing it to
+    // exactly 0 and manufacturing a spurious repeated eigenvalue of 0
+    // instead of the true +-1.
+    if (rowCount == 2) {
+      return _eigenvalues2x2();
+    }
+
     final ({int k, Matrix scaled}) normalization = _normalizedByPowerOfTwo();
     final Matrix raw = normalization.scaled._eigenvaluesRaw(
       absoluteTolerance: absoluteTolerance,
@@ -636,9 +650,9 @@ class Matrix {
   }
 
   Matrix _eigenvaluesRaw({required double absoluteTolerance}) {
-    if (rowCount == 2) {
-      return _eigenvalues2x2();
-    }
+    // The rowCount == 2 case is handled directly by [eigenvalues] itself
+    // (round 8 correction, finding 7), before this method is ever called,
+    // so this method only ever runs for rowCount > 2.
 
     // General NxN (round 6 correction, item 11): genuine Francis
     // double-shift QR on Hessenberg form (Golub & Van Loan, Algorithm
@@ -675,26 +689,58 @@ class Matrix {
     );
   }
 
-  /// The 2x2 eigenvalue solver (round 6 correction, item 7): delegates
-  /// entirely to [_stableRealEigen2x2], which already has no absolute
-  /// cutoffs anywhere — its zero-discriminant test is scale-relative
-  /// (`eps * (trace^2 + |det|)`) and neither root is ever compared against
-  /// a fixed floor. The previous version's `value.abs() <= absoluteTolerance
-  /// ? 0 : value` zeroed any eigenvalue at or below a fixed 1e-12 after
-  /// this class's matrix-wide power-of-two normalization, which wrongly
-  /// discarded a genuinely tiny-but-nonzero eigenvalue whenever the
-  /// *other* eigenvalue dominated the normalization's scale choice — e.g.
-  /// `[[0,1e20],[1e-20,0]]` normalizes to a matrix whose true eigenvalues
-  /// are `~+-1.355e-20`, both of which that fixed cutoff zeroed outright,
-  /// producing `{0,0}` instead of the correct `{1,-1}` after rescaling.
+  /// The 2x2 eigenvalue solver (round 6 correction, item 7, and round 8
+  /// correction, finding 7). Delegates to [_stableRealEigen2x2], which
+  /// already has no absolute cutoffs anywhere: its zero-discriminant test
+  /// is scale-relative (`eps * (trace^2 + |det|)`), and neither root is
+  /// ever compared against a fixed floor. The previous version's
+  /// `value.abs() <= absoluteTolerance ? 0 : value` zeroed any eigenvalue
+  /// at or below a fixed 1e-12 after this class's matrix-wide power-of-two
+  /// normalization, which wrongly discarded a genuinely tiny-but-nonzero
+  /// eigenvalue whenever the *other* eigenvalue dominated the
+  /// normalization's scale choice (for example, `[[0,1e20],[1e-20,0]]`
+  /// normalizes to a matrix whose true eigenvalues are `~+-1.355e-20`,
+  /// both of which that fixed cutoff zeroed outright, producing `{0,0}`
+  /// instead of the correct `{1,-1}` after rescaling).
+  ///
+  /// Round 8, finding 7: this method is now called directly on `this`,
+  /// never on a whole-matrix-normalized copy (that normalization is
+  /// applied by [eigenvalues] only for `rowCount > 2`). A single shared
+  /// power-of-two factor derived from the whole matrix's infinity norm is
+  /// wrong here: for `[[0,1e200],[1e-200,0]]`, the one factor that brings
+  /// `1e200` down to O(1) drives `1e-200` down past the smallest
+  /// representable subnormal double, underflowing it to exactly 0 before
+  /// the solver ever sees it (true eigenvalues +-1, wrongly reported as a
+  /// repeated 0). Instead, `b` and `c` are balanced against each other by
+  /// an exact power-of-two diagonal similarity transform
+  /// `D = diag(1, 2^k)`, `A' = D^-1 A D` (so `a` and `d` are unchanged,
+  /// `b' = b * 2^k`, `c' = c / 2^k`), choosing `k` so `|b'|` and `|c'|`
+  /// land close to each other rather than one of them landing far from
+  /// double's representable range. A diagonal similarity transform leaves
+  /// eigenvalues exactly unchanged, so no undo step is needed afterward,
+  /// and multiplying or dividing by an exact power of two changes only a
+  /// double's exponent bits, so `b'` and `c'` carry no extra rounding
+  /// error beyond what `b` and `c` already had (other than the underflow
+  /// or overflow this balancing exists to avoid).
   Matrix _eigenvalues2x2() {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
 
+    double balancedB = b;
+    double balancedC = c;
+    if (b != 0 && c != 0) {
+      final double k = ((math.log(c.abs()) - math.log(b.abs())) / math.ln2) / 2;
+      final double kRounded = k.roundToDouble();
+      if (kRounded != 0) {
+        balancedB = _scalarScaleByPowerOfTwo(b, kRounded);
+        balancedC = _scalarScaleByPowerOfTwo(c, -kRounded);
+      }
+    }
+
     final ({bool isComplex, double lambda1, double lambda2}) solved =
-        _stableRealEigen2x2(a, b, c, d);
+        _stableRealEigen2x2(a, balancedB, balancedC, d);
 
     if (solved.isComplex) {
       throw MatrixDomainError(
