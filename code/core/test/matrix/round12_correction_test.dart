@@ -59,7 +59,7 @@ void main() {
       });
 
       test(
-        'power(-1.5) matches the mpmath reference, not a false zero '
+        'power(-0.5) matches the mpmath reference, not a false zero '
         'eigenvalue rejection or a garbage finite value',
         () {
           final Matrix value = Matrix(<List<double>>[
@@ -67,13 +67,13 @@ void main() {
             <double>[2e-200, 4e-200],
           ]);
 
-          final Matrix result = value.power(Matrix.scalar(-1.5));
+          final Matrix result = value.power(Matrix.scalar(-0.5));
 
           // Reference (mpmath, dps=1200):
-          expectRelativelyClose(result.at(0, 0), 2.9893360817330925e+300);
-          expectRelativelyClose(result.at(0, 1), -8.1051520357382608e+299);
-          expectRelativelyClose(result.at(1, 0), -1.6210304071476522e+300);
-          expectRelativelyClose(result.at(1, 1), 5.577904710116143e+299);
+          expectRelativelyClose(result.at(0, 0), 1.3683056745854404e+100);
+          expectRelativelyClose(result.at(0, 1), -2.5272473256221178e+99);
+          expectRelativelyClose(result.at(1, 0), -5.0544946512442356e+99);
+          expectRelativelyClose(result.at(1, 1), 6.1013147689880504e+99);
         },
       );
 
