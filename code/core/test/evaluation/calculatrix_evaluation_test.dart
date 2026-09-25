@@ -303,5 +303,93 @@ void main() {
       final result = Calculatrix.evaluateInfix('√(-1)');
       expect(result, Matrix.i);
     });
+
+    test('bug: consecutive operands with no operator is a syntax error', () {
+      expect(
+        () => Calculatrix.evaluateInfix('1 2 +'),
+        throwsA(
+          isA<ExpressionSyntaxError>().having(
+            (ExpressionSyntaxError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.syntaxError,
+          ),
+        ),
+      );
+    });
+
+    test('bug: empty parentheses are a syntax error', () {
+      expect(
+        () => Calculatrix.evaluateInfix('1()'),
+        throwsA(
+          isA<ExpressionSyntaxError>().having(
+            (ExpressionSyntaxError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.syntaxError,
+          ),
+        ),
+      );
+    });
+
+    test('bug: a bare function argument followed by another operator is a syntax error', () {
+      expect(
+        () => Calculatrix.evaluateInfix('√9+7'),
+        throwsA(
+          isA<ExpressionSyntaxError>().having(
+            (ExpressionSyntaxError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.syntaxError,
+          ),
+        ),
+      );
+    });
+
+    test('a parenthesized function argument may still be combined with further operators', () {
+      final Matrix result = Calculatrix.evaluateInfix('(√9)+7');
+      expect(result, Matrix.scalar(10));
+    });
+
+    test('bug: overflowing numeric literal is a non-finite domain error', () {
+      expect(
+        () => Calculatrix.evaluateInfix('1e999'),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.nonFinite,
+          ),
+        ),
+      );
+    });
+
+    test('bug: NaN literal is a non-finite domain error', () {
+      expect(
+        () => Calculatrix.evaluateRpn(<String>['NaN']),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.nonFinite,
+          ),
+        ),
+      );
+    });
+
+    test('unknown rpn word raises unknown-word with the offending token', () {
+      expect(
+        () => Calculatrix.evaluateRpn(<String>['banana']),
+        throwsA(
+          isA<UnknownWordError>().having(
+            (UnknownWordError e) => e.token,
+            'token',
+            'banana',
+          ),
+        ),
+      );
+    });
+
+    test('power operator is available in rpn/infix via ^', () {
+      final Matrix result = Calculatrix.evaluateRpn(<String>['2', '3', '^']);
+      expect(result, Matrix.scalar(8));
+    });
   });
 }

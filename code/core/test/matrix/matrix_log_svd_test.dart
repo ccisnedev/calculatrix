@@ -55,6 +55,54 @@ void main() {
         throwsA(isA<MatrixDomainError>()),
       );
     });
+
+    test('computes the principal log of a defective (non-diagonalizable) matrix', () {
+      final Matrix jordanBlock = Matrix(<List<double>>[
+        <double>[1, 1],
+        <double>[0, 1],
+      ]);
+
+      final Matrix result = jordanBlock.log();
+
+      expect(
+        result.almostEquals(
+          Matrix(<List<double>>[
+            <double>[0, 1],
+            <double>[0, 0],
+          ]),
+          absoluteTolerance: 5e-5,
+        ),
+        isTrue,
+      );
+    });
+
+    test('log/exp round-trip on a defective matrix', () {
+      final Matrix jordanBlock = Matrix(<List<double>>[
+        <double>[1, 1],
+        <double>[0, 1],
+      ]);
+
+      final Matrix roundTrip = jordanBlock.log().exp();
+      expect(roundTrip.almostEquals(jordanBlock, absoluteTolerance: 1e-6), isTrue);
+    });
+
+    test('rejects log for a singular matrix with errorId log-undefined', () {
+      final Matrix singular = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[2, 4],
+      ]);
+
+      expect(
+        () => singular.log(),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.logUndefined,
+          ),
+        ),
+      );
+    });
   });
 
   group('Matrix.svd', () {
