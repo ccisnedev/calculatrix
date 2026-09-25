@@ -13,7 +13,8 @@ enum CalculatrixErrorId {
   nonFinite('non-finite'),
   logUndefined('log-undefined'),
   ambiguousPower('ambiguous-power'),
-  syntaxError('syntax-error');
+  syntaxError('syntax-error'),
+  noConvergence('no-convergence');
 
   const CalculatrixErrorId(this.id);
 
