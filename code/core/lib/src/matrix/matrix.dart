@@ -355,20 +355,35 @@ class Matrix {
     );
   }
 
-  /// Computes the inverse after exact power-of-two scale normalization
-  /// (round 4 correction, rule 1): `A = c * normalized` for `c = 2^k`
-  /// nearest `‖A‖`, so `inv(A) = inv(normalized) * (1/c)`. Multiplying or
-  /// dividing by an exact power of two never rounds, so `normalized`
-  /// carries no more error than `A` itself, and its own norm is always
-  /// within a factor of 2 of 1 — which is exactly what makes the fixed
-  /// `absoluteTolerance` pivot cutoff inside [_inverseRaw] (still 1e-12 by
-  /// default) a *safe* floor regardless of `A`'s own scale: at norm ~1, a
-  /// genuinely zero pivot and a genuinely tiny-but-real one
-  /// (e.g. `diag(1e-20, 2e-20)`, whose pivots become O(1) after
-  /// normalization) are no longer confused by a cutoff tuned for O(1)
-  /// matrices. This replaces comparing the cutoff directly against `A`'s
-  /// own (possibly tiny or huge) entries, which is wrong by construction
-  /// at any scale other than the one the cutoff happened to be tuned for.
+  /// Computes the inverse directly on this matrix's own entries — no
+  /// global power-of-two normalization (round 6 correction, item 10: a
+  /// *single* scale factor `c = 2^k` is wrong for a matrix whose entries
+  /// themselves span a huge dynamic range, e.g. `diag(1e200, 1e-200)`.
+  /// Undoing one global `k` chosen from the matrix's infinity norm (~1e200
+  /// here) shrinks the *other* entry (1e-200) by the same factor, which
+  /// can underflow it to exact zero — turning a perfectly invertible
+  /// diagonal matrix into a false "singular" result — or, for a matrix
+  /// like `diag(1e160, 1e-160)`, overflow the rescale-back step to
+  /// `Infinity` even though the true inverse is representable in double
+  /// precision. Both hazards are specific to a *global* normalization
+  /// scheme; they disappear once every entry is left at its own scale and
+  /// [_inverseRaw]'s partial pivoting and exact-zero-pivot singularity
+  /// test (Higham 2002 Ch. 9) run on the raw matrix directly.
+  ///
+  /// An exactly diagonal matrix is handled directly (round 6 correction,
+  /// item 10's explicit "handle diagonal input directly"): its inverse is
+  /// just the entrywise reciprocal of the diagonal, singular only when a
+  /// diagonal entry is bit-for-bit zero, with no elimination arithmetic
+  /// (and thus no elimination-order rounding) involved at all.
+  ///
+  /// [_checkFiniteMatrix] runs unconditionally on the result (round 6
+  /// correction, item 4): the previous version only checked finiteness on
+  /// the "normalization actually did something" branch, so a matrix whose
+  /// normalization factor rounded to `k == 0` (e.g.
+  /// `[[1e-310,0],[0,1]]`, a subnormal entry whose true reciprocal
+  /// `~1e310` overflows double precision) could return a `Matrix`
+  /// containing an uncaught `Infinity` instead of throwing. There is now
+  /// exactly one return path, and it always passes through this check.
   Matrix _inverse({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -376,25 +391,39 @@ class Matrix {
     _requireSquare(operation: 'inverse');
     _checkFiniteMatrix(this);
 
-    final ({int k, Matrix scaled}) normalization = _normalizedByPowerOfTwo();
-    if (normalization.k == 0) {
-      return normalization.scaled._inverseRaw(
-        absoluteTolerance: absoluteTolerance,
-      );
+    if (_isExactlyDiagonal()) {
+      return _checkFiniteMatrix(_diagonalInverse());
     }
 
-    final Matrix rawInverse = normalization.scaled._inverseRaw(
-      absoluteTolerance: absoluteTolerance,
-    );
-    return _checkFiniteMatrix(
-      _scaleByPowerOfTwo(rawInverse, -normalization.k.toDouble()),
-    );
+    return _checkFiniteMatrix(_inverseRaw());
   }
 
-  Matrix _inverseRaw({
-    double absoluteTolerance =
-        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
-  }) {
+  /// Inverts an exactly diagonal matrix entrywise: `diag(d0,...,dn)^-1 ==
+  /// diag(1/d0,...,1/dn)`. Singular only when some `di` is bit-for-bit
+  /// zero (round 6 correction, item 10).
+  Matrix _diagonalInverse() {
+    final int size = rowCount;
+    final List<List<double>> result = List<List<double>>.generate(
+      size,
+      (int row) => List<double>.filled(size, 0),
+      growable: false,
+    );
+
+    for (int i = 0; i < size; i++) {
+      final double d = _rows[i][i];
+      if (d == 0) {
+        throw MatrixDomainError(
+          'Matrix is singular and cannot be inverted.',
+          errorId: CalculatrixErrorId.singularMatrix,
+        );
+      }
+      result[i][i] = 1 / d;
+    }
+
+    return Matrix(result);
+  }
+
+  Matrix _inverseRaw() {
     final int size = rowCount;
     final List<List<double>> augmented = List<List<double>>.generate(
       size,
@@ -421,18 +450,18 @@ class Matrix {
         }
       }
 
-      // Round 5 correction (inverse: LU with partial pivoting, Higham
+      // Round 5/6 correction (inverse: LU with partial pivoting, Higham
       // 2002 Ch. 9): singularity is declared only on an exact zero pivot,
       // never on an absolute cutoff compared against the pivot's own
-      // magnitude. `_inverse` already normalizes to a matrix of norm ~1
-      // before this runs, but even at that scale a genuinely tiny-but-real
+      // magnitude. This runs directly on `_inverse`'s raw (un-normalized,
+      // round 6 correction, item 10) matrix, so a genuinely tiny-but-real
       // pivot (e.g. one column scaled far below another by the input's own
       // structure, such as `[[1,1e20],[0,1]]`) is not singular — only a
       // pivot that is bit-for-bit zero (every candidate in the column is
       // zero, meaning the column truly has no component outside the
       // already-eliminated rows) is. A merely-huge-but-finite result is
-      // instead caught by `_inverse`'s own `_checkFiniteMatrix` call after
-      // undoing the scale normalization.
+      // instead caught by `_inverse`'s own unconditional `_checkFiniteMatrix`
+      // call on the result.
       if (pivotMagnitude == 0) {
         throw MatrixDomainError(
           'Matrix is singular and cannot be inverted.',
@@ -613,117 +642,137 @@ class Matrix {
     );
   }
 
+  /// The full spectrum, including complex-conjugate pairs (round 6
+  /// correction, item 11): unlike [eigenvalues], which throws when any
+  /// eigenvalue is genuinely complex, this always returns the complete set
+  /// of `n` eigenvalues as an `n x 2` matrix — column 0 the real part,
+  /// column 1 the imaginary part — sorted by descending real part, then by
+  /// descending imaginary part (so a conjugate pair `a+bi, a-bi` is
+  /// adjacent with `+b` first).
+  ///
+  /// This is the first public API surface exposing complex eigenvalues
+  /// directly; previously only the real-only [eigenvalues] (which throws
+  /// on a complex spectrum) and the real-filtering
+  /// [_realEigenvaluesIgnoringComplexPairs] (private, used internally by
+  /// [log] and [power]) existed.
+  Matrix eigenvaluesFull() {
+    _requireSquare(operation: 'eigenvalues');
+    _checkFiniteMatrix(this);
+
+    if (isScalar) {
+      return Matrix(<List<double>>[
+        <double>[scalarValue, 0],
+      ]);
+    }
+
+    if (_isExactlyTriangular()) {
+      final List<({double im, double re})> spectrum = List<
+        ({double im, double re})
+      >.generate(rowCount, (int i) => (im: 0, re: _rows[i][i]), growable: false);
+      return _sortedComplexSpectrumMatrix(spectrum);
+    }
+
+    if (rowCount == 2) {
+      final double a = _rows[0][0];
+      final double b = _rows[0][1];
+      final double c = _rows[1][0];
+      final double d = _rows[1][1];
+      final ({bool isComplex, double lambda1, double lambda2}) solved =
+          _stableRealEigen2x2(a, b, c, d);
+
+      if (!solved.isComplex) {
+        return _sortedComplexSpectrumMatrix(<({double im, double re})>[
+          (im: 0, re: solved.lambda1),
+          (im: 0, re: solved.lambda2),
+        ]);
+      }
+
+      final double re = (a + d) / 2;
+      final double det = (a * d) - (b * c);
+      final double discriminant = ((a + d) * (a + d)) - (4 * det);
+      final double im = math.sqrt(-discriminant) / 2;
+      return _sortedComplexSpectrumMatrix(<({double im, double re})>[
+        (im: im, re: re),
+        (im: -im, re: re),
+      ]);
+    }
+
+    final ({int k, Matrix scaled}) normalization = _normalizedByPowerOfTwo();
+    final ({List<List<double>> t, List<List<double>> q}) schur =
+        normalization.scaled._realSchurDecomposition();
+    final List<({double im, double re})> spectrum = _schurEigenvalues(
+      schur.t,
+    );
+
+    if (normalization.k == 0) {
+      return _sortedComplexSpectrumMatrix(spectrum);
+    }
+
+    final double exponent = normalization.k.toDouble();
+    final List<({double im, double re})> rescaled = spectrum
+        .map(
+          (({double im, double re}) eigenvalue) => (
+            im: _scalarScaleByPowerOfTwo(eigenvalue.im, exponent),
+            re: _scalarScaleByPowerOfTwo(eigenvalue.re, exponent),
+          ),
+        )
+        .toList(growable: false);
+    return _checkFiniteMatrix(_sortedComplexSpectrumMatrix(rescaled));
+  }
+
+  static Matrix _sortedComplexSpectrumMatrix(
+    List<({double im, double re})> spectrum,
+  ) {
+    final List<({double im, double re})> sorted =
+        List<({double im, double re})>.from(spectrum)..sort((
+          ({double im, double re}) left,
+          ({double im, double re}) right,
+        ) {
+          final int byReal = right.re.compareTo(left.re);
+          if (byReal != 0) {
+            return byReal;
+          }
+          return right.im.compareTo(left.im);
+        });
+
+    return Matrix(
+      sorted
+          .map((({double im, double re}) e) => <double>[e.re, e.im])
+          .toList(growable: false),
+    );
+  }
+
   Matrix _eigenvaluesRaw({required double absoluteTolerance}) {
     if (rowCount == 2) {
-      return _eigenvalues2x2(absoluteTolerance);
+      return _eigenvalues2x2();
     }
 
-    // General NxN: Hessenberg reduction then QR iteration with Wilkinson
-    // shift (round 4 correction, case G: every 11th iteration without a
-    // deflation instead takes an "exceptional shift" — a standard Francis
-    // QR remedy for spectra a plain Wilkinson shift can stagnate on, such
-    // as a permutation matrix's eigenvalues sitting equally spaced on the
-    // unit circle).
+    // General NxN (round 6 correction, item 11): genuine Francis
+    // double-shift QR on Hessenberg form (Golub & Van Loan, Algorithm
+    // 7.5.1/7.5.2), with deflation, exceptional shifts and the 30n bound,
+    // accumulating the orthogonal Schur vectors so `A = Q T Q^T`. See
+    // [_realSchurDecomposition] for the full citation and the one
+    // disclosed implementation-detail deviation (explicit-form shift
+    // steps rather than hand-coded implicit bulge-chasing).
     //
-    // Deflation test (round 5 correction): the standard LAPACK criterion
-    // (`dlahqr`/`dhseqr`), a subdiagonal entry is negligible relative to
-    // its two diagonal neighbors —
-    // `|h[i][i-1]| <= eps*(|h[i-1][i-1]| + |h[i][i]|)` — rather than a
-    // fixed absolute floor, which (like every other fixed cutoff replaced
-    // this round) is only sound for a matrix of norm ~1.
-    //
-    // Iteration bound (round 5 correction): a fixed `30*n` (Higham 2008
-    // Ch. 2 / LAPACK's own convergence budget), not a caller-supplied
-    // cutoff — this is a data-independent loop bound that throws
-    // `no-convergence` if exhausted, never a silent fallback.
-    final int n = rowCount;
-    final int maxIterationsPerBlock = 30 * n;
-    final List<List<double>> h = _toHessenberg(absoluteTolerance);
-    const double eps = CalculatrixNumericPolicy.machineEpsilon;
+    // A complex-conjugate pair anywhere in the spectrum throws — this is
+    // the real-only public contract [eigenvalues] has always had.
+    final ({List<List<double>> t, List<List<double>> q}) schur =
+        _realSchurDecomposition();
+    final List<({double im, double re})> spectrum = _schurEigenvalues(
+      schur.t,
+    );
 
-    // QR iteration on upper Hessenberg form
-    int size = n;
     final List<double> eigenvaluesList = <double>[];
-
-    while (size > 2) {
-      int iterations = 0;
-      while (iterations < maxIterationsPerBlock) {
-        // Check for deflation: subdiagonal element negligible relative to
-        // its two diagonal neighbors.
-        if (h[size - 1][size - 2].abs() <=
-            eps * (h[size - 2][size - 2].abs() + h[size - 1][size - 1].abs())) {
-          eigenvaluesList.add(h[size - 1][size - 1]);
-          size--;
-          break;
-        }
-
-        // Check for 2x2 block deflation
-        if (size >= 3 &&
-            h[size - 2][size - 3].abs() <=
-                eps *
-                    (h[size - 3][size - 3].abs() +
-                        h[size - 2][size - 2].abs())) {
-          // Extract 2x2 trailing block
-          final double a = h[size - 2][size - 2];
-          final double b = h[size - 2][size - 1];
-          final double c = h[size - 1][size - 2];
-          final double d = h[size - 1][size - 1];
-          _solve2x2Block(a, b, c, d, eigenvaluesList, absoluteTolerance);
-          size -= 2;
-          break;
-        }
-
-        final double a = h[size - 2][size - 2];
-        final double b = h[size - 2][size - 1];
-        final double c = h[size - 1][size - 2];
-        final double d = h[size - 1][size - 1];
-        final double shift = _shiftForQrIteration(h, size, iterations, a, b, c, d);
-
-        // Apply shift
-        for (int i = 0; i < size; i++) {
-          h[i][i] -= shift;
-        }
-
-        // QR step via Givens rotations on the Hessenberg matrix
-        _qrStepGivens(h, size, absoluteTolerance);
-
-        // Undo shift
-        for (int i = 0; i < size; i++) {
-          h[i][i] += shift;
-        }
-
-        iterations++;
-      }
-
-      if (iterations == maxIterationsPerBlock) {
-        // Failed to converge — check if it might be complex eigenvalues
+    for (final ({double im, double re}) eigenvalue in spectrum) {
+      if (eigenvalue.im != 0) {
         throw MatrixDomainError(
-          'Eigenvalues did not converge for this matrix.',
-          errorId: CalculatrixErrorId.noConvergence,
+          'Eigenvalues are undefined in the real domain for this matrix.',
         );
       }
+      eigenvaluesList.add(eigenvalue.re);
     }
 
-    // Handle remaining 1x1 or 2x2 block
-    if (size == 2) {
-      final double a = h[0][0];
-      final double b = h[0][1];
-      final double c = h[1][0];
-      final double d = h[1][1];
-      _solve2x2Block(a, b, c, d, eigenvaluesList, absoluteTolerance);
-    } else if (size == 1) {
-      eigenvaluesList.add(h[0][0]);
-    }
-
-    // Sort descending. Round 5 correction: the trailing "clean near-zero
-    // eigenvalues" absolute-cutoff loop that used to run here has been
-    // removed entirely — it zeroed any eigenvalue at or below
-    // [absoluteTolerance] regardless of the matrix's own scale, which
-    // silently discarded genuinely tiny-but-nonzero eigenvalues. The
-    // matrix-wide power-of-two normalization already makes every fixed
-    // tolerance *inside* this method (the deflation tests above) sound
-    // relative to a matrix of norm ~1; there is no further "cleanup" step
-    // that is ever correct across every scale.
     eigenvaluesList.sort((double left, double right) => right.compareTo(left));
 
     return Matrix(
@@ -733,74 +782,38 @@ class Matrix {
     );
   }
 
-  /// Picks the shift for one QR iteration step: the ordinary Wilkinson
-  /// shift, except every 11th iteration without a deflation, when an
-  /// "exceptional shift" is used instead (round 4 correction, case G).
-  ///
-  /// A plain single-shift QR iteration can stagnate indefinitely on
-  /// certain spectra — most notably a permutation matrix, whose
-  /// eigenvalues sit equally spaced on the unit circle, so the Wilkinson
-  /// shift (the trailing 2x2 block's eigenvalue closest to `h[n-1][n-1]`)
-  /// keeps picking the same non-progressing direction every iteration.
-  /// The standard remedy (used by LAPACK's `dlahqr`/EISPACK's `hqr`) is to
-  /// periodically substitute an unrelated, ad hoc shift derived from nearby
-  /// subdiagonal magnitudes, which reliably breaks the cycle without
-  /// otherwise disturbing convergence on well-behaved spectra (this never
-  /// fires before the 11th iteration of a given deflation block, so it
-  /// costs nothing for matrices that already converge quickly).
-  static double _shiftForQrIteration(
-    List<List<double>> h,
-    int size,
-    int iterations,
-    double a,
-    double b,
-    double c,
-    double d,
-  ) {
-    if (iterations > 0 && iterations % 11 == 0) {
-      final double s =
-          h[size - 1][size - 2].abs() +
-          (size >= 3 ? h[size - 2][size - 3].abs() : 0);
-      return 0.75 * s;
-    }
-    return _wilkinsonShift(a, b, c, d);
-  }
-
-  Matrix _eigenvalues2x2(double absoluteTolerance) {
+  /// The 2x2 eigenvalue solver (round 6 correction, item 7): delegates
+  /// entirely to [_stableRealEigen2x2], which already has no absolute
+  /// cutoffs anywhere — its zero-discriminant test is scale-relative
+  /// (`eps * (trace^2 + |det|)`) and neither root is ever compared against
+  /// a fixed floor. The previous version's `value.abs() <= absoluteTolerance
+  /// ? 0 : value` zeroed any eigenvalue at or below a fixed 1e-12 after
+  /// this class's matrix-wide power-of-two normalization, which wrongly
+  /// discarded a genuinely tiny-but-nonzero eigenvalue whenever the
+  /// *other* eigenvalue dominated the normalization's scale choice — e.g.
+  /// `[[0,1e20],[1e-20,0]]` normalizes to a matrix whose true eigenvalues
+  /// are `~+-1.355e-20`, both of which that fixed cutoff zeroed outright,
+  /// producing `{0,0}` instead of the correct `{1,-1}` after rescaling.
+  Matrix _eigenvalues2x2() {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final double trace = a + d;
-    final double determinantValue = (a * d) - (b * c);
 
-    double discriminant = (trace * trace) - (4 * determinantValue);
-    if (discriminant.abs() <= absoluteTolerance) {
-      discriminant = 0;
-    }
+    final ({bool isComplex, double lambda1, double lambda2}) solved =
+        _stableRealEigen2x2(a, b, c, d);
 
-    if (discriminant < 0) {
+    if (solved.isComplex) {
       throw MatrixDomainError(
         'Eigenvalues are undefined in the real domain for this matrix.',
       );
     }
 
-    final double sqrtDiscriminant = math.sqrt(discriminant);
-    final List<double> values = <double>[
-      (trace + sqrtDiscriminant) / 2,
-      (trace - sqrtDiscriminant) / 2,
-    ];
-
-    values.sort((double left, double right) => right.compareTo(left));
+    final List<double> values = <double>[solved.lambda1, solved.lambda2]
+      ..sort((double left, double right) => right.compareTo(left));
 
     return Matrix(
-      values
-          .map(
-            (double value) => <double>[
-              value.abs() <= absoluteTolerance ? 0 : value,
-            ],
-          )
-          .toList(growable: false),
+      values.map((double value) => <double>[value]).toList(growable: false),
     );
   }
 
@@ -874,92 +887,24 @@ class Matrix {
       return realEigenvaluesList;
     }
 
-    final int n = rowCount;
-    final int maxIterationsPerBlock = 30 * n;
-    final List<List<double>> h = _toHessenberg(absoluteTolerance);
-    const double eps = CalculatrixNumericPolicy.machineEpsilon;
+    // General NxN (round 6 correction, item 11): same real Schur pipeline
+    // as [_eigenvaluesRaw], via [_realSchurDecomposition]; a
+    // complex-conjugate pair anywhere in the spectrum simply contributes
+    // nothing to the list rather than throwing (see this method's own
+    // doc comment above).
+    final ({List<List<double>> t, List<List<double>> q}) schur =
+        _realSchurDecomposition();
+    final List<({double im, double re})> spectrum = _schurEigenvalues(
+      schur.t,
+    );
 
-    int size = n;
     final List<double> realEigenvaluesList = <double>[];
-
-    while (size > 2) {
-      int iterations = 0;
-      while (iterations < maxIterationsPerBlock) {
-        if (h[size - 1][size - 2].abs() <=
-            eps * (h[size - 2][size - 2].abs() + h[size - 1][size - 1].abs())) {
-          realEigenvaluesList.add(h[size - 1][size - 1]);
-          size--;
-          break;
-        }
-
-        if (size >= 3 &&
-            h[size - 2][size - 3].abs() <=
-                eps *
-                    (h[size - 3][size - 3].abs() +
-                        h[size - 2][size - 2].abs())) {
-          final double a = h[size - 2][size - 2];
-          final double b = h[size - 2][size - 1];
-          final double c = h[size - 1][size - 2];
-          final double d = h[size - 1][size - 1];
-          _solve2x2BlockIgnoringComplexPairs(
-            a,
-            b,
-            c,
-            d,
-            realEigenvaluesList,
-            absoluteTolerance,
-          );
-          size -= 2;
-          break;
-        }
-
-        final double a = h[size - 2][size - 2];
-        final double b = h[size - 2][size - 1];
-        final double c = h[size - 1][size - 2];
-        final double d = h[size - 1][size - 1];
-        final double shift = _shiftForQrIteration(h, size, iterations, a, b, c, d);
-
-        for (int i = 0; i < size; i++) {
-          h[i][i] -= shift;
-        }
-
-        _qrStepGivens(h, size, absoluteTolerance);
-
-        for (int i = 0; i < size; i++) {
-          h[i][i] += shift;
-        }
-
-        iterations++;
-      }
-
-      if (iterations == maxIterationsPerBlock) {
-        throw MatrixDomainError(
-          'Eigenvalues did not converge for this matrix.',
-          errorId: CalculatrixErrorId.noConvergence,
-        );
+    for (final ({double im, double re}) eigenvalue in spectrum) {
+      if (eigenvalue.im == 0) {
+        realEigenvaluesList.add(eigenvalue.re);
       }
     }
 
-    if (size == 2) {
-      final double a = h[0][0];
-      final double b = h[0][1];
-      final double c = h[1][0];
-      final double d = h[1][1];
-      _solve2x2BlockIgnoringComplexPairs(
-        a,
-        b,
-        c,
-        d,
-        realEigenvaluesList,
-        absoluteTolerance,
-      );
-    } else if (size == 1) {
-      realEigenvaluesList.add(h[0][0]);
-    }
-
-    // Round 5 correction: no trailing absolute-cutoff cleanup loop — see
-    // [_eigenvaluesRaw]'s doc comment for why every matrix-wide zeroing
-    // pass was removed.
     return realEigenvaluesList;
   }
 
@@ -1424,12 +1369,33 @@ class Matrix {
     return Matrix.scalar(math.sqrt(maxEig));
   }
 
-  /// Reduces the matrix to upper Hessenberg form using Householder reflections.
-  List<List<double>> _toHessenberg(double absoluteTolerance) {
+  /// Reduces the matrix to upper Hessenberg form using Householder
+  /// reflections, accumulating the orthogonal reduction `Q0` so that
+  /// `h == Q0^T * this * Q0` (round 6 correction, item 11: the previous
+  /// `_toHessenberg` discarded the reflectors instead of accumulating
+  /// them, which was sufficient for eigenvalues alone but not for the
+  /// Schur vectors [_realSchurDecomposition] now needs to build on top).
+  ///
+  /// The trailing "clean sub-subdiagonal entries" step no longer compares
+  /// against an absolute cutoff (round 6 correction, item 6's underlying
+  /// pattern): a Hessenberg reduction guarantees those entries are exactly
+  /// zero mathematically, so whatever floating-point noise landed there is
+  /// unconditionally zeroed as a structural fact, not approximated as
+  /// "small enough".
+  ({List<List<double>> h, List<List<double>> q}) _hessenbergWithSchurVectors() {
     final int n = rowCount;
     final List<List<double>> h = List<List<double>>.generate(
       n,
       (int row) => List<double>.from(_rows[row]),
+      growable: false,
+    );
+    final List<List<double>> q = List<List<double>>.generate(
+      n,
+      (int row) => List<double>.generate(
+        n,
+        (int column) => row == column ? 1.0 : 0.0,
+        growable: false,
+      ),
       growable: false,
     );
 
@@ -1448,7 +1414,7 @@ class Matrix {
       }
       norm = math.sqrt(norm);
 
-      if (norm <= absoluteTolerance) {
+      if (norm == 0) {
         continue;
       }
 
@@ -1461,6 +1427,9 @@ class Matrix {
         vNorm += x[i] * x[i];
       }
       vNorm = math.sqrt(vNorm);
+      if (vNorm == 0) {
+        continue;
+      }
       for (int i = 0; i < m; i++) {
         x[i] /= vNorm;
       }
@@ -1486,18 +1455,387 @@ class Matrix {
           h[i][k + 1 + j] -= 2 * dot * x[j];
         }
       }
-    }
 
-    // Clean up sub-subdiagonal entries
-    for (int i = 2; i < n; i++) {
-      for (int j = 0; j < i - 1; j++) {
-        if (h[i][j].abs() <= absoluteTolerance) {
-          h[i][j] = 0;
+      // Accumulate into Q0: Q0[:, k+1:n] -= 2*(Q0[:,k+1:n]*v)*v^T
+      for (int i = 0; i < n; i++) {
+        double dot = 0;
+        for (int j = 0; j < m; j++) {
+          dot += q[i][k + 1 + j] * x[j];
+        }
+        for (int j = 0; j < m; j++) {
+          q[i][k + 1 + j] -= 2 * dot * x[j];
         }
       }
     }
 
-    return h;
+    // Structurally exact zero below the subdiagonal — see doc comment.
+    for (int i = 2; i < n; i++) {
+      for (int j = 0; j < i - 1; j++) {
+        h[i][j] = 0;
+      }
+    }
+
+    return (h: h, q: q);
+  }
+
+  /// Builds the Householder vector that reflects [w] onto a multiple of
+  /// the first standard basis vector, or `null` if [w] is already exactly
+  /// zero (no reflection needed — an exact structural fact, not an
+  /// absolute-cutoff judgment call).
+  static List<double>? _householderVector(List<double> w) {
+    final int len = w.length;
+    double norm = 0;
+    for (int i = 0; i < len; i++) {
+      norm += w[i] * w[i];
+    }
+    norm = math.sqrt(norm);
+    if (norm == 0) {
+      return null;
+    }
+
+    final List<double> v = List<double>.from(w);
+    final double sign = v[0] >= 0 ? 1 : -1;
+    v[0] += sign * norm;
+
+    double vNorm = 0;
+    for (int i = 0; i < len; i++) {
+      vNorm += v[i] * v[i];
+    }
+    vNorm = math.sqrt(vNorm);
+    if (vNorm == 0) {
+      return null;
+    }
+    for (int i = 0; i < len; i++) {
+      v[i] /= vNorm;
+    }
+    return v;
+  }
+
+  /// One Francis double-shift QR step (Golub & Van Loan, Algorithm 7.5.1)
+  /// on the active block `h[lo..hi, lo..hi]` (`hi - lo >= 2`), applied as a
+  /// similarity transform to the whole working matrix [h] and accumulated
+  /// into [q].
+  ///
+  /// Implementation note (disclosed per this round's "report accurately
+  /// what is implemented" instruction): this forms the *explicit* shifted
+  /// matrix `M = Ha^2 - shiftSum*Ha + shiftProduct*I` for the active block
+  /// `Ha` and takes its dense Householder QR factorization `M = Z*R`,
+  /// using `Z` as the similarity transform, rather than hand-coding the
+  /// implicit bulge-chase recurrence (the `x, y, z` shortcut through
+  /// `Ha`'s own entries) that Algorithm 7.5.1 uses to avoid ever forming
+  /// `M`. The Implicit Q Theorem (G&VL, Theorem 7.4.2) guarantees these
+  /// produce the same next Hessenberg iterate (up to column sign) for an
+  /// unreduced Hessenberg `Ha` — and, because `Ha` is Hessenberg, `Ha^2`
+  /// (and so `M`) has lower bandwidth exactly 2, which means a *plain*,
+  /// unmodified Householder QR sweep of `M` automatically produces
+  /// reflectors confined to 3 (then 2, then 1) consecutive rows, i.e. it
+  /// mechanically *is* the bulge-chase, just derived by forming `M`
+  /// explicitly (O(n) more arithmetic per step, an accepted
+  /// correctness-first trade-off) instead of reading `x, y, z` off `Ha`
+  /// directly.
+  static void _francisDoubleShiftStep(
+    List<List<double>> h,
+    List<List<double>> q,
+    int lo,
+    int hi,
+    int n,
+    double shiftSum,
+    double shiftProduct,
+  ) {
+    final int m = hi - lo + 1;
+
+    final List<List<double>> ha = List<List<double>>.generate(
+      m,
+      (int i) => List<double>.generate(
+        m,
+        (int j) => h[lo + i][lo + j],
+        growable: false,
+      ),
+      growable: false,
+    );
+
+    final List<List<double>> shiftMatrix = List<List<double>>.generate(m, (
+      int i,
+    ) {
+      return List<double>.generate(m, (int j) {
+        double sum = 0;
+        for (int k = 0; k < m; k++) {
+          sum += ha[i][k] * ha[k][j];
+        }
+        sum -= shiftSum * ha[i][j];
+        if (i == j) {
+          sum += shiftProduct;
+        }
+        return sum;
+      }, growable: false);
+    }, growable: false);
+
+    // Dense Householder QR of shiftMatrix, accumulating Z as the product
+    // of its reflectors (Z := Z * P_k for each step k).
+    final List<List<double>> z = List<List<double>>.generate(
+      m,
+      (int i) => List<double>.generate(
+        m,
+        (int j) => i == j ? 1.0 : 0.0,
+        growable: false,
+      ),
+      growable: false,
+    );
+
+    for (int k = 0; k < m - 1; k++) {
+      final int len = m - k;
+      final List<double> column = List<double>.generate(
+        len,
+        (int i) => shiftMatrix[k + i][k],
+        growable: false,
+      );
+      final List<double>? v = _householderVector(column);
+      if (v == null) {
+        continue;
+      }
+
+      for (int j = k; j < m; j++) {
+        double dot = 0;
+        for (int i = 0; i < len; i++) {
+          dot += v[i] * shiftMatrix[k + i][j];
+        }
+        if (dot == 0) {
+          continue;
+        }
+        for (int i = 0; i < len; i++) {
+          shiftMatrix[k + i][j] -= 2 * v[i] * dot;
+        }
+      }
+
+      for (int i = 0; i < m; i++) {
+        double dot = 0;
+        for (int j = 0; j < len; j++) {
+          dot += z[i][k + j] * v[j];
+        }
+        if (dot == 0) {
+          continue;
+        }
+        for (int j = 0; j < len; j++) {
+          z[i][k + j] -= 2 * dot * v[j];
+        }
+      }
+    }
+
+    // Similarity transform Ha_new = Z^T * Ha * Z, applied to the whole
+    // working matrix: h[lo:hi+1, :] := Z^T * h[lo:hi+1, :], then
+    // h[:, lo:hi+1] := h[:, lo:hi+1] * Z, and the same on the right for q.
+    for (int col = 0; col < n; col++) {
+      final List<double> src = List<double>.generate(
+        m,
+        (int i) => h[lo + i][col],
+        growable: false,
+      );
+      for (int i = 0; i < m; i++) {
+        double sum = 0;
+        for (int k = 0; k < m; k++) {
+          sum += z[k][i] * src[k];
+        }
+        h[lo + i][col] = sum;
+      }
+    }
+
+    for (int row = 0; row < n; row++) {
+      final List<double> src = List<double>.generate(
+        m,
+        (int j) => h[row][lo + j],
+        growable: false,
+      );
+      for (int j = 0; j < m; j++) {
+        double sum = 0;
+        for (int k = 0; k < m; k++) {
+          sum += src[k] * z[k][j];
+        }
+        h[row][lo + j] = sum;
+      }
+    }
+
+    for (int row = 0; row < n; row++) {
+      final List<double> src = List<double>.generate(
+        m,
+        (int j) => q[row][lo + j],
+        growable: false,
+      );
+      for (int j = 0; j < m; j++) {
+        double sum = 0;
+        for (int k = 0; k < m; k++) {
+          sum += src[k] * z[k][j];
+        }
+        q[row][lo + j] = sum;
+      }
+    }
+  }
+
+  /// Real Schur decomposition `this == Q * T * Q^T` (round 6 correction,
+  /// item 11): Hessenberg reduction ([_hessenbergWithSchurVectors]) then
+  /// Francis double-shift QR iteration ([_francisDoubleShiftStep]) with
+  /// deflation, exceptional shifts and the `30n` iteration bound, on a
+  /// matrix with `rowCount > 2` (the `rowCount == 2` case is trivially its
+  /// own 1-block real Schur form and is handled by callers directly via
+  /// [_stableRealEigen2x2] without going through this method at all).
+  ///
+  /// `T` is quasi-upper-triangular: 1x1 diagonal blocks for real
+  /// eigenvalues, 2x2 diagonal blocks for complex-conjugate pairs. `Q` is
+  /// orthogonal — the accumulated Schur vectors.
+  ///
+  /// Deflation test (round 5 correction, kept): the LAPACK criterion
+  /// `|h[i][i-1]| <= eps*(|h[i-1][i-1]| + |h[i][i]|)`, scale-relative
+  /// rather than a fixed absolute floor.
+  ///
+  /// Exceptional shift (round 4 correction, case G's remedy, adapted to
+  /// the double-shift form used here): every 11th QR step taken without a
+  /// deflation substitutes an ad hoc repeated shift derived from nearby
+  /// subdiagonal magnitudes, which breaks the stagnation a plain Wilkinson
+  /// double shift can hit on certain spectra (e.g. a permutation matrix's
+  /// eigenvalues sitting equally spaced on the unit circle).
+  ///
+  /// Iteration bound: `30*n` total QR steps taken without an intervening
+  /// deflation (Higham 2008 Ch. 2 / LAPACK's own convergence budget) — a
+  /// data-independent loop bound that throws `no-convergence` if
+  /// exhausted, never a silent fallback.
+  ({List<List<double>> t, List<List<double>> q}) _realSchurDecomposition() {
+    final int n = rowCount;
+    final ({List<List<double>> h, List<List<double>> q}) hessenberg =
+        _hessenbergWithSchurVectors();
+    final List<List<double>> h = hessenberg.h;
+    final List<List<double>> q = hessenberg.q;
+
+    const double eps = CalculatrixNumericPolicy.machineEpsilon;
+    final int maxIterations = 30 * n;
+    int iterationsSinceDeflation = 0;
+
+    int hi = n - 1;
+    while (hi > 0) {
+      int lo = hi;
+      while (lo > 0) {
+        final bool negligible =
+            h[lo][lo - 1].abs() <=
+            eps * (h[lo - 1][lo - 1].abs() + h[lo][lo].abs());
+        if (negligible) {
+          h[lo][lo - 1] = 0;
+          break;
+        }
+        lo--;
+      }
+
+      if (lo == hi) {
+        // h[hi][hi-1] is negligible: hi is an isolated 1x1 eigenvalue.
+        hi -= 1;
+        iterationsSinceDeflation = 0;
+        continue;
+      }
+
+      if (hi - lo == 1) {
+        // An unreduced 2x2 trailing block: a valid Schur block either way
+        // (real pair or complex-conjugate pair) — leave it and deflate.
+        hi -= 2;
+        iterationsSinceDeflation = 0;
+        continue;
+      }
+
+      iterationsSinceDeflation++;
+      if (iterationsSinceDeflation > maxIterations) {
+        throw MatrixDomainError(
+          'Eigenvalues did not converge for this matrix.',
+          errorId: CalculatrixErrorId.noConvergence,
+        );
+      }
+
+      double shiftSum;
+      double shiftProduct;
+      if (iterationsSinceDeflation % 11 == 0) {
+        final double adHoc =
+            0.75 * (h[hi][hi - 1].abs() + h[hi - 1][hi - 2].abs());
+        shiftSum = 2 * adHoc;
+        shiftProduct = adHoc * adHoc;
+      } else {
+        final double a = h[hi - 1][hi - 1];
+        final double b = h[hi - 1][hi];
+        final double c = h[hi][hi - 1];
+        final double d = h[hi][hi];
+        shiftSum = a + d;
+        shiftProduct = (a * d) - (b * c);
+      }
+
+      _francisDoubleShiftStep(h, q, lo, hi, n, shiftSum, shiftProduct);
+
+      // The explicit-form similarity transform above is only *provably*
+      // band-limited (see [_francisDoubleShiftStep]'s doc comment) in
+      // exact arithmetic: in floating point it leaves rounding noise on
+      // the order of a few ULPs in entries that are structurally exactly
+      // zero for a Hessenberg matrix (`h[i][j]` for `i > j+1`), because the
+      // dense QR of `M` and the full-width similarity transform it drives
+      // — applied across every row and column of the *whole* working
+      // matrix, not just the local `[lo, hi]` block, so that a similarity
+      // transform on a sub-block stays correct for the matrix as a whole
+      // — do not themselves know about the band. This reaches beyond the
+      // active block too: a row below `hi` that was already deflated
+      // (its own sub-subdiagonal entries columns `lo..hi` explicitly
+      // zeroed by an earlier deflation) gets touched again by this step's
+      // right-multiply across all `n` rows, turning what was an exact
+      // zero back into a few-ULP residue. Left alone, that noise would
+      // make [_schurEigenvalues]'s exact-zero block-boundary test wrongly
+      // read two adjacent Schur blocks as fused into one larger block —
+      // this is exactly what round 6's own probe against a 5x5 symmetric
+      // tridiagonal matrix caught: three eigenvalues collapsed to one
+      // repeated (wrong) value where two isolated blocks should have
+      // stayed separate. Re-imposing the structural zero across the
+      // *entire* matrix here — unconditional, not a tolerance comparison,
+      // since these entries are exactly zero in exact arithmetic — keeps
+      // that invariant true after every step, the same way
+      // [_hessenbergWithSchurVectors] establishes it once at the start.
+      for (int row = 2; row < n; row++) {
+        for (int column = 0; column < row - 1; column++) {
+          h[row][column] = 0;
+        }
+      }
+    }
+
+    return (t: h, q: q);
+  }
+
+  /// Reads the full spectrum (real and complex) off a real-Schur
+  /// quasi-triangular matrix [t] (round 6 correction, item 11), scanning
+  /// its 1x1 and 2x2 diagonal blocks. A 2x2 block's eigenvalues are found
+  /// via [_stableRealEigen2x2] — if complex, both conjugates are reported.
+  static List<({double im, double re})> _schurEigenvalues(
+    List<List<double>> t,
+  ) {
+    final int n = t.length;
+    final List<({double im, double re})> result = <({double im, double re})>[];
+    int i = 0;
+    while (i < n) {
+      if (i == n - 1 || t[i + 1][i] == 0) {
+        result.add((im: 0, re: t[i][i]));
+        i += 1;
+        continue;
+      }
+
+      final double a = t[i][i];
+      final double b = t[i][i + 1];
+      final double c = t[i + 1][i];
+      final double d = t[i + 1][i + 1];
+      final ({bool isComplex, double lambda1, double lambda2}) solved =
+          _stableRealEigen2x2(a, b, c, d);
+
+      if (solved.isComplex) {
+        final double re = (a + d) / 2;
+        final double det = (a * d) - (b * c);
+        final double discriminant = ((a + d) * (a + d)) - (4 * det);
+        final double im = math.sqrt(-discriminant) / 2;
+        result.add((im: im, re: re));
+        result.add((im: -im, re: re));
+      } else {
+        result.add((im: 0, re: solved.lambda1));
+        result.add((im: 0, re: solved.lambda2));
+      }
+      i += 2;
+    }
+    return result;
   }
 
   /// Cancellation-resistant real-eigenvalue solver for a 2x2 block with
@@ -1555,29 +1893,6 @@ class Matrix {
     return (isComplex: false, lambda1: lambda1, lambda2: lambda2);
   }
 
-  /// Solves the eigenvalues of a 2x2 block and adds them to the list.
-  /// Throws MatrixDomainError if the eigenvalues are complex.
-  static void _solve2x2Block(
-    double a,
-    double b,
-    double c,
-    double d,
-    List<double> eigenvaluesList,
-    double absoluteTolerance,
-  ) {
-    final ({bool isComplex, double lambda1, double lambda2}) result =
-        _stableRealEigen2x2(a, b, c, d);
-
-    if (result.isComplex) {
-      throw MatrixDomainError(
-        'Eigenvalues are undefined in the real domain for this matrix.',
-      );
-    }
-
-    eigenvaluesList.add(result.lambda1);
-    eigenvaluesList.add(result.lambda2);
-  }
-
   /// Solves the eigenvalues of a 2x2 block and adds them to the list, only
   /// when they are real. A block with a negative discriminant is a genuine
   /// complex-conjugate pair and simply contributes nothing to the list,
@@ -1602,90 +1917,6 @@ class Matrix {
     realEigenvaluesList.add(result.lambda1);
     realEigenvaluesList.add(result.lambda2);
   }
-
-  /// Computes the Wilkinson shift from a trailing 2x2 block.
-  static double _wilkinsonShift(
-    double a,
-    double b,
-    double c,
-    double d,
-  ) {
-    final double trace = a + d;
-    final double det = (a * d) - (b * c);
-    final double discriminant = (trace * trace) - (4 * det);
-
-    if (discriminant < 0) {
-      // Complex eigenvalues in the 2x2 block — use the diagonal entry
-      return d;
-    }
-
-    final double sqrtD = math.sqrt(discriminant);
-    final double lambda1 = (trace + sqrtD) / 2;
-    final double lambda2 = (trace - sqrtD) / 2;
-
-    // Pick the eigenvalue closest to d
-    return (lambda1 - d).abs() < (lambda2 - d).abs() ? lambda1 : lambda2;
-  }
-
-  /// Performs one QR step using Givens rotations on the upper Hessenberg
-  /// matrix h (operating on the top-left size x size submatrix).
-  static void _qrStepGivens(
-    List<List<double>> h,
-    int size,
-    double absoluteTolerance,
-  ) {
-    // Store Givens rotation parameters
-    final List<double> cosines = List<double>.filled(size - 1, 0);
-    final List<double> sines = List<double>.filled(size - 1, 0);
-
-    // Apply Givens rotations from left to zero subdiagonal (Q^T * H = R)
-    for (int i = 0; i < size - 1; i++) {
-      final double x = h[i][i];
-      final double y = h[i + 1][i];
-      final double r = math.sqrt(x * x + y * y);
-
-      if (r <= absoluteTolerance) {
-        cosines[i] = 1;
-        sines[i] = 0;
-        continue;
-      }
-
-      final double cos = x / r;
-      final double sin = y / r;
-      cosines[i] = cos;
-      sines[i] = sin;
-
-      // Apply G(i, i+1, theta)^T to rows i and i+1
-      for (int j = i; j < size; j++) {
-        final double hi = h[i][j];
-        final double hi1 = h[i + 1][j];
-        h[i][j] = cos * hi + sin * hi1;
-        h[i + 1][j] = -sin * hi + cos * hi1;
-      }
-    }
-
-    // Apply Givens rotations from right (R * Q)
-    for (int i = 0; i < size - 1; i++) {
-      final double cos = cosines[i];
-      final double sin = sines[i];
-
-      // Apply G(i, i+1, theta) to columns i and i+1
-      for (int j = 0; j <= math.min(i + 2, size - 1); j++) {
-        final double hj = h[j][i];
-        final double hj1 = h[j][i + 1];
-        h[j][i] = cos * hj + sin * hj1;
-        h[j][i + 1] = -sin * hj + cos * hj1;
-      }
-    }
-
-    // Clean near-zero subdiagonal entries
-    for (int i = 0; i < size - 1; i++) {
-      if (h[i + 1][i].abs() <= absoluteTolerance) {
-        h[i + 1][i] = 0;
-      }
-    }
-  }
-
 
   LuDecomposition luDecomposition({
     double absoluteTolerance =
