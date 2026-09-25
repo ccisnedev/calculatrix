@@ -152,7 +152,7 @@ product `Y · log B` does not matter for them.
 | 2 | scalar > 0 | square matrix | `exp(ln B · Y)` | `e πi ^` gives `[[-1 0] [0 -1]]` |
 | 3 | complex, or scalar < 0 | complex | `exp(Y · log B)` | `i i ^` gives `[[0.2079 0] [0 0.2079]]`, which is e^(-π/2) |
 | 4 | square | integer scalar | repeated multiplication; a negative integer uses the inverse; a singular B with a negative integer is `singular-matrix` | `[[1 1] [0 1]] 3 ^` gives `[[1 3] [0 1]]` |
-| 5 | square | non-integer scalar | `exp(y · log B)` | `[[2 0] [0 3]] 0.5 ^` gives `[[1.414 0] [0 1.732]]` |
+| 5 | square | non-integer scalar | `exp(y · log B)` | `[[2 0] [0 3]] 0.5 ^` gives `[[1.4142 0] [0 1.7321]]`; `[[1 1] [0 1]] 0.5 ^` gives `[[1 0.5] [0 1]]`, with a base that is not diagonalizable |
 | 6 | square, not complex and not scalar | square, not scalar | `ambiguous-power`: `exp(Y log B)` and `exp(log B · Y)` differ when Y and log B do not commute. Case 3 is the exception | `[[1 1] [0 1]] [[0 1] [1 0]] ^`: `log B` is `[[0 1] [0 0]]`, and the two orders give `[[1 0] [0 2.7183]]` and `[[2.7183 0] [0 1]]` |
 | 7 | 0 | scalar | Y > 0 gives 0; `0 0 ^` gives 1; Y < 0 is `non-finite` | `0 -1 ^` |
 | 8 | 0, or a singular matrix, where the case needs `log B` | | `log-undefined` | `0 πi ^` |
@@ -168,7 +168,7 @@ base is a complex matrix. `X exp` gives the same value as `e X ^`. The step
 S4 turns every row of this table into a core test, which also measures the
 precision of `Matrix.log()` on non-diagonal matrices (spec section 11,
 risk 5). The examples were checked on 2026-09-24 with Julia's `exp` and
-`log` of `LinearAlgebra`, rounded to 4 decimals.
+`log` of `LinearAlgebra`, rounded to 4 decimals. A test compares each entry with its expected value within `5e-5`. `Matrix.log()` must compute the principal logarithm of a matrix that is not diagonalizable (the second example of case 5); passing only the diagonal examples is not enough.
 
 ## Open questions
 
@@ -270,7 +270,7 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
 | S0 | calculatrix | Pending from before: the ENTER/delete fix and the Phase 0 docs. | Nothing |
 | S1 | cli_router | Issue #4, PR #5: negative numbers and expressions are positionals. Release 0.1.1. | Nothing |
 | S1b | cli_router, modular_cli_sdk | Releases 0.2.0 and 0.6.0 (D24), then migration of the consumers. | S1 released |
-| S2 | calculatrix | CLI on `modular_cli_sdk` 0.6.0: banner, `eval rpn`, `eval infix`, the shortcut, the grammar of spec section 4 with a test per row of spec section 13, `dev-install.ps1`. | S1b |
+| S2 | calculatrix | CLI on `modular_cli_sdk` 0.6.0: banner, `eval rpn`, `eval infix`, the shortcut, the grammar of spec section 4, `dev-install.ps1`. Tests: every row of spec section 13 whose behavior S2 delivers. The rows of `version`, `doctor`, `upgrade` and `uninstall` are tests of S3; the rows of `commands`, of domain error ids (`unknown-word`, `stack-underflow`, `syntax-error`) and of the suggestion `cx version` are tests of S4. | S1b |
 | S3a | modular_cli_sdk | Plugin system and standard plugins (D33): `VersionPlugin`, `DoctorPlugin` with `doctor.checks` and exit 78, `InstallationPlugin` with `upgrade` and `uninstall` as commands (D26) and the release lookup by tag prefix (D31). `macss` and `docmd` replace their own routes with them. Can ship inside 0.6.0 or as 0.6.x. | S1b |
 | S3 | calculatrix | Publishing: release workflow, app workflow guards, installers, ADR 0002 amendment, the standard plugins from S3a. | S2, S3a |
 | S4 | calculatrix | Core: command line parser and command registry with aliases and search terms (D29), `power` on matrices with a test per row of the D25 table, the domain error ids of spec section 6, `vector`, `append-rows`, `append-cols`, `rows`, space-separated matrix literals in RPN and infix, the core fixes of spec section 10. `eval rpn` and `commands` use it. | S2 |
