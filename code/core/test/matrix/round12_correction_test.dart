@@ -467,4 +467,82 @@ void main() {
       );
     },
   );
+
+  group(
+    'Round 12, finding 9: general 2x2 log\'s repeated-eigenvalue branch '
+    'c1 = 1/l overflows for a subnormal-scale repeated eigenvalue, even '
+    'when it only ever feeds into a genuinely finite entry',
+    () {
+      // A=[[2l,l],[-l,0]] with l=1e-320 (subnormal) is a genuine Jordan
+      // coupling (a != d, but the discriminant is still exactly 0:
+      // (a-d)/2 = l and bc = -l^2, so (a-d)^2+4bc = 4l^2-4l^2 = 0,
+      // repeated eigenvalue l1=l2=(a+d)/2=l). c1 = 1/l = 1e320
+      // overflows past double's max (~1.7977e308), even though the true
+      // centered-form entries (log(l)*I + (1/l)*(A-l*I), where each
+      // (A-l*I) entry is itself O(l), so (1/l)*(A-l*I) entry is O(1)) are
+      // all finite. Reference (mpmath, dps=60), independent of this
+      // implementation: log(l) = -736.8272408909739061509869,
+      // entry00 = log(l)+1 = -735.8272408909739061509869,
+      // entry11 = log(l)-1 = -737.8272408909739061509869,
+      // entry01 = b/l = 1.0, entry10 = c/l = -1.0.
+      test(
+        'log() on [[2e-320,1e-320],[-1e-320,0]] returns a finite result '
+        'instead of throwing MatrixDomainError from an overflowed c1',
+        () {
+          const double l = 1e-320;
+          final Matrix value = Matrix(<List<double>>[
+            <double>[2 * l, l],
+            <double>[-l, 0],
+          ]);
+
+          final Matrix result = value.log();
+
+          expectRelativelyClose(result.at(0, 0), -735.8272408909739061509869);
+          expectRelativelyClose(result.at(0, 1), 1.0);
+          expectRelativelyClose(result.at(1, 0), -1.0);
+          expectRelativelyClose(result.at(1, 1), -737.8272408909739061509869);
+        },
+      );
+    },
+  );
+
+  group(
+    'Round 12, finding 10: general 2x2 log\'s complex-eigenvalue-pair '
+    'branch c1 = angle/w overflows for a subnormal-scale eigenvalue '
+    'pair, even when it only ever feeds into genuinely finite entries',
+    () {
+      // A=[[w,w],[-2w,-w]] with w=1e-309 (subnormal): m=(a+d)/2=0,
+      // discriminant (a-d)^2+4bc = 4w^2 - 8w^2 = -4w^2, complex pair with
+      // eigenvalue-pair half-width w_eigen = w, angle = atan2(w,0) =
+      // pi/2. c1 = angle/w_eigen = (pi/2)/1e-309 overflows past double's
+      // max, even though the true centered-form entries (log(w)*I +
+      // (angle/w_eigen)*A, where every entry of A is O(w), so
+      // (angle/w_eigen)*entry is O(1)) are all finite. Reference (mpmath,
+      // dps=60), independent of this implementation:
+      // log(w) = -711.4987937351601144759702,
+      // entry00 = log(w)+pi/2 = -709.9279974083652178567388,
+      // entry11 = log(w)-pi/2 = -713.0695900619550110952015,
+      // entry01 = pi/2 = 1.570796326794896619231322,
+      // entry10 = -pi = -3.141592653589793238462643.
+      test(
+        'log() on [[1e-309,1e-309],[-2e-309,-1e-309]] returns a finite '
+        'result instead of throwing MatrixDomainError from an overflowed '
+        'c1',
+        () {
+          const double w = 1e-309;
+          final Matrix value = Matrix(<List<double>>[
+            <double>[w, w],
+            <double>[-2 * w, -w],
+          ]);
+
+          final Matrix result = value.log();
+
+          expectRelativelyClose(result.at(0, 0), -709.9279974083652178567388);
+          expectRelativelyClose(result.at(0, 1), 1.570796326794896619231322);
+          expectRelativelyClose(result.at(1, 0), -3.141592653589793238462643);
+          expectRelativelyClose(result.at(1, 1), -713.0695900619550110952015);
+        },
+      );
+    },
+  );
 }
