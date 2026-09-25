@@ -98,6 +98,7 @@ class RpnEngine {
     if (_stack.length < 3) {
       throw RpnStackUnderflowError(
         'Rot requires at least three values in the stack.',
+        errorId: CalculatrixErrorId.stackUnderflow,
       );
     }
 

@@ -278,6 +278,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot multiply ${rowCount}x${columnCount} by '
         '${other.rowCount}x${other.columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -314,7 +315,10 @@ class Matrix {
     if (other.isScalar) {
       final double divisor = other.scalarValue;
       if (divisor == 0) {
-        throw MatrixDomainError('Division by zero scalar is undefined.');
+        throw MatrixDomainError(
+          'Division by zero scalar is undefined.',
+          errorId: CalculatrixErrorId.nonFinite,
+        );
       }
 
       return scale(1 / divisor);
@@ -322,6 +326,7 @@ class Matrix {
 
     throw UnsupportedCalculatrixOperationError(
       'Matrix division is only supported by scalar (1x1) denominator.',
+      errorId: CalculatrixErrorId.typeMismatch,
     );
   }
 
@@ -969,6 +974,7 @@ class Matrix {
     if (rowCount < 2) {
       throw MatrixShapeError(
         'Minor requires at least a 2x2 matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1034,18 +1040,21 @@ class Matrix {
       throw MatrixShapeError(
         'dot product requires a column vector (n×1), '
         'got ${rowCount}×$columnCount',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
     if (other.columnCount != 1) {
       throw MatrixShapeError(
         'dot product requires a column vector (n×1), '
         'got ${other.rowCount}×${other.columnCount}',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
     if (rowCount != other.rowCount) {
       throw MatrixShapeError(
         'dot product requires vectors of the same dimension, '
         'got ${rowCount}×1 and ${other.rowCount}×1',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1065,12 +1074,14 @@ class Matrix {
       throw MatrixShapeError(
         'cross product requires a 3×1 column vector, '
         'got ${rowCount}×$columnCount',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
     if (other.columnCount != 1 || other.rowCount != 3) {
       throw MatrixShapeError(
         'cross product requires a 3×1 column vector, '
         'got ${other.rowCount}×${other.columnCount}',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1491,6 +1502,7 @@ class Matrix {
       throw MatrixShapeError(
         'QR decomposition requires row count >= column count, found '
         '${rowCount}x${columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -2118,6 +2130,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot append ${row.rowCount}x${row.columnCount} row operand to '
         '${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -2132,6 +2145,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot append ${column.rowCount}x${column.columnCount} column operand '
         'to ${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -2150,7 +2164,10 @@ class Matrix {
   Matrix deleteRow(int rowIndex) {
     _requireRowIndex(rowIndex);
     if (rowCount == 1) {
-      throw MatrixShapeError('Cannot delete the only row in a matrix.');
+      throw MatrixShapeError(
+        'Cannot delete the only row in a matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     return Matrix(
@@ -2170,7 +2187,10 @@ class Matrix {
   Matrix deleteColumn(int columnIndex) {
     _requireColumnIndex(columnIndex);
     if (columnCount == 1) {
-      throw MatrixShapeError('Cannot delete the only column in a matrix.');
+      throw MatrixShapeError(
+        'Cannot delete the only column in a matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     return Matrix(
@@ -2291,11 +2311,17 @@ class Matrix {
 
   static void _validateRectangular(List<List<double>> rows) {
     if (rows.isEmpty) {
-      throw MatrixShapeError('Matrix cannot be empty.');
+      throw MatrixShapeError(
+        'Matrix cannot be empty.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     if (rows.first.isEmpty) {
-      throw MatrixShapeError('Matrix rows cannot be empty.');
+      throw MatrixShapeError(
+        'Matrix rows cannot be empty.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     final int width = rows.first.length;
@@ -2303,6 +2329,7 @@ class Matrix {
       if (row.length != width) {
         throw MatrixShapeError(
           'All rows must have the same number of columns.',
+          errorId: CalculatrixErrorId.dimensionMismatch,
         );
       }
     }
@@ -2312,6 +2339,7 @@ class Matrix {
     if (rowCount < 1 || columnCount < 1) {
       throw MatrixShapeError(
         '$label matrix dimensions must be greater than zero.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
   }
@@ -2321,6 +2349,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot perform $operation for ${rowCount}x${columnCount} and '
         '${other.rowCount}x${other.columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
   }
@@ -2345,6 +2374,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot perform $operation for non-square '
         '${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
   }
