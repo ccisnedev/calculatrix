@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 import '../errors/errors.dart';
 import '../numeric/numeric_policy.dart';
 import 'dart:math' as math;
@@ -3828,6 +3830,7 @@ class Matrix {
 /// This function exists solely so a test can supply a matrix and a tiny
 /// budget (for example 0 sweeps) and deterministically observe
 /// noConvergence, without changing what `sqrt` itself accepts.
+@visibleForTesting
 Matrix debugCyclicJacobiSqrtWithSweepBudget(Matrix matrix, int maxSweeps) {
   return matrix._symmetricRealFunction(
     (double v) =>
