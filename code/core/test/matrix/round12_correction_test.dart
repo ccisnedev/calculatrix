@@ -255,6 +255,154 @@ void main() {
   );
 
   group(
+    'Round 12, finding 5 (revision): the functionValueCancellationRisk '
+    'gate from the first finding-5 fix is itself still a fallback to the '
+    'broken direct form whenever its own log1p argument degenerates '
+    '(an extreme eigenvalue ratio), which loses the true, tiny, nonzero '
+    'divided difference the same way the original bug did',
+    () {
+      // A=[[1e200,1],[0,1e-200]] is triangular, eigenvalues exactly 1e200
+      // and 1e-200. With y=1e-20, pow(1e200,1e-20) and pow(1e-200,1e-20)
+      // both round to 1.0 in double precision (functionValueCancellationRisk
+      // true), but (lSmall-lBig)/lBig rounds to exactly -1.0 (an extreme
+      // eigenvalue ratio), so 1.0 + log1pArg is not > 0 and the first
+      // finding-5 fix falls through to the broken direct form, giving
+      // c1 = 0 instead of the true, tiny, nonzero divided difference.
+      // Reference (mpmath, dps=100), independent of this implementation:
+      // fa = 1.0000000000000000046, fd = 0.99999999999999999539,
+      // entry01 = b*dd = 9.2103403719761827361e-218 (dd = (fa-fd)/(a-d)).
+      test(
+        'power(1e-20) on [[1e200,1],[0,1e-200]] recovers the true nonzero '
+        '(0,1) entry, not a false 0 from the log1p fallback\'s own '
+        'degenerate argument',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[1e200, 1],
+            <double>[0, 1e-200],
+          ]);
+
+          final Matrix result = value.power(Matrix.scalar(1e-20));
+
+          expectRelativelyClose(result.at(0, 0), 1.0000000000000000046);
+          expectRelativelyClose(result.at(0, 1), 9.2103403719761827361e-218);
+          expect(result.at(1, 0), equals(0));
+          expectRelativelyClose(result.at(1, 1), 0.99999999999999999539);
+        },
+      );
+
+      // Negative-y variant of the same counterexample: y=-1e-20. Reference
+      // (mpmath, dps=100): fa = 0.99999999999999999539,
+      // fd = 1.0000000000000000046,
+      // entry01 = -9.2103403719761827361e-218.
+      test(
+        'power(-1e-20) on [[1e200,1],[0,1e-200]] recovers the true nonzero '
+        '(0,1) entry with the correct sign',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[1e200, 1],
+            <double>[0, 1e-200],
+          ]);
+
+          final Matrix result = value.power(Matrix.scalar(-1e-20));
+
+          expectRelativelyClose(result.at(0, 0), 0.99999999999999999539);
+          expectRelativelyClose(
+            result.at(0, 1),
+            -9.2103403719761827361e-218,
+          );
+          expect(result.at(1, 0), equals(0));
+          expectRelativelyClose(result.at(1, 1), 1.0000000000000000046);
+        },
+      );
+
+      // Forward-looking regression, not a currently-failing case: guards
+      // the new unconditional far-branch formula against reintroducing an
+      // overflow of its own. A naive, unconditional implementation of
+      // lyBig - lySmall = lySmall * expm1(y * (ln lBig - ln lSmall)) would
+      // itself overflow here, because y * (ln lBig - ln lSmall) ~ 1409.18
+      // is far past the point where exp() (and therefore expm1()) itself
+      // overflows (~709), even though lySmall is finite and the true
+      // product is representable; the sign-of-y-conditioned form this fix
+      // uses instead always keeps expm1's own argument non-positive.
+      // Reference (mpmath, dps=100): fa = 1.0e+306, fd = 1.0e-306,
+      // entry01 = 1000000.0.
+      test(
+        'power(1.02) on [[1e300,1],[0,1e-300]] does not overflow the way '
+        'an unconditional expm1(y * logDiff) form would',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[1e300, 1],
+            <double>[0, 1e-300],
+          ]);
+
+          final Matrix result = value.power(Matrix.scalar(1.02));
+
+          expectRelativelyClose(result.at(0, 0), 1.0e+306);
+          expectRelativelyClose(result.at(0, 1), 1000000.0);
+          expect(result.at(1, 0), equals(0));
+          expectRelativelyClose(result.at(1, 1), 1.0e-306);
+        },
+      );
+
+      // Negative-y counterpart of the regression above, confirming the
+      // sign-of-y branch selection is correct in both directions.
+      // Reference (mpmath, dps=100): fa = 1.0e-306, fd = 1.0e+306,
+      // entry01 = -1000000.0.
+      test(
+        'power(-1.02) on [[1e300,1],[0,1e-300]] does not overflow either',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[1e300, 1],
+            <double>[0, 1e-300],
+          ]);
+
+          final Matrix result = value.power(Matrix.scalar(-1.02));
+
+          expectRelativelyClose(result.at(0, 0), 1.0e-306);
+          expectRelativelyClose(result.at(0, 1), -1000000.0);
+          expect(result.at(1, 0), equals(0));
+          expectRelativelyClose(result.at(1, 1), 1.0e+306);
+        },
+      );
+    },
+  );
+
+  group(
+    'Round 12, finding 8: general 2x2 power\'s repeated-eigenvalue branch '
+    'c0 = pow(l,y) - c1*l overflows even though every entry it feeds '
+    'stays finite',
+    () {
+      // A=[[1150,1],[0,1150]] has a repeated eigenvalue l=1150 (Jordan
+      // block). With y=100.25, pow(l,y) ~ 6.84e+306 and c1 = y*l^(y-1)
+      // ~ 5.96e+305 are each individually finite, but c0 = pow(l,y) -
+      // c1*l overflows: c1*l ~ 6.86e+308, past double's max (~1.8e+308).
+      // The true entries (c0*I + c1*A collapsed algebraically) are all
+      // finite. Reference (mpmath, dps=150), independent of this
+      // implementation: fl = 6.8384629050092065369e+306,
+      // fprime (c1) = 5.9613557063232430898e+305, entry00 = entry11 = fl
+      // (since a - l = d - l = 0), entry01 = fprime * b =
+      // 5.9613557063232430898e+305.
+      test(
+        'power(100.25) on [[1150,1],[0,1150]] returns a finite result '
+        'instead of throwing MatrixDomainError from an overflowed c0',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[1150, 1],
+            <double>[0, 1150],
+          ]);
+
+          final Matrix result = value.power(Matrix.scalar(100.25));
+
+          expectRelativelyClose(result.at(0, 0), 6.8384629050092065369e+306);
+          expectRelativelyClose(result.at(0, 1), 5.9613557063232430898e+305);
+          expect(result.at(1, 0), equals(0));
+          expectRelativelyClose(result.at(1, 1), 6.8384629050092065369e+306);
+        },
+      );
+    },
+  );
+
+  group(
     'Round 12, finding 6: general 2x2 exp\'s repeated-eigenvalue branch '
     'must not materialize c0 = f(l) - c1*l as a standalone value when '
     'c1*l overflows, even though every entry c0 actually feeds into '
