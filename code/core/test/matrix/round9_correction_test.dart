@@ -185,4 +185,139 @@ void main() {
       );
     },
   );
+
+  group(
+    'Round 9, finding 3: general 2x2 matrix functions must not '
+    'misclassify an underflowed discriminant',
+    () {
+      test(
+        '[[1e-200,1e-200],[0,2e-200]]^0.5 matches sqrt of each diagonal '
+        'entry, not the wrong closed-form values from a misclassified '
+        'repeated eigenvalue',
+        () {
+          final Matrix result = Matrix(<List<double>>[
+            <double>[1e-200, 1e-200],
+            <double>[0, 2e-200],
+          ]).power(Matrix.scalar(0.5));
+
+          final double expected00 = math.sqrt(1e-200);
+          final double expected11 = math.sqrt(2e-200);
+
+          expect(
+            result.at(0, 0),
+            closeTo(expected00, expected00.abs() * 1e-6),
+          );
+          expect(
+            result.at(1, 1),
+            closeTo(expected11, expected11.abs() * 1e-6),
+          );
+        },
+      );
+
+      test(
+        '[[1e200,1e200],[0,2e200]]^0.5 is finite and matches sqrt of each '
+        'diagonal entry (previously threw non-finite)',
+        () {
+          final Matrix result = Matrix(<List<double>>[
+            <double>[1e200, 1e200],
+            <double>[0, 2e200],
+          ]).power(Matrix.scalar(0.5));
+
+          final double expected00 = math.sqrt(1e200);
+          final double expected11 = math.sqrt(2e200);
+
+          expect(result.at(0, 0).isFinite, isTrue);
+          expect(result.at(1, 1).isFinite, isTrue);
+          expect(
+            result.at(0, 0),
+            closeTo(expected00, expected00.abs() * 1e-6),
+          );
+          expect(
+            result.at(1, 1),
+            closeTo(expected11, expected11.abs() * 1e-6),
+          );
+        },
+      );
+
+      test(
+        'a genuine tiny complex-conjugate pair is not misclassified as a '
+        'repeated real zero (previously wrongly threw log-undefined)',
+        () {
+          // Not the special complex form a*I+b*J (that requires the (1,0)
+          // entry to be exactly -b): this is a general 2x2 block whose
+          // b*c product underflows to -0.0 at this scale, which used to
+          // make the discriminant compare as exactly zero and misclassify
+          // a genuine complex pair as a repeated real eigenvalue of 0.
+          final Matrix base = Matrix(<List<double>>[
+            <double>[0, 1e-200],
+            <double>[-2e-200, 0],
+          ]);
+
+          final Matrix result = base.power(Matrix.scalar(0.5));
+
+          for (int r = 0; r < 2; r++) {
+            for (int c = 0; c < 2; c++) {
+              expect(result.at(r, c).isFinite, isTrue);
+            }
+          }
+
+          final Matrix reconstructed = result * result;
+          expect(
+            reconstructed.almostEquals(
+              base,
+              relativeTolerance: 1e-6,
+              absoluteTolerance: 0,
+            ),
+            isTrue,
+            reason:
+                'squaring the computed power should reconstruct the '
+                'original matrix: got $reconstructed, expected $base',
+          );
+        },
+      );
+
+      test(
+        '[[1e-200,1e-200],[0,2e-200]].exp() is finite and does not '
+        'misclassify the discriminant either',
+        () {
+          final Matrix result = Matrix(<List<double>>[
+            <double>[1e-200, 1e-200],
+            <double>[0, 2e-200],
+          ]).exp();
+
+          expect(result.at(0, 0).isFinite, isTrue);
+          expect(result.at(1, 1).isFinite, isTrue);
+          // exp of a tiny eigenvalue l is ~1 + l: at this scale both
+          // diagonal entries must round-trip to (numerically) 1.
+          expect(result.at(0, 0), closeTo(1, 1e-9));
+          expect(result.at(1, 1), closeTo(1, 1e-9));
+        },
+      );
+
+      test(
+        '[[1e200,1e200],[0,2e200]].log() is finite and does not '
+        'misclassify the discriminant either',
+        () {
+          final Matrix result = Matrix(<List<double>>[
+            <double>[1e200, 1e200],
+            <double>[0, 2e200],
+          ]).log();
+
+          final double expected00 = math.log(1e200);
+          final double expected11 = math.log(2e200);
+
+          expect(result.at(0, 0).isFinite, isTrue);
+          expect(result.at(1, 1).isFinite, isTrue);
+          expect(
+            result.at(0, 0),
+            closeTo(expected00, expected00.abs() * 1e-9),
+          );
+          expect(
+            result.at(1, 1),
+            closeTo(expected11, expected11.abs() * 1e-9),
+          );
+        },
+      );
+    },
+  );
 }
