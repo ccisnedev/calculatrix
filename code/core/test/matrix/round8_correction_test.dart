@@ -365,4 +365,39 @@ void main() {
       );
     });
   });
+
+  group('Round 8, finding 12: a zero eigenvalue raised to a negative real '
+      'power in the general 2x2 closed form must be logUndefined, not '
+      'nonFinite', () {
+    test('power(-1.5) of a general 2x2 matrix with eigenvalues 0 and 3 '
+        'throws logUndefined', () {
+      // [[0,1],[0,3]] has trace 3 and determinant 0, so its exact
+      // eigenvalues are 0 and 3: distinct, real, one of them exactly zero.
+      // It is not diagonal (the [0][1] entry is nonzero), not exactly
+      // symmetric (the [0][1] and [1][0] entries differ), and not the
+      // complex form a*I+b*J (the diagonal entries differ), so power()
+      // reaches the general 2x2 closed form. A zero eigenvalue raised to a
+      // negative power is genuinely undefined in the real domain the same
+      // way log(0) is (it is not that the result overflows to a finite-but-
+      // unrepresentable magnitude; there is no real value at all), so the
+      // typed error must be logUndefined, matching every other "no real
+      // value exists" case in this file (the repeated-zero-eigenvalue case
+      // just above already uses logUndefined for exactly this reason).
+      final Matrix matrix = Matrix(<List<double>>[
+        <double>[0, 1],
+        <double>[0, 3],
+      ]);
+
+      expect(
+        () => matrix.power(Matrix.scalar(-1.5)),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.logUndefined,
+          ),
+        ),
+      );
+    });
+  });
 }
