@@ -182,39 +182,32 @@ class Matrix {
 
   /// Whether this matrix is in complex form: `[[a, -b], [b, a]]`.
   ///
-  /// A 2×2 matrix is in complex form iff `M[0,0] == M[1,1]` and
+  /// A 2x2 matrix is in complex form iff `M[0,0] == M[1,1]` and
   /// `M[0,1] == -M[1,0]`, which is necessary and sufficient for the matrix
-  /// to belong to the subalgebra `{aI + bJ}` isomorphic to ℂ.
+  /// to belong to the subalgebra `{aI + bJ}` isomorphic to the complex
+  /// numbers.
   ///
-  /// Both equalities are tested scale-relative, never against a fixed
-  /// absolute floor: a fixed floor (e.g. [CalculatrixNumericPolicy.
-  /// defaultAbsoluteTolerance], 1e-12) is wrong by construction at any
-  /// scale far below it — `diag(1e-20, 2e-20)` has diagonal entries that
-  /// truly differ, but a 1e-12 floor calls them equal and misclassifies
-  /// this real diagonal matrix as complex form, which then fails a
-  /// downstream "is the magnitude zero" check meant for genuine zero
-  /// matrices. `M[0,0] == M[1,1]` is instead tested against
-  /// `4 * u * max(|M[0,0]|, |M[1,1]|)` (u = double's unit roundoff, see
-  /// [CalculatrixNumericPolicy.machineEpsilon]), and `M[0,1] == -M[1,0]`
-  /// against `4 * u * ‖M‖∞` (the whole matrix's own scale, since the
-  /// off-diagonal pair can be exactly zero on one or both sides).
+  /// Both equalities are tested exactly (round 8 correction, finding 5),
+  /// never against a tolerance of any kind, scale-relative or otherwise.
+  /// A scale-relative tolerance (the previous version used
+  /// `4 * u * max(|M[0,0]|, |M[1,1]|)` for the diagonal pair and
+  /// `4 * u * the matrix's own largest entry` for the off-diagonal pair,
+  /// u = double's unit roundoff, see [CalculatrixNumericPolicy.
+  /// machineEpsilon]) grows with the matrix's own scale, so at a large
+  /// enough scale it can exceed a genuine, exactly-representable
+  /// difference between two entries: `[[-1e20,1],[0,-1e20]]` is a genuine
+  /// Jordan block (not diagonalizable), but its scale-relative
+  /// off-diagonal tolerance at that magnitude (about 8.88e4) is far larger
+  /// than the true gap between its off-diagonal entries (1), so the old
+  /// tolerance wrongly called it complex form. Complex form is a structural
+  /// property of the caller-supplied entries themselves, not a
+  /// numerically-derived quantity accumulating its own rounding noise
+  /// (unlike, for example, [eigenvalues], whose scale-relative tolerances
+  /// exist to absorb rounding noise from the iterative QR pipeline that
+  /// produced them), so there is no rounding noise here to tolerate.
   bool get isComplexForm {
     if (rowCount != 2 || columnCount != 2) return false;
-    const double u = CalculatrixNumericPolicy.machineEpsilon;
-    final double diagonalTolerance =
-        4 * u * math.max(_rows[0][0].abs(), _rows[1][1].abs());
-    // Round 5 correction, case 4: the off-diagonal tolerance must stay
-    // finite whenever the individual entries are, so it is built from the
-    // largest entry's own magnitude (a plain max, never a sum) rather than
-    // from [_infinityNorm], whose row-sum can genuinely overflow to
-    // Infinity even though every entry is individually finite (e.g. all
-    // four entries at 1e308: the row sum 2e308 exceeds double's max finite
-    // value). An infinite tolerance makes `Infinity <= Infinity` compare
-    // true regardless of the actual off-diagonal values, wrongly
-    // classifying a non-complex-form matrix as complex form.
-    final double offDiagonalTolerance = 4 * u * _maxAbsEntry();
-    return (_rows[0][0] - _rows[1][1]).abs() <= diagonalTolerance &&
-        (_rows[0][1] + _rows[1][0]).abs() <= offDiagonalTolerance;
+    return _rows[0][0] == _rows[1][1] && _rows[0][1] == -_rows[1][0];
   }
 
   /// The real part of a complex-form matrix: the `a` in `aI + bJ`.
