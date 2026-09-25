@@ -2173,6 +2173,7 @@ class Matrix {
       0.5,
       maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
       operation: 'square root',
+      rejectZeroEigenvalue: false,
     );
   }
 
@@ -2428,6 +2429,7 @@ class Matrix {
       y,
       maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
       operation: 'real matrix power',
+      rejectZeroEigenvalue: true,
     );
   }
 
@@ -3328,20 +3330,28 @@ class Matrix {
   /// A real non-integer power `v^y` for a single diagonal/symmetric
   /// eigenvalue, per the coordinator's scope: `v > 0` uses ordinary real
   /// exponentiation (special-cased to `math.sqrt` for `y == 0.5`, for
-  /// maximum precision parity with the diagonal-sqrt fast path); `v == 0`
-  /// with `y > 0` is `0`; `v == 0` with `y <= 0` and any `v < 0` are
-  /// [CalculatrixErrorId.logUndefined] (a non-integer real exponent has no
-  /// real value there). `y` is always finite and non-integer here, since
-  /// an integer (including `y == 0`) exponent is routed to
-  /// [_integerMatrixPower] before this is ever reached.
-  double _realScalarPower(double v, double y) {
+  /// maximum precision parity with the diagonal-sqrt fast path); any
+  /// `v < 0` is [CalculatrixErrorId.logUndefined] (a non-integer real
+  /// exponent has no real value there). `y` is always finite and
+  /// non-integer here, since an integer (including `y == 0`) exponent is
+  /// routed to [_integerMatrixPower] before this is ever reached.
+  ///
+  /// `v == 0` is where [sqrt] and [power] diverge (round 9 correction,
+  /// finding 4, restoring runbook D25 case 5 / issue #5 amendment D34):
+  /// [power] with a non-scalar, non-complex-form base must treat a zero
+  /// eigenvalue with a non-integer exponent as log-undefined outright
+  /// (`rejectZeroEigenvalue: true`), the same as the negative-eigenvalue
+  /// case, regardless of the sign of `y`. [sqrt] itself is unaffected
+  /// (`rejectZeroEigenvalue: false`): `0^0.5 = 0` carries through its
+  /// eigendecomposition as before.
+  double _realScalarPower(double v, double y, {required bool rejectZeroEigenvalue}) {
     if (v > 0) {
       return y == 0.5 ? math.sqrt(v) : math.pow(v, y).toDouble();
     }
     if (v == 0) {
-      if (y > 0) return 0;
+      if (!rejectZeroEigenvalue && y > 0) return 0;
       throw MatrixDomainError(
-        'A zero eigenvalue cannot be raised to a non-positive real power.',
+        'A zero eigenvalue cannot be raised to a non-integer real power.',
         errorId: CalculatrixErrorId.logUndefined,
       );
     }
@@ -3370,21 +3380,32 @@ class Matrix {
     double y, {
     required int maxSweeps,
     required String operation,
+    required bool rejectZeroEigenvalue,
   }) {
     if (isComplexForm) {
       return _complexFormRealPower(y);
     }
     if (_isExactlyDiagonal()) {
-      return _diagonalRealFunction((double v) => _realScalarPower(v, y));
+      return _diagonalRealFunction(
+        (double v) => _realScalarPower(
+          v,
+          y,
+          rejectZeroEigenvalue: rejectZeroEigenvalue,
+        ),
+      );
     }
     if (_isExactlySymmetric()) {
       return _symmetricRealFunction(
-        (double v) => _realScalarPower(v, y),
+        (double v) => _realScalarPower(
+          v,
+          y,
+          rejectZeroEigenvalue: rejectZeroEigenvalue,
+        ),
         maxSweeps: maxSweeps,
       );
     }
     if (rowCount == 2) {
-      return _general2x2RealPower(y);
+      return _general2x2RealPower(y, rejectZeroEigenvalue: rejectZeroEigenvalue);
     }
     throw _unsupportedMatrixFunction(operation);
   }
@@ -3633,11 +3654,22 @@ class Matrix {
 
   /// [power]'s non-integer real-exponent case for a general (non-diagonal,
   /// non-exactly-symmetric) 2x2 matrix via the divided-difference closed
-  /// form. A repeated zero eigenvalue with genuine Jordan coupling (this
-  /// branch is only reached for a matrix that is not diagonal, so a
-  /// repeated zero here always implies real coupling) is
-  /// [CalculatrixErrorId.logUndefined] regardless of the sign of `y`.
-  Matrix _general2x2RealPower(double y) {
+  /// form. Also used, via [_matrixRealPower], for [sqrt]'s general-2x2
+  /// class (`y == 0.5`). A repeated zero eigenvalue with genuine Jordan
+  /// coupling (this branch is only reached for a matrix that is not
+  /// diagonal, so a repeated zero here always implies real coupling) is
+  /// [CalculatrixErrorId.logUndefined] regardless of the sign of `y` or of
+  /// [rejectZeroEigenvalue]: a genuine Jordan block has no meaningful
+  /// square root or power at all, for either caller.
+  ///
+  /// [rejectZeroEigenvalue] (round 9 correction, finding 4, restoring
+  /// runbook D25 case 5 / issue #5 amendment D34) distinguishes the two
+  /// callers for the *non*-repeated case where exactly one eigenvalue is
+  /// zero: [power] (`true`) always rejects a zero eigenvalue with a
+  /// non-integer exponent as log-undefined, regardless of the sign of `y`;
+  /// [sqrt] (`false`) keeps its existing behavior, where `0^0.5 = 0`
+  /// carries through for `y >= 0`.
+  Matrix _general2x2RealPower(double y, {required bool rejectZeroEigenvalue}) {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
     final double c = _rows[1][0];
@@ -3684,9 +3716,10 @@ class Matrix {
         c0 = _checkFiniteScalar(math.pow(l, y).toDouble()) - c1 * l;
       } else {
         if (l1 == 0 || l2 == 0) {
-          if (y < 0) {
+          if (rejectZeroEigenvalue || y < 0) {
             throw MatrixDomainError(
-              'A zero eigenvalue cannot be raised to a negative real power.',
+              'A zero eigenvalue cannot be raised to a non-integer real '
+              'power.',
               errorId: CalculatrixErrorId.logUndefined,
             );
           }
@@ -3797,7 +3830,8 @@ class Matrix {
 /// noConvergence, without changing what `sqrt` itself accepts.
 Matrix debugCyclicJacobiSqrtWithSweepBudget(Matrix matrix, int maxSweeps) {
   return matrix._symmetricRealFunction(
-    (double v) => matrix._realScalarPower(v, 0.5),
+    (double v) =>
+        matrix._realScalarPower(v, 0.5, rejectZeroEigenvalue: false),
     maxSweeps: maxSweeps,
   );
 }
