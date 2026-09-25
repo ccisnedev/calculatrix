@@ -3616,17 +3616,37 @@ class Matrix {
   /// bottom-right entry: true value `~1e-100`, `c0 + c1*d` instead
   /// returns `~1e-300`, off by 200 orders of magnitude).
   ///
-  /// The Lagrange form evaluated directly at each diagonal entry `x`,
-  /// `f(x) ~= fBig*(x-lSmall)/(lBig-lSmall) + fSmall*(lBig-x)/(lBig-lSmall)`,
-  /// never needs that cancellation: for a diagonal entry close to
-  /// `lSmall`, `(x - lSmall)` is a genuinely small, honestly computed
-  /// quantity (not the residue of subtracting two huge numbers), so the
-  /// first term is honestly small and the second term evaluates to
-  /// nearly exactly `fSmall` with no cancellation at all; the symmetric
-  /// argument holds for a diagonal entry close to `lBig`. [c1] (the
-  /// already-computed, well-conditioned divided difference
-  /// `(fBig - fSmall) / (lBig - lSmall)`) is reused unchanged for the
-  /// off-diagonal entries, which never had a precision problem.
+  /// The Lagrange form evaluated directly at each diagonal entry `x` still
+  /// is not enough on its own: a weighted average like
+  /// `fBig*(x-lSmall)/(lBig-lSmall) + fSmall*(lBig-x)/(lBig-lSmall)` breaks
+  /// down when `x` happens to round to the exact same double as `lSmall`
+  /// (or `lBig`) even though its true, exact offset from that eigenvalue
+  /// is nonzero: the weight `(x-lSmall)/denom` rounds to exactly 0, and
+  /// the genuine, tiny-but-amplified contribution from that offset (round
+  /// 12 correction, finding 1: `[[700,1],[1e-300,-700]]`'s `(1,1)` entry
+  /// is `0.00517...`, not `exp(-700)`, because the entry `-700` is not
+  /// exactly the true eigenvalue `lSmall`, even though both round to the
+  /// same double) is lost entirely.
+  ///
+  /// The fix recovers that offset exactly via the characteristic
+  /// polynomial `p(x) = (x-lBig)*(x-lSmall)`, which evaluates to `-b*c`
+  /// identically at `x = a` and at `x = d` (`p(a) = a^2-(a+d)a+ad-bc =
+  /// -bc`, `p(d) = d^2-(a+d)d+ad-bc = -bc`), independent of any rounding
+  /// in `lBig`/`lSmall` themselves. `x - lSmall` is a subtraction of two
+  /// independently rounded doubles (`x` is an exact matrix entry, but
+  /// `lSmall` carries up to half a ulp of its own rounding error, roughly
+  /// `machineEpsilon * |lSmall|` in absolute terms); when `x` and `lSmall`
+  /// are close enough that the true difference is comparable to or
+  /// smaller than that rounding error, the subtraction is dominated by
+  /// noise, down to and including collapsing to exactly 0 when `x` and
+  /// `lSmall` round to the same double. `x - lSmall = -bc / (x - lBig)`
+  /// recovers the offset from the well-conditioned `x - lBig` instead
+  /// (large whenever `x` sits close to `lSmall`, so its own relative
+  /// error stays at the ordinary single-ulp level), with no cancellation
+  /// anywhere in that division. [c1] (the already-computed,
+  /// well-conditioned divided difference `(fBig - fSmall) / (lBig -
+  /// lSmall)`) is reused unchanged for the off-diagonal entries, which
+  /// never had a precision problem.
   Matrix _lagrangeClosedForm2x2(
     double fBig,
     double fSmall,
@@ -3638,17 +3658,46 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final double denom = lBig - lSmall;
+    final double bc = b * c;
+    // `b` and `c` are both nonzero here (the exactly-triangular case has
+    // its own closed form in [_triangularClosedForm2x2]), so a `bc` that
+    // computes to exactly 0 is an underflow of the true, nonzero product,
+    // not a genuine zero; the identity below would then silently report
+    // an offset of 0 regardless of the true value, so it must not be
+    // trusted in that case.
+    final bool bcUnderflowed = bc == 0;
 
-    // Divide before multiplying: `(x - lSmall) / denom` and
-    // `(lBig - x) / denom` are each well-conditioned weights (close to 0
-    // or 1), but `fBig` or `fSmall` can individually approach double's
-    // max magnitude (e.g. `math.pow(lBig, y)` for a large `y`), so
-    // multiplying by the raw, unscaled `(x - lSmall)` or `(lBig - x)`
-    // first (each also up to `O(lBig)`) can overflow to `Infinity` even
-    // though the true, weight-scaled result is well within range.
-    double diagonal(double x) =>
-        (fBig * ((x - lSmall) / denom)) + (fSmall * ((lBig - x) / denom));
+    // Cancellation-risk threshold shared with [_general2x2Exp],
+    // [_general2x2Log] and [_general2x2RealPower]'s close-eigenvalue
+    // gating: approximately `sqrt(machineEpsilon)`, comfortably above the
+    // single-ulp rounding noise floor and comfortably below the scale at
+    // which a genuinely well-separated subtraction should be trusted.
+    const double closeEigenvalueThreshold = 1.4901161193847656e-08;
+
+    // Offset of `x` from `lSmall`. The direct subtraction is trusted
+    // unless it is small enough, relative to `x`/`lSmall`'s own scale, to
+    // be at risk of the rounding-noise cancellation described above; only
+    // then is the characteristic-polynomial identity used instead, and
+    // only when it produces a genuinely finite, non-underflowed value.
+    double offsetFromLSmall(double x) {
+      final double direct = x - lSmall;
+      final double scale = math.max(x.abs(), lSmall.abs());
+      final bool cancellationRisk =
+          scale != 0 && (direct.abs() / scale) < closeEigenvalueThreshold;
+      if (!cancellationRisk) {
+        return direct;
+      }
+      final double viaIdentity = -bc / (x - lBig);
+      final bool viaIdentityUnreliable =
+          !viaIdentity.isFinite || (viaIdentity == 0 && bcUnderflowed);
+      return viaIdentityUnreliable ? direct : viaIdentity;
+    }
+
+    // Anchored at fSmall, not fBig: `fSmall` is added to a term that can
+    // be many orders of magnitude larger, which never cancels, unlike
+    // anchoring at `fBig` and subtracting out the diagonal entry's honest
+    // offset from `lSmall` (the bug this replaces).
+    double diagonal(double x) => fSmall + (c1 * offsetFromLSmall(x));
 
     return Matrix(<List<double>>[
       <double>[diagonal(a), c1 * b],
