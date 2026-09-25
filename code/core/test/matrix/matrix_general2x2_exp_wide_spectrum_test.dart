@@ -34,15 +34,27 @@ void main() {
     'for the power path)',
     () {
       test(
-        'near triangular [[700,1],[1e-300,-700]]: exp no longer collapses '
-        'the (1,1) entry to 0',
+        'near triangular [[700,1],[1e-300,-700]]: exp recovers the true '
+        '(1,1) entry, not exp(-700) (round 12 correction, finding 1: the '
+        '(1,1) matrix entry -700 and the true eigenvalue lSmall round to '
+        'the same double, but lSmall is not exactly -700, and the '
+        'resulting tiny offset, amplified by c1 (of order exp(700)), '
+        'contributes a non-negligible amount)',
         () {
-          // Eigenvalues: c = 1e-300 perturbs them by an amount far below
-          // double precision relative to 700, so lBig = 700, lSmall = -700
-          // to all representable precision.
-          final double fBig = math.exp(700);
-          final double fSmall = math.exp(-700);
-          final double c1 = (fBig - fSmall) / 1400;
+          // Reference (mpmath, dps=800, exact eigenvalues from the
+          // characteristic polynomial of the *exact* rational entries,
+          // never from this implementation):
+          // lambda1 = 700, lambda2 = -700 to 40+ displayed digits (the
+          // perturbation from b*c=1e-300 sits far below the displayed
+          // precision), yet entry (1,1) of exp(A), evaluated as
+          // c0 + c1*(-700) via the *exact* divided-difference
+          // coefficients, is 0.00517465334048471688497617140424, sharply
+          // different from exp(-700) ~= 9.8597e-305: the (1,1) matrix
+          // entry -700 is not itself an eigenvalue of this
+          // non-triangular matrix, even though it agrees with lSmall to
+          // double precision.
+          const double expected11 = 0.005174653340484717;
+          final double c1 = (math.exp(700) - math.exp(-700)) / 1400;
 
           final Matrix value = Matrix(<List<double>>[
             <double>[700, 1],
@@ -51,8 +63,8 @@ void main() {
 
           final Matrix result = value.exp();
 
-          expectRelativelyClose(result.at(0, 0), fBig);
-          expectRelativelyClose(result.at(1, 1), fSmall);
+          expectRelativelyClose(result.at(0, 0), math.exp(700));
+          expectRelativelyClose(result.at(1, 1), expected11);
           expectRelativelyClose(result.at(0, 1), c1);
           expectRelativelyClose(result.at(1, 0), c1 * 1e-300);
         },
@@ -85,9 +97,12 @@ void main() {
         'at (0,0) instead of (1,1), exercising the same fix from the other '
         'orientation',
         () {
-          final double fBig = math.exp(700);
-          final double fSmall = math.exp(-700);
-          final double c1 = (fBig - fSmall) / 1400;
+          // Reference (mpmath, dps=800): by the same characteristic
+          // polynomial as the unmirrored case above (b*c is unchanged),
+          // entry (0,0) is 0.00517465334048471688497617140424, not
+          // exp(-700).
+          const double expected00 = 0.005174653340484717;
+          final double c1 = (math.exp(700) - math.exp(-700)) / 1400;
 
           final Matrix value = Matrix(<List<double>>[
             <double>[-700, 1],
@@ -96,8 +111,8 @@ void main() {
 
           final Matrix result = value.exp();
 
-          expectRelativelyClose(result.at(0, 0), fSmall);
-          expectRelativelyClose(result.at(1, 1), fBig);
+          expectRelativelyClose(result.at(0, 0), expected00);
+          expectRelativelyClose(result.at(1, 1), math.exp(700));
           expectRelativelyClose(result.at(0, 1), c1);
           expectRelativelyClose(result.at(1, 0), c1 * 1e-300);
         },
@@ -139,23 +154,22 @@ void main() {
             relativeTolerance: 1e-6,
           );
 
-          // The (1,1) entry is intrinsically ill-conditioned here, not a
-          // precision limitation of the fix under test: `d = -20` is not
-          // exactly `lambdaSmall` (`lambdaSmall` is perturbed away from
-          // `-20` by only about `c / 40 ~= 2.5e-12`, see the eigenvalue
-          // derivation above), so `diagonal(-20)` picks up a genuine,
-          // mathematically-correct contribution from `fBig` weighted by
-          // that tiny offset, on the same order as the entry's own true
-          // value. Both this hand-rolled expected value and the
-          // implementation's own `lambdaSmall` are limited by the same
-          // absolute floor (`lambdaSmall` itself is only accurate to
-          // about `1e-16 * 20 ~= 2e-15` absolute, against a true offset
-          // of `2.5e-12`, a relative floor around `1e-3`), so a looser
-          // tolerance is the honest one for this specific entry.
+          // Round 12 correction, finding 1: `lambdaSmall` here is computed
+          // as `-sqrt(400 + 1e-10)`, which is NOT the same double as
+          // `-20`: unlike the `700`/`1e-300` case above, `1e-10` is well
+          // within double precision's relative resolution against `400`
+          // (`1e-10 / 400 ~= 2.5e-13`, far above the ~2.2e-16 machine
+          // epsilon floor), so this hand-rolled `lambdaSmall` already
+          // carries its true offset from `-20` to full double precision,
+          // with no cancellation anywhere in its own derivation. This is
+          // therefore a tight, not loosened, check: once the
+          // implementation stops losing that same offset internally, it
+          // should match this reference to close to full double
+          // precision, not just 1e-2.
           expectRelativelyClose(
             result.at(1, 1),
             diagonal(-20),
-            relativeTolerance: 1e-2,
+            relativeTolerance: 1e-9,
           );
           expectRelativelyClose(result.at(0, 1), c1, relativeTolerance: 1e-6);
           expectRelativelyClose(
