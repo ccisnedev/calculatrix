@@ -455,4 +455,143 @@ void main() {
       },
     );
   });
+
+  group('Matrix.power - cancellation-resistant eigenvalue gate (#5)', () {
+    test(
+      'a genuinely tiny positive real eigenvalue at O(1) matrix scale is '
+      'not mistaken for non-positive rounding noise',
+      () {
+        // Diagonal, so the eigenvalues are exactly 1e-13 and 1: the
+        // quadratic-formula solver must not let cancellation (or an
+        // overly coarse near-zero floor borrowed from a general-purpose
+        // tolerance) turn 1e-13 into 0 and then reject it as
+        // non-positive.
+        final Matrix base = Matrix(<List<double>>[
+          <double>[1e-13, 0],
+          <double>[0, 1],
+        ]);
+        final Matrix result = base.power(Matrix.scalar(0.5));
+
+        expect(result.at(0, 0), closeTo(math.sqrt(1e-13), 1e-4 * 3.1623e-7));
+        expect(result.at(0, 1), closeTo(0, 1e-15));
+        expect(result.at(1, 0), closeTo(0, 1e-15));
+        expect(result.at(1, 1), closeTo(1, 1e-9));
+      },
+    );
+
+    test(
+      'a small real eigenvalue next to a hugely larger one in the same '
+      'matrix is recovered without catastrophic cancellation',
+      () {
+        // Eigenvalues 1 and 1e20: the naive (trace ± sqrt(disc)) / 2
+        // formula subtracts two nearly-equal ~1e20 quantities to find
+        // the smaller root and loses it entirely to rounding. The
+        // stable quadratic formula (q, then det/q) must not.
+        final Matrix base = Matrix(<List<double>>[
+          <double>[1, 0],
+          <double>[0, 1e20],
+        ]);
+        final Matrix result = base.power(Matrix.scalar(0.5));
+
+        expect(result.at(0, 0), closeTo(1, 1e-6));
+        expect(result.at(0, 1), closeTo(0, 1e-6));
+        expect(result.at(1, 0), closeTo(0, 1e-6));
+        expect(result.at(1, 1), closeTo(1e10, 1e4));
+      },
+    );
+
+    test(
+      'a genuine complex-conjugate eigenvalue pair at tiny magnitude is '
+      'not misclassified as a repeated non-positive real eigenvalue',
+      () {
+        // Eigenvalues are exactly ±1e-8i (trace 0, det 1e-15): an
+        // absolute-tolerance discriminant test (e.g. |disc| <= 1e-12)
+        // would clamp this genuinely negative discriminant to 0 and
+        // misreport a repeated real eigenvalue of 0, which would then
+        // wrongly reject the log as undefined. The discriminant test
+        // must be scaled to the block itself (trace^2 + |det|), not to
+        // a fixed absolute floor.
+        final Matrix base = Matrix(<List<double>>[
+          <double>[0, -2e-8],
+          <double>[0.5e-8, 0],
+        ]);
+        final Matrix result = base.power(Matrix.scalar(0.5));
+        final Matrix roundTrip = result * result;
+
+        expect(
+          roundTrip.almostEquals(
+            base,
+            relativeTolerance: 1e-9,
+            absoluteTolerance: 1e-20,
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'a real negative eigenvalue keeps raising log-undefined',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[-1, 0],
+          <double>[0, 4],
+        ]);
+
+        expect(
+          () => base.power(Matrix.scalar(0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'an exact zero real eigenvalue from a diagonal matrix keeps raising '
+      'log-undefined',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[0, 0],
+          <double>[0, 1],
+        ]);
+
+        expect(
+          () => base.power(Matrix.scalar(0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'an exact zero real eigenvalue from a singular non-diagonal matrix '
+      'keeps raising log-undefined',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[1, 1],
+          <double>[1, 1],
+        ]);
+
+        expect(
+          () => base.power(Matrix.scalar(0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
+          ),
+        );
+      },
+    );
+  });
 }
