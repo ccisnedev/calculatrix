@@ -2325,6 +2325,15 @@ class Matrix {
       }
 
       if (b > 0) {
+        // Classify exponent's own, unscaled structure before scaling it by
+        // log(b): scaling every entry by the same finite factor can
+        // underflow a genuinely nonzero off-diagonal entry to exactly 0,
+        // making a matrix that was never one of the five supported
+        // matrix-function classes look diagonal (or otherwise supported)
+        // only after scaling (round 8 correction, finding 10).
+        if (!exponent._isSupportedMatrixFunctionClass) {
+          throw exponent._unsupportedMatrixFunction('matrix exponent');
+        }
         final Matrix scaled = exponent.scale(math.log(b));
         return _checkFiniteMatrix(scaled.exp());
       }
@@ -3345,6 +3354,33 @@ class Matrix {
     if (u == 1.0) return x;
     if (u - 1.0 == -1.0) return -1.0;
     return (u - 1.0) * x / math.log(u);
+  }
+
+  /// True when this matrix is one of the five supported matrix-function
+  /// classes (scalar, complex-form, diagonal, exactly symmetric, general
+  /// 2x2), the same classes [exp], [log] and [sqrt] each dispatch on
+  /// (round 8 correction, finding 10). Used to classify a matrix's own
+  /// class up front, before any scalar rescaling of its entries: scaling
+  /// every entry by the same factor can underflow a genuinely nonzero
+  /// off-diagonal entry to exactly 0 (or, symmetrically, cannot ever
+  /// manufacture a genuine asymmetry out of one that was not already
+  /// there), so classifying the scaled copy instead of the original can
+  /// silently accept an input whose own, true structure was never one of
+  /// the five supported classes to begin with.
+  bool get _isSupportedMatrixFunctionClass {
+    if (isScalar) {
+      return true;
+    }
+    if (isComplexForm) {
+      return true;
+    }
+    if (_isExactlyDiagonal()) {
+      return true;
+    }
+    if (_isExactlySymmetric()) {
+      return true;
+    }
+    return rowCount == 2;
   }
 
   /// The typed domain error for any input outside the five supported
