@@ -345,8 +345,8 @@ void main() {
     );
 
     test(
-      'non-complex-form base with a complex-conjugate eigenvalue pair and a '
-      'non-positive real eigenvalue is log-undefined',
+      'a 3x3 base that is not diagonal, not exactly symmetric and not 2x2 '
+      'is unsupported-matrix-function even with a non-integer exponent',
       () {
         final Matrix base = Matrix(<List<double>>[
           <double>[0, -1, 0],
@@ -360,7 +360,7 @@ void main() {
             isA<MatrixDomainError>().having(
               (MatrixDomainError e) => e.errorId,
               'errorId',
-              CalculatrixErrorId.logUndefined,
+              CalculatrixErrorId.unsupportedMatrixFunction,
             ),
           ),
         );
@@ -566,45 +566,44 @@ void main() {
     );
 
     test(
-      'an exact zero real eigenvalue from a diagonal matrix keeps raising '
-      'log-undefined',
+      'an exact zero real eigenvalue from a diagonal matrix with a '
+      'positive power is fine: 0^0.5 = 0',
       () {
         final Matrix base = Matrix(<List<double>>[
           <double>[0, 0],
           <double>[0, 1],
         ]);
 
+        final Matrix result = base.power(Matrix.scalar(0.5));
+
         expect(
-          () => base.power(Matrix.scalar(0.5)),
-          throwsA(
-            isA<MatrixDomainError>().having(
-              (MatrixDomainError e) => e.errorId,
-              'errorId',
-              CalculatrixErrorId.logUndefined,
-            ),
-          ),
+          result.almostEquals(base, absoluteTolerance: 1e-13),
+          isTrue,
         );
       },
     );
 
     test(
-      'an exact zero real eigenvalue from a singular non-diagonal matrix '
-      'keeps raising log-undefined',
+      'an exact zero real eigenvalue from a singular exactly-symmetric '
+      'matrix with a positive power is fine',
       () {
         final Matrix base = Matrix(<List<double>>[
           <double>[1, 1],
           <double>[1, 1],
         ]);
 
+        final Matrix result = base.power(Matrix.scalar(0.5));
+        final double c = 1 / math.sqrt(2);
+
         expect(
-          () => base.power(Matrix.scalar(0.5)),
-          throwsA(
-            isA<MatrixDomainError>().having(
-              (MatrixDomainError e) => e.errorId,
-              'errorId',
-              CalculatrixErrorId.logUndefined,
-            ),
+          result.almostEquals(
+            Matrix(<List<double>>[
+              <double>[c, c],
+              <double>[c, c],
+            ]),
+            relativeTolerance: 1e-13,
           ),
+          isTrue,
         );
       },
     );
@@ -734,11 +733,12 @@ void main() {
       );
 
       test(
-        'a block-triangular matrix with a negative real eigenvalue on the '
-        'diagonal block keeps raising log-undefined',
+        'a block-triangular 3x3 matrix that is not diagonal, not exactly '
+        'symmetric and not 2x2 is unsupported-matrix-function',
         () {
           // Eigenvalues: -0.37 and 5.37 (from the [[1,2],[3,4]] block)
-          // and 1 (from the trailing diagonal entry).
+          // and 1 (from the trailing diagonal entry) — but the matrix is
+          // outside the supported classes regardless of its spectrum.
           final Matrix base = Matrix(<List<double>>[
             <double>[1, 2, 0],
             <double>[3, 4, 0],
@@ -751,7 +751,7 @@ void main() {
               isA<MatrixDomainError>().having(
                 (MatrixDomainError e) => e.errorId,
                 'errorId',
-                CalculatrixErrorId.logUndefined,
+                CalculatrixErrorId.unsupportedMatrixFunction,
               ),
             ),
           );

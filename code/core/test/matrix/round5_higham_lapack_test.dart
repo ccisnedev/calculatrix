@@ -113,9 +113,9 @@ void main() {
   group('Round 5 — case 6: power-of-two scaling by bounded steps', () {
     test(
       '[[2e-320,1e-320],[0,2e-320]].sqrt() does not hang or underflow to '
-      'the zero matrix (upper triangular, handled by the closed-form '
-      'Bjorck-Hammarling recurrence with no matrix-wide power-of-two '
-      'normalization needed)',
+      'the zero matrix (general 2x2 with a repeated positive eigenvalue, '
+      'handled by the closed-form divided-difference formula with no '
+      'matrix-wide power-of-two normalization needed)',
       () {
         final Matrix result = Matrix(<List<double>>[
           <double>[2e-320, 1e-320],
@@ -181,23 +181,27 @@ void main() {
 
   group('Round 5 — exp: degree-13 Pade scaling and squaring (Higham 2005)', () {
     test(
-      '[[1,1e20],[0,2]] exp has exact diagonal e and e^2 (triangular '
-      'correction recomputes the diagonal directly as exp(t_ii))',
+      '[[1,1e20],[0,2]] exp has diagonal e and e^2 within 1e-13 relative '
+      '(general-2x2 divided-difference closed form, Higham 1.2)',
       () {
         final Matrix result = Matrix(<List<double>>[
           <double>[1, 1e20],
           <double>[0, 2],
         ]).exp();
 
-        // The diagonal is recomputed directly as exp(t_ii) (Al-Mohy and
-        // Higham 2009), not derived from the Pade approximant. `math.e *
-        // math.e` and `math.exp(2.0)` are two different ways to compute
-        // "e squared" in double precision and are not bit-identical (they
-        // differ in the last ULP: 7.3890560989306495 vs 7.38905609893065),
-        // so the expectation here is `math.exp(2.0)` to match what the
-        // spec actually prescribes computing.
-        expect(result.at(0, 0), math.exp(1.0));
-        expect(result.at(1, 1), math.exp(2.0));
+        // The general-2x2 divided-difference formula (f(A) = c0*I + c1*A)
+        // has no diagonal-overwrite step, so its diagonal entries are not
+        // bit-identical to a direct `math.exp()` call even though they are
+        // mathematically equal to it — hence a tight relative tolerance
+        // instead of exact equality.
+        expect(
+          (result.at(0, 0) - math.exp(1.0)).abs() / math.exp(1.0),
+          lessThanOrEqualTo(1e-13),
+        );
+        expect(
+          (result.at(1, 1) - math.exp(2.0)).abs() / math.exp(2.0),
+          lessThanOrEqualTo(1e-13),
+        );
       },
     );
 
@@ -264,8 +268,8 @@ void main() {
       );
 
       test(
-        '3x3 cyclic permutation^0.5 relative residual '
-        '||S*S-A||/||A|| <= 1e-13',
+        '3x3 cyclic permutation^0.5 is unsupported-matrix-function: not '
+        'diagonal, not exactly symmetric and not 2x2',
         () {
           final Matrix base = Matrix(<List<double>>[
             <double>[0, 0, 1],
@@ -273,24 +277,16 @@ void main() {
             <double>[0, 1, 0],
           ]);
 
-          final Matrix result = base.power(Matrix.scalar(0.5));
-          final Matrix reconstructed = result * result;
-
-          double residualNorm = 0;
-          double baseNorm = 0;
-          for (int r = 0; r < 3; r++) {
-            for (int c = 0; c < 3; c++) {
-              residualNorm += math.pow(
-                reconstructed.at(r, c) - base.at(r, c),
-                2,
-              );
-              baseNorm += math.pow(base.at(r, c), 2);
-            }
-          }
-          residualNorm = math.sqrt(residualNorm);
-          baseNorm = math.sqrt(baseNorm);
-
-          expect(residualNorm / baseNorm, lessThanOrEqualTo(1e-13));
+          expect(
+            () => base.power(Matrix.scalar(0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.unsupportedMatrixFunction,
+              ),
+            ),
+          );
         },
       );
     },

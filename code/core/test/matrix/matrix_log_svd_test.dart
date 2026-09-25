@@ -59,8 +59,9 @@ void main() {
     );
 
     test(
-      'log exists for a 3x3 matrix with a rotation block and a positive '
-      'real eigenvalue',
+      'log of a 3x3 matrix with a rotation block and a positive real '
+      'eigenvalue is unsupported-matrix-function (not diagonal, not '
+      'exactly symmetric, not 2x2)',
       () {
         final Matrix value = Matrix(<List<double>>[
           <double>[0, -1, 0],
@@ -68,10 +69,15 @@ void main() {
           <double>[0, 0, 2],
         ]);
 
-        final Matrix roundTrip = value.log().exp();
         expect(
-          roundTrip.almostEquals(value, absoluteTolerance: 1e-9),
-          isTrue,
+          () => value.log(),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.unsupportedMatrixFunction,
+            ),
+          ),
         );
       },
     );

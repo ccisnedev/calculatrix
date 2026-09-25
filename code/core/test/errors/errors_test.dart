@@ -3,7 +3,7 @@ import 'package:test/test.dart';
 
 void main() {
   group('CalculatrixErrorId', () {
-    test('defines the nine domain error ids from the spec', () {
+    test('defines the eleven domain error ids from the spec', () {
       final Set<String> ids = CalculatrixErrorId.values
           .map((CalculatrixErrorId id) => id.id)
           .toSet();
@@ -19,6 +19,7 @@ void main() {
         'ambiguous-power',
         'syntax-error',
         'no-convergence',
+        'unsupported-matrix-function',
       });
     });
   });
@@ -121,17 +122,22 @@ void main() {
           },
           CalculatrixErrorId.syntaxError: () =>
               Calculatrix.evaluateInfix('1 2 +'),
-          // Not diagonal or triangular (bypasses sqrt's exact-diagonal and
-          // Bjorck-Hammarling fast paths) and defective — a repeated
-          // eigenvalue (2, 2) with only a 1-dimensional eigenspace, so
-          // [diagonalization] cannot produce an invertible eigenvector
-          // matrix and [_tryRealEigenSqrt] falls through — so this reaches
-          // the general Newton loop, which with a zero iteration budget
-          // never gets a chance to converge.
+          // Exactly symmetric, so sqrt() takes the cyclic Jacobi
+          // eigendecomposition path (Golub & Van Loan 8.5). With a
+          // `maxSweeps` budget of 0 the sweep loop never runs, so the
+          // post-loop off-diagonal-norm convergence check fails
+          // deterministically.
           CalculatrixErrorId.noConvergence: () => Matrix(<List<double>>[
-            <double>[3, 1],
-            <double>[-1, 1],
-          ]).sqrt(maxIterations: 0),
+            <double>[2, 1],
+            <double>[1, 2],
+          ]).sqrt(maxSweeps: 0),
+          // Not scalar, complex-form, diagonal or exactly symmetric, and not
+          // 2×2 either — no supported closed form applies.
+          CalculatrixErrorId.unsupportedMatrixFunction: () => Matrix(<List<double>>[
+            <double>[1, 1, 0],
+            <double>[0, 1, 1],
+            <double>[0, 0, 1],
+          ]).exp(),
         };
 
         expect(
