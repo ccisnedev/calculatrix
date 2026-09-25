@@ -112,4 +112,38 @@ void main() {
       expect(squared.at(1, 1), closeTo(1e200, 1e200 * 1e-6));
     });
   });
+
+  group('Round 8, finding 4: sqrt()/power() must dispatch to the complex '
+      'form closed form before the general 2x2 closed form', () {
+    test('sqrt() of a complex-form matrix with a negative real part and a '
+        'tiny imaginary part succeeds instead of wrongly throwing '
+        'logUndefined', () {
+      // a=-1, b=1e-170: b*b underflows to exactly 0 in double precision
+      // (1e-340 is below the smallest subnormal double, about 4.9e-324),
+      // so the general 2x2 eigenvalue classification (which squares b as
+      // part of its discriminant) sees a discriminant of exactly 0 and
+      // misclassifies this as a repeated real eigenvalue of -1, a genuine
+      // negative real eigenvalue that non-integer real powers reject.
+      // log() already dispatches to the dedicated complex-form branch
+      // first and succeeds for the exact same matrix (ln(1) + pi*i, since
+      // the magnitude is exactly 1 and the angle is essentially pi), so
+      // sqrt() should too: the complex form aI+bJ has a well-defined
+      // non-integer power for any nonzero magnitude, regardless of sign.
+      final Matrix matrix = Matrix(<List<double>>[
+        <double>[-1, -1e-170],
+        <double>[1e-170, -1],
+      ]);
+      expect(matrix.isComplexForm, isTrue);
+
+      final Matrix result = matrix.sqrt();
+
+      expect(result.at(0, 0).isFinite, isTrue);
+      expect(result.at(1, 1).isFinite, isTrue);
+      // sqrt(-1) = i (magnitude 1, angle pi/2), so the real part collapses
+      // to (near) zero and the imaginary part to (near) 1.
+      expect(result.at(0, 0), closeTo(0, 1e-9));
+      expect(result.at(1, 1), closeTo(0, 1e-9));
+      expect(result.at(1, 0).abs(), closeTo(1, 1e-9));
+    });
+  });
 }
