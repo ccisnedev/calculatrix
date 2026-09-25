@@ -3965,7 +3965,26 @@ class Matrix {
         final bool l1IsLarger = l1.abs() >= l2.abs();
         final double lBig = l1IsLarger ? l1 : l2;
         final double lSmall = l1IsLarger ? l2 : l1;
-        const double closeEigenvalueThreshold = 1.4901161193847656e-08;
+
+        // Round 12 correction, finding 7: unlike [_general2x2Exp] and
+        // [_general2x2RealPower], where the direct divided difference is
+        // safe as soon as the eigenvalues are not close (their outputs
+        // spread apart at least as fast as their inputs), log's direct
+        // form (log(lBig) - log(lSmall)) / (lBig - lSmall) stays
+        // cancellation-prone well past sqrt(machine epsilon): the
+        // absolute rounding error in each independently-computed
+        // math.log call is of order machineEpsilon * |log(lBig)|, and
+        // log(lBig) - log(lSmall) itself is of order relativeGap (since
+        // log(1+x) ~= x for small x), so the relative error in c1 is of
+        // order machineEpsilon * |log(lBig)| / relativeGap. For the
+        // widest magnitude a representable double's logarithm can reach
+        // (|log(lBig)| up to ~745, near the underflow/overflow edges of
+        // double precision), that error only drops below 1e-9 once
+        // relativeGap exceeds roughly 1.65e-4, so the eigenvalue
+        // closeness threshold used to route to the cancellation-safe
+        // log1p form must be widened well past sqrt(machine epsilon)
+        // here specifically, with margin to spare.
+        const double closeEigenvalueThreshold = 1e-3;
         final double relativeGap = (lBig - lSmall).abs() / lBig.abs();
         if (relativeGap < closeEigenvalueThreshold) {
           c1 = _log1p((lSmall - lBig) / lBig) / (lSmall - lBig);
