@@ -314,8 +314,8 @@ class Calculatrix {
             errorId: CalculatrixErrorId.syntaxError,
           );
         }
-        if (frame.pendingFunction) {
-          frame.pendingFunction = false;
+        if (frame.pendingFunctionCount > 0) {
+          frame.pendingFunctionCount = 0;
           frame.bareClosed = true;
         }
         expectOperand = false;
@@ -329,7 +329,13 @@ class Calculatrix {
             errorId: CalculatrixErrorId.syntaxError,
           );
         }
-        frame.pendingFunction = true;
+        // Tracked as a count, not a boolean (round 4 correction, case H):
+        // consecutive prefix functions (e.g. `√√(16)`) each push their own
+        // pending obligation onto the *same* frame — a boolean can only
+        // ever remember whether *some* function is pending, not how many,
+        // so a nested `(...)` group that resolves one of them (see below)
+        // would wrongly erase all of them at once.
+        frame.pendingFunctionCount++;
         continue;
       }
 
@@ -340,7 +346,14 @@ class Calculatrix {
             errorId: CalculatrixErrorId.syntaxError,
           );
         }
-        frame.pendingFunction = false;
+        // Only the *immediately* preceding function is parenthesized by
+        // this group (`f(...)` makes `f` no longer bare) — any further
+        // pending functions stacked on this same frame from before it
+        // (e.g. the outer `√` in `√√(16)`) remain pending across the
+        // nested group and must still be resolved once it closes.
+        if (frame.pendingFunctionCount > 0) {
+          frame.pendingFunctionCount--;
+        }
         frames.add(_InfixValidationFrame());
         continue;
       }
@@ -354,6 +367,16 @@ class Calculatrix {
         }
         if (frames.length > 1) {
           frames.removeLast();
+          // The just-closed group is itself a complete operand for
+          // whatever pending function(s) remain on the parent frame (e.g.
+          // the outer `√` in `√√(16)`) — resolve it exactly as an operand
+          // token would, so a further bare operator after it is still
+          // rejected.
+          final _InfixValidationFrame parent = frames.last;
+          if (parent.pendingFunctionCount > 0) {
+            parent.pendingFunctionCount = 0;
+            parent.bareClosed = true;
+          }
         }
         expectOperand = false;
         continue;
@@ -608,6 +631,10 @@ class _NumberScanResult {
 }
 
 class _InfixValidationFrame {
-  bool pendingFunction = false;
+  // A count, not a boolean, because consecutive prefix functions (e.g.
+  // `√√(16)`) stack more than one pending obligation on the same frame —
+  // see the round 4 correction (case H) doc comments at the call sites in
+  // [Calculatrix._validateInfixTokens].
+  int pendingFunctionCount = 0;
   bool bareClosed = false;
 }
