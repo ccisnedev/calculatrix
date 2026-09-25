@@ -416,45 +416,55 @@ class Matrix {
     return Matrix(result);
   }
 
+  /// Genuine LU decomposition with partial pivoting (round 8 correction,
+  /// finding 9; Higham 2002 Ch. 9), replacing the previous Gauss-Jordan
+  /// elimination on an augmented `[A | I]` matrix. The doc comment above
+  /// `_inverse` already claimed "LU with partial pivoting" before this
+  /// correction, which was not actually true: Gauss-Jordan updates the
+  /// entire augmented row, including columns already reduced toward the
+  /// identity, at every pivot step, which does materially more arithmetic
+  /// (and accumulates materially more rounding error on an ill-conditioned
+  /// matrix) than eliminating once below the pivot and solving each
+  /// right-hand side with a single forward and back substitution.
+  ///
+  /// `lu` is overwritten in place: its strictly-lower part stores the unit
+  /// lower-triangular factor `L`'s off-diagonal multipliers, and its
+  /// upper part (including the diagonal) stores `U`. `pivotOf[i]` records
+  /// which original row ended up in position `i` after partial pivoting,
+  /// so each unit column `e_k` of the identity is permuted the same way
+  /// before being solved.
   Matrix _inverseRaw() {
     final int size = rowCount;
-    final List<List<double>> augmented = List<List<double>>.generate(
+    final List<List<double>> lu = List<List<double>>.generate(
       size,
-      (int row) => <double>[
-        ..._rows[row],
-        ...List<double>.generate(
-          size,
-          (int column) => row == column ? 1 : 0,
-          growable: false,
-        ),
-      ],
+      (int row) => List<double>.from(_rows[row]),
       growable: false,
     );
+    final List<int> pivotOf = List<int>.generate(size, (int i) => i);
 
     for (int pivotColumn = 0; pivotColumn < size; pivotColumn++) {
       int pivotRow = pivotColumn;
-      double pivotMagnitude = augmented[pivotRow][pivotColumn].abs();
+      double pivotMagnitude = lu[pivotRow][pivotColumn].abs();
 
       for (int row = pivotColumn + 1; row < size; row++) {
-        final double candidateMagnitude = augmented[row][pivotColumn].abs();
+        final double candidateMagnitude = lu[row][pivotColumn].abs();
         if (candidateMagnitude > pivotMagnitude) {
           pivotMagnitude = candidateMagnitude;
           pivotRow = row;
         }
       }
 
-      // Round 5/6 correction (inverse: LU with partial pivoting, Higham
-      // 2002 Ch. 9): singularity is declared only on an exact zero pivot,
-      // never on an absolute cutoff compared against the pivot's own
-      // magnitude. This runs directly on `_inverse`'s raw (un-normalized,
-      // round 6 correction, item 10) matrix, so a genuinely tiny-but-real
-      // pivot (e.g. one column scaled far below another by the input's own
-      // structure, such as `[[1,1e20],[0,1]]`) is not singular — only a
-      // pivot that is bit-for-bit zero (every candidate in the column is
-      // zero, meaning the column truly has no component outside the
-      // already-eliminated rows) is. A merely-huge-but-finite result is
-      // instead caught by `_inverse`'s own unconditional `_checkFiniteMatrix`
-      // call on the result.
+      // Round 5/6 correction (kept): singularity is declared only on an
+      // exact zero pivot, never on an absolute cutoff compared against the
+      // pivot's own magnitude. This runs directly on `_inverse`'s raw
+      // (un-normalized, round 6 correction, item 10) matrix, so a
+      // genuinely tiny-but-real pivot (e.g. one column scaled far below
+      // another by the input's own structure, such as `[[1,1e20],[0,1]]`)
+      // is not singular. Only a pivot that is bit-for-bit zero (every
+      // candidate in the column is zero, meaning the column truly has no
+      // component outside the already-eliminated rows) is. A
+      // merely-huge-but-finite result is instead caught by `_inverse`'s
+      // own unconditional `_checkFiniteMatrix` call on the result.
       if (pivotMagnitude == 0) {
         throw MatrixDomainError(
           'Matrix is singular and cannot be inverted.',
@@ -463,43 +473,61 @@ class Matrix {
       }
 
       if (pivotRow != pivotColumn) {
-        final List<double> temp = augmented[pivotColumn];
-        augmented[pivotColumn] = augmented[pivotRow];
-        augmented[pivotRow] = temp;
+        final List<double> tempRow = lu[pivotColumn];
+        lu[pivotColumn] = lu[pivotRow];
+        lu[pivotRow] = tempRow;
+        final int tempPivot = pivotOf[pivotColumn];
+        pivotOf[pivotColumn] = pivotOf[pivotRow];
+        pivotOf[pivotRow] = tempPivot;
       }
 
-      final double pivot = augmented[pivotColumn][pivotColumn];
-      for (int column = 0; column < augmented[pivotColumn].length; column++) {
-        augmented[pivotColumn][column] /= pivot;
-      }
-
-      for (int row = 0; row < size; row++) {
-        if (row == pivotColumn) {
-          continue;
-        }
-
-        final double factor = augmented[row][pivotColumn];
+      final double pivot = lu[pivotColumn][pivotColumn];
+      for (int row = pivotColumn + 1; row < size; row++) {
+        final double factor = lu[row][pivotColumn] / pivot;
+        lu[row][pivotColumn] = factor;
         if (factor == 0) {
           continue;
         }
-
-        for (int column = 0; column < augmented[row].length; column++) {
-          augmented[row][column] -= factor * augmented[pivotColumn][column];
+        for (int column = pivotColumn + 1; column < size; column++) {
+          lu[row][column] -= factor * lu[pivotColumn][column];
         }
       }
     }
 
-    return Matrix(
-      List<List<double>>.generate(
-        size,
-        (int row) => List<double>.generate(
-          size,
-          (int column) => augmented[row][size + column],
-          growable: false,
-        ),
-        growable: false,
-      ),
+    final List<List<double>> inverseColumns = List<List<double>>.generate(
+      size,
+      (int _) => List<double>.filled(size, 0),
+      growable: false,
     );
+
+    for (int rhsColumn = 0; rhsColumn < size; rhsColumn++) {
+      // Forward substitution: L*y = P*e_rhsColumn, L unit lower-triangular
+      // (its diagonal is implicitly 1, never stored).
+      final List<double> y = List<double>.filled(size, 0);
+      for (int i = 0; i < size; i++) {
+        double sum = pivotOf[i] == rhsColumn ? 1 : 0;
+        for (int j = 0; j < i; j++) {
+          sum -= lu[i][j] * y[j];
+        }
+        y[i] = sum;
+      }
+
+      // Back substitution: U*x = y.
+      final List<double> x = List<double>.filled(size, 0);
+      for (int i = size - 1; i >= 0; i--) {
+        double sum = y[i];
+        for (int j = i + 1; j < size; j++) {
+          sum -= lu[i][j] * x[j];
+        }
+        x[i] = sum / lu[i][i];
+      }
+
+      for (int row = 0; row < size; row++) {
+        inverseColumns[row][rhsColumn] = x[row];
+      }
+    }
+
+    return Matrix(inverseColumns);
   }
 
   Matrix inverse({
