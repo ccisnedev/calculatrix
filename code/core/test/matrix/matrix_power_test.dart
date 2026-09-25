@@ -518,14 +518,29 @@ void main() {
         final Matrix result = base.power(Matrix.scalar(0.5));
         final Matrix roundTrip = result * result;
 
-        expect(
-          roundTrip.almostEquals(
-            base,
-            relativeTolerance: 1e-9,
-            absoluteTolerance: 1e-20,
-          ),
-          isTrue,
-        );
+        // Two of base's four entries are exactly zero, so a fixed
+        // Matrix.almostEquals(absoluteTolerance: ...) floor is the wrong
+        // instrument here: any floor loose enough to tolerate the ~1e-8
+        // scale's own rounding noise on those zero entries is, by
+        // construction, many orders of magnitude looser than the
+        // "relative to the matrix's own scale" check this test is meant
+        // to enforce. Compare the worst-case entrywise absolute
+        // deviation against the matrix's own scale instead, which is
+        // exactly what "S*S = A to N relative" means for a matrix with
+        // exact-zero entries.
+        double scale = 0;
+        double maxAbsoluteDeviation = 0;
+        for (int r = 0; r < 2; r++) {
+          for (int c = 0; c < 2; c++) {
+            scale = math.max(scale, base.at(r, c).abs());
+            maxAbsoluteDeviation = math.max(
+              maxAbsoluteDeviation,
+              (roundTrip.at(r, c) - base.at(r, c)).abs(),
+            );
+          }
+        }
+
+        expect(maxAbsoluteDeviation / scale, lessThan(1e-9));
       },
     );
 
