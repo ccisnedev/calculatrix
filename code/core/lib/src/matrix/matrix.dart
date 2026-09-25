@@ -3545,9 +3545,11 @@ class Matrix {
   /// `c != 0`) whose two real eigenvalues [lBig] and [lSmall]
   /// (`|lBig| >= |lSmall|`) are far enough apart that [_c0IPlusC1A]'s
   /// `c0 + c1*A` reconstruction loses a diagonal entry that happens to
-  /// sit close to `lSmall` (round 11 correction, finding 3; the exactly
-  /// triangular case, `b == 0` or `c == 0`, already has its own exact
-  /// closed form in [_triangularClosedForm2x2]).
+  /// sit close to `lSmall` (round 11 correction, finding 3, for
+  /// [_general2x2RealPower]; round 12 correction, finding 1, for
+  /// [_general2x2Exp]; the exactly triangular case, `b == 0` or
+  /// `c == 0`, already has its own exact closed form in
+  /// [_triangularClosedForm2x2]).
   ///
   /// `_c0IPlusC1A` anchors at `lBig`: `c0 = fBig - c1*lBig`, then every
   /// entry is `c0 + c1*entry`. When `lBig` and `lSmall` differ by many
@@ -3722,7 +3724,6 @@ class Matrix {
         final double fLo = _checkFiniteScalar(math.exp(lLo));
         final double fHi = _checkFiniteScalar(math.exp(lHi));
         c1 = fHi * _expm1(lLo - lHi) / (lLo - lHi);
-        c0 = fLo - (c1 * lLo);
 
         // Round 10 correction: an exactly triangular block (`b == 0` or
         // `c == 0`) is routed to the exact closed form directly, see
@@ -3732,6 +3733,39 @@ class Matrix {
           final double fa = _checkFiniteScalar(math.exp(a));
           final double fd = _checkFiniteScalar(math.exp(d));
           return _checkFiniteMatrix(_triangularClosedForm2x2(fa, fd, c1));
+        }
+
+        // Round 12 correction, finding 1: a genuinely non-triangular
+        // matrix (both `b` and `c` nonzero) suffers the same near
+        // triangular diagonal cancellation the triangular case above is
+        // routed away from, once its two eigenvalues are far enough
+        // apart that `fHi` dwarfs `fLo` (e.g.
+        // `exp([[700,1],[1e-300,-700]])`: `fLo` around 9.86e-305 sits
+        // hundreds of orders of magnitude below `fHi` around 1.01e304).
+        // `c0 = fLo - c1*lLo` then loses `fLo` entirely to rounding
+        // against `c1*lLo`, itself `O(fHi)` in magnitude, so the
+        // diagonal entry that should recover `fLo` comes back as
+        // exactly 0. Mirror the same closeness threshold and Lagrange
+        // closed form [_general2x2RealPower] uses for its analogous far
+        // apart, non-triangular case (see [_lagrangeClosedForm2x2]'s doc
+        // comment). The close-eigenvalue branch below keeps the
+        // original `c0 = fLo - c1*lLo` line unchanged: there `fLo` and
+        // `fHi` stay comparable in magnitude (`exp` never spreads two
+        // close inputs far apart in output), so that anchor subtraction
+        // never loses precision.
+        final bool hiIsLarger = lHi.abs() >= lLo.abs();
+        final double lBig = hiIsLarger ? lHi : lLo;
+        final double lSmall = hiIsLarger ? lLo : lHi;
+        final double fBig = hiIsLarger ? fHi : fLo;
+        final double fSmall = hiIsLarger ? fLo : fHi;
+        const double closeEigenvalueThreshold = 1.4901161193847656e-08;
+        final double relativeGap = (lBig - lSmall).abs() / lBig.abs();
+        if (relativeGap < closeEigenvalueThreshold) {
+          c0 = fLo - (c1 * lLo);
+        } else {
+          return _checkFiniteMatrix(
+            _lagrangeClosedForm2x2(fBig, fSmall, lBig, lSmall, c1),
+          );
         }
       }
     }
