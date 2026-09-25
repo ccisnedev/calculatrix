@@ -72,6 +72,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D33 | `modular_cli_sdk` gets a plugin system modeled on `modular_api` (`CliPlugin` with a manifest and `setup(host)`; the host registers routes and extension points, nothing else for now). `version`, `doctor`, `upgrade` and `uninstall` are standard plugins inside the SDK (`VersionPlugin`, `DoctorPlugin`, `InstallationPlugin`), like health and openapi in `modular_api`. Every plugin is registered explicitly with `cli.plugin(...)`. `DoctorPlugin` declares `doctor.checks`; `InstallationPlugin` requires it and contributes its checks. No `modular_cli_installer` package, no install plugin. Spec section 8.7. | User, 2026-09-24 (R18) |
 | D35 | From the Codex review of the core PR (calculatrix#7): an iterative method of the core (matrix exponential by scaling and squaring, square root, logarithm) that reaches its iteration cap without meeting its tolerance raises the new id `no-convergence` (65), never the unconverged value. Every intermediate result is checked for finiteness (`non-finite`). | Claude, 2026-09-25 |
 | D36 | One JSON error shape for every error: `{"error": {"id", "message", "exitCode", ...}}`, `id` in kebab-case (the SDK maps each router rejection kind to one id), extra fields only when they apply (`token`, `position`, `contract`, `details`). `isRetryable` is removed; `CommandException.exitCode` is required. Spec section 6. | User, 2026-09-25 |
+| D37 | From the Codex review of the core PR (calculatrix#7): `exp`, `log`, `sqrt` and a non-integer real power are defined on exactly five classes of matrix: a scalar, the complex form `a·I + b·J`, an exactly diagonal matrix, an exactly symmetric matrix (cyclic Jacobi eigendecomposition) and a general 2x2 matrix (closed form `c0·I + c1·A`). Any other matrix raises the new id `unsupported-matrix-function` (65); the core never approximates outside these classes. The only iterative method left is the cyclic Jacobi sweep, whose cap is the source of `no-convergence` (D35). A general `n x n` algorithm is future work. | User, 2026-09-25 |
 
 ## Command catalog (proposal)
 
@@ -184,14 +185,14 @@ form. In this stage it is `log-undefined`. A complex number is only
 entries would be complex is to be studied (roadmap, Stage 9). Turning the
 error into a value later breaks no one.
 
-All errors exit with `65`. `ambiguous-power`, `log-undefined` and
-`no-convergence` (D35) are new ids;
+All errors exit with `65`. `ambiguous-power`, `log-undefined`,
+`no-convergence` (D35) and `unsupported-matrix-function` (D37) are new ids;
 there is no `not-real` error, because the result of case 1 with a negative
 base is a complex matrix. `X exp` gives the same value as `e X ^`. The step
 S4 turns every row of this table into a core test, which also measures the
 precision of `Matrix.log()` on non-diagonal matrices (spec section 11,
 risk 5). The examples were checked on 2026-09-24 with Julia's `exp` and
-`log` of `LinearAlgebra`, rounded to 4 decimals. A test compares each entry with its expected value within `5e-5`. `Matrix.log()` must compute the principal logarithm of a matrix that is not diagonalizable (the second example of case 5); passing only the diagonal examples is not enough.
+`log` of `LinearAlgebra`, rounded to 4 decimals. A test compares each entry with its expected value within `5e-5`. `Matrix.log()` must compute the principal logarithm of a matrix that is not diagonalizable (the second example of case 5); passing only the diagonal examples is not enough. Every example of this table is in one of the five classes of D37; a base outside them (for example a 3x3 matrix that is neither diagonal nor symmetric) raises `unsupported-matrix-function`.
 
 ## Open questions
 
@@ -323,6 +324,8 @@ S3 and S4 can run in parallel after S2.
   datajack, inquiry, linkedin_cli). The first rule in the issue ("any token
   with whitespace is positional") would have broken `--title='two words'`; the
   issue and the tests were corrected.
+- 2026-09-25: D37, from the Codex review of PR #7: matrix functions limited to
+  five classes, `unsupported-matrix-function` added to the ids (spec R23).
 - 2026-09-25: D36, one JSON error shape for every error (spec section 6).
 - 2026-09-25: D35, from the Codex review of PR #7: `no-convergence` added to
   the ids (spec R22).
