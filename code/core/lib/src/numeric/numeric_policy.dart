@@ -159,28 +159,42 @@ class CalculatrixNumericPolicy {
   /// section 8.5): the computed eigenvalues are the exact eigenvalues of
   /// `A + E` for some symmetric perturbation `E` with `||E||_F` bounded by a
   /// modest multiple of [unitRoundoff] and the matrix's own size and norm,
-  /// so `|computed_i - exact_i| <= jacobiEigenvalueBackwardErrorFactor * n *
-  /// unitRoundoff * ||A||_F` for every eigenvalue `i`, where `n` is the
-  /// matrix's row count.
+  /// so `|computed_i - exact_i| <= jacobiEigenvalueBackwardErrorFactor * m *
+  /// unitRoundoff * ||B||_F` for every eigenvalue `i`, where `B` is the
+  /// BLOCK of the original matrix spanning every index an executed
+  /// rotation ever merged with index `i` (a union-find component, per
+  /// `Matrix._cyclicJacobiEigendecomposition`), and `m` is that block's own
+  /// size, not the whole matrix's row count `n` (Codex round 12, finding
+  /// 1, correcting round 11 finding 1's whole-matrix version of this same
+  /// bound): an index whose row/column entries stay exactly zero
+  /// throughout every sweep is never touched by any rotation, so it
+  /// carries no Jacobi rounding whatsoever, and bounding it by the whole
+  /// matrix's Frobenius norm instead of its own (possibly much smaller)
+  /// block's norm can wrongly call a genuinely tiny, exactly-computed
+  /// eigenvalue "numerically indistinguishable from zero" when it is not.
   ///
   /// Used only to decide whether a computed eigenvalue that is not exactly
   /// zero is nonetheless numerically indistinguishable from a true zero
-  /// eigenvalue (Codex round 11, finding 1): a rank-deficient exactly
-  /// symmetric input (for example a rank-1 PSD matrix `v*v^T`) has a true
-  /// zero eigenvalue that cyclic Jacobi, being a floating-point
-  /// computation, generically returns as a tiny nonzero value of either
-  /// sign instead of exactly `0.0`. Only a computed eigenvalue within this
-  /// bound of zero is treated as zero; anything further from zero is a
-  /// genuine (positive or negative) eigenvalue, rejected or accepted on its
-  /// own terms exactly as before.
+  /// eigenvalue, and only for [Matrix.sqrt]'s semantics
+  /// (`Matrix._realScalarPower`'s `rejectZeroEigenvalue == false` case):
+  /// a rank-deficient exactly symmetric input (for example a rank-1 PSD
+  /// matrix `v*v^T`) has a true zero eigenvalue that cyclic Jacobi, being
+  /// a floating-point computation, generically returns as a tiny nonzero
+  /// value of either sign instead of exactly `0.0`. Only a computed
+  /// eigenvalue within this bound of zero is treated as zero; anything
+  /// further from zero is a genuine (positive or negative) eigenvalue,
+  /// rejected or accepted on its own terms exactly as before. [Matrix.log]
+  /// and non-integer [Matrix.power] never apply this bound at all: they
+  /// see every computed eigenvalue exactly as Jacobi produced it.
   ///
   /// Calibrated empirically against the measured Jacobi noise on
   /// `[[1,2,4],[2,4,8],[4,8,16]]` (a true eigenvalue of exactly `0.0`
-  /// computed as about `-1.78e-15`, with `n = 3`, `||A||_F = 21`): `10 * 3 *
-  /// unitRoundoff * 21 =~ 7.0e-14`, about a 40x margin above the measured
-  /// noise, while remaining many orders of magnitude below any eigenvalue
-  /// that would be considered meaningfully nonzero at the matrix's own
-  /// scale.
+  /// computed as about `-1.78e-15`, a matrix whose every index ends up in
+  /// a single block spanning the whole matrix, so `m = n = 3`,
+  /// `||B||_F = ||A||_F = 21`): `10 * 3 * unitRoundoff * 21 =~ 7.0e-14`,
+  /// about a 40x margin above the measured noise, while remaining many
+  /// orders of magnitude below any eigenvalue that would be considered
+  /// meaningfully nonzero at the block's own scale.
   static const double jacobiEigenvalueBackwardErrorFactor = 10;
 
   static bool nearlyEqual(
