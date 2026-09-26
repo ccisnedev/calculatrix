@@ -13,9 +13,15 @@
 //      accept an indefinite matrix. The fix tracks, via a union-find over
 //      which index pairs an executed rotation actually merges, a per-block
 //      backward-error bound computed from that block's own entries in the
-//      ORIGINAL matrix, and applies the zero decision only inside
-//      [Matrix._realScalarPower] (used only by [Matrix.sqrt]'s semantics,
-//      never by [Matrix.log] or non-integer [Matrix.power]).
+//      ORIGINAL matrix. This round applied the zero decision only inside
+//      [Matrix._realScalarPower]'s [Matrix.sqrt] semantics, never by
+//      [Matrix.log] or non-integer [Matrix.power]; round 13, finding 1
+//      (P1) corrects this: the same per-block bound now classifies an
+//      eigenvalue as numerically zero uniformly for every one of
+//      sqrt/log/power, before any declared-precision-range gate, with only
+//      the classified result differing by caller (sqrt maps it to exactly
+//      0, log/power raise log-undefined), see
+//      test/matrix/round17_codex_round13_test.dart.
 //   2. matrix.dart:2878, [Matrix._powerByMatrixExponent]'s three internal
 //      chains (`scaled.exp()`, and two `product.exp()` calls, `product`
 //      itself built from the public `log()`) routed an internally derived
@@ -227,16 +233,18 @@ void main() {
         '45 ULPs above it): the widened result-eigenvalue check upstream '
         'already accepts this result (its log-magnitude, y*ln(1e-100), is '
         'exactly at the boundary in log space), so the result-entry check '
-        'must accept the materialized magnitude too',
+        'must accept the materialized magnitude too. Real-part reference '
+        'updated by round 13, finding 5 (P3): the true real part is '
+        'magnitude*cosPi(-1.5), exactly 0 (a quarter-turn axis-aligned '
+        'angle), not the old naive cos(y*pi) residual this test used to '
+        'assert (round 13\'s cosPi/sinPi exact argument reduction fixes '
+        'this)',
         () {
           final Matrix result = Matrix.scalar(
             -1e-100,
           ).power(Matrix.scalar(-1.5));
 
-          expect(
-            result.realPart,
-            closeTo(-1.8369701987211123e134, 1.9e125),
-          );
+          expect(result.realPart, 0.0);
           expect(result.imagPart, closeTo(1.000000000000045e150, 1e141));
         },
       );
@@ -245,24 +253,25 @@ void main() {
         'scalar(-1e100)^scalar(1.5) (a mirrored boundary case: same '
         'magnitude, opposite exponent sign, so the marginal entry lands at '
         'the same upper bound with the opposite sign) no longer raises '
-        'matrix-out-of-precision-range for the same reason. Decision: this '
-        'is used instead of a literal lower-boundary "-1.5 analogue" '
-        '(mirroring round 11\'s finding 2 pairing) because, at this '
-        'branch\'s exact axis-aligned angle, the orthogonal boundary\'s '
-        'own trig residual computes about 16 orders of magnitude below '
+        'matrix-out-of-precision-range for the same reason. This is used '
+        'instead of a literal lower-boundary "-1.5 analogue" (mirroring '
+        'round 11\'s finding 2 pairing) because, at this branch\'s exact '
+        'axis-aligned angle, the orthogonal boundary\'s own trig residual '
+        'computes about 16 orders of magnitude below '
         'matrixFunctionMinMagnitude, a separate, unrelated floating-point '
-        'quirk this finding does not ask to fix; both cases here instead '
-        'hit the same upper bound from opposite sides, which is enough to '
-        'exercise the fix at both signs',
+        'quirk round 12 did not ask to fix; both cases here instead hit '
+        'the same upper bound from opposite sides, which is enough to '
+        'exercise round 12\'s fix at both signs. Real-part reference '
+        'updated by round 13, finding 5 (P3), for the same reason as the '
+        'case above: this is also the exact "lower-boundary mirror" round '
+        '13\'s finding 5 explicitly fixes (round 12 left it as a residual '
+        'a few ULPs from 0, not exactly 0)',
         () {
           final Matrix result = Matrix.scalar(
             -1e100,
           ).power(Matrix.scalar(1.5));
 
-          expect(
-            result.realPart,
-            closeTo(-1.8369701987211123e134, 1.9e125),
-          );
+          expect(result.realPart, 0.0);
           expect(result.imagPart, closeTo(-1.000000000000045e150, 1e141));
         },
       );
