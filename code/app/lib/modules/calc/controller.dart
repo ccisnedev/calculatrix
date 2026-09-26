@@ -336,6 +336,10 @@ class CalculatorController extends ChangeNotifier {
     _mutate(_session.enter);
   }
 
+  void appendSpace() {
+    _mutate(_session.appendSpace);
+  }
+
   void applyRpnBinary(RpnBinaryOperator operator) {
     _mutate(() => _session.applyRpnBinary(operator));
   }

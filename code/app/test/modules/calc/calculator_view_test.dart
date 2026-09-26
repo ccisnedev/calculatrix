@@ -1874,7 +1874,7 @@ void main() {
 
       expect(_rpnStackCard(1), findsOneWidget);
       expect(
-        find.descendant(of: _rpnStackCard(1), matching: find.text('2')),
+        find.descendant(of: _rpnStackCard(1), matching: find.text('[[2]]')),
         findsOneWidget,
       );
       expect(
@@ -1893,7 +1893,7 @@ void main() {
               ),
             )
             .data,
-        '3',
+        '[[3]]',
       );
     });
 
