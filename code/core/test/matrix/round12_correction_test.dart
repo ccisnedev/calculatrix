@@ -26,6 +26,14 @@ void expectRelativelyClose(
   );
 }
 
+Matcher throwsOutOfPrecisionRange() => throwsA(
+  isA<MatrixDomainError>().having(
+    (MatrixDomainError e) => e.errorId,
+    'errorId',
+    CalculatrixErrorId.matrixOutOfPrecisionRange,
+  ),
+);
+
 void main() {
   group(
     'Round 12, finding 2: general 2x2 discriminant solver must not let an '
@@ -419,34 +427,35 @@ void main() {
 
   group(
     'Round 12, finding 8: general 2x2 power\'s repeated-eigenvalue branch '
-    'c0 = pow(l,y) - c1*l overflows even though every entry it feeds '
-    'stays finite',
+    'converted from an overflowed-c0 finding to a rule A rejection: '
+    'power(100.25) on [[1150,1],[0,1150]] now raises '
+    'matrix-out-of-precision-range',
     () {
       // A=[[1150,1],[0,1150]] has a repeated eigenvalue l=1150 (Jordan
-      // block). With y=100.25, pow(l,y) ~ 6.84e+306 and c1 = y*l^(y-1)
-      // ~ 5.96e+305 are each individually finite, but c0 = pow(l,y) -
-      // c1*l overflows: c1*l ~ 6.86e+308, past double's max (~1.8e+308).
-      // The true entries (c0*I + c1*A collapsed algebraically) are all
-      // finite. Reference (mpmath, dps=150), independent of this
-      // implementation: fl = 6.8384629050092065369e+306,
-      // fprime (c1) = 5.9613557063232430898e+305, entry00 = entry11 = fl
-      // (since a - l = d - l = 0), entry01 = fprime * b =
-      // 5.9613557063232430898e+305.
+      // block), and every raw entry (1150, 1, 0) sits well inside
+      // [1e-150, 1e150], so this passes the argument-side D38 check. But
+      // rule A also requires the RESULT eigenvalue (l^y = 1150^100.25,
+      // whose log-magnitude is y*ln(l)) to be in the same declared range:
+      // y*ln(l) = 100.25 * ln(1150) is about 706.51, far above
+      // ln(1e150)~=345.39. This now raises matrix-out-of-precision-range
+      // before ever computing pow(1150, 100.25), superseding this
+      // finding's previous overflowed-c0 regression check, which asserted
+      // a finite result matching an independently derived mpmath
+      // reference (fl ~= 6.8384629050092065369e+306) before rule A
+      // existed.
       test(
-        'power(100.25) on [[1150,1],[0,1150]] returns a finite result '
-        'instead of throwing MatrixDomainError from an overflowed c0',
+        'power(100.25) on [[1150,1],[0,1150]] raises '
+        'matrix-out-of-precision-range',
         () {
           final Matrix value = Matrix(<List<double>>[
             <double>[1150, 1],
             <double>[0, 1150],
           ]);
 
-          final Matrix result = value.power(Matrix.scalar(100.25));
-
-          expectRelativelyClose(result.at(0, 0), 6.8384629050092065369e+306);
-          expectRelativelyClose(result.at(0, 1), 5.9613557063232430898e+305);
-          expect(result.at(1, 0), equals(0));
-          expectRelativelyClose(result.at(1, 1), 6.8384629050092065369e+306);
+          expect(
+            () => value.power(Matrix.scalar(100.25)),
+            throwsOutOfPrecisionRange(),
+          );
         },
       );
     },
@@ -454,29 +463,30 @@ void main() {
 
   group(
     'Round 12, finding 6: general 2x2 exp\'s repeated-eigenvalue branch '
-    'must not materialize c0 = f(l) - c1*l as a standalone value when '
-    'c1*l overflows, even though every entry c0 actually feeds into '
-    '(c0 + c1*a, c0 + c1*d) is itself finite',
+    'converted from an overflowed-c0 finding to a rule A rejection: '
+    'exp([[709,1],[0,709]]) now raises matrix-out-of-precision-range',
     () {
       // A=[[709,1],[0,709]]: triangular with equal diagonal entries, so
-      // the eigenvalue is repeated exactly at l=709. el = exp(709) is
-      // close to double's max (~1.7977e308), so c1*l = el*709 overflows
-      // to Infinity even though the true result (mpmath, dps=60) is
-      // finite: every entry is exp(709) except the exact-zero (1,0).
-      test('exp([[709,1],[0,709]]) does not throw, matches exp(709)', () {
-        final Matrix value = Matrix(<List<double>>[
-          <double>[709, 1],
-          <double>[0, 709],
-        ]);
+      // the eigenvalue is repeated exactly at l=709, and every raw entry
+      // (709, 1, 0) sits well inside [1e-150, 1e150], so this passes the
+      // argument-side D38 check. But rule A also requires the RESULT
+      // eigenvalue (exp(l), whose log-magnitude is l itself) to be in the
+      // same declared range: l=709 is far above ln(1e150)~=345.39. This
+      // now raises matrix-out-of-precision-range before ever computing
+      // exp(709), superseding this finding's previous overflowed-c0
+      // regression check, which asserted a finite result (every entry
+      // exp(709) except the exact-zero (1,0)) before rule A existed.
+      test(
+        'exp([[709,1],[0,709]]) raises matrix-out-of-precision-range',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[709, 1],
+            <double>[0, 709],
+          ]);
 
-        final Matrix result = value.exp();
-
-        final double expected = 8.2184074615549721892e+307;
-        expectRelativelyClose(result.at(0, 0), expected);
-        expectRelativelyClose(result.at(0, 1), expected);
-        expect(result.at(1, 0), equals(0));
-        expectRelativelyClose(result.at(1, 1), expected);
-      });
+          expect(value.exp, throwsOutOfPrecisionRange());
+        },
+      );
     },
   );
 

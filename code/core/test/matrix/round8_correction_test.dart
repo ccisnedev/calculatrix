@@ -6,6 +6,14 @@ import 'dart:math' as math;
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
+Matcher throwsOutOfPrecisionRange() => throwsA(
+  isA<MatrixDomainError>().having(
+    (MatrixDomainError e) => e.errorId,
+    'errorId',
+    CalculatrixErrorId.matrixOutOfPrecisionRange,
+  ),
+);
+
 void main() {
   group('Round 8, finding 1: general 2x2 exp real-eigenvalue divided '
       'difference must not cancel to zero for well-separated eigenvalues', () {
@@ -20,20 +28,28 @@ void main() {
       expect(result.at(1, 1), closeTo(math.exp(50), math.exp(50) * 1e-9));
     });
 
-    test('exp([[-1000,1],[0,-500]]) has a finite [1][1] entry close to '
-        'exp(-500)', () {
-      final Matrix result = Matrix(<List<double>>[
-        <double>[-1000, 1],
-        <double>[0, -500],
-      ]).exp();
+    // Converted from a finite-result regression check to a rule A
+    // rejection: every raw entry (-1000, 1, 0, -500) sits well inside
+    // [1e-150, 1e150], so this passes the argument-side D38 check, but
+    // rule A also requires each RESULT eigenvalue (exp(-1000) and
+    // exp(-500), whose log-magnitudes are the eigenvalues themselves) to
+    // be in the same declared range. Both -1000 and -500 exceed
+    // ln(1e150)~=345.39 in magnitude (most severely -1000), so this now
+    // raises matrix-out-of-precision-range before ever computing
+    // exp(-1000) or exp(-500), superseding the previous expectation that
+    // this returns a finite result close to exp(-500) with a
+    // vanishingly small (0, 0) entry.
+    test(
+      'exp([[-1000,1],[0,-500]]) raises matrix-out-of-precision-range',
+      () {
+        final Matrix value = Matrix(<List<double>>[
+          <double>[-1000, 1],
+          <double>[0, -500],
+        ]);
 
-      expect(result.at(1, 1).isFinite, isTrue);
-      expect(
-        result.at(1, 1),
-        closeTo(math.exp(-500), math.exp(-500) * 1e-9),
-      );
-      expect(result.at(0, 0), closeTo(math.exp(-1000), 1e-300));
-    });
+        expect(value.exp, throwsOutOfPrecisionRange());
+      },
+    );
   });
 
   group('Round 8, finding 2: general 2x2 complex-pair closed forms must use '

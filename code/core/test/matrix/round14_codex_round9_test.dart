@@ -96,92 +96,82 @@ Matcher throwsOutOfPrecisionRange() => throwsA(
 );
 
 void main() {
-  group('Codex round 9 finding 1: exp underflow-before-multiply', () {
-    test(
-      'exp([[-750,1e150],[0,-750]]): entry01 must not collapse to zero just '
-      'because the standalone exp(-750) factor underflows before being '
-      'multiplied by the 1e150 coupling entry. Reference (mpmath, dps=80, '
-      'via the repeated-eigenvalue closed form f(l)*I + f\'(l)*(A-l*I) with '
-      'l=-750, f=exp): entry00=entry11=0 (exp(-750) genuinely rounds to 0 '
-      'in double, which is correct), entry01='
-      '1.901684963475006403550798e-176, entry10=0.',
-      () {
-        final Matrix m = Matrix(<List<double>>[
-          <double>[-750, 1e150],
-          <double>[0, -750],
-        ]);
+  group(
+    'Codex round 9 finding 1: exp underflow-before-multiply, now converted '
+    'to a rule A rejection',
+    () {
+      test(
+        'exp([[-750,1e150],[0,-750]]) now raises '
+        'matrix-out-of-precision-range under rule A, converted from its '
+        'previous finite result (entry00=entry11=0, entry01='
+        '1.901684963475006403550798e-176, entry10=0): the repeated '
+        'eigenvalue -750 has magnitude 750, above '
+        'ln(1e150)~=345.3877639491069, so the result eigenvalue '
+        'log-magnitude (the eigenvalue itself, for exp) is out of the '
+        'declared range, even though the true off-diagonal entry this '
+        'test used to check was representable and this is rejected '
+        'before math.exp(-750) is ever called',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[-750, 1e150],
+            <double>[0, -750],
+          ]);
 
-        final Matrix computed = m.exp();
-        expect(computed.at(0, 0), equals(0));
-        expect(computed.at(1, 1), equals(0));
-        expect(computed.at(1, 0), equals(0));
-        expectRelativelyClose(
-          computed.at(0, 1),
-          1.901684963475006403550798e-176,
-        );
-      },
-    );
-  });
+          expect(m.exp, throwsOutOfPrecisionRange());
+        },
+      );
+    },
+  );
 
   group(
     'Codex round 9 finding 2: repeated-eigenvalue power underflow/overflow '
-    'before multiply',
+    'before multiply, now converted to rule A rejections',
     () {
       test(
-        '[[1e-150,1e-150],[0,1e-150]]^-1.5 must not throw non-finite: the '
-        'derivative-times-entry product y*pow(l,y-1)*factor is finite even '
-        'though the standalone pow(1e-150,-2.5) factor overflows. Reference '
-        '(mpmath, dps=400, repeated-eigenvalue closed form with l=1e-150, '
-        'y=-1.5): entry00=entry11=9.999999999999999905569627e+224, '
-        'entry01=-1.499999999999999985835444e+225, entry10=0.',
+        '[[1e-150,1e-150],[0,1e-150]]^-1.5 now raises '
+        'matrix-out-of-precision-range under rule A, converted from its '
+        'previous finite result (entry00=entry11='
+        '9.999999999999999905569627e+224, entry01='
+        '-1.499999999999999985835444e+225, entry10=0): the repeated '
+        'eigenvalue 1e-150 has ln(1e-150)=-345.3877639491069, and rule A '
+        'requires the result eigenvalue log-magnitude y*ln(|l|) to stay '
+        'within +/-345.3877639491069, but y*ln(l) = -1.5 * '
+        '-345.3877639491069 = 518.08164592366035, above the declared '
+        'bound, even though the true entries above were finite doubles',
         () {
           final Matrix m = Matrix(<List<double>>[
             <double>[1e-150, 1e-150],
             <double>[0, 1e-150],
           ]);
 
-          final Matrix computed = m.power(Matrix.scalar(-1.5));
-          expect(computed.at(1, 0), equals(0));
-          expectRelativelyClose(
-            computed.at(0, 0),
-            9.999999999999999905569627e224,
-          );
-          expectRelativelyClose(
-            computed.at(1, 1),
-            9.999999999999999905569627e224,
-          );
-          expectRelativelyClose(
-            computed.at(0, 1),
-            -1.499999999999999985835444e225,
+          expect(
+            () => m.power(Matrix.scalar(-1.5)),
+            throwsOutOfPrecisionRange(),
           );
         },
       );
 
       test(
-        '[[1e150,1e150],[0,1e150]]^-1.5 must not lose the off-diagonal '
-        'entry to underflow-before-multiply. Reference (mpmath, dps=400, '
-        'repeated-eigenvalue closed form with l=1e150, y=-1.5): '
-        'entry00=entry11=1.000000000000000028746606e-225, '
-        'entry01=-1.500000000000000043119909e-225, entry10=0.',
+        '[[1e150,1e150],[0,1e150]]^-1.5 now raises '
+        'matrix-out-of-precision-range under rule A, converted from its '
+        'previous finite result (entry00=entry11='
+        '1.000000000000000028746606e-225, entry01='
+        '-1.500000000000000043119909e-225, entry10=0): the repeated '
+        'eigenvalue 1e150 has ln(1e150)=345.3877639491069, and rule A '
+        'requires the result eigenvalue log-magnitude y*ln(|l|) to stay '
+        'within +/-345.3877639491069, but y*ln(l) = -1.5 * '
+        '345.3877639491069 = -518.08164592366035, above the declared '
+        'bound in magnitude, even though the true entries above were '
+        'finite doubles',
         () {
           final Matrix m = Matrix(<List<double>>[
             <double>[1e150, 1e150],
             <double>[0, 1e150],
           ]);
 
-          final Matrix computed = m.power(Matrix.scalar(-1.5));
-          expect(computed.at(1, 0), equals(0));
-          expectRelativelyClose(
-            computed.at(0, 0),
-            1.000000000000000028746606e-225,
-          );
-          expectRelativelyClose(
-            computed.at(1, 1),
-            1.000000000000000028746606e-225,
-          );
-          expectRelativelyClose(
-            computed.at(0, 1),
-            -1.500000000000000043119909e-225,
+          expect(
+            () => m.power(Matrix.scalar(-1.5)),
+            throwsOutOfPrecisionRange(),
           );
         },
       );
@@ -193,45 +183,33 @@ void main() {
     'repeated negative real eigenvalues',
     () {
       test(
-        'sqrt([[-1e100,1e-150],[-2e-150,-1e100]]) must not throw '
-        'log-undefined: the discriminant halfDiff^2+b*c is representable '
-        'even though the whole-block-scaled product underflows to exactly '
-        'zero. Reference (mpmath, dps=700, needed because a*d~1e200 and '
-        'b*c~-2e-300 span about 500 decimal orders of magnitude, so a '
-        'lower dps silently rounds the discriminant correction away; '
+        'sqrt([[-1e100,1e-150],[-2e-150,-1e100]]) now raises '
+        'matrix-out-of-precision-range under rule A (converted from the '
+        'previous "must not throw log-undefined" classification): the '
+        'discriminant halfDiff^2+b*c is still representable, so the old '
+        'log-undefined misclassification this test guarded against is '
+        'gone, but rule A also requires every NONZERO ENTRY of the '
+        'computed result to be in the declared range, not just its '
+        'eigenvalues (sqrt itself can never fail the eigenvalue-side '
+        'check, since 0.5*ln(|lambda|) is always within '
+        '[-172.7, 172.7] whenever the argument-side check already '
+        'passed). Reference (mpmath, dps=700, needed because a*d~1e200 '
+        'and b*c~-2e-300 span about 500 decimal orders of magnitude, so '
+        'a lower dps silently rounds the discriminant correction away; '
         'independently cross-checked by squaring the computed root back '
         'to the original matrix): entry00=entry11='
         '7.071067811865475244008443621048490392848e-201, entry01='
         '7.071067811865475244008443621048490392848e+49, entry10='
-        '-1.41421356237309504880168872420969807857e+50.',
+        '-1.41421356237309504880168872420969807857e+50. entry00/entry11 '
+        'are nonzero but below matrixFunctionMinMagnitude=1e-150, so rule '
+        'A rejects this before the accuracy contract ever applies.',
         () {
           final Matrix m = Matrix(<List<double>>[
             <double>[-1e100, 1e-150],
             <double>[-2e-150, -1e100],
           ]);
 
-          final Matrix computed = m.sqrt();
-          expectRelativelyClose(
-            computed.at(0, 0),
-            7.071067811865475244008443621048490392848e-201,
-          );
-          expectRelativelyClose(
-            computed.at(1, 1),
-            7.071067811865475244008443621048490392848e-201,
-          );
-          expectRelativelyClose(
-            computed.at(0, 1),
-            7.071067811865475244008443621048490392848e49,
-          );
-          expectRelativelyClose(
-            computed.at(1, 0),
-            -1.41421356237309504880168872420969807857e50,
-          );
-
-          // Independent cross-check within the test itself: squaring the
-          // computed root should reproduce the original matrix to the same
-          // normwise tolerance.
-          expectNormwiseRelativeError(computed * computed, m);
+          expect(() => m.sqrt(), throwsOutOfPrecisionRange());
         },
       );
     },
