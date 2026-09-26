@@ -609,6 +609,110 @@ void main() {
     );
   });
 
+  group('CalculatrixSession - rpn MR with empty memory', () {
+    test(
+      'MR with empty memory commits a pending multi-token draft first, then '
+      'surfaces a typed empty-memory error',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+        session.input('3');
+
+        session.memoryRecall();
+
+        expect(
+          session.rpnStack,
+          orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(3)]),
+        );
+        expect(session.rpnDraft, '');
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<EmptyMemoryError>());
+      },
+    );
+
+    test(
+      'MR with empty memory and an invalid pending draft surfaces the '
+      'parse error, not the empty-memory error',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+        session.input('abc');
+
+        session.memoryRecall();
+
+        expect(session.rpnDraft, '2 abc');
+        expect(session.rpnStackDepth, 0);
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isNot(isA<EmptyMemoryError>()));
+        expect(session.lastError, isA<CalculatrixError>());
+      },
+    );
+
+    test(
+      'MR with empty memory and no pending draft surfaces a typed error '
+      'and pushes nothing',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+
+        session.memoryRecall();
+
+        expect(session.rpnStackDepth, 0);
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<EmptyMemoryError>());
+      },
+    );
+  });
+
+  group('CalculatrixSession - rpn sign toggle whitespace parity', () {
+    test(
+      'toggleSign treats a tab between tokens as a boundary, like '
+      'tokenizeRpnLine',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.input('\t');
+        session.input('3');
+
+        session.toggleSign();
+
+        expect(session.rpnDraft, '2\t-3');
+      },
+    );
+
+    test(
+      'toggleSign treats a newline between tokens as a boundary, like '
+      'tokenizeRpnLine',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.input('\n');
+        session.input('3');
+
+        session.toggleSign();
+
+        expect(session.rpnDraft, '2\n-3');
+      },
+    );
+
+    test('a tab-separated draft commits as two separate tokens', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.input('\t');
+      session.input('3');
+
+      session.enter();
+
+      expect(
+        session.rpnStack,
+        orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(3)]),
+      );
+      expect(session.rpnDraft, '');
+      expect(session.hasError, isFalse);
+    });
+  });
+
   group('CalculatrixSession - rpn matrix literal tokens', () {
     test(
       'a JSON matrix literal with spaces after commas commits as one token',
@@ -675,14 +779,92 @@ void main() {
       expect(session.hasError, isFalse);
     });
 
-    test('toggleSign negates a matrix literal token and reserializes it', () {
+    test(
+      'toggleSign on a matrix literal token toggles a leading minus without '
+      're-serializing',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('[[1,2],[3,4]]');
+
+        session.toggleSign();
+
+        expect(session.rpnDraft, '-[[1,2],[3,4]]');
+      },
+    );
+
+    test(
+      'toggleSign on a matrix literal token preserves exponent notation '
+      'exactly, with no rounding',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('[[1.25e-10]]');
+
+        session.toggleSign();
+
+        expect(session.rpnDraft, '-[[1.25e-10]]');
+      },
+    );
+
+    test(
+      'toggleSign twice on an exponent matrix literal token returns to the '
+      'exact original text',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('[[1.25e-10]]');
+
+        session.toggleSign();
+        session.toggleSign();
+
+        expect(session.rpnDraft, '[[1.25e-10]]');
+      },
+    );
+
+    test(
+      'toggleSign on a matrix literal token preserves 17 significant '
+      'digits, with no rounding',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('[[1.2345678901234567]]');
+
+        session.toggleSign();
+
+        expect(session.rpnDraft, '-[[1.2345678901234567]]');
+      },
+    );
+
+    test('toggleSign on a 1x1 matrix literal token toggles losslessly', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('[[42]]');
+
+      session.toggleSign();
+
+      expect(session.rpnDraft, '-[[42]]');
+    });
+
+    test('toggleSign on a 2x2 matrix literal token toggles losslessly', () {
       session.setMode(CalculatrixMode.rpn);
       session.input('[[1,2],[3,4]]');
 
       session.toggleSign();
 
-      expect(session.rpnDraft, '[[-1,-2],[-3,-4]]');
+      expect(session.rpnDraft, '-[[1,2],[3,4]]');
     });
+
+    test(
+      'a toggled matrix literal token commits as the negated matrix value',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('[[1.25e-10]]');
+        session.toggleSign();
+
+        session.enter();
+
+        expect(session.rpnStackDepth, 1);
+        expect(session.rpnTopValue, Matrix.scalar(-1.25e-10));
+        expect(session.rpnDraft, '');
+        expect(session.hasError, isFalse);
+      },
+    );
 
     test(
       'toggleSign twice on a matrix literal token returns to the original '
@@ -706,7 +888,7 @@ void main() {
 
       session.toggleSign();
 
-      expect(session.rpnDraft, '2 [[-1,-2],[-3,-4]]');
+      expect(session.rpnDraft, '2 -[[1 2] [3 4]]');
     });
 
     test('an unclosed matrix literal bracket surfaces a typed error on commit', () {

@@ -428,6 +428,24 @@ void main() {
         expect(controller.error, '');
       },
     );
+
+    test(
+      'MRC with empty memory commits a pending multi-token rpn draft first, '
+      'then surfaces a typed empty-memory error on the first press',
+      () {
+        controller.setMode(CalculatorMode.rpn);
+        controller.input('2');
+        controller.appendSpace();
+        controller.input('3');
+
+        controller.memoryRecallClear();
+
+        expect(controller.rpnStackDepth, 2);
+        expect(controller.expression, '');
+        expect(controller.error, isNotEmpty);
+        expect(controller.hasMemory, isFalse);
+      },
+    );
   });
 
   group('CalculatorController - sign toggle', () {
