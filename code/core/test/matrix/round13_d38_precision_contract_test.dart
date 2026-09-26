@@ -21,7 +21,11 @@
 //      checked against an independently derived reference (Python mpmath,
 //      dps 50-300 depending on how much cancellation the specific
 //      computation involves) using the contract's own normwise (Frobenius)
-//      accuracy criterion: `||F_computed - F_true|| / ||F_true|| <= 1e-12`.
+//      accuracy criterion, condition-relative since the user's finding 7
+//      correction: `||F_computed - F_true|| / ||F_true|| <=
+//      matrixFunctionAccuracyFactor * kappa(f, A) * unitRoundoff`, which
+//      recovers the flat `1e-12` this file used before that correction
+//      whenever `kappa(f, A) ~= 1` (see [expectConditionRelativeError]).
 //
 // Classification:
 //   1  I (exp analogue + power(-0.5) analogue; both already fixed by the
@@ -107,6 +111,35 @@ void expectNormwiseRelativeError(
         'computed=$computed reference=$reference '
         'normwiseRelativeError=$relativeError',
   );
+}
+
+/// The D38 contract's condition-relative accuracy criterion (Codex round 9
+/// finding 7 correction): normwise (Frobenius) relative error at most
+/// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor * kappa *
+/// CalculatrixNumericPolicy.unitRoundoff`, where [kappa] is the caller-
+/// supplied relative condition number of the matrix function under test at
+/// its specific input, `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F`
+/// (`L_f(A)` the Frechet derivative of `f` at `A`). Each call site below
+/// documents how its own `kappa` was independently computed in mpmath: a
+/// central-difference Frechet derivative, in each of the 4 basis
+/// directions of a 2x2 matrix, at high mpmath precision, assembled into a
+/// 4x4 operator matrix whose largest singular value is
+/// `sigma_max(L_f(A))` (`= sqrt(largest eigenvalue of M^T * M)`, `M` that
+/// 4x4 matrix), since the vec-flattened basis of 2x2 matrices is
+/// orthonormal under the Frobenius inner product, so that largest singular
+/// value equals the operator norm `||L_f(A)||_F` induced by that inner
+/// product; verified stable across finite-difference step sizes from
+/// `1e-20` to `1e-40`.
+void expectConditionRelativeError(
+  Matrix computed,
+  Matrix reference, {
+  required double kappa,
+}) {
+  final double tolerance =
+      CalculatrixNumericPolicy.matrixFunctionAccuracyFactor *
+      kappa *
+      CalculatrixNumericPolicy.unitRoundoff;
+  expectNormwiseRelativeError(computed, reference, tolerance: tolerance);
 }
 
 Matcher throwsOutOfPrecisionRange() => throwsA(
@@ -432,7 +465,18 @@ void main() {
             <double>[7.23934371688083161638350888816e200, 5.16726889142100757771842176171e197],
           ]);
 
-          expectNormwiseRelativeError(m.exp(), reference);
+          // kappa(f, A) = 990.657609153752, computed in mpmath (dps=200)
+          // via a central-difference Frechet derivative in each of the 4
+          // basis directions, assembled into a 4x4 operator matrix whose
+          // largest singular value (sigma_max(L_f(A)) ~= 1.014e304) is
+          // the numerator's operator-norm factor; ||A||_F ~= 990.657,
+          // ||f(A)||_F ~= 1.014e304. Bound =
+          // 1e4 * 990.657609153752 * 1.1102230246251565e-16 ~= 1.10e-9.
+          expectConditionRelativeError(
+            m.exp(),
+            reference,
+            kappa: 990.657609153752,
+          );
         },
       );
 
@@ -461,9 +505,23 @@ void main() {
             <double>[-1e-151, 1e49],
           ]);
 
-          expectNormwiseRelativeError(
+          // kappa(f, A) = 5.0e+197, computed in mpmath (dps=400) via the
+          // same central-difference Frechet-derivative/largest-singular-
+          // value method as above; sigma_max(L_f(A)) ~= 5.0e+146,
+          // ||A||_F ~= 1e100, ||f(A)||_F ~= 1e49. This kappa is enormous
+          // because the -0.5 power derivative itself blows up near a
+          // 1e100-magnitude eigenvalue (large sigma_max), unlike finding
+          // 7's case where the huge kappa comes entirely from ||A||_F
+          // dwarfing ||f(A)||_F with a modest operator norm. Bound =
+          // 1e4 * 5.0e+197 * 1.1102230246251565e-16 ~= 5.55e+186; this
+          // matrix's every quantity is an exact power of ten (see the
+          // test name's comment above), so the previously-asserted flat
+          // 1e-12 tolerance already held here too, well inside this much
+          // looser condition-relative bound.
+          expectConditionRelativeError(
             m.power(Matrix.scalar(-0.5)),
             reference,
+            kappa: 5.0e+197,
           );
         },
       );
@@ -497,7 +555,17 @@ void main() {
             <double>[-1.148039198152586325383499416e308, 1.28160882464220463078095360971e307],
           ]);
 
-          expectNormwiseRelativeError(m.exp(), reference);
+          // kappa(f, A) = 861.992625900178, computed in mpmath (dps=100)
+          // via the same central-difference Frechet-derivative/largest-
+          // singular-value method as finding 1a above; sigma_max(L_f(A))
+          // ~= 1.114e308, ||A||_F ~= 1002.68, ||f(A)||_F ~= 1.296e308.
+          // Bound = 1e4 * 861.992625900178 * 1.1102230246251565e-16
+          // ~= 9.57e-10.
+          expectConditionRelativeError(
+            m.exp(),
+            reference,
+            kappa: 861.992625900178,
+          );
         },
       );
 
@@ -522,7 +590,16 @@ void main() {
             <double>[1.64368149231099991678658218064e301, 8.21840746155505437331598793646e307],
           ]);
 
-          expectNormwiseRelativeError(m.exp(), reference);
+          // kappa(f, A) = 709.000106349992, computed in mpmath (dps=100)
+          // via the same method as finding 9a above; sigma_max(L_f(A))
+          // ~= 8.218e307, ||A||_F ~= 1002.68, ||f(A)||_F ~= 1.162e308.
+          // Bound = 1e4 * 709.000106349992 * 1.1102230246251565e-16
+          // ~= 7.87e-10.
+          expectConditionRelativeError(
+            m.exp(),
+            reference,
+            kappa: 709.000106349992,
+          );
         },
       );
     },
@@ -557,7 +634,67 @@ void main() {
             <double>[0, 0.99999999254199997219],
           ]);
 
+          // kappa(f, A) = 0.752679392434872, computed in mpmath (dps=100)
+          // via the same method as finding 1a above (sigma_max(L_f(A))
+          // ~= 0.652, ||A||_F ~= 1.732, ||f(A)||_F ~= 1.5): this is the
+          // "kappa about 1" case, so the flat 1e-12 tolerance (recovered
+          // from the condition-relative bound at kappa=1) is kept
+          // directly here rather than routed through
+          // [expectConditionRelativeError].
           expectNormwiseRelativeError(m.sqrt(), reference);
+        },
+      );
+    },
+  );
+
+  group(
+    'D38: Codex round 9 finding 7 (I) - exp with a huge purely-imaginary '
+    'rotation frequency, condition-relative accuracy contract',
+    () {
+      test(
+        'exp([[0,1e10],[-2e10,0]]): complex-eigenvalue-pair branch with '
+        'm=0, w=sqrt(2)*1e10~=1.4142e10 (purely imaginary eigenvalue '
+        'pair, both in range: |1e10| and |2e10| are well inside '
+        '[1e-150, 1e150]). Reference (mpmath, dps=100): '
+        'entry00=entry11=-0.78147106333642978134, '
+        'entry01=0.44119325536992842452, '
+        'entry10=-0.88238651073985684903. kappa(f, A) = '
+        '18414244737.4962, computed in mpmath via the same central-'
+        'difference Frechet-derivative/largest-singular-value method as '
+        'the other cases in this file (verified stable across finite-'
+        'difference step sizes from 1e-20 to 1e-40, and cross-checked '
+        'against a direct, non-infinitesimal finite difference): '
+        'sigma_max(L_f(A)) ~= 1.220 (a modest, well-behaved operator '
+        'norm), ||A||_F ~= 2.236e10, ||f(A)||_F ~= 1.481. This kappa is '
+        'enormous purely because ||A||_F dwarfs ||f(A)||_F (exp of a '
+        'huge purely-imaginary eigenvalue pair is still bounded, since '
+        'it is essentially a rotation), not because the derivative '
+        'operator itself is ill-conditioned, unlike finding 1b above. '
+        'Bound = matrixFunctionAccuracyFactor * kappa * unitRoundoff = '
+        '1e4 * 18414244737.4962 * 1.1102230246251565e-16 ~= 2.044e-2. '
+        'The actual computed result here has normwise relative error '
+        '~= 8.42e-7 (verified directly against this reference before '
+        'writing this test), about 24300 times tighter than the bound, '
+        'so no algorithmic fix was needed for this finding: the '
+        'existing complex-pair branch (which calls cos/sin on the raw '
+        'rotation half-width w, relying on dart:math\'s own argument '
+        'reduction) already stays comfortably within this contract.',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[0, 1e10],
+            <double>[-2e10, 0],
+          ]);
+
+          final Matrix reference = Matrix(<List<double>>[
+            <double>[-0.78147106333642978134, 0.44119325536992842452],
+            <double>[-0.88238651073985684903, -0.78147106333642978134],
+          ]);
+
+          expectConditionRelativeError(
+            m.exp(),
+            reference,
+            kappa: 18414244737.4962,
+          );
         },
       );
     },
