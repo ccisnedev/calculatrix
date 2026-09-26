@@ -2233,9 +2233,20 @@ class Matrix {
   /// - General 2x2 matrices: the divided-difference closed form
   ///   `f(A) = c0*I + c1*A` (Higham, "Functions of Matrices", section 1.2).
   /// - Any other input: [CalculatrixErrorId.unsupportedMatrixFunction].
+  ///
+  /// D38 declared precision contract: every nonzero raw entry, and every
+  /// nonzero eigenvalue this computes, must lie in
+  /// `[CalculatrixNumericPolicy.matrixFunctionMinMagnitude,
+  /// CalculatrixNumericPolicy.matrixFunctionMaxMagnitude]`
+  /// (`[1e-150, 1e150]`); otherwise this throws
+  /// [CalculatrixErrorId.matrixOutOfPrecisionRange]. Inside that range, the
+  /// accuracy contract is a normwise (Frobenius) relative error
+  /// `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a componentwise
+  /// one.
   Matrix sqrt() {
     _requireSquare(operation: 'square root');
     _checkFiniteMatrix(this);
+    _requireEntriesInPrecisionRange('square root');
 
     if (isScalar) {
       final double source = scalarValue;
@@ -2279,9 +2290,24 @@ class Matrix {
   /// - Any other input: [CalculatrixErrorId.unsupportedMatrixFunction].
   ///
   /// Every matrix/scalar involved is checked finite before it is used.
+  ///
+  /// D38 declared precision contract: every nonzero raw entry, and every
+  /// nonzero eigenvalue (or, for a complex-conjugate pair, its real part
+  /// `m` and rotation half-width `w`) this computes, must lie in
+  /// `[CalculatrixNumericPolicy.matrixFunctionMinMagnitude,
+  /// CalculatrixNumericPolicy.matrixFunctionMaxMagnitude]`
+  /// (`[1e-150, 1e150]`); otherwise this throws
+  /// [CalculatrixErrorId.matrixOutOfPrecisionRange]. Inside that range, the
+  /// accuracy contract is a normwise (Frobenius) relative error
+  /// `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a componentwise
+  /// one. The non-finite check above is unaffected: a true result that
+  /// genuinely overflows (e.g. `exp` of a large positive in-range
+  /// eigenvalue) is still reported as [CalculatrixErrorId.nonFinite], not
+  /// as an out-of-precision-range rejection.
   Matrix exp() {
     _requireSquare(operation: 'exponential');
     _checkFiniteMatrix(this);
+    _requireEntriesInPrecisionRange('matrix exponential');
 
     if (isScalar) {
       return Matrix.scalar(_checkFiniteScalar(math.exp(scalarValue)));
@@ -2304,6 +2330,7 @@ class Matrix {
       return _symmetricRealFunction(
         (double v) => math.exp(v),
         maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
+        operation: 'matrix exponential',
       );
     }
 
@@ -2332,9 +2359,21 @@ class Matrix {
   ///   using log1p-style formulas for the divided difference near-repeated
   ///   eigenvalues; undefined for a negative or zero real eigenvalue.
   /// - Any other input: [CalculatrixErrorId.unsupportedMatrixFunction].
+  ///
+  /// D38 declared precision contract: every nonzero raw entry, and every
+  /// nonzero eigenvalue (or, for a complex-conjugate pair, its real part
+  /// `m` and rotation half-width `w`) this computes, must lie in
+  /// `[CalculatrixNumericPolicy.matrixFunctionMinMagnitude,
+  /// CalculatrixNumericPolicy.matrixFunctionMaxMagnitude]`
+  /// (`[1e-150, 1e150]`); otherwise this throws
+  /// [CalculatrixErrorId.matrixOutOfPrecisionRange]. Inside that range, the
+  /// accuracy contract is a normwise (Frobenius) relative error
+  /// `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a componentwise
+  /// one.
   Matrix log() {
     _requireSquare(operation: 'logarithm');
     _checkFiniteMatrix(this);
+    _requireEntriesInPrecisionRange('matrix logarithm');
 
     if (isScalar) {
       final double source = scalarValue;
@@ -2409,7 +2448,7 @@ class Matrix {
           );
         }
         return math.log(v);
-      }, maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps);
+      }, maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps, operation: 'matrix logarithm');
     }
 
     if (rowCount == 2) {
@@ -2429,6 +2468,19 @@ class Matrix {
   /// `log-undefined`, `dimension-mismatch`, `non-finite` or
   /// `singular-matrix`) rather than guessing a result: no fallbacks, no
   /// silent defaults.
+  ///
+  /// D38 declared precision contract (non-integer exponent only; an
+  /// integer exponent, computed by repeated multiplication, is not
+  /// affected): every nonzero raw entry, and every nonzero eigenvalue (or,
+  /// for a complex-conjugate pair, its real part `m` and rotation
+  /// half-width `w`) this computes, must lie in
+  /// `[CalculatrixNumericPolicy.matrixFunctionMinMagnitude,
+  /// CalculatrixNumericPolicy.matrixFunctionMaxMagnitude]`
+  /// (`[1e-150, 1e150]`); otherwise this throws
+  /// [CalculatrixErrorId.matrixOutOfPrecisionRange]. Inside that range, the
+  /// accuracy contract is a normwise (Frobenius) relative error
+  /// `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a componentwise
+  /// one.
   Matrix power(Matrix exponent) {
     if (!isSquare) {
       throw MatrixShapeError(
@@ -2482,10 +2534,24 @@ class Matrix {
     if (isScalar) {
       final double b = scalarValue;
 
-      if (integerExponent || b >= 0) {
-        // Integer exponent (any base) and non-negative base use ordinary
-        // real exponentiation directly; this also yields the 0^y cases
-        // (0^0 = 1, 0^positive = 0, 0^negative = +Infinity) for free.
+      if (integerExponent) {
+        // Integer exponent (any base) uses ordinary real exponentiation
+        // directly; this also yields the 0^0 = 1 and 0^negative =
+        // +Infinity cases for free. Not a D38-governed computation (round
+        // 13 / D38 correction): an integer exponent is excluded from the
+        // declared precision range check, the same as
+        // [_integerMatrixPower].
+        return Matrix.scalar(_checkFiniteScalar(math.pow(b, y).toDouble()));
+      }
+
+      // Non-integer exponent: D38's declared precision range applies, this
+      // scalar being the sole "entry" of a 1x1 matrix.
+      _requireEntriesInPrecisionRange('real matrix power');
+
+      if (b >= 0) {
+        // Non-negative base, non-integer exponent uses ordinary real
+        // exponentiation directly; this also yields 0^positive = 0 for
+        // free.
         return Matrix.scalar(_checkFiniteScalar(math.pow(b, y).toDouble()));
       }
 
@@ -2625,6 +2691,100 @@ class Matrix {
       }
     }
     return matrix;
+  }
+
+  /// D38 declared precision contract (see
+  /// [CalculatrixNumericPolicy.matrixFunctionMinMagnitude]): rejects a
+  /// single nonzero magnitude that falls outside
+  /// `[matrixFunctionMinMagnitude, matrixFunctionMaxMagnitude]`, naming
+  /// [operation] and [quantity] (which entry or eigenvalue) and the
+  /// declared range in the error message, rather than guessing at a
+  /// result. Zero is never passed here (callers skip zero entries and
+  /// zero eigenvalues before calling this).
+  static void _requireMagnitudeInPrecisionRange(
+    double magnitude, {
+    required String operation,
+    required String quantity,
+  }) {
+    if (magnitude < CalculatrixNumericPolicy.matrixFunctionMinMagnitude ||
+        magnitude > CalculatrixNumericPolicy.matrixFunctionMaxMagnitude) {
+      throw MatrixDomainError(
+        'Cannot compute the $operation: $quantity has magnitude '
+        '$magnitude, outside the declared precision range '
+        '[${CalculatrixNumericPolicy.matrixFunctionMinMagnitude}, '
+        '${CalculatrixNumericPolicy.matrixFunctionMaxMagnitude}].',
+        errorId: CalculatrixErrorId.matrixOutOfPrecisionRange,
+      );
+    }
+  }
+
+  /// D38 domain check, stage 1 (before anything is computed): every
+  /// nonzero raw entry of this matrix must lie in the declared precision
+  /// range. Called at the top of [sqrt], [exp], [log] and the non-integer
+  /// branches of [power], uniformly across every one of the five
+  /// supported matrix-function classes (scalar, complex-form, diagonal,
+  /// exactly symmetric, general 2x2): this is a declarative gate on the
+  /// input itself, not a risk-tailored one, so it applies before the
+  /// input is even classified into one of those five classes.
+  void _requireEntriesInPrecisionRange(String operation) {
+    for (int row = 0; row < rowCount; row++) {
+      for (int column = 0; column < columnCount; column++) {
+        final double value = _rows[row][column];
+        if (value == 0) continue;
+        _requireMagnitudeInPrecisionRange(
+          value.abs(),
+          operation: operation,
+          quantity: 'entry ($row, $column)',
+        );
+      }
+    }
+  }
+
+  /// D38 domain check, stage 2 (after the eigenvalues are computed): every
+  /// nonzero computed eigenvalue must also lie in the declared precision
+  /// range. Used by the general 2x2 real-eigenvalue branches and the
+  /// exactly-symmetric (cyclic Jacobi) branch; not applied to diagonal,
+  /// scalar or standalone complex-form input, whose "eigenvalues" are read
+  /// directly from entries already covered by
+  /// [_requireEntriesInPrecisionRange].
+  static void _requireEigenvaluesInPrecisionRange(
+    List<double> eigenvalues,
+    String operation,
+  ) {
+    for (int i = 0; i < eigenvalues.length; i++) {
+      final double value = eigenvalues[i];
+      if (value == 0) continue;
+      _requireMagnitudeInPrecisionRange(
+        value.abs(),
+        operation: operation,
+        quantity: 'computed eigenvalue $i (value $value)',
+      );
+    }
+  }
+
+  /// D38 domain check, stage 2, for a general 2x2 complex-conjugate
+  /// eigenvalue pair: the pair's real part [m] and rotation half-width [w]
+  /// (not the complex eigenvalue's own magnitude `hypot(m, w)`) must each
+  /// lie in the declared precision range, per the contract's own wording.
+  static void _requireComplexPairPartsInPrecisionRange(
+    double m,
+    double w,
+    String operation,
+  ) {
+    if (m != 0) {
+      _requireMagnitudeInPrecisionRange(
+        m.abs(),
+        operation: operation,
+        quantity: 'computed eigenvalue real part m (value $m)',
+      );
+    }
+    if (w != 0) {
+      _requireMagnitudeInPrecisionRange(
+        w.abs(),
+        operation: operation,
+        quantity: 'computed eigenvalue rotation half-width w (value $w)',
+      );
+    }
   }
 
   /// Computes a matrix-first singular value decomposition.
@@ -3380,9 +3540,11 @@ class Matrix {
   Matrix _symmetricRealFunction(
     double Function(double value) f, {
     required int maxSweeps,
+    required String operation,
   }) {
     final ({Matrix q, List<double> lambda}) eigen =
         _cyclicJacobiEigendecomposition(maxSweeps: maxSweeps);
+    _requireEigenvaluesInPrecisionRange(eigen.lambda, operation);
     final int n = rowCount;
     final List<double> fLambda = List<double>.generate(
       n,
@@ -3458,6 +3620,7 @@ class Matrix {
     required String operation,
     required bool rejectZeroEigenvalue,
   }) {
+    _requireEntriesInPrecisionRange(operation);
     if (isComplexForm) {
       return _complexFormRealPower(y);
     }
@@ -3478,10 +3641,15 @@ class Matrix {
           rejectZeroEigenvalue: rejectZeroEigenvalue,
         ),
         maxSweeps: maxSweeps,
+        operation: operation,
       );
     }
     if (rowCount == 2) {
-      return _general2x2RealPower(y, rejectZeroEigenvalue: rejectZeroEigenvalue);
+      return _general2x2RealPower(
+        y,
+        rejectZeroEigenvalue: rejectZeroEigenvalue,
+        operation: operation,
+      );
     }
     throw _unsupportedMatrixFunction(operation);
   }
@@ -3674,30 +3842,57 @@ class Matrix {
     // which a genuinely well-separated subtraction should be trusted.
     const double closeEigenvalueThreshold = 1.4901161193847656e-08;
 
-    // Offset of `x` from `lSmall`. The direct subtraction is trusted
-    // unless it is small enough, relative to `x`/`lSmall`'s own scale, to
+    // D38 / round 13 correction, finding 1: anchor at whichever of
+    // fBig/fSmall has the SMALLER magnitude, not always at fSmall (the
+    // eigenvalue-magnitude-smaller side), as the previous version did. `f`
+    // is not always magnitude-increasing in the same direction as
+    // `|lambda|`: for [_general2x2Exp] with a very negative,
+    // larger-magnitude eigenvalue (lBig) paired with a smaller-magnitude
+    // positive eigenvalue (lSmall), `exp(lBig)` is tiny while
+    // `exp(lSmall)` is huge, i.e. `fSmall` is actually the huge value
+    // (e.g. `exp([[700,1],[1e-100,-701]])`: `lBig` is the `-701`-side
+    // eigenvalue, so `fBig = exp(lBig)` is tiny, while `fSmall =
+    // exp(lSmall)` is huge). The same inversion happens for
+    // [_general2x2RealPower] with a negative exponent `y`: raising the
+    // larger-magnitude eigenvalue to a negative power can make it the
+    // smaller function value. Anchoring at a huge `fSmall` and then
+    // subtracting a comparably huge `c1*offset` to reach a diagonal entry
+    // whose true value is the tiny `fBig` is catastrophic cancellation of
+    // two huge quantities down to a tiny target, exactly the failure this
+    // closed form exists to avoid. Anchoring at whichever f-value is
+    // smaller in magnitude never has that problem: the other diagonal
+    // entry only ever needs a moderate correction added to a value that is
+    // already close to its own target.
+    final bool fSmallIsSafeAnchor = fSmall.abs() <= fBig.abs();
+    final double fAnchor = fSmallIsSafeAnchor ? fSmall : fBig;
+    final double lAnchor = fSmallIsSafeAnchor ? lSmall : lBig;
+    final double lOther = fSmallIsSafeAnchor ? lBig : lSmall;
+
+    // Offset of `x` from `lAnchor`. The direct subtraction is trusted
+    // unless it is small enough, relative to `x`/`lAnchor`'s own scale, to
     // be at risk of the rounding-noise cancellation described above; only
     // then is the characteristic-polynomial identity used instead, and
     // only when it produces a genuinely finite, non-underflowed value.
-    double offsetFromLSmall(double x) {
-      final double direct = x - lSmall;
-      final double scale = math.max(x.abs(), lSmall.abs());
+    double offsetFromAnchor(double x) {
+      final double direct = x - lAnchor;
+      final double scale = math.max(x.abs(), lAnchor.abs());
       final bool cancellationRisk =
           scale != 0 && (direct.abs() / scale) < closeEigenvalueThreshold;
       if (!cancellationRisk) {
         return direct;
       }
-      final double viaIdentity = -bc / (x - lBig);
+      final double viaIdentity = -bc / (x - lOther);
       final bool viaIdentityUnreliable =
           !viaIdentity.isFinite || (viaIdentity == 0 && bcUnderflowed);
       return viaIdentityUnreliable ? direct : viaIdentity;
     }
 
-    // Anchored at fSmall, not fBig: `fSmall` is added to a term that can
-    // be many orders of magnitude larger, which never cancels, unlike
-    // anchoring at `fBig` and subtracting out the diagonal entry's honest
-    // offset from `lSmall` (the bug this replaces).
-    double diagonal(double x) => fSmall + (c1 * offsetFromLSmall(x));
+    // Anchored at whichever of fBig/fSmall is smaller in magnitude:
+    // `fAnchor` is added to a term that can be many orders of magnitude
+    // larger, which never cancels, unlike anchoring at the larger-
+    // magnitude function value and subtracting out the diagonal entry's
+    // honest offset (the bug this replaces).
+    double diagonal(double x) => fAnchor + (c1 * offsetFromAnchor(x));
 
     return Matrix(<List<double>>[
       <double>[diagonal(a), c1 * b],
@@ -3794,6 +3989,18 @@ class Matrix {
   /// derived from the large one. `c1` itself still needs the
   /// cancellation-safe `expm1`/divided-difference form for two
   /// eigenvalues that are close together (not just well separated).
+  ///
+  /// D38 / round 13 correction, finding 9: both the complex-eigenvalue-pair
+  /// branch and the close-real-eigenvalue branch used to build a
+  /// standalone `c0` (`em*cos(w) - c1*m`, `fLo - c1*lLo`) that can overflow
+  /// even when every entry `c0` feeds into stays finite, since `c1*m`
+  /// (respectively `c1*lLo`) is not itself one of the matrix's own,
+  /// bounded quantities the way `c1*(a-m)` (respectively `c1*(a-lLo)`) is.
+  /// Both branches now compute each diagonal entry directly in centered
+  /// form, `em*cos(w) + c1*(a-m)` and `fLo + c1*(a-lLo)`, mirroring the
+  /// repeated-real-eigenvalue branch below (already fixed this way).
+  /// Every branch now returns directly, so no standalone `c0` is ever
+  /// materialized in this method at all.
   Matrix _general2x2Exp() {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
@@ -3802,93 +4009,112 @@ class Matrix {
     final ({bool isComplex, double lambda1, double lambda2, double m, double w})
     eigen = _exactRealEigen2x2(a, b, c, d);
 
-    double c0;
-    double c1;
     if (eigen.isComplex) {
       final double m = eigen.m;
       final double w = eigen.w;
+      _requireComplexPairPartsInPrecisionRange(m, w, 'matrix exponential');
       final double em = _checkFiniteScalar(math.exp(m));
-      c1 = em * _sinOverX(w);
-      c0 = em * math.cos(w) - c1 * m;
-    } else {
-      final double l1 = eigen.lambda1;
-      final double l2 = eigen.lambda2;
-      if (l1 == l2) {
-        // Round 12 correction, finding 6: c0 = el - c1*l (c1 = el)
-        // materializes c1*l, which overflows once el sits near double's
-        // max even though every entry c0 actually feeds into
-        // (c0 + c1*a = el + c1*(a-l), c0 + c1*d = el + c1*(d-l)) stays
-        // finite, since (a-l) and (d-l) are the matrix's own,
-        // well-conditioned offsets from the repeated eigenvalue. Compute
-        // those offset products directly instead of going through the
-        // overflow-prone standalone c0, the same pattern already used
-        // for the complex-eigenvalue-pair power branch (Round 12
-        // correction, finding 4).
-        final double l = l1;
-        final double el = _checkFiniteScalar(math.exp(l));
-        c1 = el;
-        final double entry00 = _checkFiniteScalar(el + (c1 * (a - l)));
-        final double entry11 = _checkFiniteScalar(el + (c1 * (d - l)));
-        final double entry01 = _checkFiniteScalar(c1 * b);
-        final double entry10 = _checkFiniteScalar(c1 * c);
-        return _checkFiniteMatrix(
-          Matrix(<List<double>>[
-            <double>[entry00, entry01],
-            <double>[entry10, entry11],
-          ]),
-        );
-      } else {
-        final double lLo = math.min(l1, l2);
-        final double lHi = math.max(l1, l2);
-        final double fLo = _checkFiniteScalar(math.exp(lLo));
-        final double fHi = _checkFiniteScalar(math.exp(lHi));
-        c1 = fHi * _expm1(lLo - lHi) / (lLo - lHi);
-
-        // Round 10 correction: an exactly triangular block (`b == 0` or
-        // `c == 0`) is routed to the exact closed form directly, see
-        // [_triangularClosedForm2x2]'s doc comment for why `c0*I + c1*A`
-        // loses the small diagonal entry here.
-        if (b == 0 || c == 0) {
-          final double fa = _checkFiniteScalar(math.exp(a));
-          final double fd = _checkFiniteScalar(math.exp(d));
-          return _checkFiniteMatrix(_triangularClosedForm2x2(fa, fd, c1));
-        }
-
-        // Round 12 correction, finding 1: a genuinely non-triangular
-        // matrix (both `b` and `c` nonzero) suffers the same near
-        // triangular diagonal cancellation the triangular case above is
-        // routed away from, once its two eigenvalues are far enough
-        // apart that `fHi` dwarfs `fLo` (e.g.
-        // `exp([[700,1],[1e-300,-700]])`: `fLo` around 9.86e-305 sits
-        // hundreds of orders of magnitude below `fHi` around 1.01e304).
-        // `c0 = fLo - c1*lLo` then loses `fLo` entirely to rounding
-        // against `c1*lLo`, itself `O(fHi)` in magnitude, so the
-        // diagonal entry that should recover `fLo` comes back as
-        // exactly 0. Mirror the same closeness threshold and Lagrange
-        // closed form [_general2x2RealPower] uses for its analogous far
-        // apart, non-triangular case (see [_lagrangeClosedForm2x2]'s doc
-        // comment). The close-eigenvalue branch below keeps the
-        // original `c0 = fLo - c1*lLo` line unchanged: there `fLo` and
-        // `fHi` stay comparable in magnitude (`exp` never spreads two
-        // close inputs far apart in output), so that anchor subtraction
-        // never loses precision.
-        final bool hiIsLarger = lHi.abs() >= lLo.abs();
-        final double lBig = hiIsLarger ? lHi : lLo;
-        final double lSmall = hiIsLarger ? lLo : lHi;
-        final double fBig = hiIsLarger ? fHi : fLo;
-        final double fSmall = hiIsLarger ? fLo : fHi;
-        const double closeEigenvalueThreshold = 1.4901161193847656e-08;
-        final double relativeGap = (lBig - lSmall).abs() / lBig.abs();
-        if (relativeGap < closeEigenvalueThreshold) {
-          c0 = fLo - (c1 * lLo);
-        } else {
-          return _checkFiniteMatrix(
-            _lagrangeClosedForm2x2(fBig, fSmall, lBig, lSmall, c1),
-          );
-        }
-      }
+      final double c1 = em * _sinOverX(w);
+      final double emCos = em * math.cos(w);
+      final double entry00 = _checkFiniteScalar(emCos + (c1 * (a - m)));
+      final double entry11 = _checkFiniteScalar(emCos + (c1 * (d - m)));
+      final double entry01 = _checkFiniteScalar(c1 * b);
+      final double entry10 = _checkFiniteScalar(c1 * c);
+      return _checkFiniteMatrix(
+        Matrix(<List<double>>[
+          <double>[entry00, entry01],
+          <double>[entry10, entry11],
+        ]),
+      );
     }
-    return _checkFiniteMatrix(_c0IPlusC1A(c0, c1));
+
+    final double l1 = eigen.lambda1;
+    final double l2 = eigen.lambda2;
+    _requireEigenvaluesInPrecisionRange(<double>[l1, l2], 'matrix exponential');
+
+    if (l1 == l2) {
+      // Round 12 correction, finding 6: c0 = el - c1*l (c1 = el)
+      // materializes c1*l, which overflows once el sits near double's
+      // max even though every entry c0 actually feeds into
+      // (c0 + c1*a = el + c1*(a-l), c0 + c1*d = el + c1*(d-l)) stays
+      // finite, since (a-l) and (d-l) are the matrix's own,
+      // well-conditioned offsets from the repeated eigenvalue. Compute
+      // those offset products directly instead of going through the
+      // overflow-prone standalone c0, the same pattern already used
+      // for the complex-eigenvalue-pair power branch (Round 12
+      // correction, finding 4).
+      final double l = l1;
+      final double el = _checkFiniteScalar(math.exp(l));
+      final double c1 = el;
+      final double entry00 = _checkFiniteScalar(el + (c1 * (a - l)));
+      final double entry11 = _checkFiniteScalar(el + (c1 * (d - l)));
+      final double entry01 = _checkFiniteScalar(c1 * b);
+      final double entry10 = _checkFiniteScalar(c1 * c);
+      return _checkFiniteMatrix(
+        Matrix(<List<double>>[
+          <double>[entry00, entry01],
+          <double>[entry10, entry11],
+        ]),
+      );
+    }
+
+    final double lLo = math.min(l1, l2);
+    final double lHi = math.max(l1, l2);
+    final double fLo = _checkFiniteScalar(math.exp(lLo));
+    final double fHi = _checkFiniteScalar(math.exp(lHi));
+    final double c1 = fHi * _expm1(lLo - lHi) / (lLo - lHi);
+
+    // Round 10 correction: an exactly triangular block (`b == 0` or
+    // `c == 0`) is routed to the exact closed form directly, see
+    // [_triangularClosedForm2x2]'s doc comment for why `c0*I + c1*A`
+    // loses the small diagonal entry here.
+    if (b == 0 || c == 0) {
+      final double fa = _checkFiniteScalar(math.exp(a));
+      final double fd = _checkFiniteScalar(math.exp(d));
+      return _checkFiniteMatrix(_triangularClosedForm2x2(fa, fd, c1));
+    }
+
+    // Round 12 correction, finding 1: a genuinely non-triangular
+    // matrix (both `b` and `c` nonzero) suffers the same near
+    // triangular diagonal cancellation the triangular case above is
+    // routed away from, once its two eigenvalues are far enough
+    // apart that `fHi` dwarfs `fLo` (e.g.
+    // `exp([[700,1],[1e-300,-700]])`: `fLo` around 9.86e-305 sits
+    // hundreds of orders of magnitude below `fHi` around 1.01e304).
+    // `c0 = fLo - c1*lLo` then loses `fLo` entirely to rounding
+    // against `c1*lLo`, itself `O(fHi)` in magnitude, so the
+    // diagonal entry that should recover `fLo` comes back as
+    // exactly 0. Mirror the same closeness threshold and Lagrange
+    // closed form [_general2x2RealPower] uses for its analogous far
+    // apart, non-triangular case (see [_lagrangeClosedForm2x2]'s doc
+    // comment).
+    final bool hiIsLarger = lHi.abs() >= lLo.abs();
+    final double lBig = hiIsLarger ? lHi : lLo;
+    final double lSmall = hiIsLarger ? lLo : lHi;
+    final double fBig = hiIsLarger ? fHi : fLo;
+    final double fSmall = hiIsLarger ? fLo : fHi;
+    const double closeEigenvalueThreshold = 1.4901161193847656e-08;
+    final double relativeGap = (lBig - lSmall).abs() / lBig.abs();
+    if (relativeGap < closeEigenvalueThreshold) {
+      // D38 / round 13 correction, finding 9: see this method's own doc
+      // comment above; `fLo` and `fHi` stay comparable in magnitude here
+      // (`exp` never spreads two close inputs far apart in output), so
+      // this centered form never loses precision, it only avoids ever
+      // materializing the overflow-prone standalone `c1*lLo`.
+      final double entry00 = _checkFiniteScalar(fLo + (c1 * (a - lLo)));
+      final double entry11 = _checkFiniteScalar(fLo + (c1 * (d - lLo)));
+      final double entry01 = _checkFiniteScalar(c1 * b);
+      final double entry10 = _checkFiniteScalar(c1 * c);
+      return _checkFiniteMatrix(
+        Matrix(<List<double>>[
+          <double>[entry00, entry01],
+          <double>[entry10, entry11],
+        ]),
+      );
+    }
+    return _checkFiniteMatrix(
+      _lagrangeClosedForm2x2(fBig, fSmall, lBig, lSmall, c1),
+    );
   }
 
   /// [log] for a general (non-diagonal, non-exactly-symmetric) 2x2 matrix
@@ -3949,6 +4175,7 @@ class Matrix {
     } else {
       final double l1 = eigen.lambda1;
       final double l2 = eigen.lambda2;
+      _requireEigenvaluesInPrecisionRange(<double>[l1, l2], 'matrix logarithm');
       if (l1 < 0 || l2 < 0) {
         throw MatrixDomainError(
           'Logarithm is undefined for matrices with a negative real '
@@ -4071,7 +4298,11 @@ class Matrix {
   /// non-integer exponent as log-undefined, regardless of the sign of `y`;
   /// [sqrt] (`false`) keeps its existing behavior, where `0^0.5 = 0`
   /// carries through for `y >= 0`.
-  Matrix _general2x2RealPower(double y, {required bool rejectZeroEigenvalue}) {
+  Matrix _general2x2RealPower(
+    double y, {
+    required bool rejectZeroEigenvalue,
+    required String operation,
+  }) {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
     final double c = _rows[1][0];
@@ -4084,6 +4315,7 @@ class Matrix {
     if (eigen.isComplex) {
       final double m = eigen.m;
       final double w = eigen.w;
+      _requireComplexPairPartsInPrecisionRange(m, w, operation);
       final double radius = _hypot(m, w);
       if (!radius.isFinite) {
         throw MatrixDomainError(
@@ -4134,6 +4366,7 @@ class Matrix {
     } else {
       final double l1 = eigen.lambda1;
       final double l2 = eigen.lambda2;
+      _requireEigenvaluesInPrecisionRange(<double>[l1, l2], operation);
       if (l1 < 0 || l2 < 0) {
         throw MatrixDomainError(
           'A negative eigenvalue cannot be raised to a non-integer real '
@@ -4202,6 +4435,49 @@ class Matrix {
           final bool l1IsLarger = l1.abs() >= l2.abs();
           final double lBig = l1IsLarger ? l1 : l2;
           final double lSmall = l1IsLarger ? l2 : l1;
+
+          // D38 / round 13 correction, finding 11: bypass the close/far
+          // divided-difference branching below entirely for `y == 0.5`
+          // (this covers both a direct `power(0.5)` call and every call
+          // routed in from [sqrt]), regardless of range or how close the
+          // eigenvalues are. The far branch's direct divided difference
+          // computes `logDiff = log(lBig) - log(lSmall)` and derives `c1`
+          // from `expm1(y*logDiff)`; once `lBig` itself has a large
+          // magnitude (so `log(lBig)` is itself a large number, not near
+          // zero) that subtraction cancels many significant digits even
+          // when `lBig` and `lSmall` are close together, e.g.
+          // `lBig = 1e100`, a relative gap of ~1.49e-8: `log(lBig)` is
+          // ~230.3, and the ~8 significant digits of relative closeness
+          // between the two eigenvalues cancel against that, leaving only
+          // ~5-6 correct digits in `c1`. This is invisible whenever
+          // `lBig` happens to be near 1 (`log(lBig) ~= 0`, nothing to
+          // cancel against), which is exactly why it went undetected
+          // earlier. The identity `c1 = 1 / (sqrt(lBig) + sqrt(lSmall))`
+          // is algebraically equivalent, in exact arithmetic, to the
+          // general divided difference specialized at `y = 0.5` (since
+          // `sqrt(lBig)^2 - sqrt(lSmall)^2 =
+          // (sqrt(lBig)-sqrt(lSmall)) * (sqrt(lBig)+sqrt(lSmall)) =
+          // lBig - lSmall`), but never routes through `math.log`/`expm1`
+          // at all, so it has no cancellation risk at any scale or
+          // eigenvalue gap.
+          if (y == 0.5) {
+            final double sqrtBig = _checkFiniteScalar(math.sqrt(lBig));
+            final double sqrtSmall = _checkFiniteScalar(math.sqrt(lSmall));
+            final double c1Sqrt = 1 / (sqrtBig + sqrtSmall);
+
+            if (b == 0 || c == 0) {
+              final double fa = _checkFiniteScalar(math.sqrt(a));
+              final double fd = _checkFiniteScalar(math.sqrt(d));
+              return _checkFiniteMatrix(
+                _triangularClosedForm2x2(fa, fd, c1Sqrt),
+              );
+            }
+
+            return _checkFiniteMatrix(
+              _lagrangeClosedForm2x2(sqrtBig, sqrtSmall, lBig, lSmall, c1Sqrt),
+            );
+          }
+
           final double lyBig = _checkFiniteScalar(math.pow(lBig, y).toDouble());
 
           // Round 9 correction, finding 1: (lSmall-lBig)/lBig rounds to
@@ -4382,5 +4658,6 @@ Matrix debugCyclicJacobiSqrtWithSweepBudget(Matrix matrix, int maxSweeps) {
     (double v) =>
         matrix._realScalarPower(v, 0.5, rejectZeroEigenvalue: false),
     maxSweeps: maxSweeps,
+    operation: 'square root',
   );
 }

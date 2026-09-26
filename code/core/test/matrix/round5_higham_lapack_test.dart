@@ -58,11 +58,12 @@ void main() {
     'complex form',
     () {
       test(
-        '[[1e308,1e308],[1e308,1e308]]^0.5 raises non-finite (its row sum '
-        'overflows to Infinity, so its true infinity-norm is not '
-        'representable; it must not be silently misclassified as complex '
-        'form by comparing Infinity <= Infinity, nor silently normalized '
-        'as if nothing overflowed)',
+        '[[1e308,1e308],[1e308,1e308]]^0.5 raises '
+        'matrix-out-of-precision-range, not non-finite (D38 declared '
+        'precision contract: entries of magnitude 1e308 sit above '
+        'matrixFunctionMaxMagnitude=1e150, so this is rejected outright '
+        'before the infinity-norm-misclassification fix this test used to '
+        'regression-check is ever reached)',
         () {
           final Matrix a = Matrix(<List<double>>[
             <double>[1e308, 1e308],
@@ -76,7 +77,7 @@ void main() {
               isA<MatrixDomainError>().having(
                 (MatrixDomainError e) => e.errorId,
                 'errorId',
-                CalculatrixErrorId.nonFinite,
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
               ),
             ),
           );
@@ -112,20 +113,28 @@ void main() {
 
   group('Round 5, case 6: power-of-two scaling by bounded steps', () {
     test(
-      '[[2e-320,1e-320],[0,2e-320]].sqrt() does not hang or underflow to '
-      'the zero matrix (general 2x2 with a repeated positive eigenvalue, '
-      'handled by the closed-form divided-difference formula with no '
-      'matrix-wide power-of-two normalization needed)',
+      '[[2e-320,1e-320],[0,2e-320]].sqrt() raises '
+      'matrix-out-of-precision-range (D38 declared precision contract: '
+      '2e-320 and 1e-320 are subnormal doubles, far below '
+      'matrixFunctionMinMagnitude=1e-150, so this is rejected outright '
+      'before the power-of-two-scaling fix this test used to '
+      'regression-check is ever reached)',
       () {
-        final Matrix result = Matrix(<List<double>>[
+        final Matrix value = Matrix(<List<double>>[
           <double>[2e-320, 1e-320],
           <double>[0, 2e-320],
-        ]).sqrt();
+        ]);
 
-        expect(result.at(0, 0), isNot(0));
-        expect(result.at(0, 0).isFinite, isTrue);
-        final Matrix reconstructed = result * result;
-        expect(reconstructed.at(0, 0), closeTo(2e-320, 2e-320 * 1e-6));
+        expect(
+          value.sqrt,
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
+          ),
+        );
       },
     );
 

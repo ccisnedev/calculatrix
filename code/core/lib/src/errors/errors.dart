@@ -15,7 +15,8 @@ enum CalculatrixErrorId {
   ambiguousPower('ambiguous-power'),
   syntaxError('syntax-error'),
   noConvergence('no-convergence'),
-  unsupportedMatrixFunction('unsupported-matrix-function');
+  unsupportedMatrixFunction('unsupported-matrix-function'),
+  matrixOutOfPrecisionRange('matrix-out-of-precision-range');
 
   const CalculatrixErrorId(this.id);
 

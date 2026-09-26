@@ -224,5 +224,29 @@ void main() {
       expect(overflow.exitCode, isNonZero);
       expect(overflow.exitCode, isNot(255));
     });
+
+    test(
+      'D38: sqrt of a scalar outside the declared precision range exits '
+      '65, the same dedicated exit code as unsupported-matrix-function',
+      () async {
+        final ProcessResult outOfRange = await Process.run(
+          Platform.resolvedExecutable,
+          <String>[
+            'run',
+            'bin/calculatrix_cli.dart',
+            'command',
+            '1e200',
+            'sqrt',
+          ],
+          workingDirectory: Directory.current.path,
+        );
+
+        expect(outOfRange.exitCode, 65);
+        expect(
+          outOfRange.stdout.toString(),
+          contains('matrix-out-of-precision-range'),
+        );
+      },
+    );
   });
 }

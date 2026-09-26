@@ -72,6 +72,33 @@ class CalculatrixNumericPolicy {
   /// error.
   static const int jacobiMaxSweeps = 50;
 
+  /// D38 declared precision contract: the closed range every nonzero raw
+  /// entry of a matrix passed to `Matrix.exp`, `Matrix.log`, `Matrix.sqrt`
+  /// or a non-integer `Matrix.power` must lie in before anything is
+  /// computed, and every nonzero eigenvalue those functions compute (or,
+  /// for a general 2x2 complex-conjugate pair, its real part `m` and
+  /// rotation half-width `w`) must also lie in once computed. An input or
+  /// a computed eigenvalue outside `[matrixFunctionMinMagnitude,
+  /// matrixFunctionMaxMagnitude]` is rejected outright
+  /// ([CalculatrixErrorId.matrixOutOfPrecisionRange]), never guessed at:
+  /// this replaces case-by-case patching of individual overflow/
+  /// cancellation bugs discovered outside this range with one declarative
+  /// gate. Zero is always allowed, at any of the five supported
+  /// matrix-function classes, regardless of this range. Integer matrix
+  /// powers (computed by repeated multiplication, [Matrix._integerMatrixPower])
+  /// are not affected: this range only bounds the four closed-form
+  /// eigenvalue-based functions.
+  ///
+  /// Inside this range, the accuracy contract is a normwise (Frobenius)
+  /// relative error `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a
+  /// componentwise one; see the dartdoc of `Matrix.exp`, `Matrix.log`,
+  /// `Matrix.sqrt` and `Matrix.power` for that contract's statement on
+  /// each function.
+  static const double matrixFunctionMinMagnitude = 1e-150;
+
+  /// See [matrixFunctionMinMagnitude].
+  static const double matrixFunctionMaxMagnitude = 1e150;
+
   static bool nearlyEqual(
     double a,
     double b, {

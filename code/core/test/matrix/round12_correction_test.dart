@@ -4,8 +4,6 @@
 // checked against an independently derived reference (Python mpmath at
 // 200-1200 decimal digits, or an analytically stated closed form), never
 // against this implementation's own prior output.
-import 'dart:math' as math;
-
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
@@ -43,59 +41,68 @@ void main() {
       // subnormal double, ~4.94e-324), so `directDet = a*d - b*c` is
       // exactly 0 and wrongly looks "finite" even though the true
       // determinant is `4e-400 - 2e-400 = 2e-400`, nonzero.
-      test('log() does not throw for the true positive real eigenvalues', () {
+      // D38 declared precision contract: every entry of this matrix
+      // (1e-200, 1e-200, 2e-200, 4e-200) sits below
+      // matrixFunctionMinMagnitude=1e-150, so all three operations below
+      // are now rejected outright, before the underflowed-determinant fix
+      // these tests used to regression-check ever runs.
+      test('log() raises matrix-out-of-precision-range', () {
         final Matrix value = Matrix(<List<double>>[
           <double>[1e-200, 1e-200],
           <double>[2e-200, 4e-200],
         ]);
 
-        final Matrix result = value.log();
-
-        // Reference (mpmath, dps=1200):
-        expectRelativelyClose(result.at(0, 0), -461.02253778330164);
-        expectRelativelyClose(result.at(0, 1), 0.56806184984831558);
-        expectRelativelyClose(result.at(1, 0), 1.1361236996966312);
-        expectRelativelyClose(result.at(1, 1), -459.31835223375669);
+        expect(
+          value.log,
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
+          ),
+        );
       });
 
       test(
-        'power(-0.5) matches the mpmath reference, not a false zero '
-        'eigenvalue rejection or a garbage finite value',
+        'power(-0.5) raises matrix-out-of-precision-range',
         () {
           final Matrix value = Matrix(<List<double>>[
             <double>[1e-200, 1e-200],
             <double>[2e-200, 4e-200],
           ]);
 
-          final Matrix result = value.power(Matrix.scalar(-0.5));
-
-          // Reference (mpmath, dps=1200):
-          expectRelativelyClose(result.at(0, 0), 1.3683056745854404e+100);
-          expectRelativelyClose(result.at(0, 1), -2.5272473256221178e+99);
-          expectRelativelyClose(result.at(1, 0), -5.0544946512442356e+99);
-          expectRelativelyClose(result.at(1, 1), 6.1013147689880504e+99);
+          expect(
+            () => value.power(Matrix.scalar(-0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
         },
       );
 
       test(
-        'sqrt() recovers the true small eigenvalue-weighted (0,0) entry, '
-        'not the value produced by trusting the underflowed direct '
-        'determinant',
+        'sqrt() raises matrix-out-of-precision-range',
         () {
           final Matrix value = Matrix(<List<double>>[
             <double>[1e-200, 1e-200],
             <double>[2e-200, 4e-200],
           ]);
 
-          final Matrix result = value.sqrt();
-
-          // Reference (mpmath, dps=1200): the bug produces 4.68213...e-101
-          // here (using lambda2 = 0 from the false directDet=0 reading);
-          // the true value is 8.6285620946101682e-101.
-          expectRelativelyClose(result.at(0, 0), 8.6285620946101682e-101);
-          expectRelativelyClose(result.at(0, 1), 3.5740674433659326e-101);
-          expectRelativelyClose(result.at(1, 0), 7.1481348867318651e-101);
-          expectRelativelyClose(result.at(1, 1), 1.9350764424707966e-100);
+          expect(
+            value.sqrt,
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
         },
       );
     },
@@ -116,52 +123,81 @@ void main() {
       // implementation's own output; math.cos/math.sin are Dart's
       // standard trig functions, independent of the matrix code path
       // under test).
-      test('exp() equals cos(1)*I + sin(1)*A, not the identity', () {
+      // D38 declared precision contract: entries 1e200 and -1e-200 both
+      // sit outside [1e-150, 1e150], so all four operations below are now
+      // rejected outright before the balancing fix these tests used to
+      // regression-check ever runs.
+      test('exp() raises matrix-out-of-precision-range', () {
         final Matrix value = Matrix(<List<double>>[
           <double>[0, 1e200],
           <double>[-1e-200, 0],
         ]);
 
-        final Matrix result = value.exp();
-
-        expectRelativelyClose(result.at(0, 0), math.cos(1));
-        expectRelativelyClose(result.at(1, 1), math.cos(1));
-        expectRelativelyClose(result.at(0, 1), math.sin(1) * 1e200);
-        expectRelativelyClose(result.at(1, 0), math.sin(1) * -1e-200);
+        expect(
+          value.exp,
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
+          ),
+        );
       });
 
-      test('log() does not throw (genuine complex pair, never undefined)', () {
+      test('log() raises matrix-out-of-precision-range', () {
         final Matrix value = Matrix(<List<double>>[
           <double>[0, 1e200],
           <double>[-1e-200, 0],
         ]);
 
-        expect(() => value.log(), returnsNormally);
-        expect(value.log().at(0, 0).isFinite, isTrue);
+        expect(
+          value.log,
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
+          ),
+        );
       });
 
-      test('sqrt() does not throw (genuine complex pair, never undefined)', () {
+      test('sqrt() raises matrix-out-of-precision-range', () {
         final Matrix value = Matrix(<List<double>>[
           <double>[0, 1e200],
           <double>[-1e-200, 0],
         ]);
 
-        expect(() => value.sqrt(), returnsNormally);
-        expect(value.sqrt().at(0, 0).isFinite, isTrue);
+        expect(
+          value.sqrt,
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
+          ),
+        );
       });
 
       test(
-        'power(0.5) does not throw (genuine complex pair, never undefined)',
+        'power(0.5) raises matrix-out-of-precision-range',
         () {
           final Matrix value = Matrix(<List<double>>[
             <double>[0, 1e200],
             <double>[-1e-200, 0],
           ]);
 
-          expect(() => value.power(Matrix.scalar(0.5)), returnsNormally);
           expect(
-            value.power(Matrix.scalar(0.5)).at(0, 0).isFinite,
-            isTrue,
+            () => value.power(Matrix.scalar(0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
           );
         },
       );
@@ -181,24 +217,31 @@ void main() {
       // genuine complex-conjugate eigenvalue pair +-i*s*sqrt(2), for any
       // s. Reference (mpmath, dps=1200), independent of this
       // implementation, via the exact eigendecomposition closed form.
-      test('s=1e-200: does not throw, matches the mpmath reference', () {
+      // D38 declared precision contract: s=1e-200 and s=1e200 both sit
+      // outside [1e-150, 1e150] (as raw entries, since b=s or c=-2s), so
+      // both cases below are now rejected outright before the
+      // standalone-c1 fix these tests used to regression-check ever runs.
+      test('s=1e-200: raises matrix-out-of-precision-range', () {
         const double s = 1e-200;
         final Matrix value = Matrix(<List<double>>[
           <double>[0, s],
           <double>[-2 * s, 0],
         ]);
 
-        final Matrix result = value.power(Matrix.scalar(-1.5));
-
-        expectRelativelyClose(result.at(0, 0), -4.2044820762685727e+299);
-        expectRelativelyClose(result.at(0, 1), -2.9730177875068027e+299);
-        expectRelativelyClose(result.at(1, 0), 5.9460355750136053e+299);
-        expectRelativelyClose(result.at(1, 1), -4.2044820762685727e+299);
+        expect(
+          () => value.power(Matrix.scalar(-1.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
+          ),
+        );
       });
 
       test(
-        's=1e200: recovers the true nonzero off-diagonal entries, not '
-        'an underflowed 0',
+        's=1e200: raises matrix-out-of-precision-range',
         () {
           const double s = 1e200;
           final Matrix value = Matrix(<List<double>>[
@@ -206,12 +249,16 @@ void main() {
             <double>[-2 * s, 0],
           ]);
 
-          final Matrix result = value.power(Matrix.scalar(-1.5));
-
-          expectRelativelyClose(result.at(0, 0), -4.2044820762685727e-301);
-          expectRelativelyClose(result.at(0, 1), -2.9730177875068027e-301);
-          expectRelativelyClose(result.at(1, 0), 5.9460355750136053e-301);
-          expectRelativelyClose(result.at(1, 1), -4.2044820762685727e-301);
+          expect(
+            () => value.power(Matrix.scalar(-1.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
         },
       );
     },
@@ -271,97 +318,100 @@ void main() {
       // Reference (mpmath, dps=100), independent of this implementation:
       // fa = 1.0000000000000000046, fd = 0.99999999999999999539,
       // entry01 = b*dd = 9.2103403719761827361e-218 (dd = (fa-fd)/(a-d)).
+      // D38 declared precision contract: entries 1e200 and 1e-200 both sit
+      // outside [1e-150, 1e150], so this and the negative-y variant below
+      // are now rejected outright before the log1p-fallback fix these
+      // tests used to regression-check ever runs.
       test(
-        'power(1e-20) on [[1e200,1],[0,1e-200]] recovers the true nonzero '
-        '(0,1) entry, not a false 0 from the log1p fallback\'s own '
-        'degenerate argument',
+        'power(1e-20) on [[1e200,1],[0,1e-200]] raises '
+        'matrix-out-of-precision-range',
         () {
           final Matrix value = Matrix(<List<double>>[
             <double>[1e200, 1],
             <double>[0, 1e-200],
           ]);
 
-          final Matrix result = value.power(Matrix.scalar(1e-20));
-
-          expectRelativelyClose(result.at(0, 0), 1.0000000000000000046);
-          expectRelativelyClose(result.at(0, 1), 9.2103403719761827361e-218);
-          expect(result.at(1, 0), equals(0));
-          expectRelativelyClose(result.at(1, 1), 0.99999999999999999539);
-        },
-      );
-
-      // Negative-y variant of the same counterexample: y=-1e-20. Reference
-      // (mpmath, dps=100): fa = 0.99999999999999999539,
-      // fd = 1.0000000000000000046,
-      // entry01 = -9.2103403719761827361e-218.
-      test(
-        'power(-1e-20) on [[1e200,1],[0,1e-200]] recovers the true nonzero '
-        '(0,1) entry with the correct sign',
-        () {
-          final Matrix value = Matrix(<List<double>>[
-            <double>[1e200, 1],
-            <double>[0, 1e-200],
-          ]);
-
-          final Matrix result = value.power(Matrix.scalar(-1e-20));
-
-          expectRelativelyClose(result.at(0, 0), 0.99999999999999999539);
-          expectRelativelyClose(
-            result.at(0, 1),
-            -9.2103403719761827361e-218,
+          expect(
+            () => value.power(Matrix.scalar(1e-20)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
           );
-          expect(result.at(1, 0), equals(0));
-          expectRelativelyClose(result.at(1, 1), 1.0000000000000000046);
         },
       );
 
-      // Forward-looking regression, not a currently-failing case: guards
-      // the new unconditional far-branch formula against reintroducing an
-      // overflow of its own. A naive, unconditional implementation of
-      // lyBig - lySmall = lySmall * expm1(y * (ln lBig - ln lSmall)) would
-      // itself overflow here, because y * (ln lBig - ln lSmall) ~ 1409.18
-      // is far past the point where exp() (and therefore expm1()) itself
-      // overflows (~709), even though lySmall is finite and the true
-      // product is representable; the sign-of-y-conditioned form this fix
-      // uses instead always keeps expm1's own argument non-positive.
-      // Reference (mpmath, dps=100): fa = 1.0e+306, fd = 1.0e-306,
-      // entry01 = 1000000.0.
       test(
-        'power(1.02) on [[1e300,1],[0,1e-300]] does not overflow the way '
-        'an unconditional expm1(y * logDiff) form would',
+        'power(-1e-20) on [[1e200,1],[0,1e-200]] raises '
+        'matrix-out-of-precision-range',
+        () {
+          final Matrix value = Matrix(<List<double>>[
+            <double>[1e200, 1],
+            <double>[0, 1e-200],
+          ]);
+
+          expect(
+            () => value.power(Matrix.scalar(-1e-20)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
+        },
+      );
+
+      // D38 declared precision contract: entries 1e300 and 1e-300 both sit
+      // outside [1e-150, 1e150], so this forward-looking overflow
+      // regression and its negative-y counterpart below are now rejected
+      // outright before the sign-of-y-conditioned expm1 form these tests
+      // used to guard is even reached.
+      test(
+        'power(1.02) on [[1e300,1],[0,1e-300]] raises '
+        'matrix-out-of-precision-range',
         () {
           final Matrix value = Matrix(<List<double>>[
             <double>[1e300, 1],
             <double>[0, 1e-300],
           ]);
 
-          final Matrix result = value.power(Matrix.scalar(1.02));
-
-          expectRelativelyClose(result.at(0, 0), 1.0e+306);
-          expectRelativelyClose(result.at(0, 1), 1000000.0);
-          expect(result.at(1, 0), equals(0));
-          expectRelativelyClose(result.at(1, 1), 1.0e-306);
+          expect(
+            () => value.power(Matrix.scalar(1.02)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
         },
       );
 
-      // Negative-y counterpart of the regression above, confirming the
-      // sign-of-y branch selection is correct in both directions.
-      // Reference (mpmath, dps=100): fa = 1.0e-306, fd = 1.0e+306,
-      // entry01 = -1000000.0.
       test(
-        'power(-1.02) on [[1e300,1],[0,1e-300]] does not overflow either',
+        'power(-1.02) on [[1e300,1],[0,1e-300]] raises '
+        'matrix-out-of-precision-range',
         () {
           final Matrix value = Matrix(<List<double>>[
             <double>[1e300, 1],
             <double>[0, 1e-300],
           ]);
 
-          final Matrix result = value.power(Matrix.scalar(-1.02));
-
-          expectRelativelyClose(result.at(0, 0), 1.0e-306);
-          expectRelativelyClose(result.at(0, 1), -1000000.0);
-          expect(result.at(1, 0), equals(0));
-          expectRelativelyClose(result.at(1, 1), 1.0e+306);
+          expect(
+            () => value.power(Matrix.scalar(-1.02)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
         },
       );
     },
@@ -448,23 +498,28 @@ void main() {
       // log(lBig)-log(lSmall) (~1.4916e-08 in this case), losing most of
       // c1's significant digits. Reference (mpmath, dps=60), independent
       // of this implementation.
-      test(
-        'log() recovers the true (0,1) entry to near machine precision, '
-        'not a value with a 1e-6-scale relative error from cancellation',
-        () {
-          final Matrix value = Matrix(<List<double>>[
-            <double>[1e200, 1e200],
-            <double>[0, 9.999999850839375e199],
-          ]);
+      // D38 declared precision contract: entries 1e200 and
+      // 9.999999850839375e199 both sit above matrixFunctionMaxMagnitude=
+      // 1e150, so this is now rejected outright before the
+      // relativeGap-threshold fix this test used to regression-check ever
+      // runs.
+      test('log() raises matrix-out-of-precision-range', () {
+        final Matrix value = Matrix(<List<double>>[
+          <double>[1e200, 1e200],
+          <double>[0, 9.999999850839375e199],
+        ]);
 
-          final Matrix result = value.log();
-
-          expectRelativelyClose(result.at(0, 0), 460.5170185988091368);
-          expectRelativelyClose(result.at(0, 1), 1.0000000074580313242);
-          expect(result.at(1, 0), equals(0));
-          expectRelativelyClose(result.at(1, 1), 460.51701858389307419);
-        },
-      );
+        expect(
+          value.log,
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
+          ),
+        );
+      });
     },
   );
 
@@ -485,24 +540,29 @@ void main() {
       // entry00 = log(l)+1 = -735.8272408909739061509869,
       // entry11 = log(l)-1 = -737.8272408909739061509869,
       // entry01 = b/l = 1.0, entry10 = c/l = -1.0.
-      test(
-        'log() on [[2e-320,1e-320],[-1e-320,0]] returns a finite result '
-        'instead of throwing MatrixDomainError from an overflowed c1',
-        () {
-          const double l = 1e-320;
-          final Matrix value = Matrix(<List<double>>[
-            <double>[2 * l, l],
-            <double>[-l, 0],
-          ]);
+      // D38 declared precision contract: l=1e-320 is a subnormal double,
+      // far below matrixFunctionMinMagnitude=1e-150, so this is now
+      // rejected outright before the overflowed-c1 fix this test used to
+      // regression-check ever runs.
+      test('log() on [[2e-320,1e-320],[-1e-320,0]] raises '
+          'matrix-out-of-precision-range', () {
+        const double l = 1e-320;
+        final Matrix value = Matrix(<List<double>>[
+          <double>[2 * l, l],
+          <double>[-l, 0],
+        ]);
 
-          final Matrix result = value.log();
-
-          expectRelativelyClose(result.at(0, 0), -735.8272408909739061509869);
-          expectRelativelyClose(result.at(0, 1), 1.0);
-          expectRelativelyClose(result.at(1, 0), -1.0);
-          expectRelativelyClose(result.at(1, 1), -737.8272408909739061509869);
-        },
-      );
+        expect(
+          value.log,
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
+          ),
+        );
+      });
     },
   );
 
@@ -524,25 +584,29 @@ void main() {
       // entry11 = log(w)-pi/2 = -713.0695900619550110952015,
       // entry01 = pi/2 = 1.570796326794896619231322,
       // entry10 = -pi = -3.141592653589793238462643.
-      test(
-        'log() on [[1e-309,1e-309],[-2e-309,-1e-309]] returns a finite '
-        'result instead of throwing MatrixDomainError from an overflowed '
-        'c1',
-        () {
-          const double w = 1e-309;
-          final Matrix value = Matrix(<List<double>>[
-            <double>[w, w],
-            <double>[-2 * w, -w],
-          ]);
+      // D38 declared precision contract: w=1e-309 is a subnormal double,
+      // far below matrixFunctionMinMagnitude=1e-150, so this is now
+      // rejected outright before the overflowed-c1 fix this test used to
+      // regression-check ever runs.
+      test('log() on [[1e-309,1e-309],[-2e-309,-1e-309]] raises '
+          'matrix-out-of-precision-range', () {
+        const double w = 1e-309;
+        final Matrix value = Matrix(<List<double>>[
+          <double>[w, w],
+          <double>[-2 * w, -w],
+        ]);
 
-          final Matrix result = value.log();
-
-          expectRelativelyClose(result.at(0, 0), -709.9279974083652178567388);
-          expectRelativelyClose(result.at(0, 1), 1.570796326794896619231322);
-          expectRelativelyClose(result.at(1, 0), -3.141592653589793238462643);
-          expectRelativelyClose(result.at(1, 1), -713.0695900619550110952015);
-        },
-      );
+        expect(
+          value.log,
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
+          ),
+        );
+      });
     },
   );
 }
