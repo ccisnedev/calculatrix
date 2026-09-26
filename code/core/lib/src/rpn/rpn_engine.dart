@@ -119,8 +119,11 @@ class RpnEngine {
       );
     }
 
-    final Matrix right = _stack.removeLast();
-    final Matrix left = _stack.removeLast();
+    // Read the operands without removing them yet: if the computation below
+    // throws, the stack is left exactly as it was. Only the failing
+    // operation is rolled back, not the operands that were already there.
+    final Matrix right = _stack[_stack.length - 1];
+    final Matrix left = _stack[_stack.length - 2];
 
     late final Matrix result;
     switch (operatorType) {
@@ -134,6 +137,8 @@ class RpnEngine {
         result = _divide(left, right);
     }
 
+    _stack.removeLast();
+    _stack.removeLast();
     _stack.add(result);
     return result;
   }
@@ -145,7 +150,9 @@ class RpnEngine {
       );
     }
 
-    final Matrix value = _stack.removeLast();
+    // Same rationale as applyBinary: compute first, mutate the stack only
+    // once the computation has succeeded.
+    final Matrix value = _stack.last;
 
     late final Matrix result;
     switch (operatorType) {
@@ -154,6 +161,8 @@ class RpnEngine {
       case RpnUnaryOperator.percent:
         result = _percent(value);
     }
+
+    _stack.removeLast();
 
     _stack.add(result);
     return result;

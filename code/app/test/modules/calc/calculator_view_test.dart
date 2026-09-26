@@ -1897,6 +1897,39 @@ void main() {
       );
     });
 
+    testWidgets('sign toggle after SPC negates only the pending operand', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _tapCalculatorButton(tester, '2');
+      await _tapCalculatorButton(tester, 'SPC');
+      await _tapCalculatorButton(tester, '3');
+      await _tapCalculatorButton(tester, '±');
+
+      expect(
+        find.descendant(of: _rpnDraftCard(), matching: find.text('2 -3')),
+        findsOneWidget,
+      );
+
+      await _tapCalculatorButton(tester, 'ENTER');
+
+      expect(_rpnStackCard(1), findsOneWidget);
+      expect(
+        find.descendant(of: _rpnStackCard(1), matching: find.text('[[2]]')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.descendant(
+                of: _rpnStackCard(0),
+                matching: find.byKey(const ValueKey<String>('calculator-display-text')),
+              ),
+            )
+            .data,
+        '[[-3]]',
+      );
+    });
+
     testWidgets('SPC is disabled and rendered as disabled in infix mode', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
       await _openInfixEditor(tester);

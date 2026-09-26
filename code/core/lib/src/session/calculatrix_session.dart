@@ -199,11 +199,7 @@ class CalculatrixSession {
   void toggleSign() {
     if (isRpnMode) {
       if (_rpnDraft.isNotEmpty) {
-        if (_rpnDraft.startsWith('-')) {
-          _rpnDraft = _rpnDraft.substring(1);
-        } else {
-          _rpnDraft = '-$_rpnDraft';
-        }
+        _rpnDraft = _toggleSignOfLastToken(_rpnDraft);
         return;
       }
 
@@ -647,6 +643,30 @@ class CalculatrixSession {
         .where((String token) => token.isNotEmpty)
         .map(_parseDraftOperand)
         .toList(growable: false);
+  }
+
+  /// Toggles the sign of the last space-delimited token in a multi-operand
+  /// rpn draft, leaving every earlier token untouched. This is what makes
+  /// `2 SPC 3 ±` negate the pending `3`, not the whole draft.
+  ///
+  /// When the draft ends with a trailing space (SPC was pressed but nothing
+  /// has been typed for the next operand yet), the "last token" is empty;
+  /// toggling it prepends a bare `-` as the start of that next operand,
+  /// exactly as pressing ± before typing any digit would. Toggling again
+  /// removes it, returning to the empty token. Committing a draft that
+  /// still ends in a lone `-` fails to parse like any other invalid token:
+  /// nothing is pushed and the typed error is surfaced, matching the
+  /// existing atomic commit behavior; there is no silent fallback.
+  String _toggleSignOfLastToken(String draft) {
+    final int lastSpaceIndex = draft.lastIndexOf(' ');
+    final String prefix = draft.substring(0, lastSpaceIndex + 1);
+    final String lastToken = draft.substring(lastSpaceIndex + 1);
+
+    final String toggledToken = lastToken.startsWith('-')
+        ? lastToken.substring(1)
+        : '-$lastToken';
+
+    return prefix + toggledToken;
   }
 
   Matrix? _tryParseOperand(String expression) {
