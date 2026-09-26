@@ -71,10 +71,15 @@ void main() {
 
   group('Round 4 correction, case B: must not hang (run isolate-guarded)', () {
     test(
-      'B1: 10^[[1e308,0],[0,0]] raises non-finite quickly instead of '
-      'hanging (ln(10)*1e308 overflows to Infinity; a loop whose only '
-      'exit condition is "norm <= 0.5" never terminates on an infinite '
-      'norm)',
+      'B1: 10^[[1e308,0],[0,0]] does not hang, and now raises '
+      'matrix-out-of-precision-range (D38 declared precision contract: '
+      'the exponent entry of magnitude 1e308 sits above '
+      'matrixFunctionMaxMagnitude=1e150, so this is rejected outright by '
+      'Codex round 9, finding 4\'s raw-operand gate before the '
+      'ln(10)*1e308-overflows-to-Infinity hang this test used to '
+      'regression-check is ever reached; either way, the case still '
+      'completes quickly instead of hanging, which is what this test '
+      'guards)',
       () async {
         final ReceivePort port = ReceivePort();
         final Isolate isolate = await Isolate.spawn(
@@ -93,7 +98,7 @@ void main() {
           port.close();
         }
 
-        expect(outcome, CalculatrixErrorId.nonFinite.id);
+        expect(outcome, CalculatrixErrorId.matrixOutOfPrecisionRange.id);
       },
       timeout: const Timeout(Duration(seconds: 15)),
     );

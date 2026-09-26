@@ -310,10 +310,13 @@ void main() {
   group('Round 8, finding 10: a positive scalar base raised to a matrix '
       'exponent must classify the exponent\'s own supported '
       'matrix-function class before scaling it by log(base)', () {
-    test('base^exponent throws unsupportedMatrixFunction for a 3x3 '
-        'non-diagonal, non-symmetric exponent whose off-diagonal entries '
-        'underflow to exactly zero only after being scaled by log(base)',
-        () {
+    test('base^exponent raises matrix-out-of-precision-range (D38 declared '
+        'precision contract: this test\'s exponent entries of magnitude '
+        '1e-310 sit below matrixFunctionMinMagnitude=1e-150, so this is '
+        'rejected outright before the classify-before-scaling fix this '
+        'test used to regression-check is ever reached; see below for why '
+        'that original scenario is now provably unreachable, not merely '
+        'untested, for any exponent within the declared range)', () {
       // base = 1 + 2^-52 (the smallest double strictly greater than 1),
       // so log(base) is about 2.22e-16, the smallest nonzero magnitude a
       // scaling factor derived this way can have. exponent's off-diagonal
@@ -321,15 +324,32 @@ void main() {
       // subnormal doubles, making exponent a genuine 3x3 non-diagonal,
       // non-symmetric matrix, which is not one of the five supported
       // matrix-function classes (scalar, complex-form, diagonal, exactly
-      // symmetric, general 2x2). But entry * log(base) (about 1e-310 *
+      // symmetric, general 2x2). entry * log(base) (about 1e-310 *
       // 2.22e-16 =~ 2.22e-326) is below the smallest representable
       // subnormal double (about 4.9e-324), so every off-diagonal entry of
-      // the scaled copy underflows to exactly 0, making the scaled copy
-      // look exactly diagonal even though exponent itself never was.
-      // Classifying the scaled copy instead of exponent itself wrongly
-      // accepts this input and returns a number, instead of throwing the
-      // typed error that exponent's own true, unscaled structure calls
-      // for.
+      // the scaled copy used to underflow to exactly 0, making the scaled
+      // copy look exactly diagonal even though exponent itself never was.
+      //
+      // Codex round 9, finding 4 added a D38 raw-entry precision-range
+      // gate ([_requireEntriesInPrecisionRange]) that now runs on both
+      // operands before this scenario's classify-before-scale check
+      // ([_isSupportedMatrixFunctionClass]) is ever reached, so this
+      // specific 1e-310-magnitude exponent is now rejected earlier, for a
+      // different reason, than the one this test originally targeted.
+      // This is not just a coincidence of this particular fixture: the
+      // smallest nonzero |log(base)| a positive double base distinct
+      // from 1 can produce is about 2.22e-16 (base = 1 +/- one ulp of 1,
+      // the closest a double can sit to 1 without being 1), so an
+      // exponent entry would need magnitude below roughly
+      // 4.9e-324 / 2.22e-16 =~ 2.2e-308 to underflow to exactly 0 once
+      // scaled. matrixFunctionMinMagnitude is 1e-150, twenty orders of
+      // magnitude above that floor, so no exponent entry within the D38
+      // declared range can ever underflow to exactly 0 under this
+      // scaling. The classify-before-scale fix (still present, and still
+      // correct as a defense-in-depth measure) is therefore unreachable
+      // for any input the D38 gate now admits; this test is kept, with
+      // its expectation updated, to document that finding and to keep
+      // regression-checking the D38 gate firing first on this code path.
       final double base = 1.0000000000000002;
       final Matrix exponent = Matrix(<List<double>>[
         <double>[1, 1e-310, 3e-310],
@@ -343,7 +363,7 @@ void main() {
           isA<MatrixDomainError>().having(
             (MatrixDomainError e) => e.errorId,
             'errorId',
-            CalculatrixErrorId.unsupportedMatrixFunction,
+            CalculatrixErrorId.matrixOutOfPrecisionRange,
           ),
         ),
       );
