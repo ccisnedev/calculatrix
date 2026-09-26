@@ -437,4 +437,129 @@ void main() {
       );
     });
   });
+
+  group('CalculatrixSession - rpn multi-token sign toggle', () {
+    test('toggleSign negates only the last space-delimited token', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+
+      session.toggleSign();
+
+      expect(session.rpnDraft, '2 -3');
+
+      session.enter();
+
+      expect(
+        session.rpnStack,
+        orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(-3)]),
+      );
+    });
+
+    test('toggleSign twice on the last token returns it to its original sign', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+
+      session.toggleSign();
+      session.toggleSign();
+
+      expect(session.rpnDraft, '2 3');
+    });
+
+    test(
+      'toggleSign on an empty last token after a trailing SPC starts a negative '
+      'operand',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+
+        session.toggleSign();
+
+        expect(session.rpnDraft, '2 -');
+
+        session.input('3');
+
+        expect(session.rpnDraft, '2 -3');
+      },
+    );
+
+    test('toggleSign twice on an empty last token returns to the empty token', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+
+      session.toggleSign();
+      session.toggleSign();
+
+      expect(session.rpnDraft, '2 ');
+    });
+
+    test(
+      'committing a lone dash left by toggling an empty token surfaces a typed '
+      'error and pushes nothing',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+        session.toggleSign();
+
+        session.enter();
+
+        expect(session.rpnDraft, '2 -');
+        expect(session.rpnStackDepth, 0);
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<CalculatrixError>());
+      },
+    );
+  });
+
+  group('CalculatrixSession - rpn operation atomicity', () {
+    test(
+      'a failing operation rolls back only itself, keeping already-committed '
+      'operands on the stack',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+        session.input('3');
+        session.appendSpace();
+        session.input('0');
+
+        session.applyRpnBinary(RpnBinaryOperator.divide);
+
+        expect(
+          session.rpnStack,
+          orderedEquals(<Matrix>[
+            Matrix.scalar(2),
+            Matrix.scalar(3),
+            Matrix.scalar(0),
+          ]),
+        );
+        expect(session.rpnDraft, '');
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<MatrixDomainError>());
+      },
+    );
+
+    test(
+      'a post-commit stack underflow keeps the committed operand and an '
+      'empty draft',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+
+        session.applyRpnBinary(RpnBinaryOperator.add);
+
+        expect(session.rpnStack, orderedEquals(<Matrix>[Matrix.scalar(2)]));
+        expect(session.rpnDraft, '');
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<RpnStackUnderflowError>());
+      },
+    );
+  });
 }
