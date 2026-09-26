@@ -4135,6 +4135,7 @@ class Matrix {
     if (eigen.isComplex) {
       final double m = eigen.m;
       final double w = eigen.w;
+      _requireComplexPairPartsInPrecisionRange(m, w, 'matrix logarithm');
       final double radius = _hypot(m, w);
       if (!radius.isFinite) {
         throw MatrixDomainError(

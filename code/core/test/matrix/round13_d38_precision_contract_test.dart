@@ -204,6 +204,23 @@ void main() {
         },
       );
 
+      test(
+        'log: same general (asymmetric) 2x2 [[9e149,9e149],[8e149,0]], '
+        'real-eigenvalue branch: the eigenvalue-range check must run '
+        'before the negative-eigenvalue check, since this matrix\'s other '
+        'eigenvalue (~-5.10e149) is negative and would otherwise be '
+        'reported as the ordinary log-undefined error instead of the '
+        'out-of-range one, masking the fact that the larger eigenvalue is '
+        'already outside the declared range',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[9e149, 9e149],
+            <double>[8e149, 0],
+          ]);
+
+          expect(m.log, throwsOutOfPrecisionRange());
+        },
+      );
     },
   );
 
