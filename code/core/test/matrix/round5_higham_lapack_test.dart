@@ -11,6 +11,14 @@ import 'dart:math' as math;
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
+Matcher throwsOutOfPrecisionRange() => throwsA(
+  isA<MatrixDomainError>().having(
+    (MatrixDomainError e) => e.errorId,
+    'errorId',
+    CalculatrixErrorId.matrixOutOfPrecisionRange,
+  ),
+);
+
 void main() {
   group('Round 5, case 1: non-finite power exponent must not hang', () {
     test(
@@ -214,41 +222,69 @@ void main() {
       },
     );
 
-    test('diag(-1000,-500) exp gives diag(0, 7.124576406741286e-218)', () {
-      final Matrix result = Matrix(<List<double>>[
-        <double>[-1000, 0],
-        <double>[0, -500],
-      ]).exp();
+    test(
+      'diag(-1000,-500) now raises matrix-out-of-precision-range under '
+      'rule A, converted from its previous exp result diag(0, '
+      '7.124576406741286e-218): both eigenvalues, -1000 and -500, have '
+      'magnitude above ln(1e150)~=345.3877639491069, so the result '
+      'eigenvalue log-magnitude (the eigenvalue itself, for exp) is out '
+      'of the declared range, and this is rejected before math.exp is '
+      'ever called, even though the -1000 entry would have underflowed to '
+      'a plain, finite (exactly zero) double result anyway; the '
+      'zero-eigenvalue exception does not apply here, since it is about '
+      'an exactly zero input eigenvalue, not an underflowed exp output',
+      () {
+        final Matrix m = Matrix(<List<double>>[
+          <double>[-1000, 0],
+          <double>[0, -500],
+        ]);
 
-      expect(result.at(0, 0), 0);
-      expect(result.at(1, 1), closeTo(7.124576406741286e-218, 1e-218 * 1e-8));
-    });
+        expect(m.exp, throwsOutOfPrecisionRange());
+      },
+    );
 
-    test('diag(0,-1600) exp gives diag(1,0)', () {
-      final Matrix result = Matrix(<List<double>>[
-        <double>[0, 0],
-        <double>[0, -1600],
-      ]).exp();
-
-      expect(result.at(0, 0), 1);
-      expect(result.at(1, 1), 0);
-    });
-
-    test('overflow of a real diagonal entry gives non-finite', () {
-      expect(
-        () => Matrix(<List<double>>[
-          <double>[1000, 0],
+    test(
+      'diag(0,-1600) now raises matrix-out-of-precision-range under rule '
+      'A, converted from its previous exp result diag(1,0): the -1600 '
+      'eigenvalue has magnitude 1600, above ln(1e150)~=345.3877639491069, '
+      'so its result eigenvalue log-magnitude is out of the declared '
+      'range; the 0 eigenvalue on its own is fine (its result '
+      'log-magnitude is 0), but the -1600 entry alone is enough to reject '
+      'the whole matrix',
+      () {
+        final Matrix m = Matrix(<List<double>>[
           <double>[0, 0],
-        ]).exp(),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError e) => e.errorId,
-            'errorId',
-            CalculatrixErrorId.nonFinite,
+          <double>[0, -1600],
+        ]);
+
+        expect(m.exp, throwsOutOfPrecisionRange());
+      },
+    );
+
+    test(
+      'overflow of a real diagonal entry now raises '
+      'matrix-out-of-precision-range under rule A, converted from its '
+      'previous non-finite errorId: the eigenvalue 1000 has magnitude '
+      '1000, above ln(1e150)~=345.3877639491069, so this is rejected on '
+      'the result eigenvalue log-magnitude before math.exp(1000) is ever '
+      'called, and so no longer reaches the plain double overflow this '
+      'test used to regression-check',
+      () {
+        expect(
+          () => Matrix(<List<double>>[
+            <double>[1000, 0],
+            <double>[0, 0],
+          ]).exp(),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.matrixOutOfPrecisionRange,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   });
 
   group(

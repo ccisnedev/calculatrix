@@ -25,6 +25,14 @@ void expectRelativelyClose(
   );
 }
 
+Matcher throwsOutOfPrecisionRange() => throwsA(
+  isA<MatrixDomainError>().having(
+    (MatrixDomainError e) => e.errorId,
+    'errorId',
+    CalculatrixErrorId.matrixOutOfPrecisionRange,
+  ),
+);
+
 void main() {
   group(
     'Matrix.exp diagonal reconstruction for a genuinely non-triangular, '
@@ -61,24 +69,24 @@ void main() {
       );
 
       test(
-        'triangular analogue [[700,1],[0,-700]]: already exact via the '
-        'triangular closed form, unaffected by this fix',
+        'triangular analogue [[700,1],[0,-700]] now raises '
+        'matrix-out-of-precision-range under rule A (converted from the '
+        'previous "already exact via the triangular closed form" '
+        'expectation): every raw entry (700, 1, 0, -700) is in range, and '
+        'both eigenvalues (700, -700, the diagonal entries) are '
+        'individually in range as argument-side magnitudes, but rule A '
+        'also requires the RESULT eigenvalue (exp(700), log-magnitude 700) '
+        'to sit in the declared range, and 700 is far above '
+        'ln(1e150)~=345.39. This is now rejected before ever reaching the '
+        'triangular closed form, superseding the previous exact-value '
+        'assertions',
         () {
-          final double fa = math.exp(700);
-          final double fd = math.exp(-700);
-          final double c1 = (fa - fd) / 1400;
-
           final Matrix value = Matrix(<List<double>>[
             <double>[700, 1],
             <double>[0, -700],
           ]);
 
-          final Matrix result = value.exp();
-
-          expectRelativelyClose(result.at(0, 0), fa);
-          expectRelativelyClose(result.at(1, 1), fd);
-          expectRelativelyClose(result.at(0, 1), c1);
-          expect(result.at(1, 0), equals(0));
+          expect(value.exp, throwsOutOfPrecisionRange());
         },
       );
 

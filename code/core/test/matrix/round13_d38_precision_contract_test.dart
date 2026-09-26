@@ -135,9 +135,16 @@ void expectConditionRelativeError(
   Matrix reference, {
   required double kappa,
 }) {
+  // Coordinator amendment (docs review, runbook D38, commit afb9477): the
+  // bound floors kappa at 1, `max(1, kappa) * unitRoundoff`, not a bare
+  // `kappa * unitRoundoff`, since no double-precision algorithm ever does
+  // better than the flat, condition-1 figure regardless of how favorably
+  // kappa computes for a specific (f, A) pair (e.g. exp(1e-16), whose
+  // kappa comes out below 1, still returns 1.0 exactly, not something
+  // more accurate than the flat figure would allow).
   final double tolerance =
       CalculatrixNumericPolicy.matrixFunctionAccuracyFactor *
-      kappa *
+      math.max(1, kappa) *
       CalculatrixNumericPolicy.unitRoundoff;
   expectNormwiseRelativeError(computed, reference, tolerance: tolerance);
 }
@@ -149,6 +156,26 @@ Matcher throwsOutOfPrecisionRange() => throwsA(
     CalculatrixErrorId.matrixOutOfPrecisionRange,
   ),
 );
+
+/// Rule B (runbook D38 amendment): the absolute-bound analogue of
+/// [expectConditionRelativeError], for a genuinely singular `sqrt` input
+/// whose reference is itself partly or wholly zero, so a relative bound is
+/// either undefined or vacuous. `||X - sqrt(A)||_F <=
+/// 1e4*sqrt(unitRoundoff*||A||_F)`, where `X` is the computed result and
+/// `A` is the original (singular) input this bound is stated against.
+void expectSqrtSingularBound(Matrix computed, Matrix reference, Matrix a) {
+  final double tolerance =
+      1e4 *
+      math.sqrt(CalculatrixNumericPolicy.unitRoundoff * _frobeniusNorm(a));
+  final double frobeniusDiff = _frobeniusNorm(computed - reference);
+  expect(
+    frobeniusDiff,
+    lessThanOrEqualTo(tolerance),
+    reason:
+        'computed=$computed reference=$reference '
+        'frobeniusDiff=$frobeniusDiff tolerance=$tolerance',
+  );
+}
 
 void main() {
   group('D38: precision-range constants', () {
@@ -435,93 +462,55 @@ void main() {
   });
 
   group(
-    'D38: round 8 finding 1 (I) - exp analogue, 1e-100 coupling far below '
+    'D38: round 8 finding 1 - exp analogue, 1e-100 coupling far below '
     'the diagonal scale',
     () {
       test(
-        'exp([[700,1],[1e-100,-701]]): every entry (700, 1, 1e-100, -701) '
-        'and both eigenvalues (700, -701) are in range. Reference '
-        '(mpmath, dps=200, needed because entry11 is the result of '
-        'catastrophic cancellation between two ~5e303-magnitude '
-        'quantities down to a ~5e197-magnitude result, about 106 decimal '
-        'orders of magnitude, unresolvable at a default dps=60): '
-        'entry00=1.01423205473500450945532959523e304, '
-        'entry01=7.23934371688083161638350888816e300, '
-        'entry10=7.23934371688083161638350888816e200, '
-        'entry11=5.16726889142100757771842176171e197. This exercises the '
-        'same "small coupling relative to the diagonal scale" pattern as '
-        'the original (out-of-range) finding, and is already handled '
-        'correctly by [Matrix._lagrangeClosedForm2x2]\'s anchor-at-'
-        'whichever-function-value-is-smaller fix, plus its bc-identity '
-        'cancellation recovery for the near-zero offset.',
+        'exp([[700,1],[1e-100,-701]]) now raises '
+        'matrix-out-of-precision-range under rule A (converted from the '
+        'previous (I) classification): every raw entry (700, 1, 1e-100, '
+        '-701) and both argument-side eigenvalues (700, -701) individually '
+        'sit in [1e-150, 1e150], but rule A also requires the RESULT '
+        'eigenvalue (exp(700), magnitude about 1.014e304) to be in that '
+        'same declared range, and 1.014e304 is far above '
+        'matrixFunctionMaxMagnitude=1e150 (its log-magnitude, 700, is '
+        'likewise far above ln(1e150)~=345.39). This is now rejected '
+        'before ever computing exp(700), rather than computed and checked '
+        'against the mpmath reference this test used before rule A '
+        'existed.',
         () {
           final Matrix m = Matrix(<List<double>>[
             <double>[700, 1],
             <double>[1e-100, -701],
           ]);
 
-          final Matrix reference = Matrix(<List<double>>[
-            <double>[1.01423205473500450945532959523e304, 7.23934371688083161638350888816e300],
-            <double>[7.23934371688083161638350888816e200, 5.16726889142100757771842176171e197],
-          ]);
-
-          // kappa(f, A) = 990.657609153752, computed in mpmath (dps=200)
-          // via a central-difference Frechet derivative in each of the 4
-          // basis directions, assembled into a 4x4 operator matrix whose
-          // largest singular value (sigma_max(L_f(A)) ~= 1.014e304) is
-          // the numerator's operator-norm factor; ||A||_F ~= 990.657,
-          // ||f(A)||_F ~= 1.014e304. Bound =
-          // 1e4 * 990.657609153752 * 1.1102230246251565e-16 ~= 1.10e-9.
-          expectConditionRelativeError(
-            m.exp(),
-            reference,
-            kappa: 990.657609153752,
-          );
+          expect(m.exp, throwsOutOfPrecisionRange());
         },
       );
 
       test(
-        '[[1e100,1],[1e-100,1e-98]]^-0.5: every entry and both eigenvalues '
-        '(1e100, 1e-98) are in range. This exercises the negative-'
-        'exponent anchor inversion the original finding named directly '
-        '("anchoring at fSmall when it exceeds fBig"): raising the '
-        'larger-magnitude eigenvalue to a negative power makes it the '
-        'smaller function value (1e100^-0.5 = 1e-50) while the smaller-'
-        'magnitude eigenvalue becomes the larger function value '
-        '(1e-98^-0.5 = 1e49). Reference (mpmath, dps=300; the eigenvalues '
-        'here are each exact powers of ten with even exponents, so every '
-        'downstream quantity is an exact power of ten, verified to 50 '
-        'significant digits): entry00=1e-50, entry01=-1e-51, '
-        'entry10=-1e-151, entry11=1e49. Already handled correctly by the '
-        'same anchor-selection fix as the exp case above.',
+        '[[1e100,1],[1e-100,1e-98]]^-0.5 now raises matrix-out-of-'
+        'precision-range under rule A (converted from the previous (I) '
+        'classification): both eigenvalues (1e100, 1e-98) individually '
+        'sit in [1e-150, 1e150], and the exponent -0.5 keeps every result '
+        'eigenvalue in range too (0.5*ln(1e100)=115.1, 0.5*ln(1e-98)='
+        '-112.8, both under 345.39), but rule A also requires every '
+        'NONZERO ENTRY of the computed result to be in the declared '
+        'range, not just its eigenvalues: the off-diagonal entry (1,0) '
+        'is mathematically -1e-151 (per the mpmath reference below, '
+        'dps=300, verified to 50 significant digits, since every '
+        'quantity here is an exact power of ten), below '
+        'matrixFunctionMinMagnitude=1e-150. Reference: entry00=1e-50, '
+        'entry01=-1e-51, entry10=-1e-151, entry11=1e49.',
         () {
           final Matrix m = Matrix(<List<double>>[
             <double>[1e100, 1],
             <double>[1e-100, 1e-98],
           ]);
 
-          final Matrix reference = Matrix(<List<double>>[
-            <double>[1e-50, -1e-51],
-            <double>[-1e-151, 1e49],
-          ]);
-
-          // kappa(f, A) = 5.0e+197, computed in mpmath (dps=400) via the
-          // same central-difference Frechet-derivative/largest-singular-
-          // value method as above; sigma_max(L_f(A)) ~= 5.0e+146,
-          // ||A||_F ~= 1e100, ||f(A)||_F ~= 1e49. This kappa is enormous
-          // because the -0.5 power derivative itself blows up near a
-          // 1e100-magnitude eigenvalue (large sigma_max), unlike finding
-          // 7's case where the huge kappa comes entirely from ||A||_F
-          // dwarfing ||f(A)||_F with a modest operator norm. Bound =
-          // 1e4 * 5.0e+197 * 1.1102230246251565e-16 ~= 5.55e+186; this
-          // matrix's every quantity is an exact power of ten (see the
-          // test name's comment above), so the previously-asserted flat
-          // 1e-12 tolerance already held here too, well inside this much
-          // looser condition-relative bound.
-          expectConditionRelativeError(
-            m.power(Matrix.scalar(-0.5)),
-            reference,
-            kappa: 5.0e+197,
+          expect(
+            () => m.power(Matrix.scalar(-0.5)),
+            throwsOutOfPrecisionRange(),
           );
         },
       );
@@ -529,77 +518,46 @@ void main() {
   );
 
   group(
-    'D38: round 8 finding 9 (I) - exp at 709 with normal-magnitude '
-    'entries, complex and close-real branches',
+    'D38 / Codex round 10, rule A: exp at 709 now raises '
+    'matrix-out-of-precision-range, converted from round 8 finding 9\'s '
+    '(I) in-range analogues',
     () {
       test(
         'exp([[709,1],[-2,709]]): complex-eigenvalue-pair branch '
-        '(bc=-2, discriminant=-8 < 0, m=709, w=sqrt(2)). Reference '
-        '(mpmath, dps=60): entry00=entry11=1.28160882464220463078095'
-        '360971e307, entry01=5.74019599076293162691749707998e307, '
-        'entry10=-1.148039198152586325383499416e308. This is a '
-        'representable result (well below double\'s ~1.8e308 max) that '
-        'the previous, non-centered `c0 = em*cos(w) - c1*m` form could '
-        'overflow even when every entry itself stays finite, since '
-        '`c1*m` is not one of the matrix\'s own bounded quantities. '
-        'Already handled correctly by [Matrix._general2x2Exp]\'s centered '
-        'form.',
+        '(bc=-2, discriminant=-8 < 0, m=709, w=sqrt(2)). Every raw entry '
+        'and the pair\'s own eigenvalue magnitude (hypot(709, sqrt(2))) '
+        'are in range, but rule A also requires the RESULT eigenvalue '
+        '(exp(709 +/- sqrt(2)*i), magnitude exp(709)) to be in range: '
+        'exp(709) is about 8.2e307, comfortably representable, but its '
+        'log-magnitude (709) is above the declared bound '
+        '(ln(1e150)~=345.39), so this now raises '
+        'matrix-out-of-precision-range before ever computing exp(709), '
+        'superseding the previous (I) classification once rule A checks '
+        'the result side, not just the argument side.',
         () {
           final Matrix m = Matrix(<List<double>>[
             <double>[709, 1],
             <double>[-2, 709],
           ]);
 
-          final Matrix reference = Matrix(<List<double>>[
-            <double>[1.28160882464220463078095360971e307, 5.74019599076293162691749707998e307],
-            <double>[-1.148039198152586325383499416e308, 1.28160882464220463078095360971e307],
-          ]);
-
-          // kappa(f, A) = 861.992625900178, computed in mpmath (dps=100)
-          // via the same central-difference Frechet-derivative/largest-
-          // singular-value method as finding 1a above; sigma_max(L_f(A))
-          // ~= 1.114e308, ||A||_F ~= 1002.68, ||f(A)||_F ~= 1.296e308.
-          // Bound = 1e4 * 861.992625900178 * 1.1102230246251565e-16
-          // ~= 9.57e-10.
-          expectConditionRelativeError(
-            m.exp(),
-            reference,
-            kappa: 861.992625900178,
-          );
+          expect(m.exp, throwsOutOfPrecisionRange());
         },
       );
 
       test(
         'exp([[709,1e-7],[2e-7,709]]): close-real-eigenvalue branch '
         '(bc=2e-14, discriminant=8e-14 > 0 but tiny, relative eigenvalue '
-        'gap well under the close-eigenvalue threshold). Reference '
-        '(mpmath, dps=60): entry00=entry11=8.21840746155505437331598'
-        '793646e307, entry01=8.2184074615549995839329109032e300, '
-        'entry10=1.64368149231099991678658218064e301. Same overflow-'
-        'prone standalone-c0 pattern as the complex case above, for the '
-        'close-real-eigenvalue branch; already handled correctly by the '
-        'same centered-form fix.',
+        'gap well under the close-eigenvalue threshold). Same rule A '
+        'result-side rejection as the complex case above: both close-real '
+        'eigenvalues sit at about 709, so the result eigenvalue exp(709) '
+        'is again above the declared range.',
         () {
           final Matrix m = Matrix(<List<double>>[
             <double>[709, 1e-7],
             <double>[2e-7, 709],
           ]);
 
-          final Matrix reference = Matrix(<List<double>>[
-            <double>[8.21840746155505437331598793646e307, 8.2184074615549995839329109032e300],
-            <double>[1.64368149231099991678658218064e301, 8.21840746155505437331598793646e307],
-          ]);
-
-          // kappa(f, A) = 709.000106349992, computed in mpmath (dps=100)
-          // via the same method as finding 9a above; sigma_max(L_f(A))
-          // ~= 8.218e307, ||A||_F ~= 1002.68, ||f(A)||_F ~= 1.162e308.
-          // Bound = 1e4 * 709.000106349992 * 1.1102230246251565e-16
-          // ~= 7.87e-10.
-          expectConditionRelativeError(
-            m.exp(),
-            reference,
-            kappa: 709.000106349992,
-          );
+          expect(m.exp, throwsOutOfPrecisionRange());
         },
       );
     },
@@ -695,6 +653,288 @@ void main() {
             reference,
             kappa: 18414244737.4962,
           );
+        },
+      );
+    },
+  );
+
+  group(
+    'D38 / Codex round 10, rule A: contract examples (result-side range '
+    'check, before computing)',
+    () {
+      test('scalar exp(-1000) raises matrix-out-of-precision-range', () {
+        expect(Matrix.scalar(-1000).exp, throwsOutOfPrecisionRange());
+      });
+
+      test('scalar exp(710) raises matrix-out-of-precision-range', () {
+        expect(Matrix.scalar(710).exp, throwsOutOfPrecisionRange());
+      });
+
+      test(
+        'exp([[710,0.75],[-0.8,710]]) raises matrix-out-of-precision-'
+        'range: complex-eigenvalue-pair branch (bc=-0.6, discriminant < 0) '
+        'with real part m=710, so the result eigenvalue exp(710 +/- w*i) '
+        'has log-magnitude 710, above ln(1e150)~=345.39',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[710, 0.75],
+            <double>[-0.8, 710],
+          ]);
+          expect(m.exp, throwsOutOfPrecisionRange());
+        },
+      );
+
+      test(
+        '[[1e150,1e150],[0,1e150]]^-1.15 raises matrix-out-of-precision-'
+        'range: the repeated eigenvalue 1e150 sits right at the declared '
+        'max, but the result eigenvalue log-magnitude, '
+        '-1.15*ln(1e150)~=-397.20, exceeds -345.39 in magnitude',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[1e150, 1e150],
+            <double>[0, 1e150],
+          ]);
+          expect(
+            () => m.power(Matrix.scalar(-1.15)),
+            throwsOutOfPrecisionRange(),
+          );
+        },
+      );
+
+      test(
+        '[[1e149,1e149],[0,2e149]]^-1.5 raises matrix-out-of-precision-'
+        'range: the larger (triangular, real) eigenvalue, 2e149, has '
+        'result eigenvalue log-magnitude -1.5*ln(2e149)~=-515.67, '
+        'exceeding -345.39',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[1e149, 1e149],
+            <double>[0, 2e149],
+          ]);
+          expect(
+            () => m.power(Matrix.scalar(-1.5)),
+            throwsOutOfPrecisionRange(),
+          );
+        },
+      );
+
+      test(
+        '[[1e149,1e149],[-1e-149,1e149]]^-1.5 raises matrix-out-of-'
+        'precision-range: a complex-eigenvalue-pair branch (bc=-1, '
+        'discriminant < 0) whose radius, hypot(1e149,1), is about 1e149, '
+        'giving result eigenvalue log-magnitude -1.5*ln(1e149)~=-514.63, '
+        'exceeding -345.39',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[1e149, 1e149],
+            <double>[-1e-149, 1e149],
+          ]);
+          expect(
+            () => m.power(Matrix.scalar(-1.5)),
+            throwsOutOfPrecisionRange(),
+          );
+        },
+      );
+    },
+  );
+
+  group(
+    'D38 / Codex round 10, rule A: an exactly-zero result eigenvalue is '
+    'always allowed, distinguished from a merely tiny but nonzero one',
+    () {
+      test(
+        'log(I) succeeds: every eigenvalue of the identity is exactly 1, '
+        'so every result eigenvalue (ln(1)) is exactly zero, allowed '
+        'regardless of the declared range (rule B: the log-identity '
+        'residual is bounded by 1e4*unitRoundoff*||L_log(I)||_F*||I||_F, '
+        'in practice exactly zero)',
+        () {
+          final Matrix result = Matrix.identity(2).log();
+          expect(result.at(0, 0), 0.0);
+          expect(result.at(0, 1), 0.0);
+          expect(result.at(1, 0), 0.0);
+          expect(result.at(1, 1), 0.0);
+        },
+      );
+
+      test(
+        'sqrt(0) succeeds: the sole eigenvalue is exactly zero, allowed',
+        () {
+          expect(Matrix.scalar(0).sqrt().scalarValue, 0.0);
+        },
+      );
+
+      test(
+        'sqrt(diag(0,1)) succeeds: one eigenvalue is exactly zero '
+        '(allowed) and the other, 1, has result eigenvalue log-magnitude '
+        '0.5*ln(1)=0 (also in range)',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[0, 0],
+            <double>[0, 1],
+          ]);
+          final Matrix result = m.sqrt();
+          expect(result.at(0, 0), 0.0);
+          expect(result.at(0, 1), 0.0);
+          expect(result.at(1, 0), 0.0);
+          expect(result.at(1, 1), 1.0);
+        },
+      );
+
+      test(
+        'sqrt([[1,1],[1,1]]) succeeds: this singular symmetric matrix has '
+        'eigenvalues exactly 0 and 2, the zero eigenvalue allowed and the '
+        'other well within range (rule B: '
+        '||X - sqrt(A)||_F <= 1e4*sqrt(unitRoundoff*||A||_F))',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[1, 1],
+            <double>[1, 1],
+          ]);
+          final double s = 1 / math.sqrt(2);
+          final Matrix reference = Matrix(<List<double>>[
+            <double>[s, s],
+            <double>[s, s],
+          ]);
+          expectSqrtSingularBound(m.sqrt(), reference, m);
+        },
+      );
+
+      test(
+        'in contrast, exp(-1000) still raises matrix-out-of-precision-'
+        'range: its result eigenvalue, exp(-1000), is tiny but NOT '
+        'exactly zero (a double can represent an extremely small nonzero '
+        'value distinct from zero), so the zero exception above does not '
+        'apply here',
+        () {
+          expect(Matrix.scalar(-1000).exp, throwsOutOfPrecisionRange());
+        },
+      );
+    },
+  );
+
+  group(
+    'D38: the max(1, kappa) accuracy floor (coordinator amendment, '
+    'runbook D38, commit afb9477)',
+    () {
+      test(
+        'exp(1e-16) returns exactly 1.0: kappa(exp, 1e-16) computes below '
+        '1 (exp itself is close to 1 while its derivative times the tiny '
+        'eigenvalue is smaller still), yet no double-precision algorithm '
+        'does better than the flat, condition-1 figure regardless, which '
+        'is trivially satisfied here since 1e-16 already rounds to '
+        'exactly 1.0 under exp',
+        () {
+          expect(Matrix.scalar(1e-16).exp().scalarValue, 1.0);
+        },
+      );
+    },
+  );
+
+  group(
+    'Codex round 10, rule C: log\'s centered form must not form w/m at '
+    'exactly 1.0 for a widely separated spectrum',
+    () {
+      test(
+        'log([[1e20,1],[1,1]]): the centered log1p formula used for '
+        'close eigenvalues would compute w/m rounding to exactly 1.0 '
+        'here (spuriously calling log1p(-1) = -Infinity), since this '
+        'matrix\'s eigenvalues are far apart, not close; restricting '
+        'the centered form to close eigenvalues and using the stable, '
+        'far-apart Lagrange closed form here fixes it. Reference '
+        '(mpmath, dps=60): entry00=46.0517018598809, '
+        'entry01=4.60517018598809e-19, entry10=4.60517018598809e-19, '
+        'entry11=-9.9999999999999999955e-21 (about -1e-20).',
+        () {
+          final Matrix m = Matrix(<List<double>>[
+            <double>[1e20, 1],
+            <double>[1, 1],
+          ]);
+
+          final Matrix reference = Matrix(<List<double>>[
+            <double>[46.0517018598809, 4.60517018598809e-19],
+            <double>[4.60517018598809e-19, -9.9999999999999999955e-21],
+          ]);
+
+          // kappa(f, A) ~= 2.171472409516259e18, computed in mpmath
+          // (dps=60) via the same central-difference Frechet-derivative/
+          // largest-singular-value method as the other cases in this
+          // file: sigma_max(L_f(A)) ~= 1.0, ||A||_F ~= 1e20,
+          // ||f(A)||_F ~= 46.05. This kappa is enormous purely because
+          // ||A||_F dwarfs ||f(A)||_F, the same pattern as Codex round 9
+          // finding 7 above, not because the derivative operator itself
+          // is ill-conditioned.
+          expectConditionRelativeError(
+            m.log(),
+            reference,
+            kappa: 2.171472409516259e18,
+          );
+        },
+      );
+    },
+  );
+
+  group(
+    'D25 case 13 / runbook f7ace5e: non-integer power checks the D38 '
+    'range first, while an integer power and an integer-exponent exp '
+    'bypass it entirely',
+    () {
+      test(
+        '10^400.5 (non-integer power) raises matrix-out-of-precision-'
+        'range: result eigenvalue log-magnitude is 400.5*ln(10)~=922.19, '
+        'far above ln(1e150)~=345.39',
+        () {
+          expect(
+            () => Matrix.scalar(10).power(Matrix.scalar(400.5)),
+            throwsOutOfPrecisionRange(),
+          );
+        },
+      );
+
+      test(
+        '10^400 (integer power) stays non-finite: an integer exponent is '
+        'computed by ordinary real exponentiation, not the closed-form '
+        'eigenvalue machinery rule A governs, so it bypasses the '
+        'declared range entirely; 10^400 genuinely overflows double '
+        'precision regardless',
+        () {
+          expect(
+            () => Matrix.scalar(10).power(Matrix.scalar(400)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.nonFinite,
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'e^400 (integer power) succeeds, about 5.221469689764144e173: an '
+        'integer exponent bypasses rule A even though 400 alone, as a '
+        'scalar exp argument, raises matrix-out-of-precision-range (see '
+        'the next test); unlike 10^400 above, e^400 does not overflow '
+        'double precision',
+        () {
+          final Matrix result = Matrix.scalar(
+            math.e,
+          ).power(Matrix.scalar(400));
+          expect(
+            result.scalarValue,
+            closeTo(5.221469689764144e173, 5.221469689764144e173 * 1e-9),
+          );
+        },
+      );
+
+      test(
+        'exp(400) (scalar exp, not power) raises matrix-out-of-precision-'
+        'range: exp\'s result log-magnitude is the scalar itself, 400, '
+        'above ln(1e150)~=345.39, even though e^400 (the integer-power '
+        'form above) succeeds',
+        () {
+          expect(Matrix.scalar(400).exp, throwsOutOfPrecisionRange());
         },
       );
     },
