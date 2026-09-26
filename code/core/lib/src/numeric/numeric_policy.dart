@@ -89,15 +89,58 @@ class CalculatrixNumericPolicy {
   /// are not affected: this range only bounds the four closed-form
   /// eigenvalue-based functions.
   ///
-  /// Inside this range, the accuracy contract is a normwise (Frobenius)
-  /// relative error `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a
-  /// componentwise one; see the dartdoc of `Matrix.exp`, `Matrix.log`,
+  /// Inside this range, the accuracy contract is condition-relative, not a
+  /// flat or componentwise one: the normwise (Frobenius) relative error
+  /// `||F_computed - F_true|| / ||F_true||` is at most
+  /// `matrixFunctionAccuracyFactor * kappa(f, A) * unitRoundoff`, where
+  /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
+  /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
+  /// Frechet derivative of `f` at `A`, a linear operator on 2x2 matrices;
+  /// Higham, "Functions of Matrices", section 3.1; `||L_f(A)||_F` is the
+  /// operator norm induced by the Frobenius inner product, i.e. the
+  /// largest singular value of the 4x4 matrix representing `L_f(A)` on the
+  /// vec-flattened, and therefore orthonormal, basis of 2x2 matrices under
+  /// that inner product); see the dartdoc of `Matrix.exp`, `Matrix.log`,
   /// `Matrix.sqrt` and `Matrix.power` for that contract's statement on
-  /// each function.
+  /// each function, and [matrixFunctionAccuracyFactor] and [unitRoundoff]
+  /// for the bound's two named factors.
   static const double matrixFunctionMinMagnitude = 1e-150;
 
   /// See [matrixFunctionMinMagnitude].
   static const double matrixFunctionMaxMagnitude = 1e150;
+
+  /// Double-precision unit roundoff, `u = 2^-53`
+  /// (~1.1102230246251565e-16): half of [machineEpsilon] (`2^-52`). This is
+  /// the constant conventionally called `u` in backward-error-analysis
+  /// bounds of the form `c * kappa * u` (Higham, "Accuracy and Stability of
+  /// Numerical Algorithms"), as distinct from [machineEpsilon] (`2^-52`,
+  /// "the gap between 1.0 and the next representable double"), which this
+  /// codebase uses elsewhere for scale-relative comparison tolerances, not
+  /// for stating an error bound's roundoff unit. Used only in the D38
+  /// condition-relative accuracy contract on [matrixFunctionMinMagnitude];
+  /// see that constant and [matrixFunctionAccuracyFactor].
+  static const double unitRoundoff = 1.1102230246251565e-16;
+
+  /// Named constant factor in the D38 condition-relative accuracy contract
+  /// on [matrixFunctionMinMagnitude]: the bound on the normwise relative
+  /// error of `Matrix.exp`, `Matrix.log`, `Matrix.sqrt` and non-integer
+  /// `Matrix.power`, inside the declared magnitude range, is
+  /// `matrixFunctionAccuracyFactor * kappa(f, A) * unitRoundoff`.
+  ///
+  /// Chosen so that a well-conditioned problem (`kappa(f, A) ~= 1`, e.g. a
+  /// matrix function evaluated away from a repeated or near-repeated
+  /// eigenvalue) recovers the flat figure this codebase used before the
+  /// contract became condition-relative: `1e4 * 1 * 1.1102230246251565e-16
+  /// ~= 1.11e-12 ~= 1e-12`. For an ill-conditioned `(f, A)` pair the bound
+  /// scales up with `kappa(f, A)`, since no double-precision algorithm can
+  /// do better than roughly `kappa(f, A) * unitRoundoff` regardless of how
+  /// it is implemented (this is a property of the problem, not of this
+  /// library's algorithms); a large `kappa(f, A)` purely from `||A||_F`
+  /// dwarfing `||f(A)||_F` (rather than from a large Frechet-derivative
+  /// operator norm) still legitimately widens this bound, since the
+  /// definition of `kappa(f, A)` (see [matrixFunctionMinMagnitude]) does
+  /// not distinguish the two causes.
+  static const double matrixFunctionAccuracyFactor = 1e4;
 
   static bool nearlyEqual(
     double a,

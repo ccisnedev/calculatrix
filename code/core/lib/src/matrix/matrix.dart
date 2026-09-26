@@ -2295,9 +2295,17 @@ class Matrix {
   /// CalculatrixNumericPolicy.matrixFunctionMaxMagnitude]`
   /// (`[1e-150, 1e150]`); otherwise this throws
   /// [CalculatrixErrorId.matrixOutOfPrecisionRange]. Inside that range, the
-  /// accuracy contract is a normwise (Frobenius) relative error
-  /// `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a componentwise
-  /// one.
+  /// accuracy contract is condition-relative, not a flat or componentwise
+  /// one: the normwise (Frobenius) relative error
+  /// `||F_computed - F_true|| / ||F_true||` is at most
+  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor * kappa(f, A) *
+  /// CalculatrixNumericPolicy.unitRoundoff`, where
+  /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
+  /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
+  /// Frechet derivative of `f` at `A`; Higham, "Functions of Matrices",
+  /// section 3.1). See [CalculatrixNumericPolicy.matrixFunctionAccuracyFactor]
+  /// for why a well-conditioned `A` (`kappa(f, A) ~= 1`) recovers the old
+  /// flat figure, about `1.1e-12`.
   Matrix sqrt() {
     _requireSquare(operation: 'square root');
     _checkFiniteMatrix(this);
@@ -2353,9 +2361,17 @@ class Matrix {
   /// CalculatrixNumericPolicy.matrixFunctionMaxMagnitude]`
   /// (`[1e-150, 1e150]`); otherwise this throws
   /// [CalculatrixErrorId.matrixOutOfPrecisionRange]. Inside that range, the
-  /// accuracy contract is a normwise (Frobenius) relative error
-  /// `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a componentwise
-  /// one. The non-finite check above is unaffected: a true result that
+  /// accuracy contract is condition-relative, not a flat or componentwise
+  /// one: the normwise (Frobenius) relative error
+  /// `||F_computed - F_true|| / ||F_true||` is at most
+  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor * kappa(f, A) *
+  /// CalculatrixNumericPolicy.unitRoundoff`, where
+  /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
+  /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
+  /// Frechet derivative of `f` at `A`; Higham, "Functions of Matrices",
+  /// section 3.1). See [CalculatrixNumericPolicy.matrixFunctionAccuracyFactor]
+  /// for why a well-conditioned `A` (`kappa(f, A) ~= 1`) recovers the old
+  /// flat figure, about `1.1e-12`. The non-finite check above is unaffected: a true result that
   /// genuinely overflows (e.g. `exp` of a large positive in-range
   /// eigenvalue) is still reported as [CalculatrixErrorId.nonFinite], not
   /// as an out-of-precision-range rejection.
@@ -2438,9 +2454,17 @@ class Matrix {
   /// CalculatrixNumericPolicy.matrixFunctionMaxMagnitude]`
   /// (`[1e-150, 1e150]`); otherwise this throws
   /// [CalculatrixErrorId.matrixOutOfPrecisionRange]. Inside that range, the
-  /// accuracy contract is a normwise (Frobenius) relative error
-  /// `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a componentwise
-  /// one.
+  /// accuracy contract is condition-relative, not a flat or componentwise
+  /// one: the normwise (Frobenius) relative error
+  /// `||F_computed - F_true|| / ||F_true||` is at most
+  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor * kappa(f, A) *
+  /// CalculatrixNumericPolicy.unitRoundoff`, where
+  /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
+  /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
+  /// Frechet derivative of `f` at `A`; Higham, "Functions of Matrices",
+  /// section 3.1). See [CalculatrixNumericPolicy.matrixFunctionAccuracyFactor]
+  /// for why a well-conditioned `A` (`kappa(f, A) ~= 1`) recovers the old
+  /// flat figure, about `1.1e-12`.
   Matrix log() {
     _requireSquare(operation: 'logarithm');
     _checkFiniteMatrix(this);
@@ -2558,9 +2582,17 @@ class Matrix {
   /// CalculatrixNumericPolicy.matrixFunctionMaxMagnitude]`
   /// (`[1e-150, 1e150]`); otherwise this throws
   /// [CalculatrixErrorId.matrixOutOfPrecisionRange]. Inside that range, the
-  /// accuracy contract is a normwise (Frobenius) relative error
-  /// `||F_computed - F_true|| / ||F_true|| <= 1e-12`, not a componentwise
-  /// one.
+  /// accuracy contract is condition-relative, not a flat or componentwise
+  /// one: the normwise (Frobenius) relative error
+  /// `||F_computed - F_true|| / ||F_true||` is at most
+  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor * kappa(f, A) *
+  /// CalculatrixNumericPolicy.unitRoundoff`, where
+  /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
+  /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
+  /// Frechet derivative of `f` at `A`; Higham, "Functions of Matrices",
+  /// section 3.1). See [CalculatrixNumericPolicy.matrixFunctionAccuracyFactor]
+  /// for why a well-conditioned `A` (`kappa(f, A) ~= 1`) recovers the old
+  /// flat figure, about `1.1e-12`.
   Matrix power(Matrix exponent) {
     if (!isSquare) {
       throw MatrixShapeError(
@@ -4415,9 +4447,12 @@ class Matrix {
           // branch's own relativeGap threshold, e.g. `lBig=1e100`,
           // `lSmall=1e100*(1-1.01e-3)`: both logarithms are ~230.26, so
           // their difference (~1.01e-3 relative) loses several
-          // significant digits to cancellation, past the 1e-12 normwise
-          // accuracy contract. `_log1p((lBig-lSmall) / lSmall)` computes
-          // the same mathematical quantity, `ln(lBig/lSmall)`, without
+          // significant digits to cancellation, past what the
+          // condition-relative normwise accuracy contract allows for a
+          // well-conditioned case like this (kappa(f, A) ~= 1, so the
+          // bound is ~1.1e-12; see [CalculatrixNumericPolicy.
+          // matrixFunctionAccuracyFactor]). `_log1p((lBig-lSmall) / lSmall)`
+          // computes the same mathematical quantity, `ln(lBig/lSmall)`, without
           // ever subtracting two comparable absolute logarithms: it is
           // safe at any `lBig >= lSmall > 0` (both strictly positive
           // here; the negative-eigenvalue case is rejected above), and is
@@ -4881,8 +4916,11 @@ class Matrix {
             // this branch's `relativeGap` check classifies the pair, e.g.
             // `lBig=1e100`, `lSmall=1e100*(1-1.4916e-8)`: both logarithms
             // are ~230.26, so their difference (~1.49e-8) loses about 8 of
-            // its significant digits to cancellation, well past the
-            // 1e-12 normwise accuracy contract. `_log1p((lBig-lSmall) /
+            // its significant digits to cancellation, well past what the
+            // condition-relative normwise accuracy contract allows for a
+            // well-conditioned case like this (kappa(f, A) ~= 1, so the
+            // bound is ~1.1e-12; see [CalculatrixNumericPolicy.
+            // matrixFunctionAccuracyFactor]). `_log1p((lBig-lSmall) /
             // lSmall)` computes the exact same mathematical quantity,
             // `ln(lBig/lSmall)`, without ever subtracting two comparable
             // absolute logarithms: it is safe at any `lBig >= lSmall > 0`
