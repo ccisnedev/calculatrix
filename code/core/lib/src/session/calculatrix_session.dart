@@ -712,8 +712,13 @@ class CalculatrixSession {
       _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
     } on FormatException catch (error) {
       _lastError = error;
+      // The action may have already committed draft operands onto the real
+      // stack before the failing step ran, so currentValue must still track
+      // the new top even though the operation itself failed.
+      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
     } on CalculatrixError catch (error) {
       _lastError = error;
+      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
     }
   }
 

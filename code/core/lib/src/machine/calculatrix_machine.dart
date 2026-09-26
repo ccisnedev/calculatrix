@@ -25,8 +25,21 @@ final class CalculatrixMachine {
     _engine.clear();
   }
 
+  // Every command runs through this single choke point, so this is where
+  // atomicity is guaranteed structurally: snapshot the stack first, and if
+  // the command throws for any reason, restore it exactly, so a partially
+  // applied command (e.g. one that popped its operands before failing)
+  // never leaves the stack changed. Individual commands and engine helpers
+  // may still compute before popping as a cheap optimization, but they no
+  // longer need to be individually correct for this guarantee to hold.
   void execute(CalculatrixCommand command) {
-    command.executeOn(_engine);
+    final List<Matrix> snapshot = _engine.stack;
+    try {
+      command.executeOn(_engine);
+    } catch (_) {
+      _engine.restore(snapshot);
+      rethrow;
+    }
   }
 
   void executeAll(Iterable<CalculatrixCommand> commands) {

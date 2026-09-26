@@ -18,6 +18,16 @@ class RpnEngine {
     _stack.clear();
   }
 
+  // Restores the stack to a previously captured snapshot (see `stack`).
+  // Used by CalculatrixMachine.execute to roll back a command that threw
+  // partway through, so a failing command never leaves the stack with
+  // some operands popped and others not.
+  void restore(List<Matrix> snapshot) {
+    _stack
+      ..clear()
+      ..addAll(snapshot);
+  }
+
   void push(Matrix value) {
     _stack.add(value);
   }
