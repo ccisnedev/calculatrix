@@ -92,7 +92,12 @@ class CalculatrixNumericPolicy {
   /// Inside this range, the accuracy contract is condition-relative, not a
   /// flat or componentwise one: the normwise (Frobenius) relative error
   /// `||F_computed - F_true|| / ||F_true||` is at most
-  /// `matrixFunctionAccuracyFactor * kappa(f, A) * unitRoundoff`, where
+  /// `matrixFunctionAccuracyFactor * max(1, kappa(f, A)) * unitRoundoff`,
+  /// the `max(1, ...)` floor covering a well-conditioned pair whose
+  /// `kappa(f, A)` computes below 1 purely from how that ratio is defined
+  /// (for example `exp` at a tiny eigenvalue, where `kappa(f, A)` can come
+  /// out below 1 even though the achievable accuracy is still bounded below
+  /// by the flat, condition-1 figure, never better than it), where
   /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
   /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
   /// Frechet derivative of `f` at `A`, a linear operator on 2x2 matrices;
@@ -125,7 +130,7 @@ class CalculatrixNumericPolicy {
   /// on [matrixFunctionMinMagnitude]: the bound on the normwise relative
   /// error of `Matrix.exp`, `Matrix.log`, `Matrix.sqrt` and non-integer
   /// `Matrix.power`, inside the declared magnitude range, is
-  /// `matrixFunctionAccuracyFactor * kappa(f, A) * unitRoundoff`.
+  /// `matrixFunctionAccuracyFactor * max(1, kappa(f, A)) * unitRoundoff`.
   ///
   /// Chosen so that a well-conditioned problem (`kappa(f, A) ~= 1`, e.g. a
   /// matrix function evaluated away from a repeated or near-repeated
@@ -139,7 +144,14 @@ class CalculatrixNumericPolicy {
   /// dwarfing `||f(A)||_F` (rather than from a large Frechet-derivative
   /// operator norm) still legitimately widens this bound, since the
   /// definition of `kappa(f, A)` (see [matrixFunctionMinMagnitude]) does
-  /// not distinguish the two causes.
+  /// not distinguish the two causes. The `max(1, ...)` floor exists because
+  /// `kappa(f, A)` can compute to below 1 for a pair where `||f(A)||_F`
+  /// happens to exceed `||L_f(A)||_F * ||A||_F` (for example `exp` at a
+  /// tiny eigenvalue, where `exp` itself is close to 1 while its derivative
+  /// times the eigenvalue's own tiny magnitude is smaller still): no
+  /// double-precision algorithm ever does better than the flat,
+  /// condition-1 figure regardless of how favorably `kappa(f, A)` computes,
+  /// so the bound never drops below it.
   static const double matrixFunctionAccuracyFactor = 1e4;
 
   static bool nearlyEqual(

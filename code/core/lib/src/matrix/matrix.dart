@@ -2298,8 +2298,8 @@ class Matrix {
   /// accuracy contract is condition-relative, not a flat or componentwise
   /// one: the normwise (Frobenius) relative error
   /// `||F_computed - F_true|| / ||F_true||` is at most
-  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor * kappa(f, A) *
-  /// CalculatrixNumericPolicy.unitRoundoff`, where
+  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor *
+  /// max(1, kappa(f, A)) * CalculatrixNumericPolicy.unitRoundoff`, where
   /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
   /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
   /// Frechet derivative of `f` at `A`; Higham, "Functions of Matrices",
@@ -2314,7 +2314,19 @@ class Matrix {
     if (isScalar) {
       final double source = scalarValue;
       if (source < 0) {
+        _requireResultLogMagnitudeInRange(
+          0.5 * math.log(-source),
+          operation: 'square root',
+          quantity: 'result eigenvalue',
+        );
         return Matrix.i.scale(math.sqrt(-source));
+      }
+      if (source != 0) {
+        _requireResultLogMagnitudeInRange(
+          0.5 * math.log(source),
+          operation: 'square root',
+          quantity: 'result eigenvalue',
+        );
       }
       return Matrix.scalar(math.sqrt(source));
     }
@@ -2364,8 +2376,8 @@ class Matrix {
   /// accuracy contract is condition-relative, not a flat or componentwise
   /// one: the normwise (Frobenius) relative error
   /// `||F_computed - F_true|| / ||F_true||` is at most
-  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor * kappa(f, A) *
-  /// CalculatrixNumericPolicy.unitRoundoff`, where
+  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor *
+  /// max(1, kappa(f, A)) * CalculatrixNumericPolicy.unitRoundoff`, where
   /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
   /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
   /// Frechet derivative of `f` at `A`; Higham, "Functions of Matrices",
@@ -2381,6 +2393,16 @@ class Matrix {
     _requireEntriesInPrecisionRange('matrix exponential');
 
     if (isScalar) {
+      // D38 / Codex round 10, rule A: exp's result eigenvalue magnitude is
+      // exactly exp(scalarValue), whose log-magnitude is scalarValue
+      // itself, so this checks the range directly, before ever calling
+      // math.exp. exp is never exactly zero for a finite input, so there
+      // is no exact-zero case to exempt here.
+      _requireResultLogMagnitudeInRange(
+        scalarValue,
+        operation: 'matrix exponential',
+        quantity: 'result eigenvalue',
+      );
       return Matrix.scalar(_checkFiniteScalar(math.exp(scalarValue)));
     }
 
@@ -2392,6 +2414,14 @@ class Matrix {
       // bounded by the stage-1 per-entry check on a and b individually
       // (see [_requireComplexPairPartsInPrecisionRange]'s doc comment).
       _requireComplexPairPartsInPrecisionRange(a, b, 'matrix exponential');
+      // D38 / Codex round 10, rule A: exp's result eigenvalue is
+      // exp(a +/- b*i), whose magnitude is exp(a), so the log-magnitude of
+      // the result is a itself.
+      _requireResultLogMagnitudeInRange(
+        a,
+        operation: 'matrix exponential',
+        quantity: 'result eigenvalue magnitude',
+      );
       final double magnitude = _checkFiniteScalar(math.exp(a));
       return _checkFiniteMatrix(
         Matrix.complex(magnitude * math.cos(b), magnitude * math.sin(b)),
@@ -2399,7 +2429,17 @@ class Matrix {
     }
 
     if (_isExactlyDiagonal()) {
-      return _diagonalRealFunction((double v) => math.exp(v));
+      return _requireResultEntriesInPrecisionRange(
+        _diagonalRealFunction((double v) {
+          _requireResultLogMagnitudeInRange(
+            v,
+            operation: 'matrix exponential',
+            quantity: 'result eigenvalue',
+          );
+          return math.exp(v);
+        }),
+        operation: 'matrix exponential',
+      );
     }
 
     // Codex round 9, finding 8: an exactly-symmetric 2x2 matrix is routed
@@ -2414,15 +2454,28 @@ class Matrix {
     // gets: it evaluates `f` on each eigenvalue independently, with no
     // analogous cancellation-safe subtraction step.
     if (_isExactlySymmetric() && rowCount != 2) {
-      return _symmetricRealFunction(
-        (double v) => math.exp(v),
-        maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
+      return _requireResultEntriesInPrecisionRange(
+        _symmetricRealFunction(
+          (double v) {
+            _requireResultLogMagnitudeInRange(
+              v,
+              operation: 'matrix exponential',
+              quantity: 'result eigenvalue',
+            );
+            return math.exp(v);
+          },
+          maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
+          operation: 'matrix exponential',
+        ),
         operation: 'matrix exponential',
       );
     }
 
     if (rowCount == 2) {
-      return _general2x2Exp();
+      return _requireResultEntriesInPrecisionRange(
+        _general2x2Exp(),
+        operation: 'matrix exponential',
+      );
     }
 
     throw _unsupportedMatrixFunction('matrix exponential');
@@ -2457,8 +2510,8 @@ class Matrix {
   /// accuracy contract is condition-relative, not a flat or componentwise
   /// one: the normwise (Frobenius) relative error
   /// `||F_computed - F_true|| / ||F_true||` is at most
-  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor * kappa(f, A) *
-  /// CalculatrixNumericPolicy.unitRoundoff`, where
+  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor *
+  /// max(1, kappa(f, A)) * CalculatrixNumericPolicy.unitRoundoff`, where
   /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
   /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
   /// Frechet derivative of `f` at `A`; Higham, "Functions of Matrices",
@@ -2479,9 +2532,21 @@ class Matrix {
         );
       }
       if (source > 0) {
-        return Matrix.scalar(math.log(source));
+        return Matrix.scalar(
+          _requireLogResultInPrecisionRange(
+            math.log(source),
+            operation: 'matrix logarithm',
+            quantity: 'result eigenvalue',
+          ),
+        );
       }
-      return Matrix.complex(math.log(-source), math.pi);
+      final double magnitude = math.log(-source);
+      _requireLogResultInPrecisionRange(
+        _hypot(magnitude, math.pi),
+        operation: 'matrix logarithm',
+        quantity: 'result eigenvalue magnitude',
+      );
+      return Matrix.complex(magnitude, math.pi);
     }
 
     if (isComplexForm) {
@@ -2523,40 +2588,63 @@ class Matrix {
       }
 
       final double angle = math.atan2(b, a);
-      return Matrix.complex(math.log(radius), angle);
+      final double logRadius = math.log(radius);
+      _requireLogResultInPrecisionRange(
+        _hypot(logRadius, angle),
+        operation: 'matrix logarithm',
+        quantity: 'result eigenvalue magnitude',
+      );
+      return Matrix.complex(logRadius, angle);
     }
 
     if (_isExactlyDiagonal()) {
-      return _diagonalRealFunction((double v) {
-        if (v <= 0) {
-          throw MatrixDomainError(
-            'Logarithm is undefined for matrices with non-positive real '
-            'eigenvalues.',
-            errorId: CalculatrixErrorId.logUndefined,
+      return _requireResultEntriesInPrecisionRange(
+        _diagonalRealFunction((double v) {
+          if (v <= 0) {
+            throw MatrixDomainError(
+              'Logarithm is undefined for matrices with non-positive real '
+              'eigenvalues.',
+              errorId: CalculatrixErrorId.logUndefined,
+            );
+          }
+          return _requireLogResultInPrecisionRange(
+            math.log(v),
+            operation: 'matrix logarithm',
+            quantity: 'result eigenvalue',
           );
-        }
-        return math.log(v);
-      });
+        }),
+        operation: 'matrix logarithm',
+      );
     }
 
     // Codex round 9, finding 8: route exactly-symmetric 2x2 matrices
     // through the general 2x2 closed form instead of Jacobi, for the same
     // reason as [exp]'s identical dispatch-condition change above.
     if (_isExactlySymmetric() && rowCount != 2) {
-      return _symmetricRealFunction((double v) {
-        if (v <= 0) {
-          throw MatrixDomainError(
-            'Logarithm is undefined for matrices with non-positive real '
-            'eigenvalues.',
-            errorId: CalculatrixErrorId.logUndefined,
+      return _requireResultEntriesInPrecisionRange(
+        _symmetricRealFunction((double v) {
+          if (v <= 0) {
+            throw MatrixDomainError(
+              'Logarithm is undefined for matrices with non-positive real '
+              'eigenvalues.',
+              errorId: CalculatrixErrorId.logUndefined,
+            );
+          }
+          return _requireLogResultInPrecisionRange(
+            math.log(v),
+            operation: 'matrix logarithm',
+            quantity: 'result eigenvalue',
           );
-        }
-        return math.log(v);
-      }, maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps, operation: 'matrix logarithm');
+        }, maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps, operation: 'matrix logarithm'),
+        operation: 'matrix logarithm',
+      );
     }
 
     if (rowCount == 2) {
-      return _general2x2Log();
+      return _requireResultEntriesInPrecisionRange(
+        _general2x2Log(),
+        operation: 'matrix logarithm',
+      );
     }
 
     throw _unsupportedMatrixFunction('matrix logarithm');
@@ -2585,8 +2673,8 @@ class Matrix {
   /// accuracy contract is condition-relative, not a flat or componentwise
   /// one: the normwise (Frobenius) relative error
   /// `||F_computed - F_true|| / ||F_true||` is at most
-  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor * kappa(f, A) *
-  /// CalculatrixNumericPolicy.unitRoundoff`, where
+  /// `CalculatrixNumericPolicy.matrixFunctionAccuracyFactor *
+  /// max(1, kappa(f, A)) * CalculatrixNumericPolicy.unitRoundoff`, where
   /// `kappa(f, A) = ||L_f(A)||_F * ||A||_F / ||f(A)||_F` is the relative
   /// condition number of `f` at `A` in the Frobenius norm (`L_f(A)` the
   /// Frechet derivative of `f` at `A`; Higham, "Functions of Matrices",
@@ -2663,7 +2751,18 @@ class Matrix {
       if (b >= 0) {
         // Non-negative base, non-integer exponent uses ordinary real
         // exponentiation directly; this also yields 0^positive = 0 for
-        // free.
+        // free (an exactly zero result eigenvalue, always allowed, so no
+        // range check is needed when b is exactly zero).
+        if (b != 0) {
+          // D38 / Codex round 10, rule A: this scalar power's result
+          // eigenvalue magnitude is b^y, whose log-magnitude is y*ln(b),
+          // checked directly, before ever calling math.pow.
+          _requireResultLogMagnitudeInRange(
+            y * math.log(b),
+            operation: 'real matrix power',
+            quantity: 'result eigenvalue',
+          );
+        }
         return Matrix.scalar(_checkFiniteScalar(math.pow(b, y).toDouble()));
       }
 
@@ -2919,6 +3018,107 @@ class Matrix {
       operation: operation,
       quantity: 'computed eigenvalue magnitude hypot(m, w) (value $magnitude)',
     );
+  }
+
+  /// D38 / Codex round 10, rule A: `ln` of the declared precision range's
+  /// two bounds, so the result-side range check below can compare an
+  /// analytically known result exponent (for example `Re lambda` for
+  /// [exp], or `y*ln(|lambda|)` for [power]/[sqrt]) against
+  /// `[ln(matrixFunctionMinMagnitude), ln(matrixFunctionMaxMagnitude)]`
+  /// without ever calling `math.exp` or `math.pow`. Comparing in log space
+  /// means no intermediate under/overflow can occur before the check
+  /// fires: the comparison itself can never overflow or underflow, since
+  /// `ln` of a finite positive magnitude is always finite, and the bounds
+  /// are fixed, moderate numbers (about +/-345.39).
+  static final double _resultLogMagnitudeLowerBound = math.log(
+    CalculatrixNumericPolicy.matrixFunctionMinMagnitude,
+  );
+
+  /// See [_resultLogMagnitudeLowerBound].
+  static final double _resultLogMagnitudeUpperBound = math.log(
+    CalculatrixNumericPolicy.matrixFunctionMaxMagnitude,
+  );
+
+  /// D38 / Codex round 10, rule A: rejects a matrix-function RESULT whose
+  /// analytically known eigenvalue magnitude, expressed as a natural-log
+  /// exponent [logMagnitude] (never as the magnitude itself, so this never
+  /// materializes the possibly out-of-range `exp(logMagnitude)` value),
+  /// falls outside the declared precision range. Called before computing
+  /// the actual result (e.g. before `math.exp`/`math.pow` on the relevant
+  /// eigenvalue), so a result that would under/overflow is rejected
+  /// outright instead of silently returning a wrong value.
+  ///
+  /// Exactly zero is handled separately by each caller, never routed here:
+  /// an exactly zero result eigenvalue (e.g. `log` of an eigenvalue
+  /// exactly 1, or `sqrt`/non-integer `power` of an exactly zero
+  /// eigenvalue) is always allowed, at any of the five supported
+  /// matrix-function classes, the same as the existing entry/eigenvalue
+  /// checks above.
+  static void _requireResultLogMagnitudeInRange(
+    double logMagnitude, {
+    required String operation,
+    required String quantity,
+  }) {
+    if (logMagnitude < _resultLogMagnitudeLowerBound ||
+        logMagnitude > _resultLogMagnitudeUpperBound) {
+      throw MatrixDomainError(
+        'Cannot compute the $operation: $quantity would have magnitude '
+        'exp($logMagnitude), outside the declared precision range '
+        '[${CalculatrixNumericPolicy.matrixFunctionMinMagnitude}, '
+        '${CalculatrixNumericPolicy.matrixFunctionMaxMagnitude}].',
+        errorId: CalculatrixErrorId.matrixOutOfPrecisionRange,
+      );
+    }
+  }
+
+  /// D38 / Codex round 10, rule A: mirrors [_requireEntriesInPrecisionRange]
+  /// but applied to the already-computed OUTPUT of a matrix function,
+  /// rather than to the raw input. The eigenvalue-magnitude check alone
+  /// does not bound every off-diagonal entry of a general 2x2 result (an
+  /// eigenvalue pair can be in range while an off-diagonal entry, scaled
+  /// by a divided difference, is not), so this closes that gap by
+  /// checking every nonzero entry of the RESULT directly, the same
+  /// declared range as every other D38 check.
+  static Matrix _requireResultEntriesInPrecisionRange(
+    Matrix result, {
+    required String operation,
+  }) {
+    for (int row = 0; row < result.rowCount; row++) {
+      for (int column = 0; column < result.columnCount; column++) {
+        final double value = result._rows[row][column];
+        if (value == 0) continue;
+        _requireMagnitudeInPrecisionRange(
+          value.abs(),
+          operation: operation,
+          quantity: 'computed result entry ($row, $column)',
+        );
+      }
+    }
+    return result;
+  }
+
+  /// D38 / Codex round 10, rule A, specialized for [log]: unlike [exp] and
+  /// [power], `log`'s result eigenvalue is not an exponential of anything,
+  /// it is the direct output of `math.log`/`atan2`, which never
+  /// under/overflows for a finite positive input, so there is no
+  /// intermediate to protect by checking before computing. This checks the
+  /// already-computed result magnitude directly against the declared range,
+  /// after computing it, mirroring [_requireMagnitudeInPrecisionRange] but
+  /// skipped for an exactly zero result (e.g. `log` of an eigenvalue
+  /// exactly 1), which is always allowed.
+  static double _requireLogResultInPrecisionRange(
+    double value, {
+    required String operation,
+    required String quantity,
+  }) {
+    if (value != 0) {
+      _requireMagnitudeInPrecisionRange(
+        value.abs(),
+        operation: operation,
+        quantity: quantity,
+      );
+    }
+    return value;
   }
 
   /// Computes a matrix-first singular value decomposition.
@@ -3716,8 +3916,21 @@ class Matrix {
   /// case, regardless of the sign of `y`. [sqrt] itself is unaffected
   /// (`rejectZeroEigenvalue: false`): `0^0.5 = 0` carries through its
   /// eigendecomposition as before.
-  double _realScalarPower(double v, double y, {required bool rejectZeroEigenvalue}) {
+  double _realScalarPower(
+    double v,
+    double y, {
+    required bool rejectZeroEigenvalue,
+    required String operation,
+  }) {
     if (v > 0) {
+      // D38 / Codex round 10, rule A: this eigenvalue's result magnitude is
+      // v^y, whose log-magnitude is y*ln(v), checked directly, before ever
+      // calling math.pow/math.sqrt.
+      _requireResultLogMagnitudeInRange(
+        y * math.log(v),
+        operation: operation,
+        quantity: 'result eigenvalue',
+      );
       return y == 0.5 ? math.sqrt(v) : math.pow(v, y).toDouble();
     }
     if (v == 0) {
@@ -3762,35 +3975,49 @@ class Matrix {
       // check on realPart and imagPart individually (see
       // [_requireComplexPairPartsInPrecisionRange]'s doc comment).
       _requireComplexPairPartsInPrecisionRange(realPart, imagPart, operation);
-      return _complexFormRealPower(y);
+      return _requireResultEntriesInPrecisionRange(
+        _complexFormRealPower(y, operation: operation),
+        operation: operation,
+      );
     }
     if (_isExactlyDiagonal()) {
-      return _diagonalRealFunction(
-        (double v) => _realScalarPower(
-          v,
-          y,
-          rejectZeroEigenvalue: rejectZeroEigenvalue,
+      return _requireResultEntriesInPrecisionRange(
+        _diagonalRealFunction(
+          (double v) => _realScalarPower(
+            v,
+            y,
+            rejectZeroEigenvalue: rejectZeroEigenvalue,
+            operation: operation,
+          ),
         ),
+        operation: operation,
       );
     }
     // Codex round 9, finding 8: route exactly-symmetric 2x2 matrices
     // through the general 2x2 closed form instead of Jacobi, for the same
     // reason as [exp]'s identical dispatch-condition change.
     if (_isExactlySymmetric() && rowCount != 2) {
-      return _symmetricRealFunction(
-        (double v) => _realScalarPower(
-          v,
-          y,
-          rejectZeroEigenvalue: rejectZeroEigenvalue,
+      return _requireResultEntriesInPrecisionRange(
+        _symmetricRealFunction(
+          (double v) => _realScalarPower(
+            v,
+            y,
+            rejectZeroEigenvalue: rejectZeroEigenvalue,
+            operation: operation,
+          ),
+          maxSweeps: maxSweeps,
+          operation: operation,
         ),
-        maxSweeps: maxSweeps,
         operation: operation,
       );
     }
     if (rowCount == 2) {
-      return _general2x2RealPower(
-        y,
-        rejectZeroEigenvalue: rejectZeroEigenvalue,
+      return _requireResultEntriesInPrecisionRange(
+        _general2x2RealPower(
+          y,
+          rejectZeroEigenvalue: rejectZeroEigenvalue,
+          operation: operation,
+        ),
         operation: operation,
       );
     }
@@ -3803,7 +4030,7 @@ class Matrix {
   /// a non-positive power is [CalculatrixErrorId.logUndefined]; any other
   /// nonzero magnitude is defined for every real `y`, regardless of the
   /// sign of `a`.
-  Matrix _complexFormRealPower(double y) {
+  Matrix _complexFormRealPower(double y, {required String operation}) {
     final double a = realPart;
     final double b = imagPart;
 
@@ -3825,6 +4052,15 @@ class Matrix {
         errorId: CalculatrixErrorId.nonFinite,
       );
     }
+    // D38 / Codex round 10, rule A: this pair's result eigenvalue magnitude
+    // is radius^y, whose log-magnitude is y*ln(radius). radius is strictly
+    // positive here (the a==0 && b==0 case returns above), so this never
+    // takes the log of zero.
+    _requireResultLogMagnitudeInRange(
+      y * math.log(radius),
+      operation: operation,
+      quantity: 'result eigenvalue magnitude',
+    );
     final double angle = math.atan2(b, a);
     final double rToY = _checkFiniteScalar(math.pow(radius, y).toDouble());
     final double newAngle = y * angle;
@@ -4183,6 +4419,14 @@ class Matrix {
       final double m = eigen.m;
       final double w = eigen.w;
       _requireComplexPairPartsInPrecisionRange(m, w, 'matrix exponential');
+      // D38 / Codex round 10, rule A: this pair's result eigenvalue is
+      // exp(m +/- w*i), whose magnitude is exp(m), so the log-magnitude of
+      // the result is m itself.
+      _requireResultLogMagnitudeInRange(
+        m,
+        operation: 'matrix exponential',
+        quantity: 'result eigenvalue magnitude',
+      );
       final double em = _checkFiniteScalar(math.exp(m));
       final double c1 = em * _sinOverX(w);
       final double emCos = em * math.cos(w);
@@ -4223,6 +4467,13 @@ class Matrix {
       // while the standalone `el` addend below is left as-is: it is
       // legitimately allowed to underflow to 0 on its own.
       final double l = l1;
+      // D38 / Codex round 10, rule A: this repeated eigenvalue's result is
+      // exp(l), whose log-magnitude is l itself.
+      _requireResultLogMagnitudeInRange(
+        l,
+        operation: 'matrix exponential',
+        quantity: 'result eigenvalue',
+      );
       final double el = _checkFiniteScalar(math.exp(l));
       final double entry00 = _checkFiniteScalar(el + _scaledExpTimes(l, a - l));
       final double entry11 = _checkFiniteScalar(el + _scaledExpTimes(l, d - l));
@@ -4238,6 +4489,18 @@ class Matrix {
 
     final double lLo = math.min(l1, l2);
     final double lHi = math.max(l1, l2);
+    // D38 / Codex round 10, rule A: each distinct eigenvalue's result is
+    // exp(lLo)/exp(lHi), whose log-magnitudes are lLo/lHi themselves.
+    _requireResultLogMagnitudeInRange(
+      lLo,
+      operation: 'matrix exponential',
+      quantity: 'result eigenvalue',
+    );
+    _requireResultLogMagnitudeInRange(
+      lHi,
+      operation: 'matrix exponential',
+      quantity: 'result eigenvalue',
+    );
     final double fLo = _checkFiniteScalar(math.exp(lLo));
     final double fHi = _checkFiniteScalar(math.exp(lHi));
     final double c1 = fHi * _expm1(lLo - lHi) / (lLo - lHi);
@@ -4512,25 +4775,65 @@ class Matrix {
         // when `w` is tiny relative to `m` and `halfDiff` is comparably
         // tiny), so there is no `O(m)` intermediate left to cancel away
         // the target's precision.
-        final double w = eigen.w;
-        final double m = eigen.m;
-        final double halfDiff = (a - d) / 2;
-        final double centerTerm = _checkFiniteScalar(
-          math.log(m) + (0.5 * _log1p(-(w / m) * (w / m))),
-        );
-        final double entry00 = _checkFiniteScalar(
-          centerTerm + (c1 * halfDiff),
-        );
-        final double entry11 = _checkFiniteScalar(
-          centerTerm - (c1 * halfDiff),
-        );
         final double entry01 = _checkFiniteScalar(c1 * b);
         final double entry10 = _checkFiniteScalar(c1 * c);
+
+        // Codex round 10, finding 1: the centered form below,
+        // `log(m) + 0.5*log1p(-(w/m)^2)`, is only valid while `w/m` stays
+        // bounded away from 1. Once the two eigenvalues are widely
+        // separated (one negligible relative to the other, e.g.
+        // `log([[1e20,1],[1,1]])`, whose eigenvalues are about 1e20 and
+        // `1 - 1e-20`), `w` and `m` sit at nearly the same huge scale, and
+        // forming the standalone ratio `w/m` as a double rounds it to
+        // exactly 1.0 (each of `w` and `m` independently carries about
+        // `2.22e-16` relative rounding noise, which dwarfs the true,
+        // `~1e-20`-scale gap between `w/m` and 1 at this scale). That
+        // makes `_log1p(-(w/m)*(w/m))` compute `_log1p(-1) = -Infinity`,
+        // a spurious non-finite result for a perfectly well-conditioned
+        // input. This reuses the already-computed [relativeGap] this
+        // branch uses to pick `c1`'s formula: the centered form is only
+        // reached here in the close-eigenvalue case, where `w/m` never
+        // approaches 1, so it remains exact; the far-apart case instead
+        // reuses the already-existing, well-tested
+        // [_lagrangeClosedForm2x2] (the same closed form
+        // [_general2x2Exp] and [_general2x2RealPower] already use for
+        // their own far-apart branches), anchored at whichever of
+        // `logBig`/`logSmall` has the smaller magnitude, which never
+        // forms `w/m` at all.
+        if (relativeGap < closeEigenvalueThreshold) {
+          final double w = eigen.w;
+          final double m = eigen.m;
+          final double halfDiff = (a - d) / 2;
+          final double centerTerm = _checkFiniteScalar(
+            math.log(m) + (0.5 * _log1p(-(w / m) * (w / m))),
+          );
+          final double entry00 = _checkFiniteScalar(
+            centerTerm + (c1 * halfDiff),
+          );
+          final double entry11 = _checkFiniteScalar(
+            centerTerm - (c1 * halfDiff),
+          );
+          return _checkFiniteMatrix(
+            Matrix(<List<double>>[
+              <double>[entry00, entry01],
+              <double>[entry10, entry11],
+            ]),
+          );
+        }
+
+        // D38 / Codex round 10, rule A: log's result eigenvalues here are
+        // math.log(lBig)/math.log(lSmall), always automatically within
+        // the declared range whenever the input-side eigenvalue check
+        // above already passed: lBig/lSmall are already constrained to
+        // [matrixFunctionMinMagnitude, matrixFunctionMaxMagnitude], so
+        // their logarithms are always within
+        // [ln(matrixFunctionMinMagnitude), ln(matrixFunctionMaxMagnitude)],
+        // exactly [_resultLogMagnitudeLowerBound, _resultLogMagnitudeUpperBound].
+        // No separate result-side check is needed for this function.
+        final double logBig = _checkFiniteScalar(math.log(lBig));
+        final double logSmall = _checkFiniteScalar(math.log(lSmall));
         return _checkFiniteMatrix(
-          Matrix(<List<double>>[
-            <double>[entry00, entry01],
-            <double>[entry10, entry11],
-          ]),
+          _lagrangeClosedForm2x2(logBig, logSmall, lBig, lSmall, c1),
         );
       }
     }
@@ -4607,6 +4910,13 @@ class Matrix {
           errorId: CalculatrixErrorId.nonFinite,
         );
       }
+      // D38 / Codex round 10, rule A: this pair's result eigenvalue
+      // magnitude is radius^y, whose log-magnitude is y*ln(radius).
+      _requireResultLogMagnitudeInRange(
+        y * math.log(radius),
+        operation: operation,
+        quantity: 'result eigenvalue magnitude',
+      );
       double rToYCos;
       double rToYSin;
       if (y == 0.5) {
@@ -4735,6 +5045,13 @@ class Matrix {
         // computes each such product in combined-exponent (log-space)
         // form, never materializing the overflowed/underflowed
         // standalone `c1`.
+        // D38 / Codex round 10, rule A: this repeated eigenvalue's result
+        // magnitude is l^y, whose log-magnitude is y*ln(l).
+        _requireResultLogMagnitudeInRange(
+          y * math.log(l),
+          operation: operation,
+          quantity: 'result eigenvalue',
+        );
         final double fl = _checkFiniteScalar(math.pow(l, y).toDouble());
         final double entry00 = _checkFiniteScalar(
           fl + _scaledDerivativeTimes(l, y, a - l),
@@ -4764,6 +5081,15 @@ class Matrix {
             );
           }
           final double lOther = l1 == 0 ? l2 : l1;
+          // D38 / Codex round 10, rule A: this branch's nonzero result
+          // eigenvalue magnitude is lOther^y, whose log-magnitude is
+          // y*ln(lOther); the other result eigenvalue is exactly zero,
+          // always allowed.
+          _requireResultLogMagnitudeInRange(
+            y * math.log(lOther),
+            operation: operation,
+            quantity: 'result eigenvalue',
+          );
           c1 = _checkFiniteScalar(math.pow(lOther, y - 1).toDouble());
           c0 = 0;
         } else {
@@ -4783,6 +5109,22 @@ class Matrix {
           final bool l1IsLarger = l1.abs() >= l2.abs();
           final double lBig = l1IsLarger ? l1 : l2;
           final double lSmall = l1IsLarger ? l2 : l1;
+
+          // D38 / Codex round 10, rule A: each distinct eigenvalue's
+          // result magnitude is lBig^y/lSmall^y, whose log-magnitudes are
+          // y*ln(lBig)/y*ln(lSmall). Checked before either the `y == 0.5`
+          // fast path or the close/far divided-difference branches below
+          // ever call math.pow/math.sqrt.
+          _requireResultLogMagnitudeInRange(
+            y * math.log(lBig),
+            operation: operation,
+            quantity: 'result eigenvalue',
+          );
+          _requireResultLogMagnitudeInRange(
+            y * math.log(lSmall),
+            operation: operation,
+            quantity: 'result eigenvalue',
+          );
 
           // D38 / round 13 correction, finding 11: bypass the close/far
           // divided-difference branching below entirely for `y == 0.5`
@@ -5022,8 +5364,12 @@ class Matrix {
 @visibleForTesting
 Matrix debugCyclicJacobiSqrtWithSweepBudget(Matrix matrix, int maxSweeps) {
   return matrix._symmetricRealFunction(
-    (double v) =>
-        matrix._realScalarPower(v, 0.5, rejectZeroEigenvalue: false),
+    (double v) => matrix._realScalarPower(
+      v,
+      0.5,
+      rejectZeroEigenvalue: false,
+      operation: 'square root',
+    ),
     maxSweeps: maxSweeps,
     operation: 'square root',
   );
