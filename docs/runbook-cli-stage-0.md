@@ -165,7 +165,7 @@ product `Y · log B` does not matter for them.
 | 10 | any | not square | `dimension-mismatch` | `2 [[1 2]] ^`, `[[1 0] [0 1]] [[1 2]] ^` |
 | 11 | n x n | m x m, n ≠ m, neither scalar | `dimension-mismatch` | `[[1 0] [0 1]] [[1 0 0] [0 1 0] [0 0 1]] ^` |
 | 12 | scalar < 0 | square, not complex, not scalar | `ambiguous-power`: `log B` is complex (2x2) and does not match Y | `-2 [[1 0] [0 2]] ^`: `log -2` is `[[0.6931 -3.1416] [3.1416 0.6931]]`, which does not commute with Y |
-| 13 | any | any, when the result overflows | `non-finite` | `10 400 ^` (10^400 exceeds the largest double) |
+| 13 | any | any, when the result overflows | `non-finite` for an integer power; a non-integer power checks the range of D38 first and raises `matrix-out-of-precision-range` | `10 400 ^` (10^400 exceeds the largest double) is `non-finite`; `10 400.5 ^` is `matrix-out-of-precision-range` |
 
 **Order of the checks.** The first rule that applies decides; the kinds of
 B and Y decide, never a numerical test of whether they commute:
@@ -190,7 +190,7 @@ All errors exit with `65`. `ambiguous-power`, `log-undefined`,
 `no-convergence` (D35), `unsupported-matrix-function` (D37) and
 `matrix-out-of-precision-range` (D38) are new ids;
 there is no `not-real` error, because the result of case 1 with a negative
-base is a complex matrix. `X exp` gives the same value as `e X ^`. The step
+base is a complex matrix. `X exp` gives the same value as `e X ^` when both are inside the precision range of D38; an integer power is not bounded by D38, so `400 exp` raises `matrix-out-of-precision-range` while `e 400 ^` returns about `5.22e173`. The step
 S4 turns every row of this table into a core test, which also measures the
 precision of `Matrix.log()` on non-diagonal matrices (spec section 11,
 risk 5). The examples were checked on 2026-09-24 with Julia's `exp` and
