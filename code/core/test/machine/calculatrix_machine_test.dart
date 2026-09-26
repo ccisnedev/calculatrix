@@ -473,4 +473,127 @@ void main() {
       expect(() => machine.execute(const DeleteColumnCommand(0)), throwsA(isA<MatrixShapeError>()));
     });
   });
+
+  group('CalculatrixMachine - structural command atomicity', () {
+    test('InverseCommand preserves an empty stack when it underflows', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+
+      expect(
+        () => machine.execute(const InverseCommand()),
+        throwsA(isA<RpnStackUnderflowError>()),
+      );
+      expect(machine.depth, 0);
+    });
+
+    test(
+      'InverseCommand does not lose the popped operand when the inverse '
+      'computation fails',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+
+        machine.execute(const PushScalarCommand(2));
+        machine.execute(const PushScalarCommand(0));
+
+        expect(
+          () => machine.execute(const InverseCommand()),
+          throwsA(isA<MatrixDomainError>()),
+        );
+        expect(
+          machine.stackSnapshot,
+          orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(0)]),
+        );
+      },
+    );
+
+    test(
+      'AppendRowCommand restores a single operand lost to underflow',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+        final Matrix target = Matrix(<List<double>>[
+          <double>[1, 2],
+        ]);
+
+        machine.execute(PushMatrixCommand(target));
+
+        expect(
+          () => machine.execute(const AppendRowCommand()),
+          throwsA(isA<RpnStackUnderflowError>()),
+        );
+        expect(machine.stackSnapshot, orderedEquals(<Matrix>[target]));
+      },
+    );
+
+    test(
+      'AppendRowCommand restores both operands when they are shape '
+      'incompatible',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+        final Matrix target = Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[3, 4],
+        ]);
+        final Matrix incompatibleRow = Matrix(<List<double>>[
+          <double>[5, 6, 7],
+        ]);
+
+        machine.execute(PushMatrixCommand(target));
+        machine.execute(PushMatrixCommand(incompatibleRow));
+
+        expect(
+          () => machine.execute(const AppendRowCommand()),
+          throwsA(isA<MatrixShapeError>()),
+        );
+        expect(
+          machine.stackSnapshot,
+          orderedEquals(<Matrix>[target, incompatibleRow]),
+        );
+      },
+    );
+
+    test(
+      'DotProductCommand restores a single operand lost to underflow',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+        final Matrix vector = Matrix(<List<double>>[
+          <double>[1],
+          <double>[2],
+        ]);
+
+        machine.execute(PushMatrixCommand(vector));
+
+        expect(
+          () => machine.execute(const DotProductCommand()),
+          throwsA(isA<RpnStackUnderflowError>()),
+        );
+        expect(machine.stackSnapshot, orderedEquals(<Matrix>[vector]));
+      },
+    );
+
+    test(
+      'DotProductCommand restores both operands when the operands are not '
+      'column vectors',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+        final Matrix rowVector = Matrix(<List<double>>[
+          <double>[1, 2],
+        ]);
+        final Matrix columnVector = Matrix(<List<double>>[
+          <double>[3],
+          <double>[4],
+        ]);
+
+        machine.execute(PushMatrixCommand(rowVector));
+        machine.execute(PushMatrixCommand(columnVector));
+
+        expect(
+          () => machine.execute(const DotProductCommand()),
+          throwsA(isA<MatrixShapeError>()),
+        );
+        expect(
+          machine.stackSnapshot,
+          orderedEquals(<Matrix>[rowVector, columnVector]),
+        );
+      },
+    );
+  });
 }

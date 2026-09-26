@@ -562,4 +562,67 @@ void main() {
       },
     );
   });
+
+  group('CalculatrixSession - rpn stale currentValue after failed operation', () {
+    void setUpFailedDivision() {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('9');
+      session.enter();
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+      session.appendSpace();
+      session.input('0');
+      session.applyRpnBinary(RpnBinaryOperator.divide);
+    }
+
+    test(
+      'currentValue reflects the new stack top even though the operation failed',
+      () {
+        setUpFailedDivision();
+
+        expect(session.hasError, isTrue);
+        expect(
+          session.rpnStack,
+          orderedEquals(<Matrix>[
+            Matrix.scalar(9),
+            Matrix.scalar(2),
+            Matrix.scalar(3),
+            Matrix.scalar(0),
+          ]),
+        );
+        expect(session.currentValue, Matrix.scalar(0));
+      },
+    );
+
+    test(
+      'toggleSign after a failed operation negates the new top, not a stale value',
+      () {
+        setUpFailedDivision();
+
+        session.toggleSign();
+
+        expect(
+          session.rpnStack,
+          orderedEquals(<Matrix>[
+            Matrix.scalar(9),
+            Matrix.scalar(2),
+            Matrix.scalar(3),
+            Matrix.scalar(0),
+          ]),
+        );
+      },
+    );
+
+    test(
+      'memoryAdd after a failed operation adds the new top, not a stale value',
+      () {
+        setUpFailedDivision();
+
+        session.memoryAdd();
+
+        expect(session.memoryValue, Matrix.scalar(0));
+      },
+    );
+  });
 }
