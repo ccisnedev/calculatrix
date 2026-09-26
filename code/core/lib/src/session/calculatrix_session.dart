@@ -419,12 +419,59 @@ class CalculatrixSession {
   }
 
   Matrix? _currentMemoryOperand() {
+    if (isRpnMode) {
+      return _currentRpnMemoryOperand();
+    }
+
     final String currentExpression = expression;
     if (currentExpression.isNotEmpty) {
       return _tryEvaluateExpression(currentExpression);
     }
 
     return _currentValue;
+  }
+
+  // An rpn draft is never evaluated as an infix expression: "2 -3" is two
+  // separate operands, not a subtraction. A single-token draft still reads
+  // like a plain operand (unchanged behavior). A draft with more than one
+  // token must first be committed exactly like ENTER (parsing every token
+  // atomically, so an invalid token raises the typed error, pushes nothing
+  // and leaves the draft as typed), and only then does the memory operand
+  // come from the new top of the stack.
+  Matrix? _currentRpnMemoryOperand() {
+    if (_rpnDraft.isEmpty) {
+      return _currentValue;
+    }
+
+    final List<String> tokens = _rpnDraft
+        .split(' ')
+        .where((String token) => token.isNotEmpty)
+        .toList(growable: false);
+
+    if (tokens.length <= 1) {
+      return _tryEvaluateExpression(_rpnDraft);
+    }
+
+    return _commitRpnDraftForMemoryOperand();
+  }
+
+  Matrix? _commitRpnDraftForMemoryOperand() {
+    try {
+      final List<Matrix> operands = _parseDraftTokens(_rpnDraft);
+      for (final Matrix operand in operands) {
+        _machine.execute(PushMatrixCommand(operand));
+      }
+      _rpnDraft = '';
+      _clearError();
+      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
+      return _machine.top;
+    } on FormatException catch (error) {
+      _lastError = error;
+      return null;
+    } on CalculatrixError catch (error) {
+      _lastError = error;
+      return null;
+    }
   }
 
   bool get _showsCommittedValueInInfix {
@@ -706,6 +753,8 @@ class CalculatrixSession {
       return;
     }
 
+    final int depthBeforeAction = _machine.depth;
+
     try {
       action();
       _clearError();
@@ -714,11 +763,21 @@ class CalculatrixSession {
       _lastError = error;
       // The action may have already committed draft operands onto the real
       // stack before the failing step ran, so currentValue must still track
-      // the new top even though the operation itself failed.
-      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
+      // the new top even though the operation itself failed. Repeat-equals
+      // state (_lastOperator/_lastOperand) is only invalidated when the
+      // stack actually changed: a failing command is atomic and rolls
+      // itself back, so the only way depth can differ here is a draft
+      // commit that already went through before the failure. A no-op
+      // failure (e.g. an underflow on an untouched stack) must leave
+      // repeat-equals intact.
+      _syncCommittedValueFromRpnStack(
+        invalidateRepeatEquals: _machine.depth != depthBeforeAction,
+      );
     } on CalculatrixError catch (error) {
       _lastError = error;
-      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
+      _syncCommittedValueFromRpnStack(
+        invalidateRepeatEquals: _machine.depth != depthBeforeAction,
+      );
     }
   }
 
