@@ -9,7 +9,19 @@ final class CalculatrixMachine {
 
   final RpnEngine _engine;
 
+  int _mutationCount = 0;
+
   int get depth => _engine.depth;
+
+  // Counts every command that has run through execute() without throwing.
+  // A command either fully applies or fully rolls itself back (see the
+  // comment on execute() below), so this is an exact proxy for "did the
+  // stack's content change", unlike depth: a macro can mutate a matrix in
+  // place without changing the number of elements on the stack (e.g.
+  // negating the top), so a before/after depth comparison alone can miss a
+  // real mutation that happened before a later command in the same macro
+  // failed.
+  int get mutationCount => _mutationCount;
 
   Matrix? get top {
     if (_engine.depth == 0) {
@@ -40,6 +52,7 @@ final class CalculatrixMachine {
       _engine.restore(snapshot);
       rethrow;
     }
+    _mutationCount++;
   }
 
   void executeAll(Iterable<CalculatrixCommand> commands) {

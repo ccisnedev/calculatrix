@@ -432,24 +432,17 @@ class CalculatrixSession {
   }
 
   // An rpn draft is never evaluated as an infix expression: "2 -3" is two
-  // separate operands, not a subtraction. A single-token draft still reads
-  // like a plain operand (unchanged behavior). A draft with more than one
-  // token must first be committed exactly like ENTER (parsing every token
-  // atomically, so an invalid token raises the typed error, pushes nothing
-  // and leaves the draft as typed), and only then does the memory operand
-  // come from the new top of the stack.
+  // separate operands, not a subtraction. Any non-empty draft, whether it
+  // holds one token or several, must first be committed exactly like ENTER
+  // (parsing every token atomically, so an invalid token raises the typed
+  // error, pushes nothing and leaves the draft as typed), and only then does
+  // the memory operand come from the new top of the stack. This is a single
+  // path regardless of token count: a lone token is not special-cased into a
+  // read-only evaluation, so it is pushed onto the real stack just like a
+  // multi-token draft is.
   Matrix? _currentRpnMemoryOperand() {
     if (_rpnDraft.isEmpty) {
       return _currentValue;
-    }
-
-    final List<String> tokens = _rpnDraft
-        .split(' ')
-        .where((String token) => token.isNotEmpty)
-        .toList(growable: false);
-
-    if (tokens.length <= 1) {
-      return _tryEvaluateExpression(_rpnDraft);
     }
 
     return _commitRpnDraftForMemoryOperand();
@@ -753,7 +746,7 @@ class CalculatrixSession {
       return;
     }
 
-    final int depthBeforeAction = _machine.depth;
+    final int mutationCountBeforeAction = _machine.mutationCount;
 
     try {
       action();
@@ -766,17 +759,20 @@ class CalculatrixSession {
       // the new top even though the operation itself failed. Repeat-equals
       // state (_lastOperator/_lastOperand) is only invalidated when the
       // stack actually changed: a failing command is atomic and rolls
-      // itself back, so the only way depth can differ here is a draft
-      // commit that already went through before the failure. A no-op
-      // failure (e.g. an underflow on an untouched stack) must leave
-      // repeat-equals intact.
+      // itself back, so the only way mutationCount can differ here is a
+      // draft commit or an earlier macro step that already went through
+      // before the failure. A no-op failure (e.g. an underflow on an
+      // untouched stack) must leave repeat-equals intact. mutationCount is
+      // used rather than depth because a command can mutate a matrix's
+      // content in place without changing how many elements are on the
+      // stack (e.g. negating the top), which depth alone cannot detect.
       _syncCommittedValueFromRpnStack(
-        invalidateRepeatEquals: _machine.depth != depthBeforeAction,
+        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
       );
     } on CalculatrixError catch (error) {
       _lastError = error;
       _syncCommittedValueFromRpnStack(
-        invalidateRepeatEquals: _machine.depth != depthBeforeAction,
+        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
       );
     }
   }
