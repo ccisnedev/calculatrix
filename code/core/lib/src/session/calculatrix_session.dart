@@ -101,6 +101,19 @@ class CalculatrixSession {
     _infixDraft += value;
   }
 
+  void appendSpace() {
+    if (!isRpnMode) {
+      return;
+    }
+
+    if (_rpnDraft.isEmpty || _rpnDraft.endsWith(' ')) {
+      return;
+    }
+
+    _clearError();
+    _rpnDraft += ' ';
+  }
+
   void insertMatrixLiteral(String literal) {
     final Matrix matrix = Calculatrix.evaluateInfix(literal);
     _clearError();
@@ -290,7 +303,10 @@ class CalculatrixSession {
     }
 
     try {
-      _machine.execute(PushMatrixCommand(_parseDraftOperand(_rpnDraft)));
+      final List<Matrix> operands = _parseDraftTokens(_rpnDraft);
+      for (final Matrix operand in operands) {
+        _machine.execute(PushMatrixCommand(operand));
+      }
       _rpnDraft = '';
       _clearError();
       _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
@@ -625,6 +641,14 @@ class CalculatrixSession {
     return Calculatrix.evaluateInfix(normalized);
   }
 
+  List<Matrix> _parseDraftTokens(String draft) {
+    return draft
+        .split(' ')
+        .where((String token) => token.isNotEmpty)
+        .map(_parseDraftOperand)
+        .toList(growable: false);
+  }
+
   Matrix? _tryParseOperand(String expression) {
     try {
       return _parseDraftOperand(expression);
@@ -650,7 +674,10 @@ class CalculatrixSession {
       return;
     }
 
-    _machine.execute(PushMatrixCommand(_parseDraftOperand(_rpnDraft)));
+    final List<Matrix> operands = _parseDraftTokens(_rpnDraft);
+    for (final Matrix operand in operands) {
+      _machine.execute(PushMatrixCommand(operand));
+    }
     _rpnDraft = '';
   }
 
@@ -665,10 +692,8 @@ class CalculatrixSession {
       _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
     } on FormatException catch (error) {
       _lastError = error;
-      _rpnDraft = '';
     } on CalculatrixError catch (error) {
       _lastError = error;
-      _rpnDraft = '';
     }
   }
 
