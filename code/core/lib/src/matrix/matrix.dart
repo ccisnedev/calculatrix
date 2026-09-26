@@ -1973,30 +1973,64 @@ class Matrix {
     double rescale(double value) =>
         k == 0 ? value : _scalarScaleByPowerOfTwo(value, k.toDouble());
 
-    if (discriminant < 0) {
-      final double w = math.sqrt(-discriminant);
+    // Codex round 9, finding 3: the same whole-block-scaling underflow risk
+    // as the `det`/`lambda2` fix below, but for the discriminant instead.
+    // The power-of-two scale that keeps `sa`/`sd` representable can drive
+    // `sb`/`sc` (and therefore their scaled product `sb*sc`) to underflow
+    // to exactly 0 even when the *unscaled* product `b*c` is perfectly
+    // representable, e.g. `a=d=-1e100`, `b=1e-150`, `c=-2e-150`: the
+    // unscaled `b*c=-2e-300` is representable, but scaling the whole block
+    // down by `2^332` (to keep `sa`/`sd` near 1) drives `sb`/`sc` down to
+    // `~1e-250` each, whose product `~-2e-500` underflows to exactly 0,
+    // spuriously zeroing the discriminant's correction term and
+    // misclassifying a genuine complex-conjugate pair (here, eigenvalues
+    // `-1e100 +/- i*sqrt(2)*1e-150`) as a repeated real eigenvalue at the
+    // pair's mean, `-1e100`, wrongly rejected as "negative eigenvalue" by
+    // callers that need a real square root/log/power. Prefer the direct,
+    // unscaled discriminant whenever it is reliable, the same "prefer
+    // direct when reliable, else fall back to the scaled block" pattern
+    // already used for `det`/`lambda2` below.
+    final double directHalfDiff = (a - d) / 2;
+    final double directBc = b * c;
+    final bool directBcUnderflowed = b != 0 && c != 0 && directBc == 0;
+    final double directDiscriminant =
+        (directHalfDiff * directHalfDiff) + directBc;
+    final bool directDiscriminantReliable =
+        directDiscriminant.isFinite && !directBcUnderflowed;
+    final double effectiveDiscriminant =
+        directDiscriminantReliable ? directDiscriminant : discriminant;
+    final double effectiveM = directDiscriminantReliable ? (a + d) / 2 : m;
+    // The direct discriminant/m above are already in natural (unscaled)
+    // units when reliable, so they must not be rescaled again; only the
+    // scaled-block fallback still needs the `2^k` rescale back to natural
+    // units.
+    double finishScale(double value) =>
+        directDiscriminantReliable ? value : rescale(value);
+
+    if (effectiveDiscriminant < 0) {
+      final double w = math.sqrt(-effectiveDiscriminant);
       return (
         isComplex: true,
         lambda1: 0,
         lambda2: 0,
-        m: rescale(m),
-        w: rescale(w),
+        m: finishScale(effectiveM),
+        w: finishScale(w),
       );
     }
 
-    if (discriminant == 0) {
-      final double lambda = rescale(m);
+    if (effectiveDiscriminant == 0) {
+      final double lambda = finishScale(effectiveM);
       return (isComplex: false, lambda1: lambda, lambda2: lambda, m: lambda, w: 0);
     }
 
-    final double sqrtD = math.sqrt(discriminant);
-    final double signM = m >= 0 ? 1.0 : -1.0;
-    final double q = m + (signM * sqrtD);
-    final double lambda1 = rescale(q);
+    final double sqrtD = math.sqrt(effectiveDiscriminant);
+    final double signM = effectiveM >= 0 ? 1.0 : -1.0;
+    final double q = effectiveM + (signM * sqrtD);
+    final double lambda1 = finishScale(q);
 
     double lambda2;
     if (q == 0) {
-      lambda2 = rescale(m - (signM * sqrtD));
+      lambda2 = finishScale(effectiveM - (signM * sqrtD));
     } else {
       // Round 11 correction, finding 2: `det` above is the determinant of
       // the *scaled* block (`sa*sd - sb*sc`), and a matrix whose own
@@ -2031,21 +2065,42 @@ class Matrix {
       // brings every entry back to a representable magnitude before any
       // product is formed.
       final double directAD = a * d;
-      final double directBC = b * c;
       final bool directAdUnderflowed = a != 0 && d != 0 && directAD == 0;
-      final bool directBcUnderflowed = b != 0 && c != 0 && directBC == 0;
-      final double directDet = directAD - directBC;
+      final double directDet = directAD - directBc;
       final bool directDetReliable =
           directDet.isFinite && !directAdUnderflowed && !directBcUnderflowed;
-      lambda2 = directDetReliable ? directDet / lambda1 : rescale(det / q);
+      if (directDetReliable) {
+        lambda2 = directDet / lambda1;
+      } else {
+        // The `det/q` fallback needs `det` and `q` in the same (scaled)
+        // unit system; `q` above may already be in natural, unscaled
+        // units when the finding-3 direct discriminant was reliable, so
+        // recompute a scaled-block `q` independently here rather than
+        // reusing whichever units `q` happens to be in.
+        final double sqrtDScaled = math.sqrt(discriminant);
+        final double signMScaled = m >= 0 ? 1.0 : -1.0;
+        final double qScaled = m + (signMScaled * sqrtDScaled);
+        lambda2 = rescale(det / qScaled);
+      }
     }
 
+    // Codex round 9, finding 8: expose the real half-separation
+    // `sqrt(discriminant)` here too (previously hardcoded to `0` for every
+    // real, non-complex branch), the same way the complex branch already
+    // exposes its own rotation frequency `w`. `sqrtD` is computed directly
+    // from the discriminant, never by subtracting two already-materialized
+    // eigenvalues, so it keeps its full double precision even when it is
+    // many orders of magnitude smaller than `m` (e.g. `m = 1`,
+    // `sqrtD = 1e-10`): [_general2x2Log]'s distinct-real-eigenvalue branch
+    // needs exactly this precise, independent `w` to recover an
+    // eigenvalue-offset-from-`m` correction that materializing
+    // `lambda1 = m + w` as a single double would otherwise destroy.
     return (
       isComplex: false,
       lambda1: lambda1,
       lambda2: lambda2,
-      m: rescale(m),
-      w: 0,
+      m: finishScale(effectiveM),
+      w: finishScale(sqrtD),
     );
   }
 
@@ -2316,6 +2371,11 @@ class Matrix {
     if (isComplexForm) {
       final double a = realPart;
       final double b = imagPart;
+      // Codex round 9, finding 5: standalone complex-form input's
+      // eigenvalue is a +/- b*i, whose magnitude is hypot(a, b), not
+      // bounded by the stage-1 per-entry check on a and b individually
+      // (see [_requireComplexPairPartsInPrecisionRange]'s doc comment).
+      _requireComplexPairPartsInPrecisionRange(a, b, 'matrix exponential');
       final double magnitude = _checkFiniteScalar(math.exp(a));
       return _checkFiniteMatrix(
         Matrix.complex(magnitude * math.cos(b), magnitude * math.sin(b)),
@@ -2326,7 +2386,18 @@ class Matrix {
       return _diagonalRealFunction((double v) => math.exp(v));
     }
 
-    if (_isExactlySymmetric()) {
+    // Codex round 9, finding 8: an exactly-symmetric 2x2 matrix is routed
+    // through the general 2x2 closed-form branch below instead of cyclic
+    // Jacobi. A symmetric 2x2 matrix always has real eigenvalues
+    // (discriminant `halfDiff^2 + b^2 >= 0`), so the general 2x2 path
+    // applies unconditionally, and it already preserves precision for
+    // eigenvalues offset from 1 by a tiny amount (e.g.
+    // `[[1,1e-10],[1e-10,1]]`) via its Sterbenz-lemma-safe
+    // log1p/expm1 divided-difference formulas, a guarantee Jacobi's
+    // opaque per-eigenvalue callback (`_symmetricRealFunction`) never
+    // gets: it evaluates `f` on each eigenvalue independently, with no
+    // analogous cancellation-safe subtraction step.
+    if (_isExactlySymmetric() && rowCount != 2) {
       return _symmetricRealFunction(
         (double v) => math.exp(v),
         maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
@@ -2405,6 +2476,12 @@ class Matrix {
         );
       }
 
+      // Codex round 9, finding 5: standalone complex-form input's
+      // eigenvalue is a +/- b*i, whose magnitude is hypot(a, b), not
+      // bounded by the stage-1 per-entry check on a and b individually
+      // (see [_requireComplexPairPartsInPrecisionRange]'s doc comment).
+      _requireComplexPairPartsInPrecisionRange(a, b, 'matrix logarithm');
+
       // Hypot-style magnitude, not `sqrt(a*a+b*b)` (round 4 correction,
       // rule 3): squaring a merely-large `a` (e.g. 1e200) overflows to
       // `Infinity` well before the true magnitude does, silently poisoning
@@ -2438,7 +2515,10 @@ class Matrix {
       });
     }
 
-    if (_isExactlySymmetric()) {
+    // Codex round 9, finding 8: route exactly-symmetric 2x2 matrices
+    // through the general 2x2 closed form instead of Jacobi, for the same
+    // reason as [exp]'s identical dispatch-condition change above.
+    if (_isExactlySymmetric() && rowCount != 2) {
       return _symmetricRealFunction((double v) {
         if (v <= 0) {
           throw MatrixDomainError(
@@ -2576,6 +2656,17 @@ class Matrix {
   }
 
   Matrix _powerByMatrixExponent(Matrix exponent) {
+    // Codex round 9, finding 4: every other matrix-function entry point
+    // ([exp], [log], the non-integer branches of [power]) validates its
+    // raw operands against the D38 declared precision range before
+    // computing anything; this path (a matrix base raised to a matrix
+    // exponent) previously validated neither the base nor the exponent,
+    // so e.g. `Matrix.scalar(1e200).power(diag(0.5,0.5))` silently
+    // succeeded, and `Matrix.scalar(1).power(diag(1e200,1e200))` silently
+    // returned the identity, instead of both being rejected the same way
+    // an equally out-of-range [exp]/[log]/[power] input would be.
+    _requireEntriesInPrecisionRange('matrix exponent base');
+    exponent._requireEntriesInPrecisionRange('matrix exponent');
     if (isScalar) {
       final double b = scalarValue;
 
@@ -2763,28 +2854,39 @@ class Matrix {
   }
 
   /// D38 domain check, stage 2, for a general 2x2 complex-conjugate
-  /// eigenvalue pair: the pair's real part [m] and rotation half-width [w]
-  /// (not the complex eigenvalue's own magnitude `hypot(m, w)`) must each
-  /// lie in the declared precision range, per the contract's own wording.
+  /// eigenvalue pair: the pair's own eigenvalue magnitude `hypot(m, w)`
+  /// (not its real part [m] and rotation half-width [w] individually) must
+  /// lie in the declared precision range.
+  ///
+  /// Codex round 9, finding 5 (this replaces and retracts an earlier
+  /// "structurally unreachable" claim about this check): bounding [m] and
+  /// [w] individually instead of `hypot(m, w)` is wrong in both
+  /// directions, and both directions are reachable, not merely
+  /// theoretical. `log([[1e-150,1],[-2,0]])` has `m=5e-151` (individually
+  /// just below the declared minimum) but `hypot(m,w) ~= sqrt(2)` (safely
+  /// in range), so the old per-component check wrongly rejected it.
+  /// `[[9e149,9e149],[-8e149,9e149]].log()` has `m=9e149` and
+  /// `w~8.4853e149` (both individually in range) but
+  /// `hypot(m,w) ~= 1.237e150`, above the declared maximum, so the old
+  /// check wrongly accepted it. The same flaw affects standalone
+  /// complex-form input (`Matrix.complex(a,b)`): its "eigenvalue" is
+  /// `a +/- b*i`, whose magnitude is `hypot(a,b)`, not bounded by checking
+  /// `a` and `b` individually either, e.g.
+  /// `exp(Matrix.complex(1e150,1e150))`, whose components each sit right
+  /// at the declared boundary but whose eigenvalue magnitude,
+  /// `1e150*sqrt(2)`, does not.
   static void _requireComplexPairPartsInPrecisionRange(
     double m,
     double w,
     String operation,
   ) {
-    if (m != 0) {
-      _requireMagnitudeInPrecisionRange(
-        m.abs(),
-        operation: operation,
-        quantity: 'computed eigenvalue real part m (value $m)',
-      );
-    }
-    if (w != 0) {
-      _requireMagnitudeInPrecisionRange(
-        w.abs(),
-        operation: operation,
-        quantity: 'computed eigenvalue rotation half-width w (value $w)',
-      );
-    }
+    final double magnitude = _hypot(m, w);
+    if (magnitude == 0) return;
+    _requireMagnitudeInPrecisionRange(
+      magnitude,
+      operation: operation,
+      quantity: 'computed eigenvalue magnitude hypot(m, w) (value $magnitude)',
+    );
   }
 
   /// Computes a matrix-first singular value decomposition.
@@ -3622,6 +3724,12 @@ class Matrix {
   }) {
     _requireEntriesInPrecisionRange(operation);
     if (isComplexForm) {
+      // Codex round 9, finding 5: standalone complex-form input's
+      // eigenvalue is realPart +/- imagPart*i, whose magnitude is
+      // hypot(realPart, imagPart), not bounded by the stage-1 per-entry
+      // check on realPart and imagPart individually (see
+      // [_requireComplexPairPartsInPrecisionRange]'s doc comment).
+      _requireComplexPairPartsInPrecisionRange(realPart, imagPart, operation);
       return _complexFormRealPower(y);
     }
     if (_isExactlyDiagonal()) {
@@ -3633,7 +3741,10 @@ class Matrix {
         ),
       );
     }
-    if (_isExactlySymmetric()) {
+    // Codex round 9, finding 8: route exactly-symmetric 2x2 matrices
+    // through the general 2x2 closed form instead of Jacobi, for the same
+    // reason as [exp]'s identical dispatch-condition change.
+    if (_isExactlySymmetric() && rowCount != 2) {
       return _symmetricRealFunction(
         (double v) => _realScalarPower(
           v,
@@ -4001,6 +4112,33 @@ class Matrix {
   /// repeated-real-eigenvalue branch below (already fixed this way).
   /// Every branch now returns directly, so no standalone `c0` is ever
   /// materialized in this method at all.
+  /// Computes `exp(l) * factor` in a way that survives a standalone
+  /// `exp(l)` underflowing to exactly 0 or overflowing to `Infinity`, as
+  /// long as the true product is finite. `[factor]` here is always one of
+  /// the matrix's own bounded quantities (an offset `a-l`/`d-l`, or an
+  /// off-diagonal entry `b`/`c`), so the true product can be
+  /// representable even when the standalone `exp(l)` the caller would
+  /// otherwise compute is not (Codex round 9, finding 1).
+  ///
+  /// Tries the direct product first; only falls back to the
+  /// combined-exponent form `exp(l + log(|factor|))` (which never
+  /// materializes the underflowed/overflowed standalone `exp(l)`) when the
+  /// direct product actually degenerates: exactly 0 with a nonzero
+  /// `factor` (underflow), or non-finite (overflow). This fallback is
+  /// self-consistent with the direct computation whenever the direct
+  /// computation is reliable, so it also reports a genuine mathematical
+  /// zero or infinity correctly, not just the underflow/overflow cases.
+  static double _scaledExpTimes(double l, double factor) {
+    if (factor == 0) return 0;
+    final double direct = math.exp(l) * factor;
+    final bool directUnderflowed = direct == 0;
+    final bool directOverflowed = !direct.isFinite;
+    if (!directUnderflowed && !directOverflowed) return direct;
+    final double logMagnitude = l + math.log(factor.abs());
+    final double magnitude = math.exp(logMagnitude);
+    return factor < 0 ? -magnitude : magnitude;
+  }
+
   Matrix _general2x2Exp() {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
@@ -4043,13 +4181,21 @@ class Matrix {
       // overflow-prone standalone c0, the same pattern already used
       // for the complex-eigenvalue-pair power branch (Round 12
       // correction, finding 4).
+      // Codex round 9, finding 1: a standalone `el = exp(l)` factor can
+      // underflow to exactly 0 (e.g. `l = -750`) even though the true
+      // product `el * (a-l)` (etc.) is representable once `(a-l)` (etc.)
+      // is huge enough, e.g. `exp([[-750,1e150],[0,-750]])` whose true
+      // off-diagonal entry is about `1.9e-176`, not 0. `_scaledExpTimes`
+      // computes each such product in combined-exponent (log-space) form,
+      // never materializing the underflowed/overflowed standalone factor,
+      // while the standalone `el` addend below is left as-is: it is
+      // legitimately allowed to underflow to 0 on its own.
       final double l = l1;
       final double el = _checkFiniteScalar(math.exp(l));
-      final double c1 = el;
-      final double entry00 = _checkFiniteScalar(el + (c1 * (a - l)));
-      final double entry11 = _checkFiniteScalar(el + (c1 * (d - l)));
-      final double entry01 = _checkFiniteScalar(c1 * b);
-      final double entry10 = _checkFiniteScalar(c1 * c);
+      final double entry00 = _checkFiniteScalar(el + _scaledExpTimes(l, a - l));
+      final double entry11 = _checkFiniteScalar(el + _scaledExpTimes(l, d - l));
+      final double entry01 = _checkFiniteScalar(_scaledExpTimes(l, b));
+      final double entry10 = _checkFiniteScalar(_scaledExpTimes(l, c));
       return _checkFiniteMatrix(
         Matrix(<List<double>>[
           <double>[entry00, entry01],
@@ -4130,7 +4276,6 @@ class Matrix {
     final ({bool isComplex, double lambda1, double lambda2, double m, double w})
     eigen = _exactRealEigen2x2(a, b, c, d);
 
-    double c0;
     double c1;
     if (eigen.isComplex) {
       final double m = eigen.m;
@@ -4264,11 +4409,25 @@ class Matrix {
         if (relativeGap < closeEigenvalueThreshold) {
           c1 = _log1p((lSmall - lBig) / lBig) / (lSmall - lBig);
         } else {
-          final double logBig = math.log(lBig);
-          final double logSmall = math.log(lSmall);
-          c1 = (logBig - logSmall) / (lBig - lSmall);
+          // Codex round 9, finding 6: `math.log(lBig) - math.log(lSmall)`
+          // subtracts two absolute logarithms whose own magnitude can
+          // dwarf the true (much smaller) difference regardless of this
+          // branch's own relativeGap threshold, e.g. `lBig=1e100`,
+          // `lSmall=1e100*(1-1.01e-3)`: both logarithms are ~230.26, so
+          // their difference (~1.01e-3 relative) loses several
+          // significant digits to cancellation, past the 1e-12 normwise
+          // accuracy contract. `_log1p((lBig-lSmall) / lSmall)` computes
+          // the same mathematical quantity, `ln(lBig/lSmall)`, without
+          // ever subtracting two comparable absolute logarithms: it is
+          // safe at any `lBig >= lSmall > 0` (both strictly positive
+          // here; the negative-eigenvalue case is rejected above), and is
+          // algebraically the same divided difference as the close branch
+          // above, just derived from the other anchor
+          // (`log1p((lSmall-lBig)/lBig) / (lSmall-lBig) ==
+          // log1p((lBig-lSmall)/lSmall) / (lBig-lSmall)`).
+          final double logDiff = _log1p((lBig - lSmall) / lSmall);
+          c1 = logDiff / (lBig - lSmall);
         }
-        c0 = math.log(lBig) - c1 * lBig;
 
         // Round 10 correction: same triangular exact closed form as
         // [_general2x2Exp], see [_triangularClosedForm2x2]'s doc comment.
@@ -4277,9 +4436,69 @@ class Matrix {
           final double fd = _checkFiniteScalar(math.log(d));
           return _checkFiniteMatrix(_triangularClosedForm2x2(fa, fd, c1));
         }
+
+        // Codex round 9, finding 8: `c0 = math.log(lBig) - c1 * lBig`
+        // followed by `entry = c0 + c1*x` (the old `_c0IPlusC1A`
+        // reconstruction this replaces) anchors at a materialized
+        // eigenvalue `lBig`, which itself already lost precision once it
+        // was formed as `m + w` (a sum of two comparable-magnitude
+        // doubles) whenever `w` (the eigenvalues' real half-separation) is
+        // tiny relative to `m` (e.g. `lBig = 1 + 1e-10`, whose own double
+        // representation keeps only about 6 significant digits of the
+        // `1e-10` offset, since `ulp(1.0)` is already `~2.22e-16`). Both
+        // `c0` and the diagonal `entry = c0 + c1*x` then separately
+        // materialize an `O(m)`-magnitude intermediate (`c0 ~ -m`,
+        // `c1*x ~ m`) that cancels down to the true, much smaller target,
+        // discarding essentially all of that target's own significant
+        // digits (round 9, finding 8:
+        // `log([[1,1e-10],[1e-10,1]])`'s diagonal entries are `~-5e-21`,
+        // twenty-one orders of magnitude below `m = 1`).
+        //
+        // The center term `(f(l1)+f(l2))/2` for `f = log`, `l1 = m+w`,
+        // `l2 = m-w`, `m > 0` (guaranteed here: both eigenvalues are
+        // strictly positive, checked above) can instead be written,
+        // without ever forming `l1`/`l2` as standalone doubles, as
+        // `log(m) + 0.5*log1p(-(w/m)^2)`: `log(l1) = log(m) +
+        // log1p(w/m)`, `log(l2) = log(m) + log1p(-w/m)`, and
+        // `log1p(x) + log1p(-x) = log(1-x^2) = log1p(-x^2)` for any `x`.
+        // `w` (the real separation `sqrt(discriminant)`, now exposed by
+        // [_exactRealEigen2x2] rather than always `0` for the real,
+        // non-complex case) is computed directly from the discriminant,
+        // never by subtracting two materialized eigenvalues, so it keeps
+        // its own full double precision even when it is many orders of
+        // magnitude smaller than `m`.
+        //
+        // The full closed form is then `f(A) = centerTerm*I +
+        // c1*(A - m*I)`: `entry00 = centerTerm + c1*halfDiff`,
+        // `entry11 = centerTerm - c1*halfDiff` (`halfDiff = a-m = (a-d)/2
+        // = -(d-m)`), `entry01 = c1*b`, `entry10 = c1*c`. Every one of
+        // these sums combines two quantities already at the target's own
+        // scale (both `centerTerm` and `c1*halfDiff` are `O((w/m)^2 * m)`
+        // when `w` is tiny relative to `m` and `halfDiff` is comparably
+        // tiny), so there is no `O(m)` intermediate left to cancel away
+        // the target's precision.
+        final double w = eigen.w;
+        final double m = eigen.m;
+        final double halfDiff = (a - d) / 2;
+        final double centerTerm = _checkFiniteScalar(
+          math.log(m) + (0.5 * _log1p(-(w / m) * (w / m))),
+        );
+        final double entry00 = _checkFiniteScalar(
+          centerTerm + (c1 * halfDiff),
+        );
+        final double entry11 = _checkFiniteScalar(
+          centerTerm - (c1 * halfDiff),
+        );
+        final double entry01 = _checkFiniteScalar(c1 * b);
+        final double entry10 = _checkFiniteScalar(c1 * c);
+        return _checkFiniteMatrix(
+          Matrix(<List<double>>[
+            <double>[entry00, entry01],
+            <double>[entry10, entry11],
+          ]),
+        );
       }
     }
-    return _checkFiniteMatrix(_c0IPlusC1A(c0, c1));
   }
 
   /// [power]'s non-integer real-exponent case for a general (non-diagonal,
@@ -4299,6 +4518,35 @@ class Matrix {
   /// non-integer exponent as log-undefined, regardless of the sign of `y`;
   /// [sqrt] (`false`) keeps its existing behavior, where `0^0.5 = 0`
   /// carries through for `y >= 0`.
+  /// Computes `y * pow(l, y-1) * factor` (the derivative of `l^y` times a
+  /// matrix-scale offset or off-diagonal entry) in a way that survives a
+  /// standalone `y * pow(l, y-1)` overflowing to a non-finite value or
+  /// underflowing to exactly 0, as long as the true product is finite.
+  /// `[factor]` here is always one of the matrix's own bounded quantities
+  /// (an offset `a-l`/`d-l`, or an off-diagonal entry `b`/`c`), so the true
+  /// product can be representable even when the standalone derivative
+  /// factor the caller would otherwise compute is not (Codex round 9,
+  /// finding 2). Requires `l > 0` (guaranteed by this method's caller: the
+  /// repeated real-eigenvalue branch already rejects `l < 0` and `l == 0`
+  /// before reaching this helper), so `math.log(l)` is always safe.
+  ///
+  /// Tries the direct product first; only falls back to the
+  /// combined-exponent form when the direct product actually degenerates
+  /// (exactly 0 with a nonzero `factor`, or non-finite), the same
+  /// direct-then-log-fallback pattern as [_scaledExpTimes].
+  static double _scaledDerivativeTimes(double l, double y, double factor) {
+    if (factor == 0 || y == 0) return 0;
+    final double direct = y * math.pow(l, y - 1).toDouble() * factor;
+    final bool directUnderflowed = direct == 0;
+    final bool directOverflowed = !direct.isFinite;
+    if (!directUnderflowed && !directOverflowed) return direct;
+    final double logMagnitude =
+        math.log(y.abs()) + (y - 1) * math.log(l) + math.log(factor.abs());
+    final double magnitude = math.exp(logMagnitude);
+    final bool negative = (y < 0) != (factor < 0);
+    return negative ? -magnitude : magnitude;
+  }
+
   Matrix _general2x2RealPower(
     double y, {
     required bool rejectZeroEigenvalue,
@@ -4324,10 +4572,56 @@ class Matrix {
           errorId: CalculatrixErrorId.nonFinite,
         );
       }
-      final double angle = math.atan2(w, m);
-      final double rToY = _checkFiniteScalar(math.pow(radius, y).toDouble());
-      final double rToYSin = rToY * math.sin(y * angle);
-      final double rToYCos = rToY * math.cos(y * angle);
+      double rToYCos;
+      double rToYSin;
+      if (y == 0.5) {
+        // Codex round 9, finding 3: `angle = atan2(w, m)` cannot resolve
+        // any offset from `pi` (or `0`) finer than a double's own
+        // ~1e-16 absolute precision, since `pi` itself is not exactly
+        // representable. When `w` is many orders of magnitude smaller
+        // than `|m|` and `m < 0` (this matrix: `m = -1e100`,
+        // `w = sqrt(2)*1e-150`), the true angle sits at `pi` minus a
+        // ~1e-250-scale offset that is entirely invisible once `angle`
+        // is materialized as a single double; `y*angle` (`y = 0.5`) then
+        // rounds to exactly `pi/2`, and `math.cos`/`math.sin` of that
+        // rounded value are dominated by the ~1e-16-scale rounding
+        // artifact already baked into how far the double `math.pi/2` sits
+        // from the true mathematical `pi/2` (the well-known
+        // `cos(pi/2) ~ 6.12e-17` artifact), not by the genuine, far
+        // smaller angular offset this branch actually needs. Multiplied
+        // by `rToY` (`~1e50` here), that ~1e-16-scale artifact swamps the
+        // true ~1e-201-scale answer entirely.
+        //
+        // `y == 0.5` is exactly [sqrt]'s case, so the standard
+        // numerically robust principal complex square root formula
+        // (e.g. Higham, "Accuracy and Stability of Numerical Algorithms",
+        // section 1.14) applies directly, computed from `m`/`w`/`radius`
+        // with no trigonometry at all: for `z = m + i*w`,
+        // `sqrt(z) = u + i*v` where, to avoid cancellation in
+        // `radius +/- m` (whichever sign of `m` would otherwise subtract
+        // two comparable-magnitude values), the larger-magnitude
+        // component is computed via a direct `sqrt`, and the other is
+        // recovered by dividing `w` by twice the first component (exact
+        // in the sense that `u*v = w/2` is preserved with no
+        // cancellation) instead of the sibling `sqrt`, which would itself
+        // suffer the very cancellation this avoids.
+        final double u;
+        final double v;
+        if (m >= 0) {
+          u = math.sqrt((radius + m) / 2);
+          v = u == 0 ? 0 : w / (2 * u);
+        } else {
+          v = math.sqrt((radius - m) / 2);
+          u = v == 0 ? 0 : w / (2 * v);
+        }
+        rToYCos = u;
+        rToYSin = v;
+      } else {
+        final double angle = math.atan2(w, m);
+        final double rToY = _checkFiniteScalar(math.pow(radius, y).toDouble());
+        rToYSin = rToY * math.sin(y * angle);
+        rToYCos = rToY * math.cos(y * angle);
+      }
 
       // Round 12 correction, finding 4: `c1 = rToY*sin(y*angle)/w`, then
       // every entry as `c0 + c1*A` for `c0 = rToY*cos(y*angle) - c1*m`,
@@ -4395,12 +4689,30 @@ class Matrix {
         // for exp's repeated-eigenvalue branch (Round 12 correction,
         // finding 6) and power's complex-eigenvalue-pair branch (Round
         // 12 correction, finding 4).
+        //
+        // Codex round 9, finding 2: a standalone `c1 = y*pow(l,y-1)`
+        // factor can itself overflow to a non-finite value (e.g.
+        // `l=1e-150, y=-1.5`) or underflow to exactly 0 (e.g.
+        // `l=1e150, y=-1.5`) even though the true product
+        // `c1 * (a-l)` (etc.) is representable, e.g.
+        // `[[1e-150,1e-150],[0,1e-150]]^-1.5`'s true off-diagonal entry
+        // is about `-1.5e+225`, not non-finite. `_scaledDerivativeTimes`
+        // computes each such product in combined-exponent (log-space)
+        // form, never materializing the overflowed/underflowed
+        // standalone `c1`.
         final double fl = _checkFiniteScalar(math.pow(l, y).toDouble());
-        c1 = _checkFiniteScalar(y * math.pow(l, y - 1).toDouble());
-        final double entry00 = _checkFiniteScalar(fl + (c1 * (a - l)));
-        final double entry11 = _checkFiniteScalar(fl + (c1 * (d - l)));
-        final double entry01 = _checkFiniteScalar(c1 * b);
-        final double entry10 = _checkFiniteScalar(c1 * c);
+        final double entry00 = _checkFiniteScalar(
+          fl + _scaledDerivativeTimes(l, y, a - l),
+        );
+        final double entry11 = _checkFiniteScalar(
+          fl + _scaledDerivativeTimes(l, y, d - l),
+        );
+        final double entry01 = _checkFiniteScalar(
+          _scaledDerivativeTimes(l, y, b),
+        );
+        final double entry10 = _checkFiniteScalar(
+          _scaledDerivativeTimes(l, y, c),
+        );
         return _checkFiniteMatrix(
           Matrix(<List<double>>[
             <double>[entry00, entry01],
@@ -4563,7 +4875,23 @@ class Matrix {
             // divided in last, and is safe here because this is
             // specifically the far-apart branch (relativeGap already
             // confirmed not small by the check above).
-            final double logDiff = math.log(lBig) - math.log(lSmall);
+            // Codex round 9, finding 6: `math.log(lBig) - math.log(lSmall)`
+            // subtracts two absolute logarithms whose own magnitude can
+            // dwarf the true (much smaller) difference regardless of how
+            // this branch's `relativeGap` check classifies the pair, e.g.
+            // `lBig=1e100`, `lSmall=1e100*(1-1.4916e-8)`: both logarithms
+            // are ~230.26, so their difference (~1.49e-8) loses about 8 of
+            // its significant digits to cancellation, well past the
+            // 1e-12 normwise accuracy contract. `_log1p((lBig-lSmall) /
+            // lSmall)` computes the exact same mathematical quantity,
+            // `ln(lBig/lSmall)`, without ever subtracting two comparable
+            // absolute logarithms: it is safe at any `lBig >= lSmall > 0`
+            // (both strictly positive here; the zero-eigenvalue case is
+            // routed to its own branch above), not just within this
+            // branch's particular relativeGap threshold, since
+            // `(lBig-lSmall)/lSmall` is always >= 0 and therefore always a
+            // valid `log1p` argument.
+            final double logDiff = _log1p((lBig - lSmall) / lSmall);
             final double t = y * logDiff;
             final double numerator = t <= 0
                 ? lySmall * _expm1(t)
