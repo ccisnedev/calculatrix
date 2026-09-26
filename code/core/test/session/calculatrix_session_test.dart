@@ -315,4 +315,126 @@ void main() {
       expect(session.hasError, isFalse);
     });
   });
+
+  group('CalculatrixSession - rpn SPC key', () {
+    test('SPC appends a single space to the rpn draft', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+
+      session.appendSpace();
+
+      expect(session.rpnDraft, '2 ');
+    });
+
+    test('SPC does nothing when the rpn draft is empty', () {
+      session.setMode(CalculatrixMode.rpn);
+
+      session.appendSpace();
+
+      expect(session.rpnDraft, '');
+    });
+
+    test('SPC does nothing when the rpn draft already ends with a space', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+
+      session.appendSpace();
+
+      expect(session.rpnDraft, '2 ');
+    });
+
+    test('SPC is a no-op in infix mode', () {
+      session.input('2');
+
+      session.appendSpace();
+
+      expect(session.expression, '2');
+    });
+
+    test('ENTER splits the draft on spaces and pushes tokens left to right', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+
+      session.enter();
+
+      expect(
+        session.rpnStack,
+        orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(3)]),
+      );
+      expect(session.rpnDraft, '');
+      expect(session.hasError, isFalse);
+    });
+
+    test('an operation commits a spaced draft the same way ENTER does', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+
+      session.applyRpnBinary(RpnBinaryOperator.add);
+
+      expect(session.rpnStackDepth, 1);
+      expect(session.rpnTopValue, Matrix.scalar(5));
+      expect(session.rpnDraft, '');
+    });
+
+    test('an invalid token pushes nothing and keeps the draft as typed on enter', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('abc');
+
+      session.enter();
+
+      expect(session.rpnDraft, '2 abc');
+      expect(session.rpnStackDepth, 0);
+      expect(session.hasError, isTrue);
+      expect(session.lastError, isA<CalculatrixError>());
+    });
+
+    test('an invalid token in a spaced draft leaves the stack untouched before an operation', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('abc');
+
+      session.applyRpnBinary(RpnBinaryOperator.add);
+
+      expect(session.rpnDraft, '2 abc');
+      expect(session.rpnStackDepth, 0);
+      expect(session.hasError, isTrue);
+    });
+
+    test('backspace removes the trailing space from the draft', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+
+      session.backspace();
+
+      expect(session.rpnDraft, '2');
+    });
+
+    test('inserting a matrix literal is unaffected by a pending spaced draft', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+
+      session.insertMatrixLiteral('[[1,2],[3,4]]');
+
+      expect(session.rpnDraft, '');
+      expect(session.rpnStackDepth, 1);
+      expect(
+        session.rpnTopValue,
+        Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[3, 4],
+        ]),
+      );
+    });
+  });
 }
