@@ -154,6 +154,35 @@ class CalculatrixNumericPolicy {
   /// so the bound never drops below it.
   static const double matrixFunctionAccuracyFactor = 1e4;
 
+  /// Named constant `c` in the Weyl-theorem backward-error bound for cyclic
+  /// Jacobi eigendecomposition (Golub and Van Loan, "Matrix Computations",
+  /// section 8.5): the computed eigenvalues are the exact eigenvalues of
+  /// `A + E` for some symmetric perturbation `E` with `||E||_F` bounded by a
+  /// modest multiple of [unitRoundoff] and the matrix's own size and norm,
+  /// so `|computed_i - exact_i| <= jacobiEigenvalueBackwardErrorFactor * n *
+  /// unitRoundoff * ||A||_F` for every eigenvalue `i`, where `n` is the
+  /// matrix's row count.
+  ///
+  /// Used only to decide whether a computed eigenvalue that is not exactly
+  /// zero is nonetheless numerically indistinguishable from a true zero
+  /// eigenvalue (Codex round 11, finding 1): a rank-deficient exactly
+  /// symmetric input (for example a rank-1 PSD matrix `v*v^T`) has a true
+  /// zero eigenvalue that cyclic Jacobi, being a floating-point
+  /// computation, generically returns as a tiny nonzero value of either
+  /// sign instead of exactly `0.0`. Only a computed eigenvalue within this
+  /// bound of zero is treated as zero; anything further from zero is a
+  /// genuine (positive or negative) eigenvalue, rejected or accepted on its
+  /// own terms exactly as before.
+  ///
+  /// Calibrated empirically against the measured Jacobi noise on
+  /// `[[1,2,4],[2,4,8],[4,8,16]]` (a true eigenvalue of exactly `0.0`
+  /// computed as about `-1.78e-15`, with `n = 3`, `||A||_F = 21`): `10 * 3 *
+  /// unitRoundoff * 21 =~ 7.0e-14`, about a 40x margin above the measured
+  /// noise, while remaining many orders of magnitude below any eigenvalue
+  /// that would be considered meaningfully nonzero at the matrix's own
+  /// scale.
+  static const double jacobiEigenvalueBackwardErrorFactor = 10;
+
   static bool nearlyEqual(
     double a,
     double b, {

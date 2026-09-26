@@ -2423,8 +2423,19 @@ class Matrix {
         quantity: 'result eigenvalue magnitude',
       );
       final double magnitude = _checkFiniteScalar(math.exp(a));
-      return _checkFiniteMatrix(
-        Matrix.complex(magnitude * math.cos(b), magnitude * math.sin(b)),
+      // Codex round 11, finding 3: the result-eigenvalue check above bounds
+      // exp(a +/- b*i)'s magnitude, exp(a), but not this result's own
+      // entries, magnitude*cos(b) and magnitude*sin(b): a large negative a
+      // paired with a tiny nonzero b (e.g. a=-345, b=1e-150) gives a
+      // magnitude just inside the declared range while
+      // magnitude*sin(b) =~ magnitude*b underflows far below it. Every
+      // other branch of exp/log/sqrt/power already checks its result's
+      // entries this way; this closes the same gap here.
+      return _requireResultEntriesInPrecisionRange(
+        _checkFiniteMatrix(
+          Matrix.complex(magnitude * math.cos(b), magnitude * math.sin(b)),
+        ),
+        operation: 'matrix exponential',
       );
     }
 
@@ -2594,7 +2605,19 @@ class Matrix {
         operation: 'matrix logarithm',
         quantity: 'result eigenvalue magnitude',
       );
-      return Matrix.complex(logRadius, angle);
+      // Codex round 11, finding 3: the combined hypot(logRadius, angle)
+      // check above mirrors the eigenvalue-magnitude check, but does not
+      // bound logRadius and angle individually as this result's own
+      // entries: a large radius paired with a tiny nonzero imaginary part
+      // (e.g. a=1e150, b=1e-150) gives a hypot dominated by logRadius
+      // (~345.39, in range) while angle =~ b/a underflows far below the
+      // declared range. Every other branch of exp/log/sqrt/power already
+      // checks its result's entries this way; this closes the same gap
+      // here.
+      return _requireResultEntriesInPrecisionRange(
+        Matrix.complex(logRadius, angle),
+        operation: 'matrix logarithm',
+      );
     }
 
     if (_isExactlyDiagonal()) {
@@ -2767,10 +2790,44 @@ class Matrix {
       }
 
       // b < 0, non-integer exponent: complex principal value via
-      // B^Y = exp(Y * log(B)), where log(B) is the complex principal log
-      // this class already gives negative scalars.
-      final Matrix scaled = log().scale(y);
-      return _checkFiniteMatrix(scaled.exp());
+      // B^Y = exp(Y * log(B)), where log(B) = ln(|b|) + pi*i is the
+      // complex principal log this class already gives negative scalars.
+      //
+      // Codex round 11, finding 4: computed directly here, rather than by
+      // chaining through the public [log] and [exp] methods (the previous
+      // `log().scale(y).exp()`): each of those re-applies its own
+      // public-entry argument gate ([_requireEntriesInPrecisionRange]) to
+      // what is, at this point, an internally derived intermediate
+      // (Y*ln(|b|) and Y*pi), not a raw argument this method's own caller
+      // supplied. That intermediate can fall below
+      // [CalculatrixNumericPolicy.matrixFunctionMinMagnitude] on its own
+      // even when the true final result is comfortably in range (e.g.
+      // `(-2)^(1e-150)`, whose true result rounds to 1.0 exactly). Only
+      // the public entry point validates raw arguments; internal
+      // computations validate only the result eigenvalue and result
+      // entries, the same as every other internal helper in this file.
+      final double logMagnitude = math.log(-b);
+      final double a = y * logMagnitude;
+      final double angle = y * math.pi;
+      // D38 / Codex round 10, rule A: this result's eigenvalue is
+      // exp(a +/- angle*i), whose magnitude is exp(a), so the log-magnitude
+      // of the result is a itself, the same check [exp]'s own complex-form
+      // branch performs.
+      _requireResultLogMagnitudeInRange(
+        a,
+        operation: 'real matrix power',
+        quantity: 'result eigenvalue magnitude',
+      );
+      final double magnitude = _checkFiniteScalar(math.exp(a));
+      return _requireResultEntriesInPrecisionRange(
+        _checkFiniteMatrix(
+          Matrix.complex(
+            magnitude * math.cos(angle),
+            magnitude * math.sin(angle),
+          ),
+        ),
+        operation: 'real matrix power',
+      );
     }
 
     // Square, non-scalar base.
@@ -3054,13 +3111,44 @@ class Matrix {
   /// eigenvalue) is always allowed, at any of the five supported
   /// matrix-function classes, the same as the existing entry/eigenvalue
   /// checks above.
+  /// Codex round 11, finding 2: how many multiples of
+  /// [CalculatrixNumericPolicy.machineEpsilon] (relative to a bound's own
+  /// magnitude, about 345.39) the boundary comparison in
+  /// [_requireResultLogMagnitudeInRange] is widened by, to absorb that
+  /// comparison's own floating-point rounding rather than the underlying
+  /// mathematical value's.
+  ///
+  /// [logMagnitude] is itself the result of at least one `math.log` call
+  /// and, for most callers, a multiplication by the exponent `y`, each
+  /// introducing up to about one machineEpsilon of relative rounding. A
+  /// result whose TRUE magnitude sits exactly at a declared, inclusive
+  /// boundary, such as `(1e-100)^1.5 = 1e-150` exactly, can therefore
+  /// compute a [logMagnitude] a few ULPs on the wrong side of
+  /// `_resultLogMagnitudeLowerBound`/`_resultLogMagnitudeUpperBound` purely
+  /// from this rounding (measured: about 5.68e-14, under 1 ULP of the
+  /// bound's own magnitude, for `scalar(1e-100)^1.5` and its `-1.5`
+  /// analogue), and would otherwise be rejected even though the boundary
+  /// itself is inclusive. 8 ULPs gives a comfortable margin above the
+  /// measured 1-ULP-scale discrepancy while remaining many orders of
+  /// magnitude too small to admit a result that is genuinely out of range
+  /// by any meaningful amount.
+  static const int _resultLogMagnitudeToleranceUlps = 8;
+
   static void _requireResultLogMagnitudeInRange(
     double logMagnitude, {
     required String operation,
     required String quantity,
   }) {
-    if (logMagnitude < _resultLogMagnitudeLowerBound ||
-        logMagnitude > _resultLogMagnitudeUpperBound) {
+    final double lowerTolerance =
+        _resultLogMagnitudeToleranceUlps *
+        CalculatrixNumericPolicy.machineEpsilon *
+        _resultLogMagnitudeLowerBound.abs();
+    final double upperTolerance =
+        _resultLogMagnitudeToleranceUlps *
+        CalculatrixNumericPolicy.machineEpsilon *
+        _resultLogMagnitudeUpperBound.abs();
+    if (logMagnitude < _resultLogMagnitudeLowerBound - lowerTolerance ||
+        logMagnitude > _resultLogMagnitudeUpperBound + upperTolerance) {
       throw MatrixDomainError(
         'Cannot compute the $operation: $quantity would have magnitude '
         'exp($logMagnitude), outside the declared precision range '
@@ -3844,9 +3932,33 @@ class Matrix {
       );
     }
 
+    // Codex round 11, finding 1: a true zero eigenvalue (for example the
+    // repeated zero of a rank-deficient exactly symmetric input, such as a
+    // rank-1 PSD matrix v*v^T) is generically computed by this
+    // floating-point sweep as a tiny nonzero value of either sign, never
+    // exactly 0.0. Weyl's theorem bounds how far any computed eigenvalue
+    // can be from its true value here (Golub and Van Loan, section 8.5);
+    // see [CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor]
+    // for the bound's derivation and named constant. A computed eigenvalue
+    // within that bound of zero is numerically indistinguishable from a
+    // true zero and is snapped to exactly 0.0 here, once, for every caller
+    // of this decomposition (sqrt/exp/log/power's shared symmetric-matrix
+    // branch): [sqrt] then returns 0 for it (its existing exactly-zero
+    // case), while [log] and non-integer [power] continue to treat an
+    // exactly-zero eigenvalue as log-undefined (their existing
+    // exactly-zero case), since a zero eigenvalue is genuinely
+    // log-undefined for both regardless of how it was computed. A computed
+    // eigenvalue beyond this bound of zero is left untouched: it is a
+    // genuine, meaningfully nonzero eigenvalue, positive or negative,
+    // handled exactly as before.
+    final double jacobiZeroTolerance =
+        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+        n *
+        CalculatrixNumericPolicy.unitRoundoff *
+        frobeniusNormOriginal;
     final List<double> lambda = List<double>.generate(
       n,
-      (int i) => a[i][i],
+      (int i) => a[i][i].abs() <= jacobiZeroTolerance ? 0.0 : a[i][i],
       growable: false,
     );
     return (q: Matrix(v), lambda: lambda);
@@ -4872,7 +4984,27 @@ class Matrix {
   /// combined-exponent form when the direct product actually degenerates
   /// (exactly 0 with a nonzero `factor`, or non-finite), the same
   /// direct-then-log-fallback pattern as [_scaledExpTimes].
-  static double _scaledDerivativeTimes(double l, double y, double factor) {
+  ///
+  /// Codex round 11, finding 5: the combined-exponent fallback's own
+  /// [logMagnitude] can itself indicate a magnitude outside the declared
+  /// D38 range (e.g. about 862.8, for
+  /// `[[1e-150,1e150],[0,1e-150]]^-0.5`'s off-diagonal entry, far past
+  /// `ln(matrixFunctionMaxMagnitude) ~= 345.39`), in which case
+  /// `math.exp(logMagnitude)` itself overflows to `Infinity` (or
+  /// underflows to 0 for a sufficiently negative logMagnitude), and the
+  /// caller's generic finiteness check would report the unhelpful
+  /// [CalculatrixErrorId.nonFinite] instead of the more specific,
+  /// declarative [CalculatrixErrorId.matrixOutOfPrecisionRange] this
+  /// magnitude, already known in log space, actually calls for. Checking
+  /// [logMagnitude] against the declared range before ever calling
+  /// `math.exp` on it, the same pattern [_requireResultLogMagnitudeInRange]
+  /// uses everywhere else in this file, raises that specific error instead.
+  static double _scaledDerivativeTimes(
+    double l,
+    double y,
+    double factor, {
+    required String operation,
+  }) {
     if (factor == 0 || y == 0) return 0;
     final double direct = y * math.pow(l, y - 1).toDouble() * factor;
     final bool directUnderflowed = direct == 0;
@@ -4880,6 +5012,11 @@ class Matrix {
     if (!directUnderflowed && !directOverflowed) return direct;
     final double logMagnitude =
         math.log(y.abs()) + (y - 1) * math.log(l) + math.log(factor.abs());
+    _requireResultLogMagnitudeInRange(
+      logMagnitude,
+      operation: operation,
+      quantity: 'result entry magnitude',
+    );
     final double magnitude = math.exp(logMagnitude);
     final bool negative = (y < 0) != (factor < 0);
     return negative ? -magnitude : magnitude;
@@ -5054,16 +5191,16 @@ class Matrix {
         );
         final double fl = _checkFiniteScalar(math.pow(l, y).toDouble());
         final double entry00 = _checkFiniteScalar(
-          fl + _scaledDerivativeTimes(l, y, a - l),
+          fl + _scaledDerivativeTimes(l, y, a - l, operation: operation),
         );
         final double entry11 = _checkFiniteScalar(
-          fl + _scaledDerivativeTimes(l, y, d - l),
+          fl + _scaledDerivativeTimes(l, y, d - l, operation: operation),
         );
         final double entry01 = _checkFiniteScalar(
-          _scaledDerivativeTimes(l, y, b),
+          _scaledDerivativeTimes(l, y, b, operation: operation),
         );
         final double entry10 = _checkFiniteScalar(
-          _scaledDerivativeTimes(l, y, c),
+          _scaledDerivativeTimes(l, y, c, operation: operation),
         );
         return _checkFiniteMatrix(
           Matrix(<List<double>>[
