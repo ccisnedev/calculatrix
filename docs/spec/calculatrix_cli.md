@@ -236,8 +236,12 @@ extension point `doctor.checks`. In `cx`, all of them come from
 A warning never fails the command; it is information for a person. A failed
 lookup is always reported, never skipped. Exit code: `0` when no check is an
 error, `78` otherwise (section 6). The release lookup is the same code
-`upgrade` uses, inside `InstallationPlugin`. JSON:
-`{"checks": [{"name": "path", "status": "ok", "detail": "..."}]}`.
+`upgrade` uses, inside `InstallationPlugin`. JSON when no check is an error:
+`{"checks": [{"name": "path", "status": "ok", "detail": "..."}]}`. When a
+check is an error, the output is the single error shape of section 6 with
+the id `doctor-check-failed`, exit code `78` and every check result under
+`checks`:
+`{"error": {"id": "doctor-check-failed", "message": "1 check failed: alias", "exitCode": 78, "checks": [...]}}`.
 
 ## 6. Output and errors
 
@@ -301,7 +305,8 @@ with the same three fields always present:
   `missing-argument`, ...).
 - `exitCode` repeats the process exit code.
 - Other fields appear only when they apply: `token` and `position` for domain
-  errors, `contract` and `details` for usage errors. There is no
+  errors, `contract` and `details` for usage errors, `checks` for
+  `doctor-check-failed` (section 5). There is no
   `isRetryable`.
 
 **Domain errors** share exit code `65` and carry a structured id, so scripts
@@ -928,11 +933,11 @@ records the ones that affect the whole stage (D25 to D38).
 | R14 | `--trace`, `--show-rpn` | Not in this stage; in the roadmap. |
 | R15 | `CliRequest.flags` | Removed in `cli_router` 0.2.0. |
 | R16 | JSON of `eval` | `{"stack": [...]}`, level 1 last, 1x1 as a number, other matrices as rows. |
-| R17 | `doctor` | Local checks plus the newer-release check; states ok, warning, error; a failed lookup is a warning, never skipped; exit 78 on any error. |
+| R17 | `doctor` | Local checks plus the newer-release check; states ok, warning, error; a failed lookup is a warning, never skipped; exit 78 on any error, with the error `doctor-check-failed` carrying every check result (section 5). |
 | R18 | Standard routes | `version`, `doctor`, `upgrade` and `uninstall` come from standard plugins inside `modular_cli_sdk` (8.7), registered explicitly; `doctor` gathers checks through the extension point `doctor.checks`. There is no `modular_cli_installer` package. |
 | R19 | `power`, closing the table | Order of checks by kinds; `i [[1 0] [0 2]] ^` is `ambiguous-power`; a non-square exponent is `dimension-mismatch` with any base (runbook D34). |
 | R20 | Help precedence | Wins over an incomplete route, a missing argument or option, and the constraints; loses to malformed invocations (8.6). |
 | R21 | Failure of `--apply` | Exit `1` with a structured id; stop at the failed step, no rollback, no retry (section 6). |
 | R22 | `no-convergence` | An iterative method (matrix exponential, square root, logarithm) that does not reach its tolerance within its cap raises `no-convergence` (65); it never returns the unconverged value (runbook D35). |
 | R23 | `unsupported-matrix-function` | `exp`, `log`, `sqrt` and a non-integer real power accept a scalar, the complex form, a diagonal, a symmetric or a 2x2 matrix; any other matrix raises `unsupported-matrix-function` (65), never an approximation (runbook D37). |
-| R24 | `matrix-out-of-precision-range` | `exp`, `log`, `sqrt` and a non-integer real power accept only matrices whose nonzero entries and nonzero eigenvalues have magnitudes between `1e-150` and `1e150`; outside that range they raise `matrix-out-of-precision-range` (65). Inside it the normwise relative error is at most `1e4 * kappa * u`, with `kappa` the relative condition number of the function at the matrix and `u = 2^-53` (about `1e-12` for a well conditioned matrix; runbook D38). |
+| R24 | `matrix-out-of-precision-range` | `exp`, `log`, `sqrt` and a non-integer real power accept only matrices whose nonzero entries and nonzero eigenvalues have magnitudes between `1e-150` and `1e150`; outside that range, or when an eigenvalue or a nonzero entry of the result falls outside it (`exp(-1000)`, `exp(710)`), they raise `matrix-out-of-precision-range` (65). Inside it the normwise relative error is at most `1e4 * kappa * u`, with `kappa` the relative condition number of the function at the matrix and `u = 2^-53` ((about `1e-12` for a well conditioned matrix); a zero result and `sqrt` of a singular matrix get the absolute bounds of runbook D38). |
