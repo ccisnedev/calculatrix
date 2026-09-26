@@ -38,6 +38,20 @@ final class SvdDecomposition {
   final Matrix vT;
 }
 
+/// Codex round 13, findings 1 and 4 (P1): the classification a computed
+/// eigenvalue gets BEFORE any D38 declared-precision-range gate ever runs,
+/// used uniformly by [Matrix.sqrt], [Matrix.log] and non-integer
+/// [Matrix.power]. An eigenvalue whose magnitude does not exceed its
+/// caller-supplied, block-local Weyl backward-error bound (exactly 0 for a
+/// diagonal or general 2x2 caller, which has no Jacobi rotation noise at
+/// all) is [zero], not [positive] or [negative], regardless of its own
+/// computed floating point sign: sqrt maps a [zero] eigenvalue to exactly
+/// 0, while log and non-integer power treat it as
+/// [CalculatrixErrorId.logUndefined], the same as a mathematically exact
+/// zero eigenvalue, never as a magnitude below the declared precision
+/// range.
+enum _EigenvalueSign { zero, positive, negative }
+
 class Matrix {
   Matrix(List<List<double>> rows) : _rows = _normalize(rows) {
     _validateRectangular(_rows);
@@ -2477,6 +2491,7 @@ class Matrix {
           },
           maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
           operation: 'matrix exponential',
+          checkOperandRange: true,
         ),
         operation: 'matrix exponential',
       );
@@ -2484,7 +2499,10 @@ class Matrix {
 
     if (rowCount == 2) {
       return _requireResultEntriesInPrecisionRange(
-        _general2x2Exp(),
+        _general2x2Exp(
+          checkOperandRange: true,
+          operation: 'matrix exponential',
+        ),
         operation: 'matrix exponential',
       );
     }
@@ -2646,7 +2664,15 @@ class Matrix {
     if (_isExactlySymmetric() && rowCount != 2) {
       return _requireResultEntriesInPrecisionRange(
         _symmetricRealFunction((double v, double zeroTolerance) {
-          if (v <= 0) {
+          // Codex round 13, finding 1 (P1): an eigenvalue this
+          // [_classifyEigenvalue]s as [_EigenvalueSign.zero] (within its
+          // own block-local backward-error bound, regardless of its own
+          // computed floating point sign) is logUndefined the same as a
+          // mathematically exact zero eigenvalue, not merely a magnitude
+          // below the declared precision range; only a genuinely
+          // [_EigenvalueSign.positive] eigenvalue reaches math.log below.
+          if (_classifyEigenvalue(v, zeroTolerance) !=
+              _EigenvalueSign.positive) {
             throw MatrixDomainError(
               'Logarithm is undefined for matrices with non-positive real '
               'eigenvalues.',
@@ -2658,14 +2684,17 @@ class Matrix {
             operation: 'matrix logarithm',
             quantity: 'result eigenvalue',
           );
-        }, maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps, operation: 'matrix logarithm'),
+        }, maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps, operation: 'matrix logarithm', checkOperandRange: true),
         operation: 'matrix logarithm',
       );
     }
 
     if (rowCount == 2) {
       return _requireResultEntriesInPrecisionRange(
-        _general2x2Log(),
+        _general2x2Log(
+          checkOperandRange: true,
+          operation: 'matrix logarithm',
+        ),
         operation: 'matrix logarithm',
       );
     }
@@ -2808,7 +2837,6 @@ class Matrix {
       // entries, the same as every other internal helper in this file.
       final double logMagnitude = math.log(-b);
       final double a = y * logMagnitude;
-      final double angle = y * math.pi;
       // D38 / Codex round 10, rule A: this result's eigenvalue is
       // exp(a +/- angle*i), whose magnitude is exp(a), so the log-magnitude
       // of the result is a itself, the same check [exp]'s own complex-form
@@ -2819,11 +2847,18 @@ class Matrix {
         quantity: 'result eigenvalue magnitude',
       );
       final double magnitude = _checkFiniteScalar(math.exp(a));
+      // Codex round 13, finding 5 (P3): the angle here is exactly y*pi (the
+      // complex principal log's imaginary part, pi, scaled by the real
+      // exponent y), not an arbitrary angle, so its cosine and sine are
+      // computed by [_cosPi]/[_sinPi]'s exact argument reduction rather
+      // than by forming `y * math.pi` and calling math.cos/math.sin on
+      // that product directly, which loses the exact zero (or exact +/-1)
+      // this closed form is entitled to at every half-integer y.
       return _requireResultEntriesInPrecisionRange(
         _checkFiniteMatrix(
           Matrix.complex(
-            magnitude * math.cos(angle),
-            magnitude * math.sin(angle),
+            magnitude * _cosPi(y),
+            magnitude * _sinPi(y),
           ),
         ),
         operation: 'real matrix power',
@@ -2861,32 +2896,51 @@ class Matrix {
   /// [exp] wrongly rejects it before the final, in-range answer is ever
   /// reached.
   ///
-  /// This mirrors [exp]'s five-class dispatch, but omits every D38
-  /// precision-range check ([_requireEntriesInPrecisionRange],
-  /// [_requireResultLogMagnitudeInRange],
-  /// [_requireResultEntriesInPrecisionRange],
-  /// [_requireComplexPairPartsInPrecisionRange]): only genuine
-  /// mathematical domain checks and finiteness guards remain. The
-  /// exactly-symmetric and general 2x2 branches are a deliberate
-  /// exception: they delegate to [_symmetricRealFunction] and
-  /// [_general2x2Exp] as-is, keeping those methods' own embedded D38
-  /// checks, rather than duplicating their numerically delicate
-  /// cancellation-avoidance formulas without those protections. Neither of
-  /// this finding's two reported cases ever reaches either branch (both
-  /// stay within the scalar and complex-form classes), so this narrower
-  /// scope carries no known correctness gap while avoiding the far larger
-  /// risk of re-deriving hardened, review-hardened numerical code.
+  /// This mirrors [exp]'s five-class dispatch, but omits every raw-operand
+  /// D38 precision-range check the scalar, complex-form and diagonal
+  /// branches would otherwise apply
+  /// ([_requireEntriesInPrecisionRange], [_requireComplexPairPartsInPrecisionRange]):
+  /// only genuine mathematical domain checks and finiteness guards remain
+  /// there. Codex round 13, findings 2 and 3 (P2) correction: every branch
+  /// still runs the always-on, before-exponentiating, log-space check
+  /// ([_requireResultLogMagnitudeInRange]) unconditionally; skipping it here
+  /// (the original round 12 version of this method did) let an
+  /// out-of-range intermediate exponent silently underflow to an
+  /// exact-zero result instead of being rejected, for example
+  /// `scalar(2).power(complex(-2000, 0))`, whose intermediate `log(2) *
+  /// -2000` (about -1386.29) underflows `exp` to exactly `0.0 + 0.0i`
+  /// without this check. The exactly-symmetric and general 2x2 branches
+  /// delegate to [_symmetricRealFunction] and [_general2x2Exp] with
+  /// `checkOperandRange: false`, keeping those methods' own embedded,
+  /// always-on result-side checks while skipping only their embedded
+  /// operand gate, for the identical reason: an internal chain's
+  /// intermediate eigenvalue is not itself a raw operand or the final
+  /// result, but its result still needs the same before-exponentiating
+  /// protection as every other branch.
   Matrix _internalExp() {
     _requireSquare(operation: 'exponential');
     _checkFiniteMatrix(this);
 
     if (isScalar) {
+      // Codex round 13, findings 2 and 3 (P2): the always-on,
+      // before-exponentiating log-space check stays unconditional even in
+      // this internal, operand-ungated path; see this method's doc comment.
+      _requireResultLogMagnitudeInRange(
+        scalarValue,
+        operation: 'matrix power',
+        quantity: 'result eigenvalue',
+      );
       return Matrix.scalar(_checkFiniteScalar(math.exp(scalarValue)));
     }
 
     if (isComplexForm) {
       final double a = realPart;
       final double b = imagPart;
+      _requireResultLogMagnitudeInRange(
+        a,
+        operation: 'matrix power',
+        quantity: 'result eigenvalue magnitude',
+      );
       final double magnitude = _checkFiniteScalar(math.exp(a));
       return _checkFiniteMatrix(
         Matrix.complex(magnitude * math.cos(b), magnitude * math.sin(b)),
@@ -2894,19 +2948,34 @@ class Matrix {
     }
 
     if (_isExactlyDiagonal()) {
-      return _diagonalRealFunction((double v) => math.exp(v));
+      return _diagonalRealFunction((double v) {
+        _requireResultLogMagnitudeInRange(
+          v,
+          operation: 'matrix power',
+          quantity: 'result eigenvalue',
+        );
+        return math.exp(v);
+      });
     }
 
     if (_isExactlySymmetric() && rowCount != 2) {
       return _symmetricRealFunction(
-        (double v, double zeroTolerance) => math.exp(v),
+        (double v, double zeroTolerance) {
+          _requireResultLogMagnitudeInRange(
+            v,
+            operation: 'matrix power',
+            quantity: 'result eigenvalue',
+          );
+          return math.exp(v);
+        },
         maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
-        operation: 'matrix exponential',
+        operation: 'matrix power',
+        checkOperandRange: false,
       );
     }
 
     if (rowCount == 2) {
-      return _general2x2Exp();
+      return _general2x2Exp(checkOperandRange: false, operation: 'matrix power');
     }
 
     throw _unsupportedMatrixFunction('matrix exponential');
@@ -2979,7 +3048,12 @@ class Matrix {
 
     if (_isExactlySymmetric() && rowCount != 2) {
       return _symmetricRealFunction((double v, double zeroTolerance) {
-        if (v <= 0) {
+        // Codex round 13, finding 1 (P1): mirrors the same classification
+        // [log]'s own exactly-symmetric branch applies, for consistency,
+        // even though this internal path is unreachable from
+        // [_powerByMatrixExponent]'s current call sites (see this method's
+        // doc comment).
+        if (_classifyEigenvalue(v, zeroTolerance) != _EigenvalueSign.positive) {
           throw MatrixDomainError(
             'Logarithm is undefined for matrices with non-positive real '
             'eigenvalues.',
@@ -2987,11 +3061,11 @@ class Matrix {
           );
         }
         return math.log(v);
-      }, maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps, operation: 'matrix logarithm');
+      }, maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps, operation: 'matrix power', checkOperandRange: false);
     }
 
     if (rowCount == 2) {
-      return _general2x2Log();
+      return _general2x2Log(checkOperandRange: false, operation: 'matrix power');
     }
 
     throw _unsupportedMatrixFunction('matrix logarithm');
@@ -3187,6 +3261,53 @@ class Matrix {
     }
   }
 
+  /// Codex round 13, findings 1 and 4 (P1): classifies a computed
+  /// eigenvalue as [_EigenvalueSign.zero], [_EigenvalueSign.positive] or
+  /// [_EigenvalueSign.negative], BEFORE any D38 declared-precision-range
+  /// gate ever runs, so that gate never sees (and never rejects) an
+  /// eigenvalue this classifies as zero, regardless of its own computed
+  /// floating point sign or magnitude. [zeroTolerance] is the caller's own
+  /// block-local Weyl backward-error bound (see
+  /// [_cyclicJacobiEigendecomposition]'s doc comment); it is exactly 0 for
+  /// a diagonal or general 2x2 caller, which has no Jacobi rotation noise
+  /// at all, so only a mathematically exact zero eigenvalue is ever
+  /// classified as zero there.
+  static _EigenvalueSign _classifyEigenvalue(
+    double lambda,
+    double zeroTolerance,
+  ) {
+    if (lambda.abs() <= zeroTolerance) return _EigenvalueSign.zero;
+    return lambda > 0 ? _EigenvalueSign.positive : _EigenvalueSign.negative;
+  }
+
+  /// Codex round 13, finding 5 (P3): `cos(y*pi)` computed by forming the
+  /// product `y * math.pi` first loses exactness at exactly the arguments
+  /// where this closed form most needs it, since pi itself is not exactly
+  /// representable and every half-integer y (0.5, 1, 1.5, 2, ...) has an
+  /// exact cosine (0, -1, 0, 1, ...). This helper instead reduces y modulo
+  /// the period 2 first, exactly, in the argument's own units (that is, in
+  /// units of pi, not radians): `r = y - 2*round(y/2)` lands in `[-1, 1]`
+  /// and is exact whenever y and y/2's rounding are, then dispatches the
+  /// four exact half-integer cases directly before ever calling
+  /// math.cos, so that argument reduction, not floating point
+  /// coincidence, is what supplies the exact zero and +/-1 results.
+  static double _cosPi(double y) {
+    final double r = y - (2 * (y / 2).round());
+    if (r == 0) return 1;
+    if (r == 1 || r == -1) return -1;
+    if (r == 0.5 || r == -0.5) return 0;
+    return math.cos(r * math.pi);
+  }
+
+  /// The `sin(y*pi)` counterpart to [_cosPi]; see its doc comment.
+  static double _sinPi(double y) {
+    final double r = y - (2 * (y / 2).round());
+    if (r == 0 || r == 1 || r == -1) return 0;
+    if (r == 0.5) return 1;
+    if (r == -0.5) return -1;
+    return math.sin(r * math.pi);
+  }
+
   /// D38 domain check, stage 2 (after the eigenvalues are computed): every
   /// nonzero computed eigenvalue must also lie in the declared precision
   /// range. Used by the general 2x2 real-eigenvalue branches and the
@@ -3194,13 +3315,29 @@ class Matrix {
   /// scalar or standalone complex-form input, whose "eigenvalues" are read
   /// directly from entries already covered by
   /// [_requireEntriesInPrecisionRange].
+  ///
+  /// Codex round 13, findings 1 and 4 (P1): [zeroTolerances] is a parallel
+  /// array (exactly 0 per index for a general 2x2 caller, which has no
+  /// Jacobi rotation noise at all); an eigenvalue [_classifyEigenvalue]s as
+  /// zero is skipped here, the same as the old exact-zero check, but now
+  /// covers any eigenvalue within its own block-local backward-error bound,
+  /// of either sign, not only a value that happens to compute to exactly
+  /// 0.0. This is a classification, not a second, looser range check: the
+  /// caller's own per-operation callback (see [_realScalarPower] and
+  /// [Matrix.log]'s exactly-symmetric branch) independently classifies the
+  /// same eigenvalue again to decide what "zero" means for that operation
+  /// (sqrt succeeds with 0, log/power raise log-undefined).
   static void _requireEigenvaluesInPrecisionRange(
     List<double> eigenvalues,
+    List<double> zeroTolerances,
     String operation,
   ) {
     for (int i = 0; i < eigenvalues.length; i++) {
       final double value = eigenvalues[i];
-      if (value == 0) continue;
+      if (_classifyEigenvalue(value, zeroTolerances[i]) ==
+          _EigenvalueSign.zero) {
+        continue;
+      }
       _requireMagnitudeInPrecisionRange(
         value.abs(),
         operation: operation,
@@ -3300,6 +3437,14 @@ class Matrix {
   /// measured 1-ULP-scale discrepancy while remaining many orders of
   /// magnitude too small to admit a result that is genuinely out of range
   /// by any meaningful amount.
+  ///
+  /// Docs review #9: stated as one explicit formula, `ln|x|` may exceed
+  /// `ln(1e150)` in magnitude by `8 * 2^-52 * ln(1e150)` (relative
+  /// `~6.1e-13`), where `8` is [_resultLogMagnitudeToleranceUlps] itself,
+  /// `2^-52` is [CalculatrixNumericPolicy.machineEpsilon], and `ln(1e150)`
+  /// is [_resultLogMagnitudeUpperBound] (equivalently
+  /// `_resultLogMagnitudeLowerBound.abs()`, the two bounds being negatives
+  /// of each other).
   static const int _resultLogMagnitudeToleranceUlps = 8;
 
   static void _requireResultLogMagnitudeInRange(
@@ -3346,11 +3491,13 @@ class Matrix {
   /// [_resultLogMagnitudeToleranceUlps] already names becomes, after
   /// materialization, a RELATIVE tolerance of the same magnitude:
   /// `_resultLogMagnitudeToleranceUlps * machineEpsilon *
-  /// _resultLogMagnitudeUpperBound.abs()`, about 6.135e-13, comfortably
-  /// above the measured ~4.5e-14 relative excess (about a 13x margin)
-  /// while remaining many orders of magnitude too small to admit a result
-  /// entry that is genuinely out of range by any meaningful amount. Raw
-  /// input entries ([_requireEntriesInPrecisionRange]) are unaffected:
+  /// _resultLogMagnitudeUpperBound.abs()`, about 6.135e-13 (that is,
+  /// `8 * 2^-52 * ln(1e150)`, the same explicit formula
+  /// [_resultLogMagnitudeToleranceUlps]'s own doc comment states),
+  /// comfortably above the measured ~4.5e-14 relative excess (about a 13x
+  /// margin) while remaining many orders of magnitude too small to admit a
+  /// result entry that is genuinely out of range by any meaningful amount.
+  /// Raw input entries ([_requireEntriesInPrecisionRange]) are unaffected:
   /// only a computed RESULT entry, never a raw caller-supplied argument,
   /// gets this tolerance.
   static final double _resultEntryMagnitudeToleranceRelative =
@@ -4286,14 +4433,29 @@ class Matrix {
   /// Applies [f] to each eigenvalue found by [_cyclicJacobiEigendecomposition]
   /// and reconstructs `f(A) = Q * f(Lambda) * Qᵀ`: the shared building
   /// block for [exp]/[log]/[sqrt]/[power]'s exactly-symmetric-matrix class.
+  ///
+  /// Codex round 13, findings 2 and 3 (P2): [checkOperandRange] guards only
+  /// the embedded [_requireEigenvaluesInPrecisionRange] operand gate below,
+  /// never [f] itself: a public caller ([sqrt], [exp], [log], the
+  /// non-integer branch of [power]) passes true; an internal caller
+  /// ([_internalExp], [_internalLog]) passes false, since its own
+  /// eigenvalues are an internal chain's intermediate, not a raw operand or
+  /// the final result (see [_internalExp]'s doc comment).
   Matrix _symmetricRealFunction(
     double Function(double value, double zeroTolerance) f, {
     required int maxSweeps,
     required String operation,
+    required bool checkOperandRange,
   }) {
     final ({Matrix q, List<double> lambda, List<double> zeroTolerance}) eigen =
         _cyclicJacobiEigendecomposition(maxSweeps: maxSweeps);
-    _requireEigenvaluesInPrecisionRange(eigen.lambda, operation);
+    if (checkOperandRange) {
+      _requireEigenvaluesInPrecisionRange(
+        eigen.lambda,
+        eigen.zeroTolerance,
+        operation,
+      );
+    }
     final int n = rowCount;
     final List<double> fLambda = List<double>.generate(
       n,
@@ -4333,6 +4495,21 @@ class Matrix {
   /// case, regardless of the sign of `y`. [sqrt] itself is unaffected
   /// (`rejectZeroEigenvalue: false`): `0^0.5 = 0` carries through its
   /// eigendecomposition as before.
+  ///
+  /// Codex round 13, finding 1 (P1) correction, retracting round 12,
+  /// finding 1's asymmetric version of this same idea: the zero
+  /// classification below ([_classifyEigenvalue]) now applies uniformly to
+  /// every caller, not only [sqrt]'s (`rejectZeroEigenvalue == false`)
+  /// negative-sign case. An eigenvalue within [zeroTolerance] of zero (the
+  /// caller's own block-local Weyl backward-error bound; exactly 0 for a
+  /// diagonal-matrix caller, which has no Jacobi rotation noise at all) is
+  /// numerically indistinguishable from a true zero eigenvalue REGARDLESS
+  /// of its own computed floating point sign, and this classification runs
+  /// BEFORE any D38 magnitude gate: only the classified result differs by
+  /// caller, sqrt maps it to exactly 0 (`rejectZeroEigenvalue == false`,
+  /// `y > 0`), log and non-integer power raise log-undefined
+  /// (`rejectZeroEigenvalue == true`), the same as a mathematically exact
+  /// zero eigenvalue.
   double _realScalarPower(
     double v,
     double y, {
@@ -4340,46 +4517,30 @@ class Matrix {
     required double zeroTolerance,
     required String operation,
   }) {
-    // Codex round 12, finding 1: the zero decision lives here, not inside
-    // the Jacobi decomposition itself, and only ever applies to [sqrt]'s
-    // semantics (rejectZeroEigenvalue == false): a computed eigenvalue
-    // that is negative but within [zeroTolerance] of zero (the caller's
-    // own block-local Weyl backward-error bound; exactly 0 for a
-    // diagonal-matrix caller, which has no Jacobi rotation noise at all)
-    // is numerically indistinguishable from a true zero eigenvalue, the
-    // same as [sqrt]'s existing exactly-zero case. [log] and non-integer
-    // [power] never reach this: they pass rejectZeroEigenvalue == true,
-    // so v is used exactly as computed, with no snapping at all, for
-    // either sign.
-    final double effectiveV =
-        (!rejectZeroEigenvalue && v < 0 && v.abs() <= zeroTolerance)
-            ? 0
-            : v;
-    if (effectiveV > 0) {
-      // D38 / Codex round 10, rule A: this eigenvalue's result magnitude is
-      // v^y, whose log-magnitude is y*ln(v), checked directly, before ever
-      // calling math.pow/math.sqrt.
-      _requireResultLogMagnitudeInRange(
-        y * math.log(effectiveV),
-        operation: operation,
-        quantity: 'result eigenvalue',
-      );
-      return y == 0.5
-          ? math.sqrt(effectiveV)
-          : math.pow(effectiveV, y).toDouble();
-    }
-    if (effectiveV == 0) {
+    final _EigenvalueSign sign = _classifyEigenvalue(v, zeroTolerance);
+    if (sign == _EigenvalueSign.zero) {
       if (!rejectZeroEigenvalue && y > 0) return 0;
       throw MatrixDomainError(
         'A zero eigenvalue cannot be raised to a non-integer real power.',
         errorId: CalculatrixErrorId.logUndefined,
       );
     }
-    throw MatrixDomainError(
-      'A negative eigenvalue cannot be raised to a non-integer real power '
-      'in the real domain.',
-      errorId: CalculatrixErrorId.logUndefined,
+    if (sign == _EigenvalueSign.negative) {
+      throw MatrixDomainError(
+        'A negative eigenvalue cannot be raised to a non-integer real power '
+        'in the real domain.',
+        errorId: CalculatrixErrorId.logUndefined,
+      );
+    }
+    // D38 / Codex round 10, rule A: this eigenvalue's result magnitude is
+    // v^y, whose log-magnitude is y*ln(v), checked directly, before ever
+    // calling math.pow/math.sqrt.
+    _requireResultLogMagnitudeInRange(
+      y * math.log(v),
+      operation: operation,
+      quantity: 'result eigenvalue',
     );
+    return y == 0.5 ? math.sqrt(v) : math.pow(v, y).toDouble();
   }
 
   /// Shared dispatcher for a real non-integer matrix power `A^y`, used by
@@ -4448,6 +4609,7 @@ class Matrix {
           ),
           maxSweeps: maxSweeps,
           operation: operation,
+          checkOperandRange: true,
         ),
         operation: operation,
       );
@@ -4848,7 +5010,20 @@ class Matrix {
     return factor < 0 ? -magnitude : magnitude;
   }
 
-  Matrix _general2x2Exp() {
+  /// Codex round 13, findings 2 and 3 (P2): [checkOperandRange] guards only
+  /// this method's own embedded D38 operand gates
+  /// ([_requireComplexPairPartsInPrecisionRange],
+  /// [_requireEigenvaluesInPrecisionRange]), never its always-on,
+  /// before-exponentiating [_requireResultLogMagnitudeInRange] checks: a
+  /// public caller ([Matrix.exp]) passes true, an internal caller
+  /// ([Matrix._internalExp]) passes false, since its own eigenvalues are an
+  /// internal chain's intermediate, not a raw operand or the final result
+  /// (see [Matrix._internalExp]'s doc comment). [operation] names the
+  /// caller's own operation for every error message this raises.
+  Matrix _general2x2Exp({
+    required bool checkOperandRange,
+    required String operation,
+  }) {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
     final double c = _rows[1][0];
@@ -4859,13 +5034,15 @@ class Matrix {
     if (eigen.isComplex) {
       final double m = eigen.m;
       final double w = eigen.w;
-      _requireComplexPairPartsInPrecisionRange(m, w, 'matrix exponential');
+      if (checkOperandRange) {
+        _requireComplexPairPartsInPrecisionRange(m, w, operation);
+      }
       // D38 / Codex round 10, rule A: this pair's result eigenvalue is
       // exp(m +/- w*i), whose magnitude is exp(m), so the log-magnitude of
       // the result is m itself.
       _requireResultLogMagnitudeInRange(
         m,
-        operation: 'matrix exponential',
+        operation: operation,
         quantity: 'result eigenvalue magnitude',
       );
       final double em = _checkFiniteScalar(math.exp(m));
@@ -4885,7 +5062,13 @@ class Matrix {
 
     final double l1 = eigen.lambda1;
     final double l2 = eigen.lambda2;
-    _requireEigenvaluesInPrecisionRange(<double>[l1, l2], 'matrix exponential');
+    if (checkOperandRange) {
+      _requireEigenvaluesInPrecisionRange(
+        <double>[l1, l2],
+        <double>[0, 0],
+        operation,
+      );
+    }
 
     if (l1 == l2) {
       // Round 12 correction, finding 6: c0 = el - c1*l (c1 = el)
@@ -4912,7 +5095,7 @@ class Matrix {
       // exp(l), whose log-magnitude is l itself.
       _requireResultLogMagnitudeInRange(
         l,
-        operation: 'matrix exponential',
+        operation: operation,
         quantity: 'result eigenvalue',
       );
       final double el = _checkFiniteScalar(math.exp(l));
@@ -4934,12 +5117,12 @@ class Matrix {
     // exp(lLo)/exp(lHi), whose log-magnitudes are lLo/lHi themselves.
     _requireResultLogMagnitudeInRange(
       lLo,
-      operation: 'matrix exponential',
+      operation: operation,
       quantity: 'result eigenvalue',
     );
     _requireResultLogMagnitudeInRange(
       lHi,
-      operation: 'matrix exponential',
+      operation: operation,
       quantity: 'result eigenvalue',
     );
     final double fLo = _checkFiniteScalar(math.exp(lLo));
@@ -5004,7 +5187,21 @@ class Matrix {
   /// ([CalculatrixErrorId.logUndefined]) for a negative or zero real
   /// eigenvalue; always defined for a genuine complex-conjugate pair
   /// (never on the negative real axis).
-  Matrix _general2x2Log() {
+  ///
+  /// Codex round 13, findings 2 and 3 (P2): [checkOperandRange] guards only
+  /// this method's own embedded D38 operand gates
+  /// ([_requireComplexPairPartsInPrecisionRange],
+  /// [_requireEigenvaluesInPrecisionRange]); a public caller ([Matrix.log])
+  /// passes true, an internal caller ([Matrix._internalLog]) passes false
+  /// (see [Matrix._internalExp]'s doc comment for why). This method has no
+  /// [_requireResultLogMagnitudeInRange] check of its own to leave
+  /// unconditional: see the doc comment above its own distinct-eigenvalue
+  /// branch below for why none is needed. [operation] names the caller's
+  /// own operation for every error message this raises.
+  Matrix _general2x2Log({
+    required bool checkOperandRange,
+    required String operation,
+  }) {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
     final double c = _rows[1][0];
@@ -5016,7 +5213,9 @@ class Matrix {
     if (eigen.isComplex) {
       final double m = eigen.m;
       final double w = eigen.w;
-      _requireComplexPairPartsInPrecisionRange(m, w, 'matrix logarithm');
+      if (checkOperandRange) {
+        _requireComplexPairPartsInPrecisionRange(m, w, operation);
+      }
       final double radius = _hypot(m, w);
       if (!radius.isFinite) {
         throw MatrixDomainError(
@@ -5057,7 +5256,13 @@ class Matrix {
     } else {
       final double l1 = eigen.lambda1;
       final double l2 = eigen.lambda2;
-      _requireEigenvaluesInPrecisionRange(<double>[l1, l2], 'matrix logarithm');
+      if (checkOperandRange) {
+        _requireEigenvaluesInPrecisionRange(
+          <double>[l1, l2],
+          <double>[0, 0],
+          operation,
+        );
+      }
       if (l1 < 0 || l2 < 0) {
         throw MatrixDomainError(
           'Logarithm is undefined for matrices with a negative real '
@@ -5472,7 +5677,11 @@ class Matrix {
     } else {
       final double l1 = eigen.lambda1;
       final double l2 = eigen.lambda2;
-      _requireEigenvaluesInPrecisionRange(<double>[l1, l2], operation);
+      _requireEigenvaluesInPrecisionRange(
+        <double>[l1, l2],
+        <double>[0, 0],
+        operation,
+      );
       if (l1 < 0 || l2 < 0) {
         throw MatrixDomainError(
           'A negative eigenvalue cannot be raised to a non-integer real '
@@ -5839,5 +6048,6 @@ Matrix debugCyclicJacobiSqrtWithSweepBudget(Matrix matrix, int maxSweeps) {
     ),
     maxSweeps: maxSweeps,
     operation: 'square root',
+    checkOperandRange: true,
   );
 }
