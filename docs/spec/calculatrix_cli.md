@@ -236,8 +236,12 @@ extension point `doctor.checks`. In `cx`, all of them come from
 A warning never fails the command; it is information for a person. A failed
 lookup is always reported, never skipped. Exit code: `0` when no check is an
 error, `78` otherwise (section 6). The release lookup is the same code
-`upgrade` uses, inside `InstallationPlugin`. JSON:
-`{"checks": [{"name": "path", "status": "ok", "detail": "..."}]}`.
+`upgrade` uses, inside `InstallationPlugin`. JSON when no check is an error:
+`{"checks": [{"name": "path", "status": "ok", "detail": "..."}]}`. When a
+check is an error, the output is the single error shape of section 6 with
+the id `doctor-check-failed`, exit code `78` and every check result under
+`checks`:
+`{"error": {"id": "doctor-check-failed", "message": "1 check failed: alias", "exitCode": 78, "checks": [...]}}`.
 
 ## 6. Output and errors
 
@@ -285,20 +289,33 @@ POSIX standard; it is used because the SDK already emits `64`. `7` is the
 existing SDK convention and stays, because changing it would affect every
 consumer.
 
-**Domain errors** share exit code `65` and carry a structured id, so scripts
-branch on the id and not on the code. They are printed through the SDK's error
-output; with `--json`:
+**One JSON error shape (runbook D36).** With `--json`, every error, whether
+from the router, the SDK, a plugin or the core, is one object under `error`
+with the same three fields always present:
 
 ```json
 {"error": {"id": "stack-underflow", "message": "+ needs 2 arguments, the stack has 1",
-           "token": "+", "position": 3}}
+           "exitCode": 65, "token": "+", "position": 3}}
+{"error": {"id": "unknown-option", "message": "unknown option '--bogus'",
+           "exitCode": 7, "contract": {"...": "..."}}}
 ```
 
-`position` is the 1-based character offset of the token in the program.
+- `id` is always kebab-case. Usage errors use the SDK's fixed table, one id
+  per router rejection kind (`unknown-command`, `unknown-option`,
+  `missing-argument`, ...).
+- `exitCode` repeats the process exit code.
+- Other fields appear only when they apply: `token` and `position` for domain
+  errors, `contract` and `details` for usage errors, `checks` for
+  `doctor-check-failed` (section 5). There is no
+  `isRetryable`.
+
+**Domain errors** share exit code `65` and carry a structured id, so scripts
+branch on the id and not on the code. `position` is the 1-based character
+offset of the token in the program.
 
 Ids: `unknown-word`, `stack-underflow`, `type-mismatch`, `dimension-mismatch`,
 `singular-matrix`, `non-finite`, `log-undefined`, `ambiguous-power`,
-`syntax-error` (infix only). The ids belong to the core; the CLI only renders
+`no-convergence`, `unsupported-matrix-function`, `matrix-out-of-precision-range`, `syntax-error` (infix only). The ids belong to the core; the CLI only renders
 them. The semantics of `power`, the source of `log-undefined` and
 `ambiguous-power`, are in the runbook (D25).
 
@@ -896,7 +913,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 ## 14. Decisions of the review of 2026-09-24
 
 Every question of the draft is closed. The user decided each one; the runbook
-records the ones that affect the whole stage (D25 to D34).
+records the ones that affect the whole stage (D25 to D38).
 
 | # | Topic | Decision |
 |---|---|---|
@@ -916,8 +933,11 @@ records the ones that affect the whole stage (D25 to D34).
 | R14 | `--trace`, `--show-rpn` | Not in this stage; in the roadmap. |
 | R15 | `CliRequest.flags` | Removed in `cli_router` 0.2.0. |
 | R16 | JSON of `eval` | `{"stack": [...]}`, level 1 last, 1x1 as a number, other matrices as rows. |
-| R17 | `doctor` | Local checks plus the newer-release check; states ok, warning, error; a failed lookup is a warning, never skipped; exit 78 on any error. |
+| R17 | `doctor` | Local checks plus the newer-release check; states ok, warning, error; a failed lookup is a warning, never skipped; exit 78 on any error, with the error `doctor-check-failed` carrying every check result (section 5). |
 | R18 | Standard routes | `version`, `doctor`, `upgrade` and `uninstall` come from standard plugins inside `modular_cli_sdk` (8.7), registered explicitly; `doctor` gathers checks through the extension point `doctor.checks`. There is no `modular_cli_installer` package. |
 | R19 | `power`, closing the table | Order of checks by kinds; `i [[1 0] [0 2]] ^` is `ambiguous-power`; a non-square exponent is `dimension-mismatch` with any base (runbook D34). |
 | R20 | Help precedence | Wins over an incomplete route, a missing argument or option, and the constraints; loses to malformed invocations (8.6). |
 | R21 | Failure of `--apply` | Exit `1` with a structured id; stop at the failed step, no rollback, no retry (section 6). |
+| R22 | `no-convergence` | The cyclic Jacobi sweep, the only iterative method left after runbook D37, raises `no-convergence` (65) when it does not reach its tolerance within its cap; it never returns the unconverged value (runbook D35). |
+| R23 | `unsupported-matrix-function` | `exp`, `log`, `sqrt` and a non-integer real power accept a scalar, the complex form, a diagonal, a symmetric or a 2x2 matrix; any other matrix raises `unsupported-matrix-function` (65), never an approximation (runbook D37). |
+| R24 | `matrix-out-of-precision-range` | `exp`, `log`, `sqrt` and a non-integer real power accept only matrices whose nonzero entries and nonzero eigenvalues have magnitudes between `1e-150` and `1e150`; outside that range, or when a nonzero eigenvalue or a nonzero entry of the result falls outside it (`exp(-1000)`, `exp(710)`), they raise `matrix-out-of-precision-range` (65). Inside it the normwise relative error is at most `1e4 * max(1, kappa) * u`, with `kappa` the relative condition number of the function at the matrix and `u = 2^-53` (about `1e-12` for a well conditioned matrix); a zero result and `sqrt` of a singular matrix get the absolute bounds of runbook D38. The range applies to the argument and the final result only, never to an intermediate value; an eigenvalue within its backward error bound is numerically zero (`sqrt` takes it as zero, `log` and a non-integer power raise `log-undefined`); the bounds of the range of the result are widened by a relative `8 * 2^-52 * ln(1e150)`, about `6.1e-13`, while the range of the argument stays strict (runbook D38). |

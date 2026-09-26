@@ -70,6 +70,10 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D32 | Not in this stage: `--trace` and `--show-rpn` (recorded in `docs/roadmap.md`, Stage 9). `CliRequest.flags` is removed in `cli_router` 0.2.0, with no deprecation period. | User, 2026-09-24 (R14, R15) |
 | D34 | From the Codex review of the design: (1) `power` follows the order of checks of the D25 table, by kinds, never by a numerical commutation test; (2) a matrix base with no real logarithm is `log-undefined` in this stage, and its representation is deferred; (3) `-h`/`--help` wins over `incomplete`, `missingArgument`, `missingRequiredOption` and the contract constraints, and loses to `unknownCommand`, `extraArgument` and the option errors (spec 8.6); (4) a failed step of `upgrade --apply` or `uninstall --apply`, or a failed release lookup, exits `1` (`ExitCode.genericError`) with the id `release-lookup-failed`, `download-failed` or `file-access-denied`; the run stops at that step, reports the steps done, and neither rolls back nor retries (spec section 6). | User, 2026-09-24 |
 | D33 | `modular_cli_sdk` gets a plugin system modeled on `modular_api` (`CliPlugin` with a manifest and `setup(host)`; the host registers routes and extension points, nothing else for now). `version`, `doctor`, `upgrade` and `uninstall` are standard plugins inside the SDK (`VersionPlugin`, `DoctorPlugin`, `InstallationPlugin`), like health and openapi in `modular_api`. Every plugin is registered explicitly with `cli.plugin(...)`. `DoctorPlugin` declares `doctor.checks`; `InstallationPlugin` requires it and contributes its checks. No `modular_cli_installer` package, no install plugin. Spec section 8.7. | User, 2026-09-24 (R18) |
+| D35 | From the Codex review of the core PR (calculatrix#7): an iterative method of the core (matrix exponential by scaling and squaring, square root, logarithm) that reaches its iteration cap without meeting its tolerance raises the new id `no-convergence` (65), never the unconverged value. Every intermediate result is checked for finiteness (`non-finite`). | Claude, 2026-09-25 |
+| D36 | One JSON error shape for every error: `{"error": {"id", "message", "exitCode", ...}}`, `id` in kebab-case (the SDK maps each router rejection kind to one id), extra fields only when they apply (`token`, `position`, `contract`, `details`). `isRetryable` is removed; `CommandException.exitCode` is required. Spec section 6. | User, 2026-09-25 |
+| D37 | From the Codex review of the core PR (calculatrix#7): `exp`, `log`, `sqrt` and a non-integer real power are defined on exactly five classes of matrix: a scalar, the complex form `a·I + b·J`, an exactly diagonal matrix, an exactly symmetric matrix (cyclic Jacobi eigendecomposition) and a general 2x2 matrix (closed form `c0·I + c1·A`). Any other matrix raises the new id `unsupported-matrix-function` (65); the core never approximates outside these classes. The only iterative method left is the cyclic Jacobi sweep, whose cap is the source of `no-convergence` (D35). A general `n x n` algorithm is future work. | User, 2026-09-25 |
+| D38 | From the Codex review of the core PR (calculatrix#7), rounds 7 and 8: `exp`, `log`, `sqrt` and a non-integer real power declare their precision range. Every nonzero entry of the matrix and every nonzero computed eigenvalue must have a magnitude between `1e-150` and `1e150`; zero entries are allowed. The same range applies to the result: every eigenvalue of the result that is not exactly zero, known before computing it (`exp(lambda)` for `exp`, `|lambda|^y` for a power), and every nonzero entry of the computed result must be inside it, so `exp(-1000)` and `exp(710)` are rejected instead of returning zero or overflowing. A matrix outside that range raises the new id `matrix-out-of-precision-range` (65), and the message names the offending entry or eigenvalue, of the argument or of the result. Inside the range the normwise relative error (Frobenius) is at most `1e4 * max(1, kappa) * u` (the `max` allows for rounding the result itself, as in `exp(1e-16)`, whose `kappa` is `1e-16`), where `u = 2^-53` is the unit roundoff, `kappa` is the relative condition number of the function at the matrix (Frobenius norm of the Frechet derivative times the norm of the matrix, divided by the norm of the result) and `1e4` is the named constant `matrixFunctionAccuracyFactor`. For a well conditioned matrix this is about `1e-12`; an ill conditioned one, such as `exp` of a rotation by an angle near `1e10`, gets a looser bound because no double precision algorithm can do better. A single entry that is tiny next to the norm of the result is not guaranteed componentwise. Two cases have no relative condition number and get an absolute bound instead: when the exact result is zero (`log` of the identity), `||X||_F <= 1e4 * u * ||L_f(A)||_F * ||A||_F`; when the function has no Frechet derivative at the matrix (`sqrt` of a singular matrix, such as `sqrt(0)`), `||X - f(A)||_F <= 1e4 * sqrt(u * ||A||_F)`. Integer powers are not affected. Three rules complete the range. First, it applies to the argument and to the final result only, never to an intermediate value of the computation: `2^(1e-150 I)` is valid although its intermediate `ln(2) * 1e-150` is below the range. Second, a computed eigenvalue whose magnitude is within its backward error bound (`10 * n * u` times the Frobenius norm of the block of the eigendecomposition it belongs to, with `n` the size of that block; `10` is the named constant `jacobiEigenvalueBackwardErrorFactor`) is numerically zero, and this is decided before the range check: `sqrt` takes it as exactly zero, while `log` and a non-integer power raise `log-undefined` because a positive value cannot be certified. An eigenvalue below minus that bound is negative. Third, when the exact result lies on a bound (`(1e-100)^1.5` is exactly `1e-150`) the computed one can land slightly past it, so the range of the result is widened in log space: `ln |x|` may exceed `ln(1e150)` in magnitude by `8 * 2^-52 * ln(1e150)`, which is a relative widening of the bounds of about `6.1e-13` (`8` is the named constant of units in the last place); the range of the argument stays strict. | User, 2026-09-25; accuracy made relative to the condition number, User, 2026-09-26; range of the result and the two absolute cases, Claude, 2026-09-26 (Codex review of #9); numerical zero, intermediate values and rounding at the bounds, Claude, 2026-09-26 (Codex rounds 11 to 13 of #7) |
 
 ## Command catalog (proposal)
 
@@ -161,7 +165,7 @@ product `Y · log B` does not matter for them.
 | 10 | any | not square | `dimension-mismatch` | `2 [[1 2]] ^`, `[[1 0] [0 1]] [[1 2]] ^` |
 | 11 | n x n | m x m, n ≠ m, neither scalar | `dimension-mismatch` | `[[1 0] [0 1]] [[1 0 0] [0 1 0] [0 0 1]] ^` |
 | 12 | scalar < 0 | square, not complex, not scalar | `ambiguous-power`: `log B` is complex (2x2) and does not match Y | `-2 [[1 0] [0 2]] ^`: `log -2` is `[[0.6931 -3.1416] [3.1416 0.6931]]`, which does not commute with Y |
-| 13 | any | any, when the result overflows | `non-finite` | `10 400 ^` (10^400 exceeds the largest double) |
+| 13 | any | any, when the result overflows | `non-finite` for an integer power; a non-integer power checks the range of D38 first and raises `matrix-out-of-precision-range` | `10 400 ^` (10^400 exceeds the largest double) is `non-finite`; `10 400.5 ^` is `matrix-out-of-precision-range` |
 
 **Order of the checks.** The first rule that applies decides; the kinds of
 B and Y decide, never a numerical test of whether they commute:
@@ -182,13 +186,15 @@ form. In this stage it is `log-undefined`. A complex number is only
 entries would be complex is to be studied (roadmap, Stage 9). Turning the
 error into a value later breaks no one.
 
-All errors exit with `65`. `ambiguous-power` and `log-undefined` are new ids;
+All errors exit with `65`. `ambiguous-power`, `log-undefined`,
+`no-convergence` (D35), `unsupported-matrix-function` (D37) and
+`matrix-out-of-precision-range` (D38) are new ids;
 there is no `not-real` error, because the result of case 1 with a negative
-base is a complex matrix. `X exp` gives the same value as `e X ^`. The step
+base is a complex matrix. `X exp` gives the same value as `e X ^` when both are inside the precision range of D38; an integer power is not bounded by D38, so `400 exp` raises `matrix-out-of-precision-range` while `e 400 ^` returns about `5.22e173`. The step
 S4 turns every row of this table into a core test, which also measures the
 precision of `Matrix.log()` on non-diagonal matrices (spec section 11,
 risk 5). The examples were checked on 2026-09-24 with Julia's `exp` and
-`log` of `LinearAlgebra`, rounded to 4 decimals. A test compares each entry with its expected value within `5e-5`. `Matrix.log()` must compute the principal logarithm of a matrix that is not diagonalizable (the second example of case 5); passing only the diagonal examples is not enough.
+`log` of `LinearAlgebra`, rounded to 4 decimals. A test compares each entry with its expected value within `5e-5`. `Matrix.log()` must compute the principal logarithm of a matrix that is not diagonalizable (the second example of case 5); passing only the diagonal examples is not enough. Every example of this table is in one of the five classes of D37; a base outside them (for example a 3x3 matrix that is neither diagonal nor symmetric) raises `unsupported-matrix-function` only in the cases that need `exp`, `log` or a non-integer power. An integer power never needs them and is computed by repeated multiplication for any square base (case 4): `[[1 1 0] [0 1 1] [0 0 1]] 2 ^` succeeds.
 
 ## Open questions
 
@@ -320,3 +326,16 @@ S3 and S4 can run in parallel after S2.
   datajack, inquiry, linkedin_cli). The first rule in the issue ("any token
   with whitespace is positional") would have broken `--title='two words'`; the
   issue and the tests were corrected.
+- 2026-09-25: D38, from the Codex review of PR #7: declared precision range for
+  matrix functions, `matrix-out-of-precision-range` added to the ids (spec R24).
+- 2026-09-26: D38 amended after Codex round 9 of PR #7: the accuracy bound is
+  relative to the condition number (`1e4 * kappa * u`), not a flat `1e-12`.
+- 2026-09-26: D38 completed after Codex rounds 11 to 13 of PR #7: the range
+  applies to the argument and the final result only, an eigenvalue within its
+  backward error bound is numerically zero, and the range of the result is
+  widened by a relative `8 * 2^-52 * ln(1e150)` (about `6.1e-13`) at the bounds.
+- 2026-09-25: D37, from the Codex review of PR #7: matrix functions limited to
+  five classes, `unsupported-matrix-function` added to the ids (spec R23).
+- 2026-09-25: D36, one JSON error shape for every error (spec section 6).
+- 2026-09-25: D35, from the Codex review of PR #7: `no-convergence` added to
+  the ids (spec R22).
