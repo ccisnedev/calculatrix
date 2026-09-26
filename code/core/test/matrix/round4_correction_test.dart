@@ -99,9 +99,11 @@ void main() {
     );
 
     test(
-      'B2: [[1e200,0],[0,1e200]]^0.5 does not hang and returns the correct '
-      'finite 1e100*I (once log\'s hypot fix stops it from ever producing '
-      'an Infinity-containing intermediate)',
+      'B2: [[1e200,0],[0,1e200]]^0.5 does not hang, and now raises '
+      'matrix-out-of-precision-range (D38 declared precision contract: '
+      'entries of magnitude 1e200 sit above matrixFunctionMaxMagnitude='
+      '1e150, so this is rejected outright before the hypot fix this test '
+      'used to regression-check is ever reached)',
       () async {
         final ReceivePort port = ReceivePort();
         final Isolate isolate = await Isolate.spawn(
@@ -121,16 +123,8 @@ void main() {
         }
 
         expect(outcome, isNot(<dynamic>['TIMEOUT']));
-        expect(outcome[0], 'ok');
-        final double d00 = outcome[1] as double;
-        final double d01 = outcome[2] as double;
-        final double d10 = outcome[3] as double;
-        final double d11 = outcome[4] as double;
-
-        expect(d00, closeTo(1e100, 1e100 * 1e-9));
-        expect(d01, closeTo(0, 1e91));
-        expect(d10, closeTo(0, 1e91));
-        expect(d11, closeTo(1e100, 1e100 * 1e-9));
+        expect(outcome[0], 'error');
+        expect(outcome[1], CalculatrixErrorId.matrixOutOfPrecisionRange.id);
       },
       timeout: const Timeout(Duration(seconds: 15)),
     );

@@ -34,39 +34,29 @@ void main() {
     'for the power path)',
     () {
       test(
-        'near triangular [[700,1],[1e-300,-700]]: exp recovers the true '
-        '(1,1) entry, not exp(-700) (round 12 correction, finding 1: the '
-        '(1,1) matrix entry -700 and the true eigenvalue lSmall round to '
-        'the same double, but lSmall is not exactly -700, and the '
-        'resulting tiny offset, amplified by c1 (of order exp(700)), '
-        'contributes a non-negligible amount)',
+        'near triangular [[700,1],[1e-300,-700]]: D38 declared precision '
+        'contract now rejects this input outright (entry (1,0)=1e-300 sits '
+        'below matrixFunctionMinMagnitude=1e-150), so the far-branch fix '
+        'this test used to exercise (exp recovers the true (1,1) entry, '
+        'not exp(-700)) is unreachable for this exact input; see '
+        'round13_d38_precision_contract_test.dart for the in-range '
+        'analogue that still exercises the underlying fix',
         () {
-          // Reference (mpmath, dps=800, exact eigenvalues from the
-          // characteristic polynomial of the *exact* rational entries,
-          // never from this implementation):
-          // lambda1 = 700, lambda2 = -700 to 40+ displayed digits (the
-          // perturbation from b*c=1e-300 sits far below the displayed
-          // precision), yet entry (1,1) of exp(A), evaluated as
-          // c0 + c1*(-700) via the *exact* divided-difference
-          // coefficients, is 0.00517465334048471688497617140424, sharply
-          // different from exp(-700) ~= 9.8597e-305: the (1,1) matrix
-          // entry -700 is not itself an eigenvalue of this
-          // non-triangular matrix, even though it agrees with lSmall to
-          // double precision.
-          const double expected11 = 0.005174653340484717;
-          final double c1 = (math.exp(700) - math.exp(-700)) / 1400;
-
           final Matrix value = Matrix(<List<double>>[
             <double>[700, 1],
             <double>[1e-300, -700],
           ]);
 
-          final Matrix result = value.exp();
-
-          expectRelativelyClose(result.at(0, 0), math.exp(700));
-          expectRelativelyClose(result.at(1, 1), expected11);
-          expectRelativelyClose(result.at(0, 1), c1);
-          expectRelativelyClose(result.at(1, 0), c1 * 1e-300);
+          expect(
+            value.exp,
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
         },
       );
 
@@ -93,28 +83,26 @@ void main() {
       );
 
       test(
-        'mirrored [[-700,1],[1e-300,700]]: the small eigenvalue now sits '
-        'at (0,0) instead of (1,1), exercising the same fix from the other '
-        'orientation',
+        'mirrored [[-700,1],[1e-300,700]]: D38 declared precision contract '
+        'now rejects this input outright (entry (1,0)=1e-300 sits below '
+        'matrixFunctionMinMagnitude=1e-150), the same way as the '
+        'unmirrored near-triangular case above',
         () {
-          // Reference (mpmath, dps=800): by the same characteristic
-          // polynomial as the unmirrored case above (b*c is unchanged),
-          // entry (0,0) is 0.00517465334048471688497617140424, not
-          // exp(-700).
-          const double expected00 = 0.005174653340484717;
-          final double c1 = (math.exp(700) - math.exp(-700)) / 1400;
-
           final Matrix value = Matrix(<List<double>>[
             <double>[-700, 1],
             <double>[1e-300, 700],
           ]);
 
-          final Matrix result = value.exp();
-
-          expectRelativelyClose(result.at(0, 0), expected00);
-          expectRelativelyClose(result.at(1, 1), math.exp(700));
-          expectRelativelyClose(result.at(0, 1), c1);
-          expectRelativelyClose(result.at(1, 0), c1 * 1e-300);
+          expect(
+            value.exp,
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
         },
       );
 
@@ -170,18 +158,28 @@ void main() {
     'are regression tests confirming that, not a new fix',
     () {
       test(
-        'sqrt([[1e200,1],[1e-300,1e-200]]) recovers both diagonal entries '
-        '(same matrix the power-path Lagrange fix already covers)',
+        'sqrt([[1e200,1],[1e-300,1e-200]]): D38 declared precision '
+        'contract now rejects this input outright (entries 1e200, 1e-300 '
+        'and 1e-200 all sit outside [1e-150, 1e150]), so the power-path '
+        'Lagrange fix this test used to regression-check is unreachable '
+        'for this exact input; see round13_d38_precision_contract_test.dart '
+        'for the in-range analogue',
         () {
           final Matrix value = Matrix(<List<double>>[
             <double>[1e200, 1],
             <double>[1e-300, 1e-200],
           ]);
 
-          final Matrix result = value.sqrt();
-
-          expectRelativelyClose(result.at(0, 0), 1e100);
-          expectRelativelyClose(result.at(1, 1), 1e-100);
+          expect(
+            value.sqrt,
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
         },
       );
 

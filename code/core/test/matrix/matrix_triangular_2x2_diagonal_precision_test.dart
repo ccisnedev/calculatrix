@@ -115,42 +115,53 @@ void main() {
       });
 
       group('Matrix.power - upper triangular [[1,1],[0,1e-300]]', () {
+        // D38 declared precision contract: entry (1,1)=1e-300 sits below
+        // matrixFunctionMinMagnitude=1e-150, so every one of the three
+        // exponents below is now rejected outright, before the triangular
+        // diagonal-precision fix these tests used to regression-check
+        // ever runs.
         final Matrix base = Matrix(<List<double>>[
           <double>[1, 1],
           <double>[0, 1e-300],
         ]);
 
-        test('^0.5: bottom-right diagonal entry is exact to rounding', () {
-          final Matrix result = base.power(Matrix.scalar(0.5));
-
-          expectRelativelyClose(result.at(0, 0), math.sqrt(1));
-          expectRelativelyClose(result.at(1, 1), math.sqrt(1e-300));
-          expect(result.at(1, 0), equals(0));
+        test('^0.5: raises matrix-out-of-precision-range', () {
+          expect(
+            () => base.power(Matrix.scalar(0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
+          );
         });
 
-        test('^1.5: bottom-right diagonal entry is exact to rounding', () {
-          final Matrix result = base.power(Matrix.scalar(1.5));
-
-          expectRelativelyClose(result.at(0, 0), math.pow(1, 1.5).toDouble());
-          expectRelativelyClose(
-            result.at(1, 1),
-            math.pow(1e-300, 1.5).toDouble(),
+        test('^1.5: raises matrix-out-of-precision-range', () {
+          expect(
+            () => base.power(Matrix.scalar(1.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
           );
-          expect(result.at(1, 0), equals(0));
         });
 
-        test('^-0.5: bottom-right diagonal entry is exact to rounding', () {
-          final Matrix result = base.power(Matrix.scalar(-0.5));
-
-          expectRelativelyClose(
-            result.at(0, 0),
-            math.pow(1, -0.5).toDouble(),
+        test('^-0.5: raises matrix-out-of-precision-range', () {
+          expect(
+            () => base.power(Matrix.scalar(-0.5)),
+            throwsA(
+              isA<MatrixDomainError>().having(
+                (MatrixDomainError e) => e.errorId,
+                'errorId',
+                CalculatrixErrorId.matrixOutOfPrecisionRange,
+              ),
+            ),
           );
-          expectRelativelyClose(
-            result.at(1, 1),
-            math.pow(1e-300, -0.5).toDouble(),
-          );
-          expect(result.at(1, 0), equals(0));
         });
       });
 
@@ -226,24 +237,38 @@ void main() {
           ]);
 
           test(
-            'sqrt: diagonal entries are exact to rounding (upper triangular)',
+            'sqrt: raises matrix-out-of-precision-range (upper triangular; '
+            'D38: entries 1e200 and 1e-200 both sit outside '
+            '[1e-150, 1e150])',
             () {
-              final Matrix result = upper.sqrt();
-
-              expectRelativelyClose(result.at(0, 0), math.sqrt(1e200));
-              expectRelativelyClose(result.at(1, 1), math.sqrt(1e-200));
-              expect(result.at(1, 0), equals(0));
+              expect(
+                upper.sqrt,
+                throwsA(
+                  isA<MatrixDomainError>().having(
+                    (MatrixDomainError e) => e.errorId,
+                    'errorId',
+                    CalculatrixErrorId.matrixOutOfPrecisionRange,
+                  ),
+                ),
+              );
             },
           );
 
           test(
-            'sqrt: diagonal entries are exact to rounding (lower triangular)',
+            'sqrt: raises matrix-out-of-precision-range (lower triangular; '
+            'D38: entries 1e200 and 1e-200 both sit outside '
+            '[1e-150, 1e150])',
             () {
-              final Matrix result = lower.sqrt();
-
-              expectRelativelyClose(result.at(0, 0), math.sqrt(1e200));
-              expectRelativelyClose(result.at(1, 1), math.sqrt(1e-200));
-              expect(result.at(0, 1), equals(0));
+              expect(
+                lower.sqrt,
+                throwsA(
+                  isA<MatrixDomainError>().having(
+                    (MatrixDomainError e) => e.errorId,
+                    'errorId',
+                    CalculatrixErrorId.matrixOutOfPrecisionRange,
+                  ),
+                ),
+              );
             },
           );
 
@@ -259,49 +284,56 @@ void main() {
           );
 
           test(
-            'exp: diagonal entries are exact to rounding (upper triangular)',
+            'exp: raises matrix-out-of-precision-range (upper triangular; '
+            'D38: entry (1,1)=1e-300 sits below matrixFunctionMinMagnitude '
+            '=1e-150)',
             () {
-              final Matrix result = expUpper.exp();
-
-              expectRelativelyClose(result.at(0, 0), math.exp(700));
-              expectRelativelyClose(result.at(1, 1), math.exp(1e-300));
-              expect(result.at(1, 0), equals(0));
+              expect(
+                expUpper.exp,
+                throwsA(
+                  isA<MatrixDomainError>().having(
+                    (MatrixDomainError e) => e.errorId,
+                    'errorId',
+                    CalculatrixErrorId.matrixOutOfPrecisionRange,
+                  ),
+                ),
+              );
             },
           );
 
           test(
-            'power ^1.5: diagonal entries are exact to rounding (upper '
-            'triangular)',
+            'power ^1.5: raises matrix-out-of-precision-range (upper '
+            'triangular; D38: entries 1e200 and 1e-200 both sit outside '
+            '[1e-150, 1e150])',
             () {
-              final Matrix result = upper.power(Matrix.scalar(1.5));
-
-              expectRelativelyClose(
-                result.at(0, 0),
-                math.pow(1e200, 1.5).toDouble(),
+              expect(
+                () => upper.power(Matrix.scalar(1.5)),
+                throwsA(
+                  isA<MatrixDomainError>().having(
+                    (MatrixDomainError e) => e.errorId,
+                    'errorId',
+                    CalculatrixErrorId.matrixOutOfPrecisionRange,
+                  ),
+                ),
               );
-              expectRelativelyClose(
-                result.at(1, 1),
-                math.pow(1e-200, 1.5).toDouble(),
-              );
-              expect(result.at(1, 0), equals(0));
             },
           );
 
           test(
-            'power ^-0.5: diagonal entries are exact to rounding (upper '
-            'triangular)',
+            'power ^-0.5: raises matrix-out-of-precision-range (upper '
+            'triangular; D38: entries 1e200 and 1e-200 both sit outside '
+            '[1e-150, 1e150])',
             () {
-              final Matrix result = upper.power(Matrix.scalar(-0.5));
-
-              expectRelativelyClose(
-                result.at(0, 0),
-                math.pow(1e200, -0.5).toDouble(),
+              expect(
+                () => upper.power(Matrix.scalar(-0.5)),
+                throwsA(
+                  isA<MatrixDomainError>().having(
+                    (MatrixDomainError e) => e.errorId,
+                    'errorId',
+                    CalculatrixErrorId.matrixOutOfPrecisionRange,
+                  ),
+                ),
               );
-              expectRelativelyClose(
-                result.at(1, 1),
-                math.pow(1e-200, -0.5).toDouble(),
-              );
-              expect(result.at(1, 0), equals(0));
             },
           );
         },

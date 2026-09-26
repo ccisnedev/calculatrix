@@ -82,68 +82,59 @@ void main() {
 
   group('Round 8, finding 3: Frobenius norm must scale before squaring to '
       'avoid spurious overflow', () {
-    test('sqrt() succeeds for a symmetric matrix whose entries individually '
-        'overflow when squared but whose true norm is finite', () {
-      // 1e200 squared is 1e400, which overflows double (max ~1.8e308), even
-      // though the true Frobenius norm (about 1.41e200) is well within
-      // double's finite range. A Frobenius norm that sums unscaled squares
-      // wrongly reports a non-finite norm and refuses to run the Jacobi
-      // eigendecomposition at all.
+    test('sqrt() raises matrix-out-of-precision-range (D38 declared '
+        'precision contract: entries of magnitude 1e200 sit above '
+        'matrixFunctionMaxMagnitude=1e150, so this is rejected outright '
+        'before the scale-before-squaring Frobenius-norm fix this test '
+        'used to regression-check is ever reached)', () {
       final Matrix matrix = Matrix(<List<double>>[
         <double>[1e200, 5],
         <double>[5, 1e200],
       ]);
 
-      final Matrix result = matrix.sqrt();
-
-      expect(result.at(0, 0).isFinite, isTrue);
-      expect(result.at(0, 1).isFinite, isTrue);
-      expect(result.at(1, 0).isFinite, isTrue);
-      expect(result.at(1, 1).isFinite, isTrue);
-
-      // A single unit-in-the-last-place near 1e200 is about 2e184, far
-      // larger than the original off-diagonal entry (5), so the residual
-      // check only requires the off-diagonal entries to stay small relative
-      // to the dominant 1e200 scale, not to reproduce 5 exactly.
-      final Matrix squared = result * result;
-      expect(squared.at(0, 0), closeTo(1e200, 1e200 * 1e-6));
-      expect(squared.at(0, 1), closeTo(0, 1e195));
-      expect(squared.at(1, 0), closeTo(0, 1e195));
-      expect(squared.at(1, 1), closeTo(1e200, 1e200 * 1e-6));
+      expect(
+        matrix.sqrt,
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.matrixOutOfPrecisionRange,
+          ),
+        ),
+      );
     });
   });
 
   group('Round 8, finding 4: sqrt()/power() must dispatch to the complex '
       'form closed form before the general 2x2 closed form', () {
     test('sqrt() of a complex-form matrix with a negative real part and a '
-        'tiny imaginary part succeeds instead of wrongly throwing '
-        'logUndefined', () {
+        'tiny imaginary part raises matrix-out-of-precision-range (D38 '
+        'declared precision contract: the off-diagonal entries have '
+        'magnitude 1e-170, below matrixFunctionMinMagnitude=1e-150, so '
+        'this is rejected outright before the complex-form-dispatch-order '
+        'fix this test used to regression-check is ever reached)', () {
       // a=-1, b=1e-170: b*b underflows to exactly 0 in double precision
       // (1e-340 is below the smallest subnormal double, about 4.9e-324),
       // so the general 2x2 eigenvalue classification (which squares b as
       // part of its discriminant) sees a discriminant of exactly 0 and
       // misclassifies this as a repeated real eigenvalue of -1, a genuine
       // negative real eigenvalue that non-integer real powers reject.
-      // log() already dispatches to the dedicated complex-form branch
-      // first and succeeds for the exact same matrix (ln(1) + pi*i, since
-      // the magnitude is exactly 1 and the angle is essentially pi), so
-      // sqrt() should too: the complex form aI+bJ has a well-defined
-      // non-integer power for any nonzero magnitude, regardless of sign.
       final Matrix matrix = Matrix(<List<double>>[
         <double>[-1, -1e-170],
         <double>[1e-170, -1],
       ]);
       expect(matrix.isComplexForm, isTrue);
 
-      final Matrix result = matrix.sqrt();
-
-      expect(result.at(0, 0).isFinite, isTrue);
-      expect(result.at(1, 1).isFinite, isTrue);
-      // sqrt(-1) = i (magnitude 1, angle pi/2), so the real part collapses
-      // to (near) zero and the imaginary part to (near) 1.
-      expect(result.at(0, 0), closeTo(0, 1e-9));
-      expect(result.at(1, 1), closeTo(0, 1e-9));
-      expect(result.at(1, 0).abs(), closeTo(1, 1e-9));
+      expect(
+        matrix.sqrt,
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.matrixOutOfPrecisionRange,
+          ),
+        ),
+      );
     });
   });
 
@@ -245,35 +236,28 @@ void main() {
 
   group('Round 8, finding 8: general 2x2 real-power divided difference must '
       'anchor at the larger-magnitude eigenvalue, not always lambda2', () {
-    test('power(1.5) of a general 2x2 with a huge eigenvalue ratio succeeds '
-        'instead of wrongly throwing nonFinite from a 0*Infinity product',
+    test('power(1.5) of a general 2x2 with a huge eigenvalue ratio raises '
+        'matrix-out-of-precision-range, not nonFinite (D38 declared '
+        'precision contract: entries of magnitude 1e-160, 2e-160 and '
+        '1e-300 all sit below matrixFunctionMinMagnitude=1e-150, so this '
+        'is rejected outright before the anchor-at-larger-eigenvalue fix '
+        'this test used to regression-check is ever reached)',
         () {
-      // Eigenvalues are approximately 1 (l1) and 1e-300 (l2). Anchoring
-      // the divided difference at l2 (the previous, always-l2 behavior)
-      // computes l2^1.5, which underflows to exactly 0, and separately
-      // computes expm1(y*log1p((l1-l2)/l2)), whose argument is huge
-      // (l1/l2 ~ 1e300) and whose expm1 result overflows to Infinity, so
-      // their product is 0*Infinity = NaN. Anchoring at l1 (the
-      // larger-magnitude eigenvalue) instead computes l1^1.5 = 1 (finite,
-      // no underflow) and expm1(y*log1p((l2-l1)/l1)), whose argument is
-      // safely close to -1, which never overflows. Since l2 is negligible
-      // next to l1, the true result is (to double precision) simply A
-      // itself: A^1.5 has eigenvalues 1^1.5=1 and (~0)^1.5=~0, so c0=~0
-      // and c1=~1 in the c0*I + c1*A closed form.
       final Matrix matrix = Matrix(<List<double>>[
         <double>[1, 1e-160],
         <double>[2e-160, 1e-300],
       ]);
 
-      final Matrix result = matrix.power(Matrix.scalar(1.5));
-
-      expect(result.at(0, 0).isFinite, isTrue);
-      expect(result.at(0, 1).isFinite, isTrue);
-      expect(result.at(1, 0).isFinite, isTrue);
-      expect(result.at(1, 1).isFinite, isTrue);
-      expect(result.at(0, 0), closeTo(1.0, 1e-6));
-      expect(result.at(0, 1), closeTo(1e-160, 1e-165));
-      expect(result.at(1, 0), closeTo(2e-160, 1e-165));
+      expect(
+        () => matrix.power(Matrix.scalar(1.5)),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.matrixOutOfPrecisionRange,
+          ),
+        ),
+      );
     });
   });
 

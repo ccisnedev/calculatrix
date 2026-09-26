@@ -45,7 +45,9 @@ void main(List<String> args) {
     }
   } on CalculatrixError catch (error) {
     print(error);
-    exitCode = error.errorId == CalculatrixErrorId.unsupportedMatrixFunction
+    exitCode =
+        error.errorId == CalculatrixErrorId.unsupportedMatrixFunction ||
+            error.errorId == CalculatrixErrorId.matrixOutOfPrecisionRange
         ? 65
         : 1;
   } on FormatException catch (error) {

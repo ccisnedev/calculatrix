@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 
 void main() {
   group('CalculatrixErrorId', () {
-    test('defines the eleven domain error ids from the spec', () {
+    test('defines the twelve domain error ids from the spec', () {
       final Set<String> ids = CalculatrixErrorId.values
           .map((CalculatrixErrorId id) => id.id)
           .toSet();
@@ -24,6 +24,7 @@ void main() {
         'syntax-error',
         'no-convergence',
         'unsupported-matrix-function',
+        'matrix-out-of-precision-range',
       });
     });
   });
@@ -148,6 +149,11 @@ void main() {
             <double>[0, 1, 1],
             <double>[0, 0, 1],
           ]).exp(),
+          // D38 declared precision contract: a raw entry (1e200) outside
+          // [matrixFunctionMinMagnitude, matrixFunctionMaxMagnitude] is
+          // rejected before sqrt even reaches its scalar shortcut.
+          CalculatrixErrorId.matrixOutOfPrecisionRange: () =>
+              Matrix.scalar(1e200).sqrt(),
         };
 
         expect(
