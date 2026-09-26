@@ -625,4 +625,134 @@ void main() {
       },
     );
   });
+
+  group('CalculatrixSession - rpn memory ops with multi-token drafts', () {
+    test('M+ with a two-token draft commits it like ENTER, then adds the new top', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+
+      session.memoryAdd();
+
+      expect(session.memoryValue, Matrix.scalar(3));
+      expect(
+        session.rpnStack,
+        orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(3)]),
+      );
+      expect(session.rpnDraft, '');
+    });
+
+    test(
+      'M+ with a two-token draft whose last token was sign-toggled adds the '
+      'negated new top',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+        session.input('3');
+        session.toggleSign();
+
+        session.memoryAdd();
+
+        expect(session.memoryValue, Matrix.scalar(-3));
+        expect(
+          session.rpnStack,
+          orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(-3)]),
+        );
+      },
+    );
+
+    test('M- with a two-token draft commits it like ENTER, then subtracts the new top', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+
+      session.memorySubtract();
+
+      expect(session.memoryValue, Matrix.scalar(-3));
+      expect(
+        session.rpnStack,
+        orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(3)]),
+      );
+      expect(session.rpnDraft, '');
+    });
+
+    test(
+      'M+ with an invalid token in a multi-token draft raises a typed error, '
+      'leaves memory unchanged and keeps the draft',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+        session.input('abc');
+
+        session.memoryAdd();
+
+        expect(session.memoryValue, isNull);
+        expect(session.hasMemory, isFalse);
+        expect(session.rpnDraft, '2 abc');
+        expect(session.rpnStackDepth, 0);
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<CalculatrixError>());
+      },
+    );
+  });
+
+  group('CalculatrixSession - rpn failure preserves repeat-equals state', () {
+    test(
+      'a failed rpn command that mutates nothing leaves the infix repeat '
+      'operator and operand intact',
+      () {
+        session.input('2');
+        session.input('+');
+        session.input('3');
+        session.evaluate();
+        expect(session.currentValue, Matrix.scalar(5));
+
+        session.setMode(CalculatrixMode.rpn);
+        session.swapRpn();
+
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<RpnStackUnderflowError>());
+        expect(session.rpnStack, orderedEquals(<Matrix>[Matrix.scalar(5)]));
+
+        session.setMode(CalculatrixMode.infix);
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(8));
+      },
+    );
+
+    test(
+      'a failed rpn command whose draft commit already mutated the stack '
+      'still invalidates the infix repeat operator and operand',
+      () {
+        session.input('2');
+        session.input('+');
+        session.input('3');
+        session.evaluate();
+        expect(session.currentValue, Matrix.scalar(5));
+
+        session.setMode(CalculatrixMode.rpn);
+        session.input('0');
+        session.applyRpnBinary(RpnBinaryOperator.divide);
+
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<MatrixDomainError>());
+        expect(
+          session.rpnStack,
+          orderedEquals(<Matrix>[Matrix.scalar(5), Matrix.scalar(0)]),
+        );
+
+        session.setMode(CalculatrixMode.infix);
+        expect(session.currentValue, Matrix.scalar(0));
+
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(0));
+      },
+    );
+  });
 }
