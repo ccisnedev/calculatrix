@@ -95,6 +95,22 @@ final class DivideCommand extends CalculatrixCommand {
   }
 }
 
+final class PowerCommand extends CalculatrixCommand {
+  const PowerCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    // Round 5 correction, case 9: arity must be checked before any pop.
+    // The previous body popped the exponent and the base unconditionally,
+    // so a 1-deep stack ([2]) popped the "exponent" (emptying the stack),
+    // then threw on the second pop, leaving the stack empty instead of
+    // unchanged. Routing through the shared `applyBinary` path (used by
+    // every other binary command) checks `_stack.length < 2` before either
+    // pop, so a failed arity check never mutates the stack.
+    engine.applyBinary(RpnBinaryOperator.power);
+  }
+}
+
 final class AppendRowCommand extends CalculatrixCommand {
   const AppendRowCommand();
 

@@ -45,7 +45,11 @@ void main(List<String> args) {
     }
   } on CalculatrixError catch (error) {
     print(error);
-    exitCode = 1;
+    exitCode =
+        error.errorId == CalculatrixErrorId.unsupportedMatrixFunction ||
+            error.errorId == CalculatrixErrorId.matrixOutOfPrecisionRange
+        ? 65
+        : 1;
   } on FormatException catch (error) {
     print('CLI error: ${error.message}');
     _printUsage();
@@ -318,7 +322,7 @@ String _formatCommandResults(CalculatrixMachine machine) {
 }
 
 Matrix _parseOperandLiteral(String token) {
-  return Calculatrix.evaluateInfix(token);
+  return Calculatrix.evaluateRpn(<String>[token]);
 }
 
 int _parseSingleIntArgument(String token, {required String prefix}) {

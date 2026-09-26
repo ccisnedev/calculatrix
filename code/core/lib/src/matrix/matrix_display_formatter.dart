@@ -61,16 +61,33 @@ class MatrixDisplayFormatter {
       return '0';
     }
 
-    if (value == value.toInt().toDouble() && value.abs() < 1e12) {
+    // Round 6 correction (item 4): `double.toInt()` throws for a
+    // non-finite value ("Infinity or NaN toInt"), so a non-finite `value`
+    // must never reach it: it falls through to `toStringAsPrecision`
+    // below, whose formatting already renders "Infinity"/"-Infinity"/"NaN"
+    // safely for a non-finite double.
+    if (value.isFinite &&
+        value == value.toInt().toDouble() &&
+        value.abs() < 1e12) {
       return value.toInt().toString();
     }
 
-    String text = value.toStringAsPrecision(12);
-    if (text.contains('.')) {
-      text = text.replaceAll(RegExp(r'0+$'), '');
-      text = text.replaceAll(RegExp(r'\.$'), '');
+    final String raw = value.toStringAsPrecision(12);
+
+    // Split off any exponent suffix (e.g. "e+20", "E-15") before trimming
+    // trailing zeros, so the trim only ever touches the mantissa and never
+    // corrupts the exponent digits themselves.
+    final int exponentIndex = raw.indexOf(RegExp(r'[eE]'));
+    final String mantissa = exponentIndex == -1 ? raw : raw.substring(0, exponentIndex);
+    final String exponentSuffix = exponentIndex == -1 ? '' : raw.substring(exponentIndex);
+
+    String trimmedMantissa = mantissa;
+    if (trimmedMantissa.contains('.')) {
+      trimmedMantissa = trimmedMantissa.replaceAll(RegExp(r'0+$'), '');
+      trimmedMantissa = trimmedMantissa.replaceAll(RegExp(r'\.$'), '');
     }
-    return text;
+
+    return '$trimmedMantissa$exponentSuffix';
   }
 
   /// Formats a complex-form matrix as `a + bi` or `a - bi`.

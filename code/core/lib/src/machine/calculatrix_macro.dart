@@ -10,7 +10,10 @@ abstract interface class CalculatrixMacro {
 Matrix requireTopMatrix(CalculatrixMachine machine, {required String operation}) {
   final Matrix? top = machine.top;
   if (top == null) {
-    throw RpnStackUnderflowError('$operation requires at least one matrix.');
+    throw RpnStackUnderflowError(
+      '$operation requires at least one matrix.',
+      errorId: CalculatrixErrorId.stackUnderflow,
+    );
   }
 
   return top;

@@ -11,10 +11,14 @@ class Calculatrix {
   static CalculatrixProgram compileInfix(String expression) {
     final String source = expression.trim();
     if (source.isEmpty) {
-      throw ExpressionSyntaxError('Expression cannot be empty.');
+      throw ExpressionSyntaxError(
+        'Expression cannot be empty.',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
     }
 
     final List<String> infixTokens = _tokenizeInfix(source);
+    _validateInfixTokens(infixTokens);
     final List<String> rpnTokens = _toRpn(infixTokens);
     return _compileRpnTokens(rpnTokens);
   }
@@ -25,7 +29,10 @@ class Calculatrix {
       machine.executeProgram(compileInfix(expression));
       return _singleResult(machine, expression: expression, notation: 'infix');
     } on RpnStackUnderflowError catch (_) {
-      throw ExpressionSyntaxError('Invalid infix expression: $expression');
+      throw ExpressionSyntaxError(
+        'Invalid infix expression: $expression',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
     }
   }
 
@@ -37,7 +44,10 @@ class Calculatrix {
 
   static CalculatrixProgram _compileRpnTokens(List<String> tokens) {
     if (tokens.isEmpty) {
-      throw ExpressionSyntaxError('RPN token list cannot be empty.');
+      throw ExpressionSyntaxError(
+        'RPN token list cannot be empty.',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
     }
 
     final List<CalculatrixCommand> commands = <CalculatrixCommand>[];
@@ -67,6 +77,8 @@ class Calculatrix {
         return const SqrtCommand();
       case '%':
         return const PercentCommand();
+      case '^':
+        return const PowerCommand();
       default:
         if (_looksLikeMatrixLiteral(token)) {
           return PushMatrixCommand(_parseMatrixLiteral(token));
@@ -74,10 +86,17 @@ class Calculatrix {
 
         final double? value = double.tryParse(token);
         if (value != null) {
+          if (!value.isFinite) {
+            throw MatrixDomainError(
+              'Numeric literal is not a finite number: $token',
+              errorId: CalculatrixErrorId.nonFinite,
+              token: token,
+            );
+          }
           return PushScalarCommand(value);
         }
 
-        throw ExpressionSyntaxError('Invalid operand token: $token');
+        throw UnknownWordError(token);
     }
   }
 
@@ -90,6 +109,7 @@ class Calculatrix {
     if (machine.depth != 1 || top == null) {
       throw ExpressionSyntaxError(
         'Invalid $notation expression: expected single result, found ${machine.depth}.',
+        errorId: CalculatrixErrorId.syntaxError,
       );
     }
 
@@ -105,33 +125,47 @@ class Calculatrix {
     try {
       decoded = jsonDecode(token);
     } catch (_) {
-      throw ExpressionSyntaxError('Invalid matrix literal: $token');
+      throw ExpressionSyntaxError(
+        'Invalid matrix literal: $token',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
     }
 
     if (decoded is num) {
-      return Matrix.scalar(decoded.toDouble());
+      return Matrix.scalar(_checkFiniteLiteralEntry(decoded, token));
     }
 
     if (decoded is! List) {
       throw ExpressionSyntaxError(
         'Matrix literal must decode to a list: $token',
+        errorId: CalculatrixErrorId.syntaxError,
       );
     }
 
     if (decoded.isEmpty) {
-      throw MatrixShapeError('Matrix literal cannot be empty.');
+      throw MatrixShapeError(
+        'Matrix literal cannot be empty.',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
     }
 
     if (decoded.every((dynamic item) => item is num)) {
       return Matrix(<List<double>>[
-        decoded.map((dynamic item) => (item as num).toDouble()).toList(),
+        decoded
+            .map(
+              (dynamic item) => _checkFiniteLiteralEntry(item as num, token),
+            )
+            .toList(),
       ]);
     }
 
     final List<List<double>> rows = <List<double>>[];
     for (final dynamic row in decoded) {
       if (row is! List || row.isEmpty) {
-        throw ExpressionSyntaxError('Invalid matrix row in literal: $token');
+        throw ExpressionSyntaxError(
+          'Invalid matrix row in literal: $token',
+          errorId: CalculatrixErrorId.syntaxError,
+        );
       }
 
       final List<double> parsedRow = <double>[];
@@ -139,14 +173,30 @@ class Calculatrix {
         if (item is! num) {
           throw ExpressionSyntaxError(
             'Matrix literal must contain only numbers.',
+            errorId: CalculatrixErrorId.syntaxError,
           );
         }
-        parsedRow.add(item.toDouble());
+        parsedRow.add(_checkFiniteLiteralEntry(item, token));
       }
       rows.add(parsedRow);
     }
 
     return Matrix(rows);
+  }
+
+  /// Guards a decoded matrix-literal entry against non-finite values
+  /// (`Infinity`, `-Infinity`, `NaN`) so a literal like `1e999` never
+  /// silently becomes an infinite matrix entry; it raises `non-finite`
+  /// instead.
+  static double _checkFiniteLiteralEntry(num item, String token) {
+    final double value = item.toDouble();
+    if (!value.isFinite) {
+      throw MatrixDomainError(
+        'Matrix literal contains a non-finite value: $token',
+        errorId: CalculatrixErrorId.nonFinite,
+      );
+    }
+    return value;
   }
 
   static List<String> _tokenizeInfix(String expression) {
@@ -163,7 +213,7 @@ class Calculatrix {
 
       if (_isSignedNumberStart(expression, index, tokens)) {
         final _NumberScanResult scan = _scanNumber(expression, index);
-        tokens.add(scan.token);
+        tokens.add(_requireParseableNumberToken(scan.token));
         index = scan.nextIndex;
         continue;
       }
@@ -196,7 +246,10 @@ class Calculatrix {
         }
 
         if (depth != 0) {
-          throw ExpressionSyntaxError('Unbalanced matrix literal brackets.');
+          throw ExpressionSyntaxError(
+            'Unbalanced matrix literal brackets.',
+            errorId: CalculatrixErrorId.syntaxError,
+          );
         }
 
         tokens.add(expression.substring(start, index));
@@ -205,15 +258,163 @@ class Calculatrix {
 
       if (_isNumberStart(char)) {
         final _NumberScanResult scan = _scanNumber(expression, index);
-        tokens.add(scan.token);
+        tokens.add(_requireParseableNumberToken(scan.token));
         index = scan.nextIndex;
         continue;
       }
 
-      throw ExpressionSyntaxError('Unexpected token near "$char".');
+      throw ExpressionSyntaxError(
+        'Unexpected token near "$char".',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
     }
 
     return tokens;
+  }
+
+  /// Rejects a scanned number token that is not a parseable double (for
+  /// example `1e`, an exponent marker with no exponent digits) right at
+  /// tokenize time, with `syntax-error`. Without this, an unparseable
+  /// number token would otherwise reach the RPN compiler as an opaque
+  /// operand and surface as the wrong id (`unknown-word`) instead of the
+  /// syntax error it actually is; this check is infix-only; RPN's own
+  /// token compiler already validates numeric literals independently.
+  static String _requireParseableNumberToken(String token) {
+    if (double.tryParse(token) == null) {
+      throw ExpressionSyntaxError(
+        'Invalid numeric literal: $token',
+        errorId: CalculatrixErrorId.syntaxError,
+        token: token,
+      );
+    }
+    return token;
+  }
+
+  static void _validateInfixTokens(List<String> tokens) {
+    final List<_InfixValidationFrame> frames = <_InfixValidationFrame>[
+      _InfixValidationFrame(),
+    ];
+    bool expectOperand = true;
+
+    for (final String token in tokens) {
+      final _InfixValidationFrame frame = frames.last;
+
+      if (frame.bareClosed && token != ')') {
+        throw ExpressionSyntaxError(
+          'A bare function argument must be parenthesized to combine it '
+          'with further operators near "$token".',
+          errorId: CalculatrixErrorId.syntaxError,
+        );
+      }
+
+      if (_isOperand(token)) {
+        if (!expectOperand) {
+          throw ExpressionSyntaxError(
+            'Unexpected operand "$token"; an operator was expected.',
+            errorId: CalculatrixErrorId.syntaxError,
+          );
+        }
+        if (frame.pendingFunctionCount > 0) {
+          frame.pendingFunctionCount = 0;
+          frame.bareClosed = true;
+        }
+        expectOperand = false;
+        continue;
+      }
+
+      if (_isFunction(token)) {
+        if (!expectOperand) {
+          throw ExpressionSyntaxError(
+            'Unexpected function "$token"; an operator was expected.',
+            errorId: CalculatrixErrorId.syntaxError,
+          );
+        }
+        // Tracked as a count, not a boolean (round 4 correction, case H):
+        // consecutive prefix functions (e.g. `√√(16)`) each push their own
+        // pending obligation onto the *same* frame: a boolean can only
+        // ever remember whether *some* function is pending, not how many,
+        // so a nested `(...)` group that resolves one of them (see below)
+        // would wrongly erase all of them at once.
+        frame.pendingFunctionCount++;
+        continue;
+      }
+
+      if (token == '(') {
+        if (!expectOperand) {
+          throw ExpressionSyntaxError(
+            'Unexpected "("; an operator was expected.',
+            errorId: CalculatrixErrorId.syntaxError,
+          );
+        }
+        // Only the *immediately* preceding function is parenthesized by
+        // this group (`f(...)` makes `f` no longer bare): any further
+        // pending functions stacked on this same frame from before it
+        // (e.g. the outer `√` in `√√(16)`) remain pending across the
+        // nested group and must still be resolved once it closes.
+        if (frame.pendingFunctionCount > 0) {
+          frame.pendingFunctionCount--;
+        }
+        frames.add(_InfixValidationFrame());
+        continue;
+      }
+
+      if (token == ')') {
+        if (expectOperand) {
+          throw ExpressionSyntaxError(
+            'Empty parentheses are not a valid operand.',
+            errorId: CalculatrixErrorId.syntaxError,
+          );
+        }
+        if (frames.length > 1) {
+          frames.removeLast();
+          // The just-closed group is itself a complete operand for
+          // whatever pending function(s) remain on the parent frame (e.g.
+          // the outer `√` in `√√(16)`), resolve it exactly as an operand
+          // token would, so a further bare operator after it is still
+          // rejected.
+          final _InfixValidationFrame parent = frames.last;
+          if (parent.pendingFunctionCount > 0) {
+            parent.pendingFunctionCount = 0;
+            parent.bareClosed = true;
+          }
+        }
+        expectOperand = false;
+        continue;
+      }
+
+      if (_isOperator(token)) {
+        if (expectOperand) {
+          throw ExpressionSyntaxError(
+            'Unexpected operator "$token"; an operand was expected.',
+            errorId: CalculatrixErrorId.syntaxError,
+          );
+        }
+        expectOperand = true;
+        continue;
+      }
+
+      if (_isPostfixOperator(token)) {
+        if (expectOperand) {
+          throw ExpressionSyntaxError(
+            'Unexpected "$token"; an operand was expected.',
+            errorId: CalculatrixErrorId.syntaxError,
+          );
+        }
+        continue;
+      }
+
+      throw ExpressionSyntaxError(
+        'Unsupported token in infix expression: $token',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
+    }
+
+    if (expectOperand) {
+      throw ExpressionSyntaxError(
+        'Expression ends with an incomplete operand.',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
+    }
   }
 
   static List<String> _toRpn(List<String> infixTokens) {
@@ -229,7 +430,9 @@ class Calculatrix {
       if (_isOperator(token)) {
         while (operators.isNotEmpty &&
             _isOperator(operators.last) &&
-            _precedence(operators.last) >= _precedence(token)) {
+            (_isRightAssociative(token)
+                ? _precedence(operators.last) > _precedence(token)
+                : _precedence(operators.last) >= _precedence(token))) {
           output.add(operators.removeLast());
         }
         operators.add(token);
@@ -262,7 +465,10 @@ class Calculatrix {
           output.add(op);
         }
         if (!foundOpen) {
-          throw ExpressionSyntaxError('Mismatched parentheses in expression.');
+          throw ExpressionSyntaxError(
+            'Mismatched parentheses in expression.',
+            errorId: CalculatrixErrorId.syntaxError,
+          );
         }
 
         if (operators.isNotEmpty && _isFunction(operators.last)) {
@@ -273,13 +479,17 @@ class Calculatrix {
 
       throw ExpressionSyntaxError(
         'Unsupported token in infix expression: $token',
+        errorId: CalculatrixErrorId.syntaxError,
       );
     }
 
     while (operators.isNotEmpty) {
       final String op = operators.removeLast();
       if (op == '(' || op == ')') {
-        throw ExpressionSyntaxError('Mismatched parentheses in expression.');
+        throw ExpressionSyntaxError(
+          'Mismatched parentheses in expression.',
+          errorId: CalculatrixErrorId.syntaxError,
+        );
       }
       output.add(op);
     }
@@ -296,7 +506,15 @@ class Calculatrix {
   }
 
   static bool _isOperator(String token) {
-    return token == '+' || token == '-' || token == '*' || token == '/';
+    return token == '+' ||
+        token == '-' ||
+        token == '*' ||
+        token == '/' ||
+        token == '^';
+  }
+
+  static bool _isRightAssociative(String token) {
+    return token == '^';
   }
 
   static bool _isFunction(String token) {
@@ -315,6 +533,8 @@ class Calculatrix {
       case '*':
       case '/':
         return 2;
+      case '^':
+        return 3;
       default:
         return -1;
     }
@@ -408,4 +628,13 @@ class _NumberScanResult {
 
   final String token;
   final int nextIndex;
+}
+
+class _InfixValidationFrame {
+  // A count, not a boolean, because consecutive prefix functions (e.g.
+  // `√√(16)`) stack more than one pending obligation on the same frame:
+  // see the round 4 correction (case H) doc comments at the call sites in
+  // [Calculatrix._validateInfixTokens].
+  int pendingFunctionCount = 0;
+  bool bareClosed = false;
 }

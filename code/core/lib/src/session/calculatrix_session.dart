@@ -730,6 +730,8 @@ class CalculatrixSession {
         return const MultiplyCommand();
       case RpnBinaryOperator.divide:
         return const DivideCommand();
+      case RpnBinaryOperator.power:
+        return const PowerCommand();
     }
   }
 
@@ -918,8 +920,18 @@ class CalculatrixSession {
     return buffer.toString();
   }
 
+  // Round 6 correction (item 4): `double.toInt()` throws for a non-finite
+  // value ("Infinity or NaN toInt"). This was reachable from the CLI's
+  // command mode through the RPN stack, e.g. pushing `1e300*1e300`
+  // (which overflows to `Infinity`; ordinary matrix multiply does not
+  // check finiteness by design) and then reading `rpnTopLiteral` or
+  // `rpnStackLiterals`, both of which serialize through
+  // [_formatMatrixNumber]. Guarding with `isFinite` before the `.toInt()`
+  // comparison, in both formatters below, falls through to `.toString()`/
+  // `toStringAsPrecision`, which already render "Infinity"/"-Infinity"/
+  // "NaN" safely for a non-finite double.
   String _formatMatrixNumber(double value) {
-    if (value == value.toInt().toDouble()) {
+    if (value.isFinite && value == value.toInt().toDouble()) {
       return value.toInt().toString();
     }
 
@@ -931,7 +943,9 @@ class CalculatrixSession {
       return '0';
     }
 
-    if (value == value.toInt().toDouble() && value.abs() < 1e12) {
+    if (value.isFinite &&
+        value == value.toInt().toDouble() &&
+        value.abs() < 1e12) {
       return value.toInt().toString();
     }
 

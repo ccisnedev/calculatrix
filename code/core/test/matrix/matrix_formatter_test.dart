@@ -21,6 +21,16 @@ void main() {
         '[ 1   2]\n[30 400]',
       );
     });
+
+    test('does not truncate the exponent of a large-magnitude number', () {
+      final Matrix large = Matrix.scalar(1e20);
+      expect(MatrixDisplayFormatter.compact(large), '[[1e+20]]');
+    });
+
+    test('does not truncate the exponent of a small-magnitude number', () {
+      final Matrix small = Matrix.scalar(1.23e-15);
+      expect(MatrixDisplayFormatter.compact(small), contains('e-15'));
+    });
   });
 
   group('MatrixDisplayFormatter.complex', () {

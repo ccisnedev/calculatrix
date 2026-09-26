@@ -41,6 +41,47 @@ void main() {
       expect(roundTrip.almostEquals(diagonal, absoluteTolerance: 1e-8), isTrue);
     });
 
+    test(
+      'log and exp are inverse on a real matrix with a complex-conjugate '
+      'eigenvalue pair',
+      () {
+        final Matrix value = Matrix(<List<double>>[
+          <double>[1, -2],
+          <double>[0.5, 1],
+        ]);
+
+        final Matrix roundTrip = value.log().exp();
+        expect(
+          roundTrip.almostEquals(value, absoluteTolerance: 1e-9),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'log of a 3x3 matrix with a rotation block and a positive real '
+      'eigenvalue is unsupported-matrix-function (not diagonal, not '
+      'exactly symmetric, not 2x2)',
+      () {
+        final Matrix value = Matrix(<List<double>>[
+          <double>[0, -1, 0],
+          <double>[1, 0, 0],
+          <double>[0, 0, 2],
+        ]);
+
+        expect(
+          () => value.log(),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.unsupportedMatrixFunction,
+            ),
+          ),
+        );
+      },
+    );
+
     test('rejects log for non-square matrix', () {
       final Matrix value = Matrix(<List<double>>[
         <double>[1, 2, 3],
@@ -53,6 +94,54 @@ void main() {
       expect(
         () => Matrix.scalar(0).log(),
         throwsA(isA<MatrixDomainError>()),
+      );
+    });
+
+    test('computes the principal log of a defective (non-diagonalizable) matrix', () {
+      final Matrix jordanBlock = Matrix(<List<double>>[
+        <double>[1, 1],
+        <double>[0, 1],
+      ]);
+
+      final Matrix result = jordanBlock.log();
+
+      expect(
+        result.almostEquals(
+          Matrix(<List<double>>[
+            <double>[0, 1],
+            <double>[0, 0],
+          ]),
+          absoluteTolerance: 5e-5,
+        ),
+        isTrue,
+      );
+    });
+
+    test('log/exp round-trip on a defective matrix', () {
+      final Matrix jordanBlock = Matrix(<List<double>>[
+        <double>[1, 1],
+        <double>[0, 1],
+      ]);
+
+      final Matrix roundTrip = jordanBlock.log().exp();
+      expect(roundTrip.almostEquals(jordanBlock, absoluteTolerance: 1e-6), isTrue);
+    });
+
+    test('rejects log for a singular matrix with errorId log-undefined', () {
+      final Matrix singular = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[2, 4],
+      ]);
+
+      expect(
+        () => singular.log(),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError e) => e.errorId,
+            'errorId',
+            CalculatrixErrorId.logUndefined,
+          ),
+        ),
       );
     });
   });
