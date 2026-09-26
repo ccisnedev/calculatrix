@@ -231,6 +231,13 @@ class CalculatrixSession {
   }
 
   void memoryClear() {
+    if (isRpnMode) {
+      _runRpnAction(() {
+        _memoryValue = null;
+      });
+      return;
+    }
+
     _memoryValue = null;
   }
 
@@ -241,10 +248,9 @@ class CalculatrixSession {
     }
 
     if (isRpnMode) {
-      _machine.execute(PushMatrixCommand(memory));
-      _rpnDraft = '';
-      _clearError();
-      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
+      _runRpnAction(() {
+        _machine.execute(PushMatrixCommand(memory));
+      });
       return;
     }
 
@@ -298,19 +304,10 @@ class CalculatrixSession {
       return;
     }
 
-    try {
-      final List<Matrix> operands = _parseDraftTokens(_rpnDraft);
-      for (final Matrix operand in operands) {
-        _machine.execute(PushMatrixCommand(operand));
-      }
-      _rpnDraft = '';
-      _clearError();
-      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
-    } on FormatException catch (error) {
-      _lastError = error;
-    } on CalculatrixError catch (error) {
-      _lastError = error;
-    }
+    // ENTER is the archetypal action key: committing the draft is the whole
+    // action, so it has nothing further to do once _runRpnAction has
+    // committed it.
+    _runRpnAction(() {});
   }
 
   void applyRpnBinary(RpnBinaryOperator operator) {
@@ -319,7 +316,6 @@ class CalculatrixSession {
     }
 
     _runRpnAction(() {
-      _commitDraftIfNeeded();
       _machine.execute(_binaryCommand(operator));
     });
   }
@@ -330,7 +326,6 @@ class CalculatrixSession {
     }
 
     _runRpnAction(() {
-      _commitDraftIfNeeded();
       _machine.execute(_unaryCommand(operator));
     });
   }
@@ -361,7 +356,6 @@ class CalculatrixSession {
     }
 
     _runRpnAction(() {
-      _commitDraftIfNeeded();
       _machine.execute(command);
     });
   }
@@ -372,7 +366,6 @@ class CalculatrixSession {
     }
 
     _runRpnAction(() {
-      _commitDraftIfNeeded();
       _machine.executeMacro(macro);
     });
   }
@@ -450,11 +443,7 @@ class CalculatrixSession {
 
   Matrix? _commitRpnDraftForMemoryOperand() {
     try {
-      final List<Matrix> operands = _parseDraftTokens(_rpnDraft);
-      for (final Matrix operand in operands) {
-        _machine.execute(PushMatrixCommand(operand));
-      }
-      _rpnDraft = '';
+      _commitDraftIfNeeded();
       _clearError();
       _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
       return _machine.top;
@@ -677,17 +666,30 @@ class CalculatrixSession {
     return Calculatrix.evaluateInfix(normalized);
   }
 
+  // Token boundaries in an rpn line are shared with rpn programs: splitting
+  // on every literal space would tear a matrix literal such as
+  // "[[1 2] [3 4]]" apart, so this delegates to the same bracket-aware
+  // tokenizer the core uses for RPN programs rather than a second one.
   List<Matrix> _parseDraftTokens(String draft) {
-    return draft
-        .split(' ')
-        .where((String token) => token.isNotEmpty)
+    return Calculatrix.tokenizeRpnLine(draft)
         .map(_parseDraftOperand)
         .toList(growable: false);
   }
 
-  /// Toggles the sign of the last space-delimited token in a multi-operand
-  /// rpn draft, leaving every earlier token untouched. This is what makes
-  /// `2 SPC 3 ±` negate the pending `3`, not the whole draft.
+  /// Toggles the sign of the last token in a multi-operand rpn draft,
+  /// leaving every earlier token untouched. This is what makes
+  /// `2 SPC 3 ±` negate the pending `3`, not the whole draft. The last
+  /// token's boundary is found with the same bracket-aware rule as
+  /// _parseDraftTokens, so a matrix literal such as `2 SPC [[1 2] [3 4]]`
+  /// is treated as one token and only that matrix is toggled.
+  ///
+  /// When the last token parses as a matrix, prefixing it with a raw `-`
+  /// would not round-trip (a bracketed literal is not a valid unary-minus
+  /// operand to the infix evaluator), so the declared behavior instead
+  /// parses the token, negates the matrix itself, and re-serializes it back
+  /// into the draft; toggling again negates it back to the original,
+  /// reformatted into canonical comma form. Any other token keeps the
+  /// original raw `-` prefix/strip toggle.
   ///
   /// When the draft ends with a trailing space (SPC was pressed but nothing
   /// has been typed for the next operand yet), the "last token" is empty;
@@ -698,15 +700,44 @@ class CalculatrixSession {
   /// nothing is pushed and the typed error is surfaced, matching the
   /// existing atomic commit behavior; there is no silent fallback.
   String _toggleSignOfLastToken(String draft) {
-    final int lastSpaceIndex = draft.lastIndexOf(' ');
+    final int lastSpaceIndex = _lastTopLevelSpaceIndex(draft);
     final String prefix = draft.substring(0, lastSpaceIndex + 1);
     final String lastToken = draft.substring(lastSpaceIndex + 1);
+
+    if (lastToken.startsWith('[')) {
+      final Matrix? matrix = _tryParseOperand(lastToken);
+      if (matrix != null) {
+        return prefix + _expressionSeedFromValue(_negatedValue(matrix));
+      }
+    }
 
     final String toggledToken = lastToken.startsWith('-')
         ? lastToken.substring(1)
         : '-$lastToken';
 
     return prefix + toggledToken;
+  }
+
+  // Finds the last space that separates tokens (as opposed to one that
+  // sits inside a matrix literal's brackets, such as the space in
+  // "[[1 2] [3 4]]"), or -1 when there is none. This is the bracket-aware
+  // equivalent of draft.lastIndexOf(' ').
+  int _lastTopLevelSpaceIndex(String draft) {
+    int bracketDepth = 0;
+    int lastTopLevelSpace = -1;
+
+    for (int index = 0; index < draft.length; index++) {
+      final String character = draft[index];
+      if (character == '[') {
+        bracketDepth++;
+      } else if (character == ']') {
+        bracketDepth--;
+      } else if (character == ' ' && bracketDepth == 0) {
+        lastTopLevelSpace = index;
+      }
+    }
+
+    return lastTopLevelSpace;
   }
 
   Matrix? _tryParseOperand(String expression) {
@@ -741,6 +772,17 @@ class CalculatrixSession {
     _rpnDraft = '';
   }
 
+  // The one declared rule for every RPN key: a key is either an EDITING key
+  // (digits, the decimal point, SPC, backspace, clear-entry, and toggling
+  // the sign of the pending line) that only ever touches _rpnDraft, or an
+  // ACTION key (ENTER, the arithmetic/unary operators, dup/drop/swap/over/
+  // rot, any CalculatrixCommand or macro, and the memory keys MR/MRC/MC)
+  // that operates on the real stack or memory. Every ACTION key commits the
+  // pending line first, through this one shared choke point, exactly like
+  // ENTER: an invalid pending token surfaces the typed error, pushes
+  // nothing, keeps the draft as typed, and the action itself does not run.
+  // This is enforced in one place, _runRpnAction, rather than re-implemented
+  // per method, so no action key can be added later that forgets to commit.
   void _runRpnAction(void Function() action) {
     if (!isRpnMode) {
       return;
@@ -749,6 +791,7 @@ class CalculatrixSession {
     final int mutationCountBeforeAction = _machine.mutationCount;
 
     try {
+      _commitDraftIfNeeded();
       action();
       _clearError();
       _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);

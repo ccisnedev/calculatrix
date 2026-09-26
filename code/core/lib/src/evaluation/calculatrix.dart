@@ -103,7 +103,7 @@ class Calculatrix {
   static Matrix _parseMatrixLiteral(String token) {
     dynamic decoded;
     try {
-      decoded = jsonDecode(token);
+      decoded = jsonDecode(_normalizeMatrixLiteralSeparators(token));
     } catch (_) {
       throw ExpressionSyntaxError('Invalid matrix literal: $token');
     }
@@ -149,6 +149,69 @@ class Calculatrix {
     return Matrix(rows);
   }
 
+  // HP-style matrix literals separate rows and entries with plain
+  // whitespace instead of commas (e.g. "[[1 2] [3 4]]"). jsonDecode only
+  // understands comma-separated JSON, so this inserts the implied commas
+  // before decoding. A comma already present is left untouched, so
+  // "[[1, 2], [3, 4]]" round-trips unchanged.
+  static String _normalizeMatrixLiteralSeparators(String token) {
+    final RegExp impliedSeparator = RegExp(r'(?<=[0-9.\]])\s+(?=[-0-9.\[])');
+    return token.replaceAll(impliedSeparator, ',');
+  }
+
+  /// One shared rule for the RPN command line and RPN programs: tokens are
+  /// separated by whitespace, except inside matrix literal brackets, where
+  /// whitespace is part of the literal (or an implied HP-style separator)
+  /// rather than a token boundary. Both the command-line draft parser and
+  /// the RPN program/word parser must call this so a bracketed literal such
+  /// as "[[1 2] [3 4]]" is always kept as a single token.
+  static List<String> tokenizeRpnLine(String line) {
+    final List<String> tokens = <String>[];
+    int index = 0;
+
+    while (index < line.length) {
+      if (line[index].trim().isEmpty) {
+        index++;
+        continue;
+      }
+
+      final int start = index;
+      while (index < line.length && line[index].trim().isNotEmpty) {
+        if (line[index] == '[') {
+          index = _scanBracketedLiteral(line, index);
+          continue;
+        }
+        index++;
+      }
+
+      tokens.add(line.substring(start, index));
+    }
+
+    return tokens;
+  }
+
+  // Scans a balanced-bracket span starting at a '[' and returns the index
+  // just past its matching ']'. Shared by _tokenizeInfix and
+  // tokenizeRpnLine so both agree on where a matrix literal ends.
+  static int _scanBracketedLiteral(String source, int start) {
+    int index = start;
+    int depth = 0;
+    while (index < source.length) {
+      final String current = source[index];
+      if (current == '[') {
+        depth++;
+      } else if (current == ']') {
+        depth--;
+        if (depth == 0) {
+          return index + 1;
+        }
+      }
+      index++;
+    }
+
+    throw ExpressionSyntaxError('Unbalanced matrix literal brackets.');
+  }
+
   static List<String> _tokenizeInfix(String expression) {
     final List<String> tokens = <String>[];
     int index = 0;
@@ -180,25 +243,7 @@ class Calculatrix {
 
       if (char == '[') {
         final int start = index;
-        int depth = 0;
-        while (index < expression.length) {
-          final String current = expression[index];
-          if (current == '[') {
-            depth++;
-          } else if (current == ']') {
-            depth--;
-            if (depth == 0) {
-              index++;
-              break;
-            }
-          }
-          index++;
-        }
-
-        if (depth != 0) {
-          throw ExpressionSyntaxError('Unbalanced matrix literal brackets.');
-        }
-
+        index = _scanBracketedLiteral(expression, index);
         tokens.add(expression.substring(start, index));
         continue;
       }
