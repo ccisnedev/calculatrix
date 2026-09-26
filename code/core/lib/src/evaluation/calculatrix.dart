@@ -69,7 +69,7 @@ class Calculatrix {
         return const PercentCommand();
       default:
         if (_looksLikeMatrixLiteral(token)) {
-          return PushMatrixCommand(_parseMatrixLiteral(token));
+          return PushMatrixCommand(_parseSignedMatrixLiteral(token));
         }
 
         final double? value = double.tryParse(token);
@@ -97,7 +97,29 @@ class Calculatrix {
   }
 
   static bool _looksLikeMatrixLiteral(String token) {
-    return token.startsWith('[') && token.endsWith(']');
+    final String unsigned = _stripLeadingMatrixSign(token);
+    return unsigned.startsWith('[') && unsigned.endsWith(']');
+  }
+
+  // A matrix literal token may carry a leading sign, e.g. "-[[1,2],[3,4]]",
+  // produced by toggling ± on a matrix operand in the rpn command line (see
+  // CalculatrixSession._toggleSignOfLastToken). The sign is handled here,
+  // as a scale(-1) applied after the ordinary, unsigned literal is decoded,
+  // rather than inside _parseMatrixLiteral, so the JSON-decode/normalization
+  // pipeline for the bracketed digits themselves never re-serializes or
+  // rounds anything: the sign toggle and the digits are two independent,
+  // lossless concerns.
+  static Matrix _parseSignedMatrixLiteral(String token) {
+    final bool negative = token.startsWith('-');
+    final Matrix matrix = _parseMatrixLiteral(_stripLeadingMatrixSign(token));
+    return negative ? matrix.scale(-1) : matrix;
+  }
+
+  static String _stripLeadingMatrixSign(String token) {
+    if (token.startsWith('-') || token.startsWith('+')) {
+      return token.substring(1);
+    }
+    return token;
   }
 
   static Matrix _parseMatrixLiteral(String token) {
@@ -170,13 +192,13 @@ class Calculatrix {
     int index = 0;
 
     while (index < line.length) {
-      if (line[index].trim().isEmpty) {
+      if (_isRpnTokenSeparator(line[index])) {
         index++;
         continue;
       }
 
       final int start = index;
-      while (index < line.length && line[index].trim().isNotEmpty) {
+      while (index < line.length && !_isRpnTokenSeparator(line[index])) {
         if (line[index] == '[') {
           index = _scanBracketedLiteral(line, index);
           continue;
@@ -188,6 +210,39 @@ class Calculatrix {
     }
 
     return tokens;
+  }
+
+  /// Where the last token of a still-uncommitted rpn draft starts, using the
+  /// same bracket-aware, whitespace-agnostic boundary rule as
+  /// tokenizeRpnLine (so a tab or a newline is a token boundary here exactly
+  /// as it is when the draft is committed, rather than only a literal space
+  /// in one place and any whitespace in the other). Used by
+  /// CalculatrixSession's ± key to edit only the trailing token of a
+  /// multi-token draft. Returns 0 when the draft has no top-level separator,
+  /// meaning the whole draft is the "last token".
+  static int lastRpnTokenBoundary(String line) {
+    int bracketDepth = 0;
+    int tokenStart = 0;
+
+    for (int index = 0; index < line.length; index++) {
+      final String character = line[index];
+      if (character == '[') {
+        bracketDepth++;
+      } else if (character == ']') {
+        bracketDepth--;
+      } else if (bracketDepth == 0 && _isRpnTokenSeparator(character)) {
+        tokenStart = index + 1;
+      }
+    }
+
+    return tokenStart;
+  }
+
+  // Whitespace predicate shared by tokenizeRpnLine and lastRpnTokenBoundary:
+  // any character that trims away is a token boundary (spaces, tabs,
+  // newlines, ...), never just the literal space character.
+  static bool _isRpnTokenSeparator(String character) {
+    return character.trim().isEmpty;
   }
 
   // Scans a balanced-bracket span starting at a '[' and returns the index
@@ -228,6 +283,13 @@ class Calculatrix {
         final _NumberScanResult scan = _scanNumber(expression, index);
         tokens.add(scan.token);
         index = scan.nextIndex;
+        continue;
+      }
+
+      if (_isSignedBracketStart(expression, index, tokens)) {
+        final int start = index;
+        index = _scanBracketedLiteral(expression, index + 1);
+        tokens.add(expression.substring(start, index));
         continue;
       }
 
@@ -395,6 +457,36 @@ class Calculatrix {
     }
 
     return _isNumberStart(source[index + 1]);
+  }
+
+  // A sign immediately followed by '[' in unary position (start of the
+  // expression, or right after an operator/function/open paren) is a signed
+  // matrix literal token such as "-[[1,2],[3,4]]", not a lone operator. In
+  // any other position (e.g. between two operands as in "[[1,2]]-[[3,4]]" or
+  // "2-[[1,2]]") tokens.last is an operand, unaryPosition is false, and this
+  // returns false so the sign is tokenized as ordinary binary subtraction,
+  // unaffected.
+  static bool _isSignedBracketStart(
+    String source,
+    int index,
+    List<String> tokens,
+  ) {
+    final String sign = source[index];
+    if (sign != '-' && sign != '+') {
+      return false;
+    }
+
+    final bool unaryPosition =
+        tokens.isEmpty ||
+        _isOperator(tokens.last) ||
+        _isFunction(tokens.last) ||
+        tokens.last == '(';
+
+    if (!unaryPosition) {
+      return false;
+    }
+
+    return index + 1 < source.length && source[index + 1] == '[';
   }
 
   static _NumberScanResult _scanNumber(String source, int start) {

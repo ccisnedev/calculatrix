@@ -241,16 +241,29 @@ class CalculatrixSession {
     _memoryValue = null;
   }
 
+  // In rpn mode MR is an action key like any other: _runRpnAction commits a
+  // pending draft first, then this checks memory. Checking memory before
+  // calling _runRpnAction (as this used to) would let "2 SPC 3 MR" leave the
+  // line uncommitted whenever memory happened to be empty, silently
+  // breaking the one declared action-key rule for that one case. Empty
+  // memory after committing is a typed EmptyMemoryError, not a silent
+  // no-op: the typed-error path already reports failed commits and invalid
+  // operations the same way, so this keeps MR consistent with every other
+  // action key rather than carving out a special case.
   void memoryRecall() {
-    final Matrix? memory = _memoryValue;
-    if (memory == null) {
+    if (isRpnMode) {
+      _runRpnAction(() {
+        final Matrix? memory = _memoryValue;
+        if (memory == null) {
+          throw EmptyMemoryError('Memory is empty.');
+        }
+        _machine.execute(PushMatrixCommand(memory));
+      });
       return;
     }
 
-    if (isRpnMode) {
-      _runRpnAction(() {
-        _machine.execute(PushMatrixCommand(memory));
-      });
+    final Matrix? memory = _memoryValue;
+    if (memory == null) {
       return;
     }
 
@@ -679,17 +692,22 @@ class CalculatrixSession {
   /// Toggles the sign of the last token in a multi-operand rpn draft,
   /// leaving every earlier token untouched. This is what makes
   /// `2 SPC 3 ±` negate the pending `3`, not the whole draft. The last
-  /// token's boundary is found with the same bracket-aware rule as
-  /// _parseDraftTokens, so a matrix literal such as `2 SPC [[1 2] [3 4]]`
-  /// is treated as one token and only that matrix is toggled.
+  /// token's boundary is found with Calculatrix.lastRpnTokenBoundary, the
+  /// same bracket-aware, whitespace-agnostic rule tokenizeRpnLine uses to
+  /// split the draft on commit (a tab or newline is a token boundary here
+  /// exactly as it is there), so a matrix literal such as
+  /// `2 SPC [[1 2] [3 4]]` is treated as one token and only that matrix is
+  /// toggled.
   ///
-  /// When the last token parses as a matrix, prefixing it with a raw `-`
-  /// would not round-trip (a bracketed literal is not a valid unary-minus
-  /// operand to the infix evaluator), so the declared behavior instead
-  /// parses the token, negates the matrix itself, and re-serializes it back
-  /// into the draft; toggling again negates it back to the original,
-  /// reformatted into canonical comma form. Any other token keeps the
-  /// original raw `-` prefix/strip toggle.
+  /// This never parses or re-serializes the token: it only ever adds or
+  /// removes one leading `-` character on the raw text, so the digits the
+  /// user typed (an exponent, 17 significant digits, HP-style spacing
+  /// inside a matrix literal, ...) always round-trip exactly, including
+  /// through a matrix literal. That is safe because the token grammar
+  /// (Calculatrix._isSignedBracketStart) accepts a leading sign directly in
+  /// front of a bracketed literal as a single signed-matrix-literal token,
+  /// so a toggled `-[[1,2],[3,4]]` commits to the negated matrix like any
+  /// other signed operand.
   ///
   /// When the draft ends with a trailing space (SPC was pressed but nothing
   /// has been typed for the next operand yet), the "last token" is empty;
@@ -700,44 +718,15 @@ class CalculatrixSession {
   /// nothing is pushed and the typed error is surfaced, matching the
   /// existing atomic commit behavior; there is no silent fallback.
   String _toggleSignOfLastToken(String draft) {
-    final int lastSpaceIndex = _lastTopLevelSpaceIndex(draft);
-    final String prefix = draft.substring(0, lastSpaceIndex + 1);
-    final String lastToken = draft.substring(lastSpaceIndex + 1);
-
-    if (lastToken.startsWith('[')) {
-      final Matrix? matrix = _tryParseOperand(lastToken);
-      if (matrix != null) {
-        return prefix + _expressionSeedFromValue(_negatedValue(matrix));
-      }
-    }
+    final int lastTokenStart = Calculatrix.lastRpnTokenBoundary(draft);
+    final String prefix = draft.substring(0, lastTokenStart);
+    final String lastToken = draft.substring(lastTokenStart);
 
     final String toggledToken = lastToken.startsWith('-')
         ? lastToken.substring(1)
         : '-$lastToken';
 
     return prefix + toggledToken;
-  }
-
-  // Finds the last space that separates tokens (as opposed to one that
-  // sits inside a matrix literal's brackets, such as the space in
-  // "[[1 2] [3 4]]"), or -1 when there is none. This is the bracket-aware
-  // equivalent of draft.lastIndexOf(' ').
-  int _lastTopLevelSpaceIndex(String draft) {
-    int bracketDepth = 0;
-    int lastTopLevelSpace = -1;
-
-    for (int index = 0; index < draft.length; index++) {
-      final String character = draft[index];
-      if (character == '[') {
-        bracketDepth++;
-      } else if (character == ']') {
-        bracketDepth--;
-      } else if (character == ' ' && bracketDepth == 0) {
-        lastTopLevelSpace = index;
-      }
-    }
-
-    return lastTopLevelSpace;
   }
 
   Matrix? _tryParseOperand(String expression) {
