@@ -101,6 +101,19 @@ class CalculatrixSession {
     _infixDraft += value;
   }
 
+  void appendSpace() {
+    if (!isRpnMode) {
+      return;
+    }
+
+    if (_rpnDraft.isEmpty || _rpnDraft.endsWith(' ')) {
+      return;
+    }
+
+    _clearError();
+    _rpnDraft += ' ';
+  }
+
   void insertMatrixLiteral(String literal) {
     final Matrix matrix = Calculatrix.evaluateInfix(literal);
     _clearError();
@@ -186,11 +199,7 @@ class CalculatrixSession {
   void toggleSign() {
     if (isRpnMode) {
       if (_rpnDraft.isNotEmpty) {
-        if (_rpnDraft.startsWith('-')) {
-          _rpnDraft = _rpnDraft.substring(1);
-        } else {
-          _rpnDraft = '-$_rpnDraft';
-        }
+        _rpnDraft = _toggleSignOfLastToken(_rpnDraft);
         return;
       }
 
@@ -222,20 +231,39 @@ class CalculatrixSession {
   }
 
   void memoryClear() {
-    _memoryValue = null;
-  }
-
-  void memoryRecall() {
-    final Matrix? memory = _memoryValue;
-    if (memory == null) {
+    if (isRpnMode) {
+      _runRpnAction(() {
+        _memoryValue = null;
+      });
       return;
     }
 
+    _memoryValue = null;
+  }
+
+  // In rpn mode MR is an action key like any other: _runRpnAction commits a
+  // pending draft first, then this checks memory. Checking memory before
+  // calling _runRpnAction (as this used to) would let "2 SPC 3 MR" leave the
+  // line uncommitted whenever memory happened to be empty, silently
+  // breaking the one declared action-key rule for that one case. Empty
+  // memory after committing is a typed EmptyMemoryError, not a silent
+  // no-op: the typed-error path already reports failed commits and invalid
+  // operations the same way, so this keeps MR consistent with every other
+  // action key rather than carving out a special case.
+  void memoryRecall() {
     if (isRpnMode) {
-      _machine.execute(PushMatrixCommand(memory));
-      _rpnDraft = '';
-      _clearError();
-      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
+      _runRpnAction(() {
+        final Matrix? memory = _memoryValue;
+        if (memory == null) {
+          throw EmptyMemoryError('Memory is empty.');
+        }
+        _machine.execute(PushMatrixCommand(memory));
+      });
+      return;
+    }
+
+    final Matrix? memory = _memoryValue;
+    if (memory == null) {
       return;
     }
 
@@ -289,16 +317,10 @@ class CalculatrixSession {
       return;
     }
 
-    try {
-      _machine.execute(PushMatrixCommand(_parseDraftOperand(_rpnDraft)));
-      _rpnDraft = '';
-      _clearError();
-      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
-    } on FormatException catch (error) {
-      _lastError = error;
-    } on CalculatrixError catch (error) {
-      _lastError = error;
-    }
+    // ENTER is the archetypal action key: committing the draft is the whole
+    // action, so it has nothing further to do once _runRpnAction has
+    // committed it.
+    _runRpnAction(() {});
   }
 
   void applyRpnBinary(RpnBinaryOperator operator) {
@@ -307,7 +329,6 @@ class CalculatrixSession {
     }
 
     _runRpnAction(() {
-      _commitDraftIfNeeded();
       _machine.execute(_binaryCommand(operator));
     });
   }
@@ -318,7 +339,6 @@ class CalculatrixSession {
     }
 
     _runRpnAction(() {
-      _commitDraftIfNeeded();
       _machine.execute(_unaryCommand(operator));
     });
   }
@@ -349,7 +369,6 @@ class CalculatrixSession {
     }
 
     _runRpnAction(() {
-      _commitDraftIfNeeded();
       _machine.execute(command);
     });
   }
@@ -360,7 +379,6 @@ class CalculatrixSession {
     }
 
     _runRpnAction(() {
-      _commitDraftIfNeeded();
       _machine.executeMacro(macro);
     });
   }
@@ -373,46 +391,123 @@ class CalculatrixSession {
     return Calculatrix.evaluateInfix(normalized);
   }
 
+  // Repeat-equals ("=" pressed again with an empty draft) replays
+  // "<committed value><lastOperator><lastOperand>". Finding the last
+  // top-level binary operator and its right-hand operand must go through
+  // Calculatrix's own tokenizer rather than a separate character scan: a
+  // scan that does not know a sign right after an operator (or a
+  // parenthesis, or the start of the expression) belongs to a signed
+  // operand token mistakes that sign for the operator itself, as in
+  // "2×-[[3]]" (the '-' belongs to "-[[3]]", not to '×') or
+  // "[[1,-2]]+3" (the '-' is inside the bracket literal, not top-level at
+  // all; a raw scan that does not even track bracket depth would find it
+  // first).
   void _saveLastOperation(String expression) {
-    int depth = 0;
-    int lastOperatorIndex = -1;
+    final String normalized = expression.replaceAll('×', '*').replaceAll('÷', '/');
 
-    for (int index = expression.length - 1; index >= 0; index--) {
-      final String character = expression[index];
-      if (character == ')') {
-        depth++;
+    List<String> tokens;
+    try {
+      tokens = Calculatrix.tokenizeInfixExpression(normalized);
+    } on CalculatrixError {
+      _clearRepeatState();
+      return;
+    }
+
+    final int operatorIndex = _lastTopLevelOperatorTokenIndex(tokens);
+    if (operatorIndex <= 0) {
+      _clearRepeatState();
+      return;
+    }
+
+    _lastOperator = _toDisplayOperator(tokens[operatorIndex]);
+    _lastOperand = tokens.sublist(operatorIndex + 1).join();
+  }
+
+  // The tokenizer already collapsed every signed number and signed matrix
+  // literal into one operand token (that decision lives in
+  // Calculatrix._isSignedNumberStart / _isSignedBracketStart), so any '+',
+  // '-', '*' or '/' token that survives on its own, outside parentheses, is
+  // by construction a genuine binary operator, never a unary sign.
+  int _lastTopLevelOperatorTokenIndex(List<String> tokens) {
+    int parenDepth = 0;
+    int lastIndex = -1;
+
+    for (int index = 0; index < tokens.length; index++) {
+      final String token = tokens[index];
+      if (token == '(') {
+        parenDepth++;
+        continue;
       }
-      if (character == '(') {
-        depth--;
+      if (token == ')') {
+        parenDepth--;
+        continue;
       }
-      if (depth == 0 &&
-          (character == '+' ||
-              character == '-' ||
-              character == '×' ||
-              character == '÷')) {
-        if (character == '-' && index == 0) {
-          break;
-        }
-        lastOperatorIndex = index;
-        break;
+      if (parenDepth == 0 && _isBareInfixOperatorToken(token)) {
+        lastIndex = index;
       }
     }
 
-    if (lastOperatorIndex > 0) {
-      _lastOperator = expression[lastOperatorIndex];
-      _lastOperand = expression.substring(lastOperatorIndex + 1);
-    } else {
-      _clearRepeatState();
+    return lastIndex;
+  }
+
+  bool _isBareInfixOperatorToken(String token) {
+    return token == '+' || token == '-' || token == '*' || token == '/';
+  }
+
+  String _toDisplayOperator(String normalizedOperator) {
+    switch (normalizedOperator) {
+      case '*':
+        return '×';
+      case '/':
+        return '÷';
+      default:
+        return normalizedOperator;
     }
   }
 
   Matrix? _currentMemoryOperand() {
+    if (isRpnMode) {
+      return _currentRpnMemoryOperand();
+    }
+
     final String currentExpression = expression;
     if (currentExpression.isNotEmpty) {
       return _tryEvaluateExpression(currentExpression);
     }
 
     return _currentValue;
+  }
+
+  // An rpn draft is never evaluated as an infix expression: "2 -3" is two
+  // separate operands, not a subtraction. Any non-empty draft, whether it
+  // holds one token or several, must first be committed exactly like ENTER
+  // (parsing every token atomically, so an invalid token raises the typed
+  // error, pushes nothing and leaves the draft as typed), and only then does
+  // the memory operand come from the new top of the stack. This is a single
+  // path regardless of token count: a lone token is not special-cased into a
+  // read-only evaluation, so it is pushed onto the real stack just like a
+  // multi-token draft is.
+  Matrix? _currentRpnMemoryOperand() {
+    if (_rpnDraft.isEmpty) {
+      return _currentValue;
+    }
+
+    return _commitRpnDraftForMemoryOperand();
+  }
+
+  Matrix? _commitRpnDraftForMemoryOperand() {
+    try {
+      _commitDraftIfNeeded();
+      _clearError();
+      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
+      return _machine.top;
+    } on FormatException catch (error) {
+      _lastError = error;
+      return null;
+    } on CalculatrixError catch (error) {
+      _lastError = error;
+      return null;
+    }
   }
 
   bool get _showsCommittedValueInInfix {
@@ -625,6 +720,67 @@ class CalculatrixSession {
     return Calculatrix.evaluateInfix(normalized);
   }
 
+  // Token boundaries in an rpn line are shared with rpn programs: splitting
+  // on every literal space would tear a matrix literal such as
+  // "[[1 2] [3 4]]" apart, so this delegates to the same bracket-aware
+  // tokenizer the core uses for RPN programs rather than a second one.
+  List<Matrix> _parseDraftTokens(String draft) {
+    return Calculatrix.tokenizeRpnLine(draft)
+        .map(_parseDraftOperand)
+        .toList(growable: false);
+  }
+
+  /// Toggles the sign of the last token in a multi-operand rpn draft,
+  /// leaving every earlier token untouched. This is what makes
+  /// `2 SPC 3 ±` negate the pending `3`, not the whole draft. The last
+  /// token's boundary is found with Calculatrix.lastRpnTokenBoundary, the
+  /// same bracket-aware, whitespace-agnostic rule tokenizeRpnLine uses to
+  /// split the draft on commit (a tab or newline is a token boundary here
+  /// exactly as it is there), so a matrix literal such as
+  /// `2 SPC [[1 2] [3 4]]` is treated as one token and only that matrix is
+  /// toggled.
+  ///
+  /// This never parses or re-serializes the token: it only ever adds or
+  /// removes one leading `-` character on the raw text, so the digits the
+  /// user typed (an exponent, 17 significant digits, HP-style spacing
+  /// inside a matrix literal, ...) always round-trip exactly, including
+  /// through a matrix literal. That is safe because the token grammar
+  /// (Calculatrix._isSignedBracketStart) accepts a leading sign directly in
+  /// front of a bracketed literal as a single signed-matrix-literal token,
+  /// so a toggled `-[[1,2],[3,4]]` commits to the negated matrix like any
+  /// other signed operand.
+  ///
+  /// When the draft ends with a trailing space (SPC was pressed but nothing
+  /// has been typed for the next operand yet), the "last token" is empty;
+  /// toggling it prepends a bare `-` as the start of that next operand,
+  /// exactly as pressing ± before typing any digit would. Toggling again
+  /// removes it, returning to the empty token. Committing a draft that
+  /// still ends in a lone `-` fails to parse like any other invalid token:
+  /// nothing is pushed and the typed error is surfaced, matching the
+  /// existing atomic commit behavior; there is no silent fallback.
+  // ± is a three-way toggle, not a two-way one: a leading '-' is removed
+  // (back to positive), a leading '+' is replaced with '-' (an explicitly
+  // positive token, e.g. left by a previous toggle, becomes negative rather
+  // than gaining a second, invalid leading sign), and anything else gets a
+  // '-' prepended. Applies uniformly to numeric and matrix tokens alike,
+  // since both are toggled by this same textual prefix rule.
+  String _toggleSignOfLastToken(String draft) {
+    final int lastTokenStart = Calculatrix.lastRpnTokenBoundary(draft);
+    final String prefix = draft.substring(0, lastTokenStart);
+    final String lastToken = draft.substring(lastTokenStart);
+
+    final String toggledToken;
+    if (lastToken.startsWith('-')) {
+      toggledToken = lastToken.substring(1);
+    } else if (lastToken.startsWith('+')) {
+      toggledToken = '-${lastToken.substring(1)}';
+    } else {
+      toggledToken = '-$lastToken';
+    }
+
+    return prefix + toggledToken;
+  }
+
   Matrix? _tryParseOperand(String expression) {
     try {
       return _parseDraftOperand(expression);
@@ -650,25 +806,65 @@ class CalculatrixSession {
       return;
     }
 
-    _machine.execute(PushMatrixCommand(_parseDraftOperand(_rpnDraft)));
+    final List<Matrix> operands = _parseDraftTokens(_rpnDraft);
+    for (final Matrix operand in operands) {
+      _machine.execute(PushMatrixCommand(operand));
+    }
     _rpnDraft = '';
   }
 
+  // The one declared rule for every RPN key: a key is either an EDITING key
+  // (digits, the decimal point, SPC, backspace, clear-entry, and toggling
+  // the sign of the pending line) that only ever touches _rpnDraft, or an
+  // ACTION key (ENTER, the arithmetic/unary operators, dup/drop/swap/over/
+  // rot, any CalculatrixCommand or macro, and the memory keys MR/MRC/MC)
+  // that operates on the real stack or memory. Every ACTION key commits the
+  // pending line first, through this one shared choke point, exactly like
+  // ENTER: an invalid pending token surfaces the typed error, pushes
+  // nothing, keeps the draft as typed, and the action itself does not run.
+  // This is enforced in one place, _runRpnAction, rather than re-implemented
+  // per method, so no action key can be added later that forgets to commit.
   void _runRpnAction(void Function() action) {
     if (!isRpnMode) {
       return;
     }
 
+    final int mutationCountBeforeAction = _machine.mutationCount;
+
     try {
+      _commitDraftIfNeeded();
       action();
       _clearError();
-      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
+      // Mirrors the two catch blocks below: repeat-equals is only
+      // invalidated when the stack actually changed, whether from
+      // committing a pending draft or from the action itself (e.g. MC's
+      // action only clears memory, so "MC" with no pending draft must
+      // leave repeat-equals intact, matching the empty-draft case there).
+      _syncCommittedValueFromRpnStack(
+        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
+      );
     } on FormatException catch (error) {
       _lastError = error;
-      _rpnDraft = '';
+      // The action may have already committed draft operands onto the real
+      // stack before the failing step ran, so currentValue must still track
+      // the new top even though the operation itself failed. Repeat-equals
+      // state (_lastOperator/_lastOperand) is only invalidated when the
+      // stack actually changed: a failing command is atomic and rolls
+      // itself back, so the only way mutationCount can differ here is a
+      // draft commit or an earlier macro step that already went through
+      // before the failure. A no-op failure (e.g. an underflow on an
+      // untouched stack) must leave repeat-equals intact. mutationCount is
+      // used rather than depth because a command can mutate a matrix's
+      // content in place without changing how many elements are on the
+      // stack (e.g. negating the top), which depth alone cannot detect.
+      _syncCommittedValueFromRpnStack(
+        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
+      );
     } on CalculatrixError catch (error) {
       _lastError = error;
-      _rpnDraft = '';
+      _syncCommittedValueFromRpnStack(
+        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
+      );
     }
   }
 

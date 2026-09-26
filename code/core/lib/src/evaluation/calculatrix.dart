@@ -19,6 +19,17 @@ class Calculatrix {
     return _compileRpnTokens(rpnTokens);
   }
 
+  // The infix tokenizer's own token stream, exposed so a caller such as
+  // CalculatrixSession's repeat-equals bookkeeping can find "the last
+  // top-level binary operator" by looking at real tokens, using the exact
+  // same unary-vs-binary call _isSignedNumberStart/_isSignedBracketStart
+  // already make while tokenizing. Re-implementing that call as a second,
+  // separate character scan is what let a token such as "-[[3]]" (a signed
+  // matrix literal) be mistaken for a binary subtraction.
+  static List<String> tokenizeInfixExpression(String expression) {
+    return _tokenizeInfix(expression.trim());
+  }
+
   static Matrix evaluateInfix(String expression) {
     try {
       final CalculatrixMachine machine = CalculatrixMachine();
@@ -69,7 +80,7 @@ class Calculatrix {
         return const PercentCommand();
       default:
         if (_looksLikeMatrixLiteral(token)) {
-          return PushMatrixCommand(_parseMatrixLiteral(token));
+          return PushMatrixCommand(_parseSignedMatrixLiteral(token));
         }
 
         final double? value = double.tryParse(token);
@@ -97,13 +108,35 @@ class Calculatrix {
   }
 
   static bool _looksLikeMatrixLiteral(String token) {
-    return token.startsWith('[') && token.endsWith(']');
+    final String unsigned = _stripLeadingMatrixSign(token);
+    return unsigned.startsWith('[') && unsigned.endsWith(']');
+  }
+
+  // A matrix literal token may carry a leading sign, e.g. "-[[1,2],[3,4]]",
+  // produced by toggling ± on a matrix operand in the rpn command line (see
+  // CalculatrixSession._toggleSignOfLastToken). The sign is handled here,
+  // as a scale(-1) applied after the ordinary, unsigned literal is decoded,
+  // rather than inside _parseMatrixLiteral, so the JSON-decode/normalization
+  // pipeline for the bracketed digits themselves never re-serializes or
+  // rounds anything: the sign toggle and the digits are two independent,
+  // lossless concerns.
+  static Matrix _parseSignedMatrixLiteral(String token) {
+    final bool negative = token.startsWith('-');
+    final Matrix matrix = _parseMatrixLiteral(_stripLeadingMatrixSign(token));
+    return negative ? matrix.scale(-1) : matrix;
+  }
+
+  static String _stripLeadingMatrixSign(String token) {
+    if (token.startsWith('-') || token.startsWith('+')) {
+      return token.substring(1);
+    }
+    return token;
   }
 
   static Matrix _parseMatrixLiteral(String token) {
     dynamic decoded;
     try {
-      decoded = jsonDecode(token);
+      decoded = jsonDecode(_normalizeMatrixLiteralSeparators(token));
     } catch (_) {
       throw ExpressionSyntaxError('Invalid matrix literal: $token');
     }
@@ -149,6 +182,102 @@ class Calculatrix {
     return Matrix(rows);
   }
 
+  // HP-style matrix literals separate rows and entries with plain
+  // whitespace instead of commas (e.g. "[[1 2] [3 4]]"). jsonDecode only
+  // understands comma-separated JSON, so this inserts the implied commas
+  // before decoding. A comma already present is left untouched, so
+  // "[[1, 2], [3, 4]]" round-trips unchanged.
+  static String _normalizeMatrixLiteralSeparators(String token) {
+    final RegExp impliedSeparator = RegExp(r'(?<=[0-9.\]])\s+(?=[-0-9.\[])');
+    return token.replaceAll(impliedSeparator, ',');
+  }
+
+  /// One shared rule for the RPN command line and RPN programs: tokens are
+  /// separated by whitespace, except inside matrix literal brackets, where
+  /// whitespace is part of the literal (or an implied HP-style separator)
+  /// rather than a token boundary. Both the command-line draft parser and
+  /// the RPN program/word parser must call this so a bracketed literal such
+  /// as "[[1 2] [3 4]]" is always kept as a single token.
+  static List<String> tokenizeRpnLine(String line) {
+    final List<String> tokens = <String>[];
+    int index = 0;
+
+    while (index < line.length) {
+      if (_isRpnTokenSeparator(line[index])) {
+        index++;
+        continue;
+      }
+
+      final int start = index;
+      while (index < line.length && !_isRpnTokenSeparator(line[index])) {
+        if (line[index] == '[') {
+          index = _scanBracketedLiteral(line, index);
+          continue;
+        }
+        index++;
+      }
+
+      tokens.add(line.substring(start, index));
+    }
+
+    return tokens;
+  }
+
+  /// Where the last token of a still-uncommitted rpn draft starts, using the
+  /// same bracket-aware, whitespace-agnostic boundary rule as
+  /// tokenizeRpnLine (so a tab or a newline is a token boundary here exactly
+  /// as it is when the draft is committed, rather than only a literal space
+  /// in one place and any whitespace in the other). Used by
+  /// CalculatrixSession's ± key to edit only the trailing token of a
+  /// multi-token draft. Returns 0 when the draft has no top-level separator,
+  /// meaning the whole draft is the "last token".
+  static int lastRpnTokenBoundary(String line) {
+    int bracketDepth = 0;
+    int tokenStart = 0;
+
+    for (int index = 0; index < line.length; index++) {
+      final String character = line[index];
+      if (character == '[') {
+        bracketDepth++;
+      } else if (character == ']') {
+        bracketDepth--;
+      } else if (bracketDepth == 0 && _isRpnTokenSeparator(character)) {
+        tokenStart = index + 1;
+      }
+    }
+
+    return tokenStart;
+  }
+
+  // Whitespace predicate shared by tokenizeRpnLine and lastRpnTokenBoundary:
+  // any character that trims away is a token boundary (spaces, tabs,
+  // newlines, ...), never just the literal space character.
+  static bool _isRpnTokenSeparator(String character) {
+    return character.trim().isEmpty;
+  }
+
+  // Scans a balanced-bracket span starting at a '[' and returns the index
+  // just past its matching ']'. Shared by _tokenizeInfix and
+  // tokenizeRpnLine so both agree on where a matrix literal ends.
+  static int _scanBracketedLiteral(String source, int start) {
+    int index = start;
+    int depth = 0;
+    while (index < source.length) {
+      final String current = source[index];
+      if (current == '[') {
+        depth++;
+      } else if (current == ']') {
+        depth--;
+        if (depth == 0) {
+          return index + 1;
+        }
+      }
+      index++;
+    }
+
+    throw ExpressionSyntaxError('Unbalanced matrix literal brackets.');
+  }
+
   static List<String> _tokenizeInfix(String expression) {
     final List<String> tokens = <String>[];
     int index = 0;
@@ -168,6 +297,13 @@ class Calculatrix {
         continue;
       }
 
+      if (_isSignedBracketStart(expression, index, tokens)) {
+        final int start = index;
+        index = _scanBracketedLiteral(expression, index + 1);
+        tokens.add(expression.substring(start, index));
+        continue;
+      }
+
       if (_isOperator(char) ||
           _isFunction(char) ||
           _isPostfixOperator(char) ||
@@ -180,25 +316,7 @@ class Calculatrix {
 
       if (char == '[') {
         final int start = index;
-        int depth = 0;
-        while (index < expression.length) {
-          final String current = expression[index];
-          if (current == '[') {
-            depth++;
-          } else if (current == ']') {
-            depth--;
-            if (depth == 0) {
-              index++;
-              break;
-            }
-          }
-          index++;
-        }
-
-        if (depth != 0) {
-          throw ExpressionSyntaxError('Unbalanced matrix literal brackets.');
-        }
-
+        index = _scanBracketedLiteral(expression, index);
         tokens.add(expression.substring(start, index));
         continue;
       }
@@ -350,6 +468,36 @@ class Calculatrix {
     }
 
     return _isNumberStart(source[index + 1]);
+  }
+
+  // A sign immediately followed by '[' in unary position (start of the
+  // expression, or right after an operator/function/open paren) is a signed
+  // matrix literal token such as "-[[1,2],[3,4]]", not a lone operator. In
+  // any other position (e.g. between two operands as in "[[1,2]]-[[3,4]]" or
+  // "2-[[1,2]]") tokens.last is an operand, unaryPosition is false, and this
+  // returns false so the sign is tokenized as ordinary binary subtraction,
+  // unaffected.
+  static bool _isSignedBracketStart(
+    String source,
+    int index,
+    List<String> tokens,
+  ) {
+    final String sign = source[index];
+    if (sign != '-' && sign != '+') {
+      return false;
+    }
+
+    final bool unaryPosition =
+        tokens.isEmpty ||
+        _isOperator(tokens.last) ||
+        _isFunction(tokens.last) ||
+        tokens.last == '(';
+
+    if (!unaryPosition) {
+      return false;
+    }
+
+    return index + 1 < source.length && source[index + 1] == '[';
   }
 
   static _NumberScanResult _scanNumber(String source, int start) {

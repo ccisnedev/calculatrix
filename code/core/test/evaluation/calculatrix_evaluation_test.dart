@@ -154,6 +154,70 @@ void main() {
       );
     });
 
+    test('evaluates a negated matrix literal token in infix mode', () {
+      final Matrix result = Calculatrix.evaluateInfix('-[[1,2],[3,4]]');
+
+      expect(
+        result,
+        Matrix(<List<double>>[
+          <double>[-1, -2],
+          <double>[-3, -4],
+        ]),
+      );
+    });
+
+    test('evaluates a negated matrix literal token in rpn mode', () {
+      final Matrix result = Calculatrix.evaluateRpn(<String>['-[[1.25e-10]]']);
+
+      expect(result, Matrix.scalar(-1.25e-10));
+    });
+
+    test('evaluates an explicitly positive-signed matrix literal token', () {
+      final Matrix result = Calculatrix.evaluateInfix('+[[1,2],[3,4]]');
+
+      expect(
+        result,
+        Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[3, 4],
+        ]),
+      );
+    });
+
+    test(
+      'binary subtraction between two bracketed matrix literals is unaffected '
+      'by the signed-matrix-literal grammar',
+      () {
+        final Matrix result = Calculatrix.evaluateInfix(
+          '[[5,6],[7,8]]-[[1,2],[3,4]]',
+        );
+
+        expect(
+          result,
+          Matrix(<List<double>>[
+            <double>[4, 4],
+            <double>[4, 4],
+          ]),
+        );
+      },
+    );
+
+    test(
+      'subtracting a bracketed matrix literal from a scalar is unaffected '
+      'by the signed-matrix-literal grammar',
+      () {
+        final Matrix result = Calculatrix.evaluateInfix('2 - [[1,2],[3,4]]');
+
+        expect(
+          result,
+          Matrix(<List<double>>[
+            <double>[1, -2],
+            <double>[-3, -2],
+          ]),
+        );
+      },
+    );
+
     test('evaluates non-square outer product in infix mode', () {
       final Matrix result = Calculatrix.evaluateInfix('[[1],[2]] * [[3,4]]');
 

@@ -97,7 +97,7 @@ class _CalculatorViewState extends State<CalculatorView> {
     _ButtonDef('8', _ButtonCategory.number),
     _ButtonDef('9', _ButtonCategory.number),
     _ButtonDef('÷', _ButtonCategory.operator),
-    _emptySlot,
+    _ButtonDef('SPC', _ButtonCategory.function),
     _ButtonDef('4', _ButtonCategory.number),
     _ButtonDef('5', _ButtonCategory.number),
     _ButtonDef('6', _ButtonCategory.number),
@@ -1126,11 +1126,13 @@ class _CalculatorViewState extends State<CalculatorView> {
 
     final colors = _getButtonColors(btn.category);
     final String visibleLabel = _visibleLabel(btn);
+    final bool isDynamicallyEnabled = _isDynamicallyEnabled(btn.label);
     final String semanticName = btn.label == 'DELETE'
       ? (_controller.deleteWouldEditDraft ? 'Delete draft' : 'Drop top')
       : _semanticLabel(btn.label);
     return Semantics(
       button: true,
+      enabled: isDynamicallyEnabled,
       label: semanticName,
       excludeSemantics: true,
       child: SizedBox.square(
@@ -1139,7 +1141,7 @@ class _CalculatorViewState extends State<CalculatorView> {
           message: semanticName,
           child: Material(
             key: ValueKey<String>('calculator-button-${btn.keyLabel}'),
-            color: colors.$1,
+            color: isDynamicallyEnabled ? colors.$1 : colors.$1.withAlpha(120),
             borderRadius: BorderRadius.circular(16),
             elevation: 0,
             child: InkWell(
@@ -1148,7 +1150,9 @@ class _CalculatorViewState extends State<CalculatorView> {
               highlightColor: colors.$2.withAlpha(30),
               hoverColor: colors.$2.withAlpha(20),
               focusColor: colors.$2.withAlpha(25),
-              onTap: () => _onButtonPressed(btn.label),
+              onTap: isDynamicallyEnabled
+                  ? () => _onButtonPressed(btn.label)
+                  : null,
               child: Padding(
                 padding: const EdgeInsets.all(6),
                 child: FittedBox(
@@ -1163,7 +1167,9 @@ class _CalculatorViewState extends State<CalculatorView> {
                         .copyWith(
                       fontSize: visibleLabel.length > 1 ? 18 : 28,
                       fontWeight: FontWeight.w500,
-                      color: colors.$2,
+                      color: isDynamicallyEnabled
+                          ? colors.$2
+                          : colors.$2.withAlpha(120),
                     ),
                   ),
                 ),
@@ -1173,6 +1179,18 @@ class _CalculatorViewState extends State<CalculatorView> {
         ),
       ),
     );
+  }
+
+  /// Whether a fixed-slot button is interactive in the current calculator
+  /// mode. `SPC` only makes sense while composing an rpn command line: it
+  /// separates operands the user types with the app's own keypad, so it is
+  /// disabled outside rpn entry mode.
+  bool _isDynamicallyEnabled(String label) {
+    if (label == 'SPC') {
+      return _controller.isRpnMode;
+    }
+
+    return true;
   }
 
   (Color background, Color foreground) _getButtonColors(
@@ -1360,6 +1378,8 @@ class _CalculatorViewState extends State<CalculatorView> {
           _controller.clear();
         case 'ENTER':
           _controller.enter();
+        case 'SPC':
+          _controller.appendSpace();
         case '=':
           if (_controller.hasDraftDisplay) {
             _controller.evaluate();
@@ -1539,6 +1559,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       'C' => 'Clear',
       '=' => _controller.isInfixMode ? 'Equals' : 'Evaluate',
       'ENTER' => 'Enter',
+      'SPC' => 'Space separator',
       '+' => 'Plus',
       '-' => 'Minus',
       '×' => 'Multiply',

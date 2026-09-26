@@ -38,3 +38,11 @@ class ExpressionSyntaxError extends CalculatrixError {
 class UnsupportedCalculatrixOperationError extends CalculatrixError {
   UnsupportedCalculatrixOperationError(super.message);
 }
+
+/// MR/MRC in rpn mode with nothing stored in memory. Raised only after any
+/// pending draft has already been committed (the action-key commit-first
+/// rule), so it always reports the true, post-commit memory state rather
+/// than racing an uncommitted line. See CalculatrixSession.memoryRecall.
+class EmptyMemoryError extends CalculatrixError {
+  EmptyMemoryError(super.message);
+}

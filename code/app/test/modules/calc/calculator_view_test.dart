@@ -1838,6 +1838,125 @@ void main() {
       expect(find.text('Stack 1'), findsOneWidget);
       handle.dispose();
     });
+
+    testWidgets('SPC sits directly right of division and above delete', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      final Rect divideRect = tester.getRect(_calculatorButton('÷'));
+      final Rect deleteRect = tester.getRect(_calculatorButton('DELETE'));
+      final Rect spcRect = tester.getRect(_calculatorButton('SPC'));
+
+      expect((spcRect.top - divideRect.top).abs(), lessThanOrEqualTo(1.0));
+      expect(spcRect.left, greaterThan(divideRect.left));
+      expect((spcRect.left - deleteRect.left).abs(), lessThanOrEqualTo(1.0));
+      expect(spcRect.top, lessThan(deleteRect.top));
+    });
+
+    testWidgets('SPC shows the SPC label', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      expect(_calculatorButtonLabel('SPC', 'SPC'), findsOneWidget);
+    });
+
+    testWidgets('SPC appends a single space to the rpn draft', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _tapCalculatorButton(tester, '2');
+      await _tapCalculatorButton(tester, 'SPC');
+
+      expect(
+        find.descendant(of: _rpnDraftCard(), matching: find.text('2 ')),
+        findsOneWidget,
+      );
+
+      await _tapCalculatorButton(tester, '3');
+      await _tapCalculatorButton(tester, 'ENTER');
+
+      expect(_rpnStackCard(1), findsOneWidget);
+      expect(
+        find.descendant(of: _rpnStackCard(1), matching: find.text('[[2]]')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: _rpnStackCard(0),
+          matching: find.byKey(const ValueKey<String>('calculator-display-text')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.descendant(
+                of: _rpnStackCard(0),
+                matching: find.byKey(const ValueKey<String>('calculator-display-text')),
+              ),
+            )
+            .data,
+        '[[3]]',
+      );
+    });
+
+    testWidgets('sign toggle after SPC negates only the pending operand', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _tapCalculatorButton(tester, '2');
+      await _tapCalculatorButton(tester, 'SPC');
+      await _tapCalculatorButton(tester, '3');
+      await _tapCalculatorButton(tester, '±');
+
+      expect(
+        find.descendant(of: _rpnDraftCard(), matching: find.text('2 -3')),
+        findsOneWidget,
+      );
+
+      await _tapCalculatorButton(tester, 'ENTER');
+
+      expect(_rpnStackCard(1), findsOneWidget);
+      expect(
+        find.descendant(of: _rpnStackCard(1), matching: find.text('[[2]]')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.descendant(
+                of: _rpnStackCard(0),
+                matching: find.byKey(const ValueKey<String>('calculator-display-text')),
+              ),
+            )
+            .data,
+        '[[-3]]',
+      );
+    });
+
+    testWidgets('SPC is disabled and rendered as disabled in infix mode', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+      await _openInfixEditor(tester);
+
+      final Finder spcButton = _calculatorButton('SPC');
+      expect(spcButton, findsOneWidget);
+
+      final Finder spcInkWell = find.descendant(
+        of: spcButton,
+        matching: find.byType(InkWell),
+      );
+      expect(spcInkWell, findsOneWidget);
+      expect(tester.widget<InkWell>(spcInkWell).onTap, isNull);
+
+      await tester.tap(spcButton, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(find.text('SPC'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey<String>('calculator-expression-text')),
+            )
+            .data,
+        ' ',
+      );
+    });
   });
 }
 
