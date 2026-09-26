@@ -700,6 +700,79 @@ void main() {
     );
   });
 
+  group('CalculatrixSession - rpn memory ops with single-token drafts', () {
+    test(
+      'M+ with an invalid single-token draft surfaces the typed error, '
+      'changes nothing and keeps the draft',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('.');
+
+        session.memoryAdd();
+
+        expect(session.memoryValue, isNull);
+        expect(session.hasMemory, isFalse);
+        expect(session.rpnDraft, '.');
+        expect(session.rpnStackDepth, 0);
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<CalculatrixError>());
+      },
+    );
+
+    test(
+      'M- with an invalid single-token draft surfaces the typed error, '
+      'changes nothing and keeps the draft',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('.');
+
+        session.memorySubtract();
+
+        expect(session.memoryValue, isNull);
+        expect(session.hasMemory, isFalse);
+        expect(session.rpnDraft, '.');
+        expect(session.rpnStackDepth, 0);
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<CalculatrixError>());
+      },
+    );
+
+    test(
+      'M+ with an invalid single-token draft followed by a trailing space '
+      'still surfaces the typed error and keeps the draft as typed',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('.');
+        session.appendSpace();
+
+        session.memoryAdd();
+
+        expect(session.memoryValue, isNull);
+        expect(session.hasMemory, isFalse);
+        expect(session.rpnDraft, '. ');
+        expect(session.rpnStackDepth, 0);
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<CalculatrixError>());
+      },
+    );
+
+    test(
+      'M+ with a valid single-token draft commits it like ENTER, then adds '
+      'the new top',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('5');
+
+        session.memoryAdd();
+
+        expect(session.memoryValue, Matrix.scalar(5));
+        expect(session.rpnStack, orderedEquals(<Matrix>[Matrix.scalar(5)]));
+        expect(session.rpnDraft, '');
+        expect(session.hasError, isFalse);
+      },
+    );
+  });
+
   group('CalculatrixSession - rpn failure preserves repeat-equals state', () {
     test(
       'a failed rpn command that mutates nothing leaves the infix repeat '
@@ -754,5 +827,49 @@ void main() {
         expect(session.currentValue, Matrix.scalar(0));
       },
     );
+
+    test(
+      'a macro that mutates then fails leaves stack depth unchanged but '
+      'still invalidates the infix repeat operator and operand',
+      () {
+        session.input('2');
+        session.input('+');
+        session.input('3');
+        session.evaluate();
+        expect(session.currentValue, Matrix.scalar(5));
+
+        session.setMode(CalculatrixMode.rpn);
+
+        session.executeMacro(const _NegateThenSwapMacro());
+
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<RpnStackUnderflowError>());
+        expect(session.rpnStack, orderedEquals(<Matrix>[Matrix.scalar(-5)]));
+
+        session.setMode(CalculatrixMode.infix);
+        expect(session.currentValue, Matrix.scalar(-5));
+
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(-5));
+      },
+    );
   });
+}
+
+// Regression fixture for round 4 defect 2: a macro whose first command
+// mutates the stack's content (Negate: 5 -> -5) and whose second command
+// fails on underflow after popping its single operand (Swap requires two).
+// Stack depth is 1 before and after (Negate keeps depth 1, Swap's failure is
+// atomic and rolls itself back), so a depth comparison alone cannot detect
+// that the stack's content actually changed. `CalculatrixMachine.execute`
+// only rolls back the command that throws, not prior commands in the same
+// macro, so the Negate mutation legitimately survives the later failure.
+class _NegateThenSwapMacro implements CalculatrixMacro {
+  const _NegateThenSwapMacro();
+
+  @override
+  Iterable<CalculatrixCommand> expand(CalculatrixMachine machine) {
+    return const <CalculatrixCommand>[NegateCommand(), SwapCommand()];
+  }
 }
