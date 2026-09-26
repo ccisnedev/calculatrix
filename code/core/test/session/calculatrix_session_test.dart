@@ -1242,6 +1242,275 @@ void main() {
       },
     );
   });
+
+  group('CalculatrixSession - infix repeat-equals with signed operands', () {
+    test(
+      'repeat-equals on a multiplication whose right operand is a signed '
+      "matrix literal replays the true binary operator, not the operand's "
+      'own unary sign',
+      () {
+        session.input('2');
+        session.input('×');
+        session.input('-[[3]]');
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(-6));
+
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(18));
+      },
+    );
+
+    test(
+      'repeat-equals on a multiplication whose right operand is a signed '
+      'number replays the true binary operator',
+      () {
+        session.input('5');
+        session.input('×');
+        session.input('-3');
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(-15));
+
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(45));
+      },
+    );
+
+    test(
+      'repeat-equals on a genuine binary subtraction between two matrix '
+      "literals still repeats the subtraction operator, not the left-hand "
+      "literal's sign",
+      () {
+        session.input('[[1]]');
+        session.input('-');
+        session.input('[[3]]');
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(-2));
+
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(-5));
+      },
+    );
+  });
+
+  group(
+    'CalculatrixSession - rpn memory keys invalidate infix repeat-equals '
+    'only when the stack actually changes',
+    () {
+      test(
+        'MC with no pending rpn draft leaves infix repeat-equals intact',
+        () {
+          session.input('2');
+          session.input('+');
+          session.input('3');
+          session.evaluate();
+          expect(session.currentValue, Matrix.scalar(5));
+
+          session.setMode(CalculatrixMode.rpn);
+          session.memoryClear();
+          expect(session.rpnStack, orderedEquals(<Matrix>[Matrix.scalar(5)]));
+
+          session.setMode(CalculatrixMode.infix);
+          session.evaluate();
+
+          expect(session.currentValue, Matrix.scalar(8));
+        },
+      );
+
+      test(
+        'MC that first commits a pending rpn draft invalidates infix '
+        'repeat-equals',
+        () {
+          session.input('2');
+          session.input('+');
+          session.input('3');
+          session.evaluate();
+          expect(session.currentValue, Matrix.scalar(5));
+
+          session.setMode(CalculatrixMode.rpn);
+          session.input('7');
+          session.memoryClear();
+          expect(
+            session.rpnStack,
+            orderedEquals(<Matrix>[Matrix.scalar(5), Matrix.scalar(7)]),
+          );
+
+          session.setMode(CalculatrixMode.infix);
+          session.evaluate();
+
+          expect(session.currentValue, Matrix.scalar(7));
+        },
+      );
+
+      test(
+        'MR that pushes a memory value invalidates infix repeat-equals even '
+        'with no pending draft',
+        () {
+          session.input('2');
+          session.input('+');
+          session.input('3');
+          session.evaluate();
+          expect(session.currentValue, Matrix.scalar(5));
+
+          session.memoryAdd();
+          expect(session.memoryValue, Matrix.scalar(5));
+
+          session.setMode(CalculatrixMode.rpn);
+          session.memoryRecall();
+          expect(
+            session.rpnStack,
+            orderedEquals(<Matrix>[Matrix.scalar(5), Matrix.scalar(5)]),
+          );
+
+          session.setMode(CalculatrixMode.infix);
+          session.evaluate();
+
+          expect(session.currentValue, Matrix.scalar(5));
+        },
+      );
+
+      test(
+        'MR that pushes a memory value after first committing a pending '
+        'draft invalidates infix repeat-equals',
+        () {
+          session.input('2');
+          session.input('+');
+          session.input('3');
+          session.evaluate();
+          expect(session.currentValue, Matrix.scalar(5));
+
+          session.memoryAdd();
+          expect(session.memoryValue, Matrix.scalar(5));
+
+          session.setMode(CalculatrixMode.rpn);
+          session.input('7');
+          session.memoryRecall();
+          expect(
+            session.rpnStack,
+            orderedEquals(<Matrix>[
+              Matrix.scalar(5),
+              Matrix.scalar(7),
+              Matrix.scalar(5),
+            ]),
+          );
+
+          session.setMode(CalculatrixMode.infix);
+          session.evaluate();
+
+          expect(session.currentValue, Matrix.scalar(5));
+        },
+      );
+
+      test(
+        'M+ with no pending draft folds the committed value into memory '
+        'without touching infix repeat-equals',
+        () {
+          session.input('2');
+          session.input('+');
+          session.input('3');
+          session.evaluate();
+          expect(session.currentValue, Matrix.scalar(5));
+
+          session.setMode(CalculatrixMode.rpn);
+          session.memoryAdd();
+          expect(session.memoryValue, Matrix.scalar(5));
+          expect(session.rpnStack, orderedEquals(<Matrix>[Matrix.scalar(5)]));
+
+          session.setMode(CalculatrixMode.infix);
+          session.evaluate();
+
+          expect(session.currentValue, Matrix.scalar(8));
+        },
+      );
+
+      test(
+        'M+ that first commits a pending draft invalidates infix '
+        'repeat-equals',
+        () {
+          session.input('2');
+          session.input('+');
+          session.input('3');
+          session.evaluate();
+          expect(session.currentValue, Matrix.scalar(5));
+
+          session.setMode(CalculatrixMode.rpn);
+          session.input('7');
+          session.memoryAdd();
+          expect(session.memoryValue, Matrix.scalar(7));
+          expect(
+            session.rpnStack,
+            orderedEquals(<Matrix>[Matrix.scalar(5), Matrix.scalar(7)]),
+          );
+
+          session.setMode(CalculatrixMode.infix);
+          session.evaluate();
+
+          expect(session.currentValue, Matrix.scalar(7));
+        },
+      );
+    },
+  );
+
+  group(
+    'CalculatrixSession - rpn sign toggle on an explicitly positive token',
+    () {
+      test(
+        'toggleSign on a token with an explicit leading + replaces it with '
+        'a single leading -, for a number',
+        () {
+          session.setMode(CalculatrixMode.rpn);
+          session.input('+3');
+
+          session.toggleSign();
+
+          expect(session.rpnDraft, '-3');
+
+          session.enter();
+
+          expect(session.hasError, isFalse);
+          expect(session.rpnStack, orderedEquals(<Matrix>[Matrix.scalar(-3)]));
+        },
+      );
+
+      test(
+        'toggleSign on a token with an explicit leading + replaces it with '
+        'a single leading -, for a matrix literal',
+        () {
+          session.setMode(CalculatrixMode.rpn);
+          session.input('+[[3]]');
+
+          session.toggleSign();
+
+          expect(session.rpnDraft, '-[[3]]');
+
+          session.enter();
+
+          expect(session.hasError, isFalse);
+          expect(session.rpnStack, orderedEquals(<Matrix>[Matrix.scalar(-3)]));
+        },
+      );
+
+      test(
+        'toggling twice on an explicitly positive token lands on the plain '
+        'unsigned token, not back on the explicit +',
+        () {
+          session.setMode(CalculatrixMode.rpn);
+          session.input('+3');
+
+          session.toggleSign();
+          expect(session.rpnDraft, '-3');
+
+          session.toggleSign();
+          expect(session.rpnDraft, '3');
+        },
+      );
+    },
+  );
 }
 
 // Regression fixture for round 4 defect 2: a macro whose first command
