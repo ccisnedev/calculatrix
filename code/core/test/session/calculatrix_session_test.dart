@@ -517,6 +517,211 @@ void main() {
     );
   });
 
+  group('CalculatrixSession - rpn action keys commit the draft first', () {
+    void seedMemoryWithNine() {
+      session.insertMatrixLiteral('9');
+      session.evaluate();
+      session.memoryAdd();
+      session.clear();
+    }
+
+    test('MR commits a pending multi-token draft before recalling memory', () {
+      seedMemoryWithNine();
+
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+
+      session.memoryRecall();
+
+      expect(
+        session.rpnStack,
+        orderedEquals(<Matrix>[
+          Matrix.scalar(2),
+          Matrix.scalar(3),
+          Matrix.scalar(9),
+        ]),
+      );
+      expect(session.rpnDraft, '');
+      expect(session.hasError, isFalse);
+    });
+
+    test(
+      'MR with an invalid pending draft surfaces a typed error and does not '
+      'recall memory',
+      () {
+        seedMemoryWithNine();
+
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+        session.input('abc');
+
+        session.memoryRecall();
+
+        expect(session.rpnDraft, '2 abc');
+        expect(session.rpnStackDepth, 0);
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<CalculatrixError>());
+      },
+    );
+
+    test('MC commits a pending multi-token draft before clearing memory', () {
+      seedMemoryWithNine();
+
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('3');
+
+      session.memoryClear();
+
+      expect(
+        session.rpnStack,
+        orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(3)]),
+      );
+      expect(session.rpnDraft, '');
+      expect(session.hasMemory, isFalse);
+      expect(session.hasError, isFalse);
+    });
+
+    test(
+      'MC with an invalid pending draft surfaces a typed error and leaves '
+      'memory unchanged',
+      () {
+        seedMemoryWithNine();
+
+        session.setMode(CalculatrixMode.rpn);
+        session.input('2');
+        session.appendSpace();
+        session.input('abc');
+
+        session.memoryClear();
+
+        expect(session.rpnDraft, '2 abc');
+        expect(session.rpnStackDepth, 0);
+        expect(session.hasMemory, isTrue);
+        expect(session.memoryValue, Matrix.scalar(9));
+        expect(session.hasError, isTrue);
+        expect(session.lastError, isA<CalculatrixError>());
+      },
+    );
+  });
+
+  group('CalculatrixSession - rpn matrix literal tokens', () {
+    test(
+      'a JSON matrix literal with spaces after commas commits as one token',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('[[1, 2], [3, 4]]');
+
+        session.enter();
+
+        expect(
+          session.rpnStack,
+          orderedEquals(<Matrix>[
+            Matrix(<List<double>>[
+              <double>[1, 2],
+              <double>[3, 4],
+            ]),
+          ]),
+        );
+        expect(session.rpnDraft, '');
+        expect(session.hasError, isFalse);
+      },
+    );
+
+    test(
+      'an HP-style comma-less matrix literal with internal spaces commits '
+      'as one token',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('[[1 2] [3 4]]');
+
+        session.enter();
+
+        expect(
+          session.rpnStack,
+          orderedEquals(<Matrix>[
+            Matrix(<List<double>>[
+              <double>[1, 2],
+              <double>[3, 4],
+            ]),
+          ]),
+        );
+        expect(session.rpnDraft, '');
+        expect(session.hasError, isFalse);
+      },
+    );
+
+    test('a scalar and a spaced matrix literal on one line multiply correctly', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('[[1 2] [3 4]]');
+
+      session.applyRpnBinary(RpnBinaryOperator.multiply);
+
+      expect(session.rpnStackDepth, 1);
+      expect(
+        session.rpnTopValue,
+        Matrix(<List<double>>[
+          <double>[2, 4],
+          <double>[6, 8],
+        ]),
+      );
+      expect(session.rpnDraft, '');
+      expect(session.hasError, isFalse);
+    });
+
+    test('toggleSign negates a matrix literal token and reserializes it', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('[[1,2],[3,4]]');
+
+      session.toggleSign();
+
+      expect(session.rpnDraft, '[[-1,-2],[-3,-4]]');
+    });
+
+    test(
+      'toggleSign twice on a matrix literal token returns to the original '
+      'matrix',
+      () {
+        session.setMode(CalculatrixMode.rpn);
+        session.input('[[1,2],[3,4]]');
+
+        session.toggleSign();
+        session.toggleSign();
+
+        expect(session.rpnDraft, '[[1,2],[3,4]]');
+      },
+    );
+
+    test('toggleSign negates only the trailing matrix token after a scalar', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('2');
+      session.appendSpace();
+      session.input('[[1 2] [3 4]]');
+
+      session.toggleSign();
+
+      expect(session.rpnDraft, '2 [[-1,-2],[-3,-4]]');
+    });
+
+    test('an unclosed matrix literal bracket surfaces a typed error on commit', () {
+      session.setMode(CalculatrixMode.rpn);
+      session.input('[[1,2]');
+
+      session.enter();
+
+      expect(session.rpnDraft, '[[1,2]');
+      expect(session.rpnStackDepth, 0);
+      expect(session.hasError, isTrue);
+      expect(session.lastError, isA<CalculatrixError>());
+    });
+  });
+
   group('CalculatrixSession - rpn operation atomicity', () {
     test(
       'a failing operation rolls back only itself, keeping already-committed '

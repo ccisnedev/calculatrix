@@ -359,6 +359,75 @@ void main() {
       expect(controller.hasMemory, isTrue);
       expect(controller.expression, '8');
     });
+
+    test(
+      'MRC commits a pending multi-token rpn draft before recalling memory '
+      'on the first press',
+      () {
+        controller.setMode(CalculatorMode.rpn);
+        controller.input('9');
+        controller.evaluate();
+        controller.memoryAdd();
+        controller.clear();
+
+        controller.input('2');
+        controller.appendSpace();
+        controller.input('3');
+
+        controller.memoryRecallClear();
+
+        expect(controller.rpnStackDepth, 3);
+        expect(controller.expression, '');
+        expect(controller.error, '');
+        expect(controller.hasMemory, isTrue);
+      },
+    );
+
+    test(
+      'MRC with an invalid pending rpn draft surfaces a typed error and '
+      'does not recall memory',
+      () {
+        controller.setMode(CalculatorMode.rpn);
+        controller.input('9');
+        controller.evaluate();
+        controller.memoryAdd();
+        controller.clear();
+
+        controller.input('2');
+        controller.appendSpace();
+        controller.input('abc');
+
+        controller.memoryRecallClear();
+
+        expect(controller.expression, '2 abc');
+        expect(controller.rpnStackDepth, 0);
+        expect(controller.error, isNotEmpty);
+        expect(controller.hasMemory, isTrue);
+      },
+    );
+
+    test(
+      'MRC commits a pending multi-token rpn draft before clearing memory '
+      'on the second consecutive press',
+      () {
+        controller.setMode(CalculatorMode.rpn);
+        controller.input('9');
+        controller.evaluate();
+        controller.memoryAdd();
+        controller.clear();
+
+        controller.input('2');
+        controller.appendSpace();
+        controller.input('3');
+
+        controller.memoryRecallClear();
+        controller.memoryRecallClear();
+
+        expect(controller.rpnStackDepth, 3);
+        expect(controller.hasMemory, isFalse);
+        expect(controller.error, '');
+      },
+    );
   });
 
   group('CalculatorController - sign toggle', () {
