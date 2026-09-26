@@ -391,36 +391,77 @@ class CalculatrixSession {
     return Calculatrix.evaluateInfix(normalized);
   }
 
+  // Repeat-equals ("=" pressed again with an empty draft) replays
+  // "<committed value><lastOperator><lastOperand>". Finding the last
+  // top-level binary operator and its right-hand operand must go through
+  // Calculatrix's own tokenizer rather than a separate character scan: a
+  // scan that does not know a sign right after an operator (or a
+  // parenthesis, or the start of the expression) belongs to a signed
+  // operand token mistakes that sign for the operator itself, as in
+  // "2×-[[3]]" (the '-' belongs to "-[[3]]", not to '×') or
+  // "[[1,-2]]+3" (the '-' is inside the bracket literal, not top-level at
+  // all; a raw scan that does not even track bracket depth would find it
+  // first).
   void _saveLastOperation(String expression) {
-    int depth = 0;
-    int lastOperatorIndex = -1;
+    final String normalized = expression.replaceAll('×', '*').replaceAll('÷', '/');
 
-    for (int index = expression.length - 1; index >= 0; index--) {
-      final String character = expression[index];
-      if (character == ')') {
-        depth++;
+    List<String> tokens;
+    try {
+      tokens = Calculatrix.tokenizeInfixExpression(normalized);
+    } on CalculatrixError {
+      _clearRepeatState();
+      return;
+    }
+
+    final int operatorIndex = _lastTopLevelOperatorTokenIndex(tokens);
+    if (operatorIndex <= 0) {
+      _clearRepeatState();
+      return;
+    }
+
+    _lastOperator = _toDisplayOperator(tokens[operatorIndex]);
+    _lastOperand = tokens.sublist(operatorIndex + 1).join();
+  }
+
+  // The tokenizer already collapsed every signed number and signed matrix
+  // literal into one operand token (that decision lives in
+  // Calculatrix._isSignedNumberStart / _isSignedBracketStart), so any '+',
+  // '-', '*' or '/' token that survives on its own, outside parentheses, is
+  // by construction a genuine binary operator, never a unary sign.
+  int _lastTopLevelOperatorTokenIndex(List<String> tokens) {
+    int parenDepth = 0;
+    int lastIndex = -1;
+
+    for (int index = 0; index < tokens.length; index++) {
+      final String token = tokens[index];
+      if (token == '(') {
+        parenDepth++;
+        continue;
       }
-      if (character == '(') {
-        depth--;
+      if (token == ')') {
+        parenDepth--;
+        continue;
       }
-      if (depth == 0 &&
-          (character == '+' ||
-              character == '-' ||
-              character == '×' ||
-              character == '÷')) {
-        if (character == '-' && index == 0) {
-          break;
-        }
-        lastOperatorIndex = index;
-        break;
+      if (parenDepth == 0 && _isBareInfixOperatorToken(token)) {
+        lastIndex = index;
       }
     }
 
-    if (lastOperatorIndex > 0) {
-      _lastOperator = expression[lastOperatorIndex];
-      _lastOperand = expression.substring(lastOperatorIndex + 1);
-    } else {
-      _clearRepeatState();
+    return lastIndex;
+  }
+
+  bool _isBareInfixOperatorToken(String token) {
+    return token == '+' || token == '-' || token == '*' || token == '/';
+  }
+
+  String _toDisplayOperator(String normalizedOperator) {
+    switch (normalizedOperator) {
+      case '*':
+        return '×';
+      case '/':
+        return '÷';
+      default:
+        return normalizedOperator;
     }
   }
 
@@ -717,14 +758,25 @@ class CalculatrixSession {
   /// still ends in a lone `-` fails to parse like any other invalid token:
   /// nothing is pushed and the typed error is surfaced, matching the
   /// existing atomic commit behavior; there is no silent fallback.
+  // ± is a three-way toggle, not a two-way one: a leading '-' is removed
+  // (back to positive), a leading '+' is replaced with '-' (an explicitly
+  // positive token, e.g. left by a previous toggle, becomes negative rather
+  // than gaining a second, invalid leading sign), and anything else gets a
+  // '-' prepended. Applies uniformly to numeric and matrix tokens alike,
+  // since both are toggled by this same textual prefix rule.
   String _toggleSignOfLastToken(String draft) {
     final int lastTokenStart = Calculatrix.lastRpnTokenBoundary(draft);
     final String prefix = draft.substring(0, lastTokenStart);
     final String lastToken = draft.substring(lastTokenStart);
 
-    final String toggledToken = lastToken.startsWith('-')
-        ? lastToken.substring(1)
-        : '-$lastToken';
+    final String toggledToken;
+    if (lastToken.startsWith('-')) {
+      toggledToken = lastToken.substring(1);
+    } else if (lastToken.startsWith('+')) {
+      toggledToken = '-${lastToken.substring(1)}';
+    } else {
+      toggledToken = '-$lastToken';
+    }
 
     return prefix + toggledToken;
   }
@@ -783,7 +835,14 @@ class CalculatrixSession {
       _commitDraftIfNeeded();
       action();
       _clearError();
-      _syncCommittedValueFromRpnStack(invalidateRepeatEquals: true);
+      // Mirrors the two catch blocks below: repeat-equals is only
+      // invalidated when the stack actually changed, whether from
+      // committing a pending draft or from the action itself (e.g. MC's
+      // action only clears memory, so "MC" with no pending draft must
+      // leave repeat-equals intact, matching the empty-draft case there).
+      _syncCommittedValueFromRpnStack(
+        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
+      );
     } on FormatException catch (error) {
       _lastError = error;
       // The action may have already committed draft operands onto the real

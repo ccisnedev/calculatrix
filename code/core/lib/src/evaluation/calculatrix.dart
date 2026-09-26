@@ -19,6 +19,17 @@ class Calculatrix {
     return _compileRpnTokens(rpnTokens);
   }
 
+  // The infix tokenizer's own token stream, exposed so a caller such as
+  // CalculatrixSession's repeat-equals bookkeeping can find "the last
+  // top-level binary operator" by looking at real tokens, using the exact
+  // same unary-vs-binary call _isSignedNumberStart/_isSignedBracketStart
+  // already make while tokenizing. Re-implementing that call as a second,
+  // separate character scan is what let a token such as "-[[3]]" (a signed
+  // matrix literal) be mistaken for a binary subtraction.
+  static List<String> tokenizeInfixExpression(String expression) {
+    return _tokenizeInfix(expression.trim());
+  }
+
   static Matrix evaluateInfix(String expression) {
     try {
       final CalculatrixMachine machine = CalculatrixMachine();
