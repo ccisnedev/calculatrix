@@ -97,17 +97,23 @@ void main() {
         '[[0.6e150,0.6e150],[0.6e150,0.6e150]] is rank 1 (both rows '
         'identical), with exact eigenvalues 0 and 1.2e150 (trace); every '
         'entry is 0.6e150, in range, but the nonzero eigenvalue 1.2e150 '
-        'exceeds matrixFunctionMaxMagnitude. A positive scalar(2) base '
-        'reaches this path regardless of the exponent\'s own class, so '
-        'this isolates the general-2x2 branch of the exponent\'s spectrum '
-        'check specifically',
+        'exceeds matrixFunctionMaxMagnitude. Codex round 15 test note: a '
+        'scalar(1) base, not scalar(2), isolates the operand-spectrum gate '
+        'itself, since log(1) is exactly 0, so the scaled exponent and its '
+        'exponential are the identity, trivially within every range, '
+        'unless the operand-spectrum check independently rejects the '
+        'exponent\'s own out-of-range eigenvalue first; scalar(2) instead '
+        'lets the RESULT-range check (exp(1.2e150 * ln 2) overflowing) '
+        'independently catch this case even if the operand-spectrum gate '
+        'itself were removed entirely, so it never isolated the gate it '
+        'was meant to test',
         () {
           final Matrix exponent = Matrix(<List<double>>[
             <double>[0.6e150, 0.6e150],
             <double>[0.6e150, 0.6e150],
           ]);
           expect(
-            () => Matrix.scalar(2).power(exponent),
+            () => Matrix.scalar(1).power(exponent),
             throwsOutOfPrecisionRange(),
           );
         },
