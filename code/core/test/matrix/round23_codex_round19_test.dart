@@ -30,17 +30,28 @@
 // alone, never of `m = (a+d)/2` or the raw magnitude of `a`/`d` beyond
 // their difference, so it is scaled by its own power of two chosen from
 // `max(|h|, |b|, |c|)` instead, independent of whatever scale `a`/`d`
-// alone might need. Its own `reliable` flag is checked before it is
-// trusted; only when even it is not sound does
-// [Matrix._exactRealEigen2x2] fall all the way back to the whole-block
-// scale, the least precise of the three.
+// alone might need.
+//
+// Codex round 20 (P6, fail closed) removed the whole-block-scaled
+// discriminant fallback entirely, along with the rest of the multi-tier
+// cascade this file's own second fixture used to fall through to. For
+// `[[1e20, 1e-150], [4e-150, 1e20]]`, the discriminant itself now certifies
+// cleanly (its own centered scale keeps every term normal), but resolving
+// which root is which still requires the determinant `a*d - b*c`, computed
+// on the whole-block scale tuned to `max(|a|,|b|,|c|,|d|)` (about `1e20`):
+// that scale drives the already-tiny `b*c` (`~4e-300`) down far enough that
+// the scaled product underflows to exactly `0`, and round 20's explicit
+// underflow check now names that and fails closed instead of silently
+// trusting a zeroed product. The correct D38 outcome for this fixture is
+// therefore `matrix-out-of-precision-range`, not a resolved bound: a clean
+// rejection is preferable to the old fallback's own, differently broken,
+// zero-bound misclassification, per round 20's "a shorter certified path is
+// better than a clever uncertified one".
 import 'dart:math' as math;
 
 import 'package:calculatrix/calculatrix.dart';
 import 'package:calculatrix/src/matrix/matrix.dart' show debugExactRealEigen2x2;
 import 'package:test/test.dart';
-
-import 'support/exact_quadratic.dart';
 
 void main() {
   group('Codex round 19', () {
@@ -113,41 +124,28 @@ void main() {
       'Finding: the same underflow can also erase a genuine tiny real '
       'separation, reporting a zero bound instead of one covering it',
       () {
+        // Codex round 20 (P6, fail closed): this fixture's discriminant now
+        // certifies cleanly, but the whole-block scale tuned to `a`/`d`
+        // (around `1e20`) still underflows the determinant's `b*c`
+        // (`~4e-300`) to exactly `0`; round 20's explicit underflow check
+        // now names that and fails closed instead of the old fallback's own
+        // zero-bound misclassification. See this file's header comment for
+        // the full explanation.
         test(
-          'debugExactRealEigen2x2 bounds both eigenvalues of '
-          '[[1e20, 1e-150], [4e-150, 1e20]] against arbitrary-precision '
-          'references, covering the true 2e-150 separation',
+          'debugExactRealEigen2x2 raises matrix-out-of-precision-range for '
+          '[[1e20, 1e-150], [4e-150, 1e20]] instead of reporting a zero '
+          'bound over the true 2e-150 separation',
           () {
-            final eigen = debugExactRealEigen2x2(1e20, 1e-150, 4e-150, 1e20);
-            expect(eigen.isComplex, isFalse);
-            final bool firstIsLarger =
-                eigen.lambda1.abs() >= eigen.lambda2.abs();
-            final double larger = firstIsLarger ? eigen.lambda1 : eigen.lambda2;
-            final double largerError =
-                firstIsLarger ? eigen.lambda1Error : eigen.lambda2Error;
-            final double smaller = firstIsLarger ? eigen.lambda2 : eigen.lambda1;
-            final double smallerError =
-                firstIsLarger ? eigen.lambda2Error : eigen.lambda1Error;
-            final errors = trueQuadraticErrors(
-              a: 1e20,
-              b: 1e-150,
-              c: 4e-150,
-              d: 1e20,
-              computedLarger: larger,
-              computedSmaller: smaller,
-            );
-            expect(largerError, greaterThanOrEqualTo(errors.largerActualError));
             expect(
-              smallerError,
-              greaterThanOrEqualTo(errors.smallerActualError),
+              () => debugExactRealEigen2x2(1e20, 1e-150, 4e-150, 1e20),
+              throwsA(
+                isA<MatrixDomainError>().having(
+                  (MatrixDomainError e) => e.errorId,
+                  'errorId',
+                  CalculatrixErrorId.matrixOutOfPrecisionRange,
+                ),
+              ),
             );
-            // The old, underflow-blind fallback reported both roots as
-            // bit-identical `1e20` with a zero bound; the true separation
-            // is `2e-150`, so a genuine fix must report a bound at least
-            // that large for whichever root actually differs from `1e20`.
-            expect(errors.largerActualError, lessThan(1e-149));
-            expect(largerError, greaterThan(0));
-            expect(smallerError, greaterThan(0));
           },
         );
       },
