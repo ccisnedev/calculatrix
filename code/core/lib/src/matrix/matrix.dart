@@ -2193,18 +2193,34 @@ class Matrix {
   static bool _halvingByTwoExact(double whole, double half) =>
       half * 2 == whole;
 
-  /// Codex round 21: rescaling a nonzero quantity from a helper's own
-  /// power-of-two scale back to natural units (multiplying by `2^scale`)
-  /// can itself underflow to exactly `0.0` when the natural-unit value is
-  /// far enough below the smallest representable subnormal double, even
-  /// though the scaled quantity being rescaled was itself normal and
-  /// nonzero. A rescaled uncertainty radius or error bound that silently
-  /// becomes `0` this way looks like a genuine, fully-resolved zero
-  /// instead of the sign that the true value could not be represented at
-  /// all; [_exactRealEigen2x2] treats this as uncertifiable rather than
-  /// trusting the zero.
-  static bool _rescaleUnderflowedToZero(double before, double after) =>
-      before != 0 && after == 0;
+  /// Codex round 22: round 21's [_rescaleUnderflowedToZero] only caught a
+  /// rescale that underflowed all the way to an exact `0.0`. A rescale that
+  /// lands in the sparse subnormal range while staying nonzero can still
+  /// lose most of its bits, understating the true value without ever
+  /// tripping that check. `t = 2^-1020`,
+  /// `debugExactRealEigen2x2(t, t, -t, -t)` hits exactly this: the
+  /// repeated-root radius is `~6.3246 * double.minPositive` in exact math,
+  /// but rescaling it to natural units rounds to `6 * double.minPositive`
+  /// (only a handful of representable values exist down there), quietly
+  /// understating the certified bound by about five percent instead of
+  /// failing closed.
+  ///
+  /// A power-of-two rescale is exact whenever it stays within, or moves
+  /// from, normal magnitude (multiplying or dividing by an exact power of
+  /// two only shifts the exponent), so it is always reversible: scaling
+  /// the result back by the inverse power of two recovers the original
+  /// value bit for bit. The moment a rescale passes through subnormal
+  /// territory, losing even one bit breaks that reversibility, whether the
+  /// result underflowed all the way to `0.0` (round 21's case) or only
+  /// partway (this one). Checking reversibility directly certifies both
+  /// failure modes with one test, subsuming round 21's own check.
+  /// [_exactRealEigen2x2] applies this at every rescale of a `sqrt`-derived
+  /// quantity or a determinant value/error back to natural units.
+  static bool _rescaleReversible(
+    double before,
+    double after,
+    double exponent,
+  ) => _scalarScaleByPowerOfTwo(after, -exponent) == before;
 
   /// Same stable quadratic-formula solver as [_stableRealEigen2x2], but
   /// with no scaled zero-discriminant tolerance: the discriminant's own
@@ -2428,7 +2444,8 @@ class Matrix {
     if (disc.value < -disc.error) {
       final double w = math.sqrt(-disc.value);
       final double wNatural = toNaturalSqrtScale(w);
-      if (!wNatural.isFinite || _rescaleUnderflowedToZero(w, wNatural)) {
+      if (!wNatural.isFinite ||
+          !_rescaleReversible(w, wNatural, disc.scale.toDouble())) {
         _failEigen2x2Certification();
       }
       return (
@@ -2456,7 +2473,7 @@ class Matrix {
       if (!rNatural.isFinite ||
           !tau.isFinite ||
           tau < 0 ||
-          _rescaleUnderflowedToZero(r, rNatural)) {
+          !_rescaleReversible(r, rNatural, disc.scale.toDouble())) {
         _failEigen2x2Certification();
       }
       return (
@@ -2473,7 +2490,7 @@ class Matrix {
     final double sqrtD = math.sqrt(disc.value);
     final double sqrtDNatural = toNaturalSqrtScale(sqrtD);
     if (!sqrtDNatural.isFinite ||
-        _rescaleUnderflowedToZero(sqrtD, sqrtDNatural)) {
+        !_rescaleReversible(sqrtD, sqrtDNatural, disc.scale.toDouble())) {
       _failEigen2x2Certification();
     }
     final double signM = m >= 0 ? 1.0 : -1.0;
@@ -2491,7 +2508,7 @@ class Matrix {
     // nor the sign check further down would ever catch this rescale
     // silently understating a genuinely nonzero error contribution.
     if (!eSqrtDNatural.isFinite ||
-        _rescaleUnderflowedToZero(eSqrtD, eSqrtDNatural)) {
+        !_rescaleReversible(eSqrtD, eSqrtDNatural, disc.scale.toDouble())) {
       _failEigen2x2Certification();
     }
     // Codex round 18, finding 2: `q = m + signM*sqrtD` above is a single,
@@ -2557,11 +2574,27 @@ class Matrix {
       final double detNaturalError = k == 0
           ? detComp.error
           : _scalarScaleByPowerOfTwo(detComp.error, twoK);
+      // Codex round 22: the two clauses below used to only check that a
+      // nonzero `detComp.value`/`detComp.error` did not underflow all the
+      // way to `0.0`, the same gap [_rescaleReversible]'s doc comment
+      // describes for the sqrt-derived rescales; a rescale that lands in
+      // subnormal territory while staying nonzero can still silently lose
+      // most of its bits, so both are checked for reversibility instead.
+      final bool valueReversible = _rescaleReversible(
+        detComp.value,
+        detNatural,
+        twoK,
+      );
+      final bool errorReversible = _rescaleReversible(
+        detComp.error,
+        detNaturalError,
+        twoK,
+      );
       final bool detRescaleFailed =
           !detNatural.isFinite ||
           !detNaturalError.isFinite ||
-          (detComp.value != 0 && detNatural == 0) ||
-          (detComp.error != 0 && detNaturalError == 0);
+          !valueReversible ||
+          !errorReversible;
       if (detRescaleFailed) {
         _failEigen2x2Certification();
       }
