@@ -1967,6 +1967,13 @@ class Matrix {
     final (double adSum, double adSumError) = _twoSum(a, -d);
     final double halfDiffHi = adSum / 2;
     final double halfDiffLo = adSumError / 2;
+    // Codex round 21: at the smallest subnormal scale, halving `adSum` or
+    // `adSumError` can itself lose a bit (see [_halvingByTwoExact]'s doc
+    // comment); a corrupted `halfDiffHi` corrupts the discriminant before
+    // it is ever formed, so this is checked here rather than trusted.
+    final bool centerHalvingExact =
+        _halvingByTwoExact(adSum, halfDiffHi) &&
+        _halvingByTwoExact(adSumError, halfDiffLo);
     final double maxAbs = <double>[
       halfDiffHi.abs(),
       b.abs(),
@@ -2029,7 +2036,8 @@ class Matrix {
         (sqNegligible || _isNormalMagnitude(crossTerm)) &&
         _isNormalMagnitude(bcHi) &&
         (bcNegligible || _isNormalMagnitude(bcErr)) &&
-        _cancellationWithinDoubleDoubleRange(cancellationScale);
+        _cancellationWithinDoubleDoubleRange(cancellationScale) &&
+        centerHalvingExact;
     return (value: value, error: error, reliable: reliable, scale: scale);
   }
 
@@ -2161,6 +2169,42 @@ class Matrix {
   static bool _cancellationWithinDoubleDoubleRange(double cancellationScale) =>
       cancellationScale == 0 ||
       cancellationScale.abs() >= _doubleDoubleUnderflowFloor;
+
+  /// Codex round 21: dividing a `double` by exactly 2 is exact for every
+  /// normal-magnitude value (it only decrements the exponent) and for a
+  /// subnormal that is an even multiple of `double.minPositive`, but an
+  /// ODD multiple of `double.minPositive` (the smallest representable
+  /// subnormal, with no bit of precision left to spare) has no
+  /// representable half: the true half sits exactly between the two
+  /// nearest subnormals and rounds to one of them, silently losing the
+  /// `0.5 * double.minPositive` remainder with no residual anywhere left
+  /// to record it. Doubling the computed half exactly recovers the
+  /// original value whenever no such bit was lost, and fails to whenever
+  /// one was, so this check alone certifies the halving without needing to
+  /// separately reason about normal-versus-subnormal ranges.
+  /// [_exactRealEigen2x2] uses it to verify the trace's half `m` and,
+  /// through [_scaledCenteredDiscriminant], the centered block's own half
+  /// difference `h`; `s = double.minPositive`,
+  /// `debugExactRealEigen2x2(5*s, 2*s, -2*s, 0)` hits exactly this for
+  /// both: the true half of the trace `5*s` is the unrepresentable
+  /// `2.5*s`, which rounds to `2*s`, hiding the fact that the true
+  /// eigenvalues (`4*s` and `s`) are not the repeated root at `2*s` this
+  /// corrupted half then reports.
+  static bool _halvingByTwoExact(double whole, double half) =>
+      half * 2 == whole;
+
+  /// Codex round 21: rescaling a nonzero quantity from a helper's own
+  /// power-of-two scale back to natural units (multiplying by `2^scale`)
+  /// can itself underflow to exactly `0.0` when the natural-unit value is
+  /// far enough below the smallest representable subnormal double, even
+  /// though the scaled quantity being rescaled was itself normal and
+  /// nonzero. A rescaled uncertainty radius or error bound that silently
+  /// becomes `0` this way looks like a genuine, fully-resolved zero
+  /// instead of the sign that the true value could not be represented at
+  /// all; [_exactRealEigen2x2] treats this as uncertifiable rather than
+  /// trusting the zero.
+  static bool _rescaleUnderflowedToZero(double before, double after) =>
+      before != 0 && after == 0;
 
   /// Same stable quadratic-formula solver as [_stableRealEigen2x2], but
   /// with no scaled zero-discriminant tolerance: the discriminant's own
@@ -2346,6 +2390,15 @@ class Matrix {
     final (double sumHi, double sumErr) = _twoSum(a, d);
     final double m = sumHi / 2;
     final double mError = sumErr.abs() / 2;
+    // Codex round 21: at the smallest subnormal scale, halving the trace
+    // (or its own [_twoSum] residual) can itself lose a bit with no
+    // residual left anywhere to record it (see [_halvingByTwoExact]'s doc
+    // comment); a corrupted `m` corrupts every branch below, so this fails
+    // closed immediately rather than propagating a silently-wrong mean.
+    if (!_halvingByTwoExact(sumHi, m) ||
+        !_halvingByTwoExact(sumErr, sumErr / 2)) {
+      _failEigen2x2Certification();
+    }
 
     // The discriminant `D = h^2 + b*c` (`h = (a-d)/2`) is a property of the
     // centered block alone (see [_scaledCenteredDiscriminant]'s doc
@@ -2375,7 +2428,7 @@ class Matrix {
     if (disc.value < -disc.error) {
       final double w = math.sqrt(-disc.value);
       final double wNatural = toNaturalSqrtScale(w);
-      if (!wNatural.isFinite) {
+      if (!wNatural.isFinite || _rescaleUnderflowedToZero(w, wNatural)) {
         _failEigen2x2Certification();
       }
       return (
@@ -2400,7 +2453,10 @@ class Matrix {
       final double tau =
           CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
           (rNatural + mError);
-      if (!rNatural.isFinite || !tau.isFinite || tau < 0) {
+      if (!rNatural.isFinite ||
+          !tau.isFinite ||
+          tau < 0 ||
+          _rescaleUnderflowedToZero(r, rNatural)) {
         _failEigen2x2Certification();
       }
       return (
@@ -2416,7 +2472,8 @@ class Matrix {
 
     final double sqrtD = math.sqrt(disc.value);
     final double sqrtDNatural = toNaturalSqrtScale(sqrtD);
-    if (!sqrtDNatural.isFinite) {
+    if (!sqrtDNatural.isFinite ||
+        _rescaleUnderflowedToZero(sqrtD, sqrtDNatural)) {
       _failEigen2x2Certification();
     }
     final double signM = m >= 0 ? 1.0 : -1.0;
@@ -2429,6 +2486,14 @@ class Matrix {
         disc.error / (2 * sqrtD) +
         CalculatrixNumericPolicy.unitRoundoff * sqrtD;
     final double eSqrtDNatural = toNaturalSqrtScale(eSqrtD);
+    // Codex round 21: `eSqrtDNatural` feeds `lambda1Error` below, and `0`
+    // is itself a finite, non-negative double, so neither the finiteness
+    // nor the sign check further down would ever catch this rescale
+    // silently understating a genuinely nonzero error contribution.
+    if (!eSqrtDNatural.isFinite ||
+        _rescaleUnderflowedToZero(eSqrtD, eSqrtDNatural)) {
+      _failEigen2x2Certification();
+    }
     // Codex round 18, finding 2: `q = m + signM*sqrtD` above is a single,
     // uncompensated floating point addition of two already-rounded
     // operands, so forming `q` itself rounds again, by up to
