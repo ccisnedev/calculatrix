@@ -1986,6 +1986,20 @@ class Matrix {
     double sb = b;
     double sc = c;
     if (maxAbs != 0) {
+      // Codex round 24: `maxAbs` is `.reduce(math.max)` over
+      // `halfDiffHi.abs()`, `b.abs()`, `c.abs()`; `halfDiffHi` is half of
+      // [_twoSum](a, -d)'s own high part, which overflows to `Infinity`
+      // whenever `a` and `-d` share the same huge sign (for example
+      // `a = double.maxFinite`, `d = -double.maxFinite`), even though `a`
+      // and `d` are each individually finite. `(math.log(maxAbs) /
+      // math.ln2).round()` has no representation for `Infinity`/`NaN` as an
+      // [int] and throws an uncaught `Unsupported operation` runtime
+      // exception instead of failing closed with a typed error; this is
+      // exactly the crash this guard closes, checked before that `.round()`
+      // is ever reached.
+      if (!maxAbs.isFinite) {
+        _failEigen2x2Certification(_guardNonFiniteDiscriminantScale);
+      }
       scale = (math.log(maxAbs) / math.ln2).round();
       if (scale != 0) {
         sh = _scalarScaleByPowerOfTwo(halfDiffHi, -scale.toDouble());
@@ -2381,6 +2395,19 @@ class Matrix {
     double balancedC = c;
     final double kBalance =
         ((math.log(c.abs()) - math.log(b.abs())) / math.ln2) / 2;
+    // Codex round 24: `kBalance` is finite whenever `b` and `c` are each a
+    // finite, nonzero double (the only case reaching here; see the
+    // `b == 0 || c == 0` early return above), since `math.log` of a finite
+    // positive number is always finite. A non-finite `b` or `c` (an
+    // Infinity or NaN raw input) is the only way `kBalance` itself can be
+    // non-finite here; `roundToDouble()` would not itself throw on that
+    // (unlike `.round()`), but the non-finite exponent it produces would
+    // then either infinite-loop or silently corrupt
+    // [_scalarScaleByPowerOfTwo]'s own bounded-step loop below, so this
+    // fails closed before ever reaching it.
+    if (!kBalance.isFinite) {
+      _failEigen2x2Certification(_guardNonFiniteBalanceScale);
+    }
     final double kBalanceRounded = kBalance.roundToDouble();
     if (kBalanceRounded != 0) {
       balancedB = _scalarScaleByPowerOfTwo(b, kBalanceRounded);
@@ -2437,6 +2464,20 @@ class Matrix {
     // survive but their product still underflows.
     bool blockScaleReversible = true;
     if (maxAbs != 0) {
+      // Codex round 24: `a`, `balancedB`, `balancedC`, `d` can each already
+      // be non-finite here even when the caller's own raw `a`, `b`, `c`, `d`
+      // are all finite: `a`, `d` reach here unchanged, but `balancedB`,
+      // `balancedC` are the balance step's own output, and `maxAbs` itself
+      // is a `.reduce(math.max)` over their four magnitudes, so any one of
+      // them being `Infinity` (or, transitively, `NaN`) makes `maxAbs`
+      // `Infinity` too. `math.log(maxAbs) / math.ln2).round()` has no
+      // representation for `Infinity`/`NaN` as an [int] and throws an
+      // uncaught `Unsupported operation` runtime exception instead of
+      // failing closed with a typed error; checked here before it is ever
+      // reached.
+      if (!maxAbs.isFinite) {
+        _failEigen2x2Certification(_guardNonFiniteBlockScale);
+      }
       k = (math.log(maxAbs) / math.ln2).round();
       if (k != 0) {
         sa = _scalarScaleByPowerOfTwo(a, -k.toDouble());
@@ -2738,6 +2779,22 @@ class Matrix {
   static const String _guardDeterminantErrorRescale =
       'determinantErrorRescale';
   static const String _guardLambda2Certification = 'lambda2Certification';
+  /// Codex round 24: a `.round()`/`.toInt()` call on a non-finite double
+  /// throws an uncaught `Unsupported operation` runtime exception instead of
+  /// this typed, fail-closed error (`double.round()` has no representation
+  /// for `Infinity`/`NaN` as an [int]). `a = double.maxFinite`,
+  /// `b = 1e300`, `c = -1e300`, `d = -double.maxFinite` triggers this: `a -
+  /// d` (inside [_twoSum]'s own high part) overflows to `Infinity` even
+  /// though `a` and `d` are each individually finite, and that `Infinity`
+  /// then reaches [_scaledCenteredDiscriminant]'s own scale exponent before
+  /// any guard had a chance to reject it. Named separately from every other
+  /// guard above (which all react to a rescale losing precision) since this
+  /// one reacts to the scale exponent's own input never being a finite
+  /// number to begin with.
+  static const String _guardNonFiniteBalanceScale = 'nonFiniteBalanceScale';
+  static const String _guardNonFiniteBlockScale = 'nonFiniteBlockScale';
+  static const String _guardNonFiniteDiscriminantScale =
+      'nonFiniteDiscriminantScale';
 
   /// Codex round 20 (P6, fail closed): raised whenever
   /// [_exactRealEigen2x2]'s single certified discriminant or determinant
