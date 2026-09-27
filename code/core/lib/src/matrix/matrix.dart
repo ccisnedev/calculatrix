@@ -2029,12 +2029,44 @@ class Matrix {
     final bool bcNegligible =
         sqHi != 0 &&
         bcHi.abs() < CalculatrixNumericPolicy.unitRoundoff * sqHi.abs();
+    // Codex round 23, finding 1: `sh`, `shLo`, `sb`, `sc` are this scale's
+    // own INPUTS, each independently rescaled by the one power of two tuned
+    // to `max(|halfDiffHi|, |b|, |c|)`. When one of `b`/`c` is far smaller
+    // than that max, this rescale alone can drive it clear through the
+    // smallest representable subnormal before `sb*sc` is ever formed; the
+    // existing `_isNormalMagnitude(bcHi)` check below passes trivially on
+    // the resulting exact `0.0` (zero is never itself a sign of underflow),
+    // so it cannot tell a genuinely negligible `b*c` apart from one that
+    // only looks negligible because this very rescale zeroed it. Gated by
+    // `sqNegligible`/`bcNegligible` the same way `sqErr`/`crossTerm`/`bcErr`
+    // already are below: when the squared or cross term genuinely does not
+    // matter to the final rounded value, an unreversible rescale of the
+    // term that produced it is harmless and would otherwise reject sound,
+    // already-published fixtures (Codex round 19's own regressions) whose
+    // whole point is that a scale tuned to one term legitimately crushes an
+    // unrelated smaller one.
+    final bool shReversible = _rescaleReversible(
+      halfDiffHi,
+      sh,
+      -scale.toDouble(),
+    );
+    final bool shLoReversible = _rescaleReversible(
+      halfDiffLo,
+      shLo,
+      -scale.toDouble(),
+    );
+    final bool sbReversible = _rescaleReversible(b, sb, -scale.toDouble());
+    final bool scReversible = _rescaleReversible(c, sc, -scale.toDouble());
     final bool reliable =
         _isNormalMagnitude(sh) &&
+        (sqNegligible || shReversible) &&
         _isNormalMagnitude(sqHi) &&
         (sqNegligible || _isNormalMagnitude(sqErr)) &&
+        (sqNegligible || shLoReversible) &&
         (sqNegligible || _isNormalMagnitude(crossTerm)) &&
         _isNormalMagnitude(bcHi) &&
+        (bcNegligible || sbReversible) &&
+        (bcNegligible || scReversible) &&
         (bcNegligible || _isNormalMagnitude(bcErr)) &&
         _cancellationWithinDoubleDoubleRange(cancellationScale) &&
         centerHalvingExact;
@@ -2353,6 +2385,19 @@ class Matrix {
     if (kBalanceRounded != 0) {
       balancedB = _scalarScaleByPowerOfTwo(b, kBalanceRounded);
       balancedC = _scalarScaleByPowerOfTwo(c, -kBalanceRounded);
+      // Codex round 23, finding 1: this balance is meant to be an exact
+      // similarity transform (see the doc comment above: it "changes no
+      // eigenvalue, discriminant, m or w"), never itself a source of lost
+      // precision. Both `balancedB` and `balancedC` feed every computation
+      // below (the discriminant call passes them directly; the whole-block
+      // scale further down rescales them again), so a rescale that is not
+      // reversible here would silently corrupt everything downstream with
+      // no later check able to tell the difference from a genuinely
+      // negligible input.
+      if (!_rescaleReversible(b, balancedB, kBalanceRounded) ||
+          !_rescaleReversible(c, balancedC, -kBalanceRounded)) {
+        _failEigen2x2Certification(_guardBalanceReversible);
+      }
     }
 
     // For a non-triangular block, the same extreme-scale problem can still
@@ -2374,6 +2419,23 @@ class Matrix {
     double sb = balancedB;
     double sc = balancedC;
     double sd = d;
+    // Codex round 23, finding 1: `a`, `balancedB`, `balancedC`, `d` are this
+    // scale's own INPUTS, each independently rescaled by the one power of
+    // two tuned to the block's largest-magnitude entry. When an entry is far
+    // smaller than that one, this rescale alone can drive it clear through
+    // the smallest representable subnormal before it is ever used, exactly
+    // what let `a = 2^400`, `b = c = d = 2^-700` certify a silently wrong
+    // `lambda2 = 0` (the true smaller root is positive, near `2^-700`)
+    // instead of failing closed: `sb`, `sc` and `sd` all underflowed to
+    // exactly `0.0` here, but the `adUnderflowed`/`bcUnderflowed` checks
+    // below only fire when BOTH factors of a product are already nonzero
+    // and their PRODUCT underflows, never when a single factor is zeroed by
+    // this very rescale (their own precondition requires that factor to
+    // already be nonzero). Certifying each entry's own rescale as
+    // reversible closes that gap independently of the product-level checks,
+    // which remain for the distinct case where both factors individually
+    // survive but their product still underflows.
+    bool blockScaleReversible = true;
     if (maxAbs != 0) {
       k = (math.log(maxAbs) / math.ln2).round();
       if (k != 0) {
@@ -2381,6 +2443,11 @@ class Matrix {
         sb = _scalarScaleByPowerOfTwo(balancedB, -k.toDouble());
         sc = _scalarScaleByPowerOfTwo(balancedC, -k.toDouble());
         sd = _scalarScaleByPowerOfTwo(d, -k.toDouble());
+        blockScaleReversible =
+            _rescaleReversible(a, sa, -k.toDouble()) &&
+            _rescaleReversible(balancedB, sb, -k.toDouble()) &&
+            _rescaleReversible(balancedC, sc, -k.toDouble()) &&
+            _rescaleReversible(d, sd, -k.toDouble());
       }
     }
 
@@ -2413,7 +2480,7 @@ class Matrix {
     // closed immediately rather than propagating a silently-wrong mean.
     if (!_halvingByTwoExact(sumHi, m) ||
         !_halvingByTwoExact(sumErr, sumErr / 2)) {
-      _failEigen2x2Certification();
+      _failEigen2x2Certification(_guardTraceHalving);
     }
 
     // The discriminant `D = h^2 + b*c` (`h = (a-d)/2`) is a property of the
@@ -2426,7 +2493,7 @@ class Matrix {
         !disc.value.isFinite ||
         !disc.error.isFinite ||
         disc.error < 0) {
-      _failEigen2x2Certification();
+      _failEigen2x2Certification(_guardDiscriminantReliable);
     }
 
     // Converts a quantity of `sqrt(D)`'s own dimension (one power of
@@ -2446,7 +2513,7 @@ class Matrix {
       final double wNatural = toNaturalSqrtScale(w);
       if (!wNatural.isFinite ||
           !_rescaleReversible(w, wNatural, disc.scale.toDouble())) {
-        _failEigen2x2Certification();
+        _failEigen2x2Certification(_guardComplexWRescale);
       }
       return (
         isComplex: true,
@@ -2474,7 +2541,7 @@ class Matrix {
           !tau.isFinite ||
           tau < 0 ||
           !_rescaleReversible(r, rNatural, disc.scale.toDouble())) {
-        _failEigen2x2Certification();
+        _failEigen2x2Certification(_guardRepeatedRootRescale);
       }
       return (
         isComplex: false,
@@ -2491,7 +2558,7 @@ class Matrix {
     final double sqrtDNatural = toNaturalSqrtScale(sqrtD);
     if (!sqrtDNatural.isFinite ||
         !_rescaleReversible(sqrtD, sqrtDNatural, disc.scale.toDouble())) {
-      _failEigen2x2Certification();
+      _failEigen2x2Certification(_guardSqrtDRescale);
     }
     final double signM = m >= 0 ? 1.0 : -1.0;
     final double q = m + (signM * sqrtDNatural);
@@ -2509,7 +2576,7 @@ class Matrix {
     // silently understating a genuinely nonzero error contribution.
     if (!eSqrtDNatural.isFinite ||
         !_rescaleReversible(eSqrtD, eSqrtDNatural, disc.scale.toDouble())) {
-      _failEigen2x2Certification();
+      _failEigen2x2Certification(_guardESqrtDRescale);
     }
     // Codex round 18, finding 2: `q = m + signM*sqrtD` above is a single,
     // uncompensated floating point addition of two already-rounded
@@ -2519,7 +2586,7 @@ class Matrix {
         CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
         (mError + eSqrtDNatural + CalculatrixNumericPolicy.unitRoundoff * q.abs());
     if (!lambda1.isFinite || !lambda1Error.isFinite || lambda1Error < 0) {
-      _failEigen2x2Certification();
+      _failEigen2x2Certification(_guardLambda1Certification);
     }
 
     double lambda2;
@@ -2551,17 +2618,26 @@ class Matrix {
       // used to guard against on a different, now-removed path).
       final bool adUnderflowed = sa != 0 && sd != 0 && sa * sd == 0;
       final bool bcUnderflowed = sb != 0 && sc != 0 && sb * sc == 0;
+      // Codex round 23: checked as its own guard, distinct from
+      // `adUnderflowed`/`bcUnderflowed` below, which catch the different
+      // case of both factors surviving their own rescale individually but
+      // their product still underflowing.
+      if (!blockScaleReversible) {
+        _failEigen2x2Certification(_guardBlockScaleReversible);
+      }
+      if (adUnderflowed) {
+        _failEigen2x2Certification(_guardAdUnderflow);
+      }
+      if (bcUnderflowed) {
+        _failEigen2x2Certification(_guardBcUnderflow);
+      }
       final ({double value, double error, bool reliable}) detComp =
           _compensatedDeterminant(sa, sb, sc, sd);
-      final bool detCertified =
-          detComp.reliable &&
-          !adUnderflowed &&
-          !bcUnderflowed &&
-          detComp.value.isFinite &&
-          detComp.error.isFinite &&
-          detComp.error >= 0;
-      if (!detCertified) {
-        _failEigen2x2Certification();
+      if (!detComp.reliable ||
+          !detComp.value.isFinite ||
+          !detComp.error.isFinite ||
+          detComp.error < 0) {
+        _failEigen2x2Certification(_guardDeterminantReliable);
       }
       // `detComp` is in `sa`/`sb`/`sc`/`sd`'s units, `natural / 2^k`
       // squared, i.e. `natural / 2^(2*k)`; rescale by `2*k` (not `k`) to
@@ -2590,13 +2666,14 @@ class Matrix {
         detNaturalError,
         twoK,
       );
-      final bool detRescaleFailed =
-          !detNatural.isFinite ||
-          !detNaturalError.isFinite ||
-          !valueReversible ||
-          !errorReversible;
-      if (detRescaleFailed) {
-        _failEigen2x2Certification();
+      // Codex round 23: checked as two distinct guards (rather than one
+      // combined `detRescaleFailed` boolean) so a value-only or error-only
+      // rescale failure can each be isolated by its own reason.
+      if (!detNatural.isFinite || !valueReversible) {
+        _failEigen2x2Certification(_guardDeterminantValueRescale);
+      }
+      if (!detNaturalError.isFinite || !errorReversible) {
+        _failEigen2x2Certification(_guardDeterminantErrorRescale);
       }
       lambda2 = detNatural / lambda1;
       // Codex round 17, finding 2: propagate `E_det` through the division,
@@ -2609,7 +2686,7 @@ class Matrix {
               lambda2.abs() * lambda1Error / lambda1.abs() +
               CalculatrixNumericPolicy.unitRoundoff * lambda2.abs());
       if (!lambda2.isFinite || !lambda2Error.isFinite || lambda2Error < 0) {
-        _failEigen2x2Certification();
+        _failEigen2x2Certification(_guardLambda2Certification);
       }
     }
 
@@ -2635,6 +2712,33 @@ class Matrix {
     );
   }
 
+  /// Codex round 23: names for each certification guard inside
+  /// [_exactRealEigen2x2], embedded in [_failEigen2x2Certification]'s own
+  /// message so a caller (in practice, a test) can tell exactly which guard
+  /// rejected a given input, rather than only that some guard did. Several
+  /// round 22 fixtures shared one generic message across every guard, so a
+  /// test asserting only "throws" kept passing even after the specific
+  /// guard its own doc comment claimed to cover was removed, as long as a
+  /// later guard on the same code path happened to reject the same input
+  /// too; asserting the specific guard name closes that gap.
+  static const String _guardTraceHalving = 'traceHalving';
+  static const String _guardBalanceReversible = 'balanceReversible';
+  static const String _guardDiscriminantReliable = 'discriminantReliable';
+  static const String _guardComplexWRescale = 'complexWRescale';
+  static const String _guardRepeatedRootRescale = 'repeatedRootRescale';
+  static const String _guardSqrtDRescale = 'sqrtDRescale';
+  static const String _guardESqrtDRescale = 'eSqrtDRescale';
+  static const String _guardLambda1Certification = 'lambda1Certification';
+  static const String _guardBlockScaleReversible = 'blockScaleReversible';
+  static const String _guardAdUnderflow = 'adUnderflow';
+  static const String _guardBcUnderflow = 'bcUnderflow';
+  static const String _guardDeterminantReliable = 'determinantReliable';
+  static const String _guardDeterminantValueRescale =
+      'determinantValueRescale';
+  static const String _guardDeterminantErrorRescale =
+      'determinantErrorRescale';
+  static const String _guardLambda2Certification = 'lambda2Certification';
+
   /// Codex round 20 (P6, fail closed): raised whenever
   /// [_exactRealEigen2x2]'s single certified discriminant or determinant
   /// computation cannot certify every error-free-transform term as normal
@@ -2642,11 +2746,14 @@ class Matrix {
   /// finite and non-negative, and the rescale of either back to natural
   /// units as exact (no underflow of the bound itself). Declared to return
   /// [Never] so the caller's flow analysis knows execution never continues
-  /// past a call to this method.
-  static Never _failEigen2x2Certification() {
+  /// past a call to this method. Codex round 23: [guard] names which of
+  /// these checks rejected the input (one of the `_guard*` constants
+  /// above), carried in the thrown message so a test can isolate a single
+  /// guard instead of only observing that the operation failed closed.
+  static Never _failEigen2x2Certification(String guard) {
     throw MatrixDomainError(
       'Cannot certify the eigenvalues of this 2x2 block in double '
-      'precision.',
+      'precision (guard: $guard).',
       errorId: CalculatrixErrorId.matrixOutOfPrecisionRange,
     );
   }
