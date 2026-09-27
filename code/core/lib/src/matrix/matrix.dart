@@ -1317,12 +1317,31 @@ class Matrix {
   /// them, which was sufficient for eigenvalues alone but not for the
   /// Schur vectors [_realSchurDecomposition] now needs to build on top).
   ///
-  /// The trailing "clean sub-subdiagonal entries" step no longer compares
-  /// against an absolute cutoff (round 6 correction, item 6's underlying
-  /// pattern): a Hessenberg reduction guarantees those entries are exactly
-  /// zero mathematically, so whatever floating-point noise landed there is
-  /// unconditionally zeroed as a structural fact, not approximated as
-  /// "small enough".
+  /// Codex round 25: the Householder-vector norm is computed scale-safely
+  /// (max-abs then scaled sum-of-squares, see [_safeVectorNorm]) rather than
+  /// as a naive `sum += x[i] * x[i]`. [eigenvalues] rescales the whole
+  /// matrix to norm ~1 before this ever runs
+  /// ([_normalizedByPowerOfTwo]), which can drive an individual, perfectly
+  /// representable nonzero entry down near the smallest representable
+  /// subnormal double; squaring it directly then underflows to exactly
+  /// zero even though the entry itself did not. The naive norm read that
+  /// false zero as "this column already has no sub-diagonal coupling to
+  /// eliminate" and skipped the reflection outright (for
+  /// `[[0,0,1e150],[0,2,0],[1.1e-12,0,0]]`, `1.1e-12` survives the
+  /// whole-matrix rescale as a nonzero double whose square underflows),
+  /// while the "structurally exact zero" cleanup below still zeroed the
+  /// entry as if a reflection had eliminated it, silently discarding real
+  /// data instead of transforming it away.
+  ///
+  /// The "structurally exact zero" cleanup itself no longer runs
+  /// unconditionally after the whole loop (round 6 correction, item 6's
+  /// underlying pattern, refined this round): a Hessenberg reduction
+  /// guarantees the entries a column's reflection eliminates are exactly
+  /// zero mathematically only for a column whose reflection actually ran,
+  /// so each column now zeroes only its own eliminated entries, right after
+  /// applying (or skipping) that column's own transform, rather than
+  /// blanket-zeroing every sub-subdiagonal entry regardless of whether any
+  /// transform touched it.
   ({List<List<double>> h, List<List<double>> q}) _hessenbergWithSchurVectors() {
     final int n = rowCount;
     final List<List<double>> h = List<List<double>>.generate(
@@ -1349,11 +1368,7 @@ class Matrix {
         growable: false,
       );
 
-      double norm = 0;
-      for (int i = 0; i < m; i++) {
-        norm += x[i] * x[i];
-      }
-      norm = math.sqrt(norm);
+      final double norm = _safeVectorNorm(x);
 
       if (norm == 0) {
         continue;
@@ -1363,11 +1378,7 @@ class Matrix {
       x[0] += sign * norm;
 
       // Normalize the Householder vector
-      double vNorm = 0;
-      for (int i = 0; i < m; i++) {
-        vNorm += x[i] * x[i];
-      }
-      vNorm = math.sqrt(vNorm);
+      final double vNorm = _safeVectorNorm(x);
       if (vNorm == 0) {
         continue;
       }
@@ -1407,12 +1418,13 @@ class Matrix {
           q[i][k + 1 + j] -= 2 * dot * x[j];
         }
       }
-    }
 
-    // Structurally exact zero below the subdiagonal, see doc comment.
-    for (int i = 2; i < n; i++) {
-      for (int j = 0; j < i - 1; j++) {
-        h[i][j] = 0;
+      // Structurally exact zero below the subdiagonal in this column, see
+      // doc comment: only for a column whose reflection actually ran above,
+      // never blanket-applied to every column regardless of whether a
+      // transform touched it.
+      for (int i = k + 2; i < n; i++) {
+        h[i][k] = 0;
       }
     }
 
@@ -1834,8 +1846,29 @@ class Matrix {
   ///   even when it is genuinely, unambiguously negative, so an absolute
   ///   floor like 1e-12 clamps it to 0 and manufactures a spurious
   ///   repeated real eigenvalue. Comparing the discriminant's magnitude to
-  ///   `eps * (trace^2 + |det|)` instead scales the zero test to the
-  ///   block's own magnitude.
+  ///   a bound scaled to the block's own magnitude fixes that, but the
+  ///   scale itself has to be chosen carefully (Codex round 25, see below).
+  /// - The discriminant is computed as `(a-d)^2 + 4*b*c`, not
+  ///   `trace*trace - 4*det` (Codex round 25), even though the two are
+  ///   algebraically identical (`(a+d)^2 - 4*(ad-bc) == a^2-2ad+d^2+4bc ==
+  ///   (a-d)^2 + 4bc`): whenever `a` and `d` are both large and nearly
+  ///   equal, `trace*trace` and `4*det` are each themselves huge and nearly
+  ///   equal, so subtracting them cancels almost all of their significant
+  ///   digits to recover a discriminant many orders of magnitude smaller
+  ///   than either term, and scaling the zero test to that same huge
+  ///   `trace*trace` (as an earlier version of this method did) then
+  ///   swallows a discriminant that is genuinely, unambiguously negative.
+  ///   For `[[1e5, 0.01], [-0.01, 1e5]]` (true eigenvalues `1e5 +/-
+  ///   0.01i`), `trace*trace` and `4*det` are both `~4e10`, so
+  ///   `trace*trace - 4*det` and a tolerance scaled to `trace*trace +
+  ///   |det|` both drown the true discriminant `-0.0004` in noise the size
+  ///   of the diagonal alone, wrongly reporting a repeated real `1e5`.
+  ///   `(a-d)^2 + 4*b*c` computes the same mathematical quantity directly
+  ///   from the terms that actually determine it, with no such
+  ///   cancellation (`(a-d)^2` here is exactly `0`, so the whole
+  ///   discriminant is exactly the `4*b*c` term), and the zero-test scale
+  ///   below is derived from those same terms so it is never larger than
+  ///   the quantities that can actually perturb the discriminant.
   /// - Computing both roots as `(trace +/- sqrt(disc)) / 2` subtracts two
   ///   nearly-equal quantities whenever the block has one eigenvalue much
   ///   larger than the other (sqrt(disc) is then close to |trace|), which
@@ -1848,11 +1881,13 @@ class Matrix {
   _stableRealEigen2x2(double a, double b, double c, double d) {
     final double trace = a + d;
     final double det = (a * d) - (b * c);
-    final double discriminant = (trace * trace) - (4 * det);
+    final double centeredDiff = a - d;
+    final double fourBC = 4 * b * c;
+    final double discriminant = (centeredDiff * centeredDiff) + fourBC;
 
     const double eps =
         CalculatrixNumericPolicy.eigenvalueRoundingNoiseTolerance;
-    final double scale = (trace * trace) + det.abs();
+    final double scale = (centeredDiff * centeredDiff) + fourBC.abs();
     final bool isZeroDiscriminant =
         scale == 0 ? discriminant == 0 : discriminant.abs() <= eps * scale;
 
@@ -5052,6 +5087,39 @@ class Matrix {
     final double minAB = math.min(absA, absB);
     final double ratio = minAB / maxAB;
     return maxAB * math.sqrt(1 + (ratio * ratio));
+  }
+
+  /// Euclidean norm of an arbitrary-length vector, computed scale-safely
+  /// (the n-ary generalization of [_hypot]'s two-term form, and the same
+  /// max-abs-then-scaled-sum-of-squares pattern [_frobeniusNorm] already
+  /// uses for a whole matrix): find the largest-magnitude entry, divide
+  /// every entry by it before squaring, and multiply the result back in at
+  /// the end. A naive
+  /// `sqrt(sum(x[i]*x[i]))` squares each entry first, which can underflow
+  /// to exactly `0` for an entry that is itself a perfectly representable
+  /// nonzero double whenever that entry's magnitude is within roughly a
+  /// factor of `1e162` of the smallest representable subnormal
+  /// (`4.94e-324`), a range [_hessenbergWithSchurVectors] can land in after
+  /// [_normalizedByPowerOfTwo] rescales a whole matrix with a huge
+  /// magnitude spread (Codex round 25). Dividing by the largest entry first
+  /// keeps every scaled term in `[-1, 1]`, so squaring only underflows a
+  /// term that is genuinely negligible relative to the vector's own largest
+  /// entry, never one that dominates or ties for the largest.
+  static double _safeVectorNorm(List<double> values) {
+    double maxAbs = 0;
+    for (final double value in values) {
+      final double abs = value.abs();
+      if (abs > maxAbs) maxAbs = abs;
+    }
+    if (maxAbs == 0) {
+      return 0;
+    }
+    double sumSquaresScaled = 0;
+    for (final double value in values) {
+      final double scaled = value / maxAbs;
+      sumSquaresScaled += scaled * scaled;
+    }
+    return maxAbs * math.sqrt(sumSquaresScaled);
   }
 
   /// Whether this square matrix is exactly upper triangular, exactly lower

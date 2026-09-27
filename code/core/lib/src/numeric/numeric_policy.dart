@@ -24,11 +24,17 @@ class CalculatrixNumericPolicy {
   /// This is deliberately much tighter than [defaultAbsoluteTolerance]
   /// (1e-12), which is calibrated for Hessenberg/QR convergence residuals,
   /// not for "is this discriminant effectively zero". It is used as the
-  /// `eps` in `|discriminant| <= eps * (trace^2 + |det|)`, i.e. already
-  /// scaled to the block's own magnitude by the caller, so this constant
-  /// only needs to cover the handful of arithmetic operations in the
-  /// eigenvalue pipeline above double's own relative precision (~2.22e-16,
-  /// see [machineEpsilon]).
+  /// `eps` in `|discriminant| <= eps * ((a-d)^2 + 4*|b*c|)`, where the
+  /// discriminant itself is computed as `(a-d)^2 + 4*b*c` rather than the
+  /// algebraically equivalent `trace^2 - 4*det` (Codex round 25: scaling
+  /// against `trace^2 + |det|` instead is wrong whenever `a` and `d` are
+  /// both large and nearly equal, since `trace^2` is then huge even though
+  /// the discriminant it is supposed to bound is not, which hides a
+  /// genuinely negative discriminant as spurious "zero"). Both the
+  /// discriminant and its scale are already expressed in the block's own
+  /// magnitude by the caller, so this constant only needs to cover the
+  /// handful of arithmetic operations in the eigenvalue pipeline above
+  /// double's own relative precision (~2.22e-16, see [machineEpsilon]).
   ///
   /// Not used to gate eigenvalue non-positivity for `Matrix.log`/`power`
   /// (see that method's own doc comment for why a fixed floor is wrong
