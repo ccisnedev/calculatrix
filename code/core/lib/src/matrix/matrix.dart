@@ -2783,6 +2783,20 @@ class Matrix {
 
     final bool integerExponent = y == y.roundToDouble();
 
+    // Codex round 14, finding 3: a non-integer exponent is itself a raw
+    // public operand, the same as a raw matrix entry or eigenvalue, and is
+    // validated the same way, before any dispatch on the base. An integer
+    // exponent is exempt (round 13 / D38 correction, mirrored by
+    // [_integerMatrixPower]'s own doc comment), and an exact zero, always
+    // integer, never reaches this check at all.
+    if (!integerExponent) {
+      _requireMagnitudeInPrecisionRange(
+        y.abs(),
+        operation: 'real matrix power',
+        quantity: 'exponent',
+      );
+    }
+
     if (isScalar) {
       final double b = scalarValue;
 
@@ -3071,6 +3085,47 @@ class Matrix {
     throw _unsupportedMatrixFunction('matrix logarithm');
   }
 
+  /// Codex round 14, finding 2 (site B): [_powerByMatrixExponent]'s two
+  /// `_internalLog() * exponent` branches (a negative scalar or
+  /// complex-form base, always paired with a complex-form exponent) lose
+  /// exactness the same way [_complexFormRealPower] did before its own
+  /// round 14 fix: whenever the base's own logarithm angle is an EXACT
+  /// multiple of pi (which happens exactly when the base is a negative
+  /// scalar, or a complex-form matrix whose own imaginary part is zero,
+  /// i.e. a real number wearing complex-form clothing) and the exponent's
+  /// imaginary part is exactly zero (a real number, again possibly
+  /// wearing complex-form clothing rather than being a [Matrix.scalar]),
+  /// the product's real part is exactly `logMagnitude * p` (the angle
+  /// term vanishes: `angle * 0 == 0` exactly) and its imaginary part is
+  /// exactly `angle * p`, i.e. exactly `pi` times `turnsBase * p`. Forming
+  /// that product with generic complex multiplication and then calling
+  /// ordinary `cos`/`sin` on the resulting radians value is the same
+  /// antipattern [_cosPi]/[_sinPi] exist to avoid, so this closed form
+  /// bypasses the generic product and [_internalExp] entirely, computing
+  /// the exact `turns` value directly and dispatching through
+  /// [_cosPi]/[_sinPi] itself, while still applying the same
+  /// [_requireResultLogMagnitudeInRange] check [_internalExp]'s own
+  /// complex-form branch would have applied to the identical
+  /// `logMagnitude * p` real part.
+  Matrix _exactRealExponentComplexPower(
+    double logMagnitude, {
+    required double exactTurns,
+    required String operation,
+  }) {
+    _requireResultLogMagnitudeInRange(
+      logMagnitude,
+      operation: operation,
+      quantity: 'result eigenvalue magnitude',
+    );
+    final double magnitude = _checkFiniteScalar(math.exp(logMagnitude));
+    return _checkFiniteMatrix(
+      Matrix.complex(
+        magnitude * _cosPi(exactTurns),
+        magnitude * _sinPi(exactTurns),
+      ),
+    );
+  }
+
   Matrix _powerByMatrixExponent(Matrix exponent) {
     // Codex round 9, finding 4: every other matrix-function entry point
     // ([exp], [log], the non-integer branches of [power]) validates its
@@ -3081,8 +3136,11 @@ class Matrix {
     // succeeded, and `Matrix.scalar(1).power(diag(1e200,1e200))` silently
     // returned the identity, instead of both being rejected the same way
     // an equally out-of-range [exp]/[log]/[power] input would be.
-    _requireEntriesInPrecisionRange('matrix exponent base');
-    exponent._requireEntriesInPrecisionRange('matrix exponent');
+    // Codex round 14, finding 1: validates each operand's own SPECTRUM
+    // (not merely its entries) against the D38 declared precision range;
+    // see [_requireSpectrumInPrecisionRange]'s doc comment.
+    _requireSpectrumInPrecisionRange('matrix exponent base');
+    exponent._requireSpectrumInPrecisionRange('matrix exponent');
     if (isScalar) {
       final double b = scalarValue;
 
@@ -3119,6 +3177,23 @@ class Matrix {
       // (aI + bJ), since complex numbers commute and the branch of
       // log(B) is then unambiguous.
       if (exponent.isComplexForm) {
+        // Codex round 14, finding 2 (site B): [_internalLog] of a negative
+        // scalar always returns exactly `Matrix.complex(ln(-b), math.pi)`
+        // (one exact turn); when the exponent's own imaginary part is
+        // exactly zero, that exactness must survive into the result the
+        // same way [_complexFormRealPower] preserves it, rather than being
+        // lost to generic complex multiplication and then ordinary trig.
+        if (exponent.imagPart == 0) {
+          final double p = exponent.realPart;
+          return _requireResultEntriesInPrecisionRange(
+            _exactRealExponentComplexPower(
+              math.log(-b) * p,
+              exactTurns: p,
+              operation: 'matrix power',
+            ),
+            operation: 'matrix power',
+          );
+        }
         final Matrix product = _internalLog() * exponent;
         return _requireResultEntriesInPrecisionRange(
           _checkFiniteMatrix(product._internalExp()),
@@ -3137,6 +3212,33 @@ class Matrix {
     // complex-form (aI + bJ) subalgebra commutes unconditionally, so it is
     // the only pairing with an unambiguous result.
     if (isComplexForm && exponent.isComplexForm) {
+      // Codex round 14, finding 2 (site B): a complex-form base whose own
+      // imaginary part is exactly zero is a real number wearing
+      // complex-form clothing; [_internalLog]'s angle for it, `atan2(0,
+      // a)`, is then an EXACT multiple of pi (0 for a positive real, +/-pi
+      // for a negative one, matching whichever sign atan2 gives that
+      // signed zero). Paired with an exponent whose own imaginary part is
+      // also exactly zero (a real number, likewise possibly wearing
+      // complex-form clothing rather than being a [Matrix.scalar]), the
+      // exact result must match [_complexFormRealPower]'s own formula for
+      // that same real exponent, not a spurious residual from generic
+      // complex multiplication followed by ordinary trig. A base of
+      // exactly zero magnitude is excluded here and left to the generic
+      // path below, which correctly raises logUndefined for it.
+      if (imagPart == 0 && exponent.imagPart == 0 && realPart != 0) {
+        final double angleBase = math.atan2(imagPart, realPart);
+        final double turnsBase = angleBase == 0 ? 0 : angleBase / math.pi;
+        final double logMagnitude = math.log(realPart.abs());
+        final double p = exponent.realPart;
+        return _requireResultEntriesInPrecisionRange(
+          _exactRealExponentComplexPower(
+            logMagnitude * p,
+            exactTurns: turnsBase * p,
+            operation: 'matrix power',
+          ),
+          operation: 'matrix power',
+        );
+      }
       final Matrix product = _internalLog() * exponent;
       return _requireResultEntriesInPrecisionRange(
         _checkFiniteMatrix(product._internalExp()),
@@ -3259,6 +3361,83 @@ class Matrix {
         );
       }
     }
+  }
+
+  /// Codex round 14, finding 1: [_requireEntriesInPrecisionRange] alone
+  /// under-validates a public operand whose own analytically known
+  /// eigenvalue magnitude differs from any single entry's magnitude, the
+  /// same gap round 9, finding 5 already closed for [exp]/[log]/[sqrt]'s
+  /// standalone complex-form input: `Matrix.complex(1e150, 1e150)` has
+  /// both entries exactly at the declared boundary, yet its own eigenvalue
+  /// magnitude, `hypot(1e150, 1e150) ~= 1.4142e150`, is not.
+  /// [_powerByMatrixExponent] used to validate only entries on its two raw
+  /// operands (the base and the exponent) before chaining into
+  /// [_internalLog]/[_internalExp]'s deliberately operand-ungated
+  /// intermediate computations (round 13, P2), so an operand whose entries
+  /// passed but whose spectrum did not slipped through entirely. This
+  /// checks the SPECTRUM (not merely the entries) of whichever of the five
+  /// supported matrix-function classes [this] actually is, mirroring the
+  /// same per-class dispatch [_internalExp]/[_internalLog] themselves use;
+  /// a class none of them supports (rejected later by
+  /// [_isSupportedMatrixFunctionClass] or the ambiguous-power checks in
+  /// [_powerByMatrixExponent]) is left for that later, more specific
+  /// rejection, so this raises nothing for it.
+  void _requireSpectrumInPrecisionRange(String operation) {
+    _requireEntriesInPrecisionRange(operation);
+
+    if (isScalar) {
+      // The scalar value is its own sole eigenvalue, already covered above.
+      return;
+    }
+
+    if (isComplexForm) {
+      // See [_requireComplexPairPartsInPrecisionRange]'s doc comment.
+      _requireComplexPairPartsInPrecisionRange(realPart, imagPart, operation);
+      return;
+    }
+
+    if (_isExactlyDiagonal()) {
+      // Every eigenvalue is a diagonal entry, already covered above.
+      return;
+    }
+
+    if (_isExactlySymmetric() && rowCount != 2) {
+      final ({Matrix q, List<double> lambda, List<double> zeroTolerance})
+      eigen = _cyclicJacobiEigendecomposition(
+        maxSweeps: CalculatrixNumericPolicy.jacobiMaxSweeps,
+      );
+      _requireEigenvaluesInPrecisionRange(
+        eigen.lambda,
+        eigen.zeroTolerance,
+        operation,
+      );
+      return;
+    }
+
+    if (rowCount == 2) {
+      final ({bool isComplex, double lambda1, double lambda2, double m, double w})
+      eigen = _exactRealEigen2x2(
+        _rows[0][0],
+        _rows[0][1],
+        _rows[1][0],
+        _rows[1][1],
+      );
+      if (eigen.isComplex) {
+        _requireComplexPairPartsInPrecisionRange(eigen.m, eigen.w, operation);
+      } else {
+        _requireEigenvaluesInPrecisionRange(
+          <double>[eigen.lambda1, eigen.lambda2],
+          <double>[0, 0],
+          operation,
+        );
+      }
+      return;
+    }
+
+    // Any other square shape is not one of the five supported
+    // matrix-function classes at all; leave its rejection to the more
+    // specific error (ambiguous-power or unsupported-matrix-function) its
+    // caller already raises downstream.
   }
 
   /// Codex round 13, findings 1 and 4 (P1): classifies a computed
@@ -4666,6 +4845,22 @@ class Matrix {
     );
     final double angle = math.atan2(b, a);
     final double rToY = _checkFiniteScalar(math.pow(radius, y).toDouble());
+    // Codex round 14, finding 2: when the base's own imaginary part is
+    // exactly zero, atan2 returns an angle that is an EXACT multiple of
+    // pi (0 for a positive real base, +/-pi for a negative one), so
+    // y*angle is exactly y times that multiple, and its cosine/sine are
+    // computed via [_cosPi]/[_sinPi]'s exact argument reduction rather
+    // than by forming `y * angle` and calling ordinary trig on that
+    // product, which leaves a spurious residual at exactly the
+    // half-integer y where this closed form most needs an exact zero
+    // (the same correction round 13, finding 5 (P3) already applied to
+    // the real scalar power closed form; see [_cosPi]'s doc comment).
+    if (b == 0) {
+      final double turns = angle / math.pi;
+      return _checkFiniteMatrix(
+        Matrix.complex(rToY * _cosPi(y * turns), rToY * _sinPi(y * turns)),
+      );
+    }
     final double newAngle = y * angle;
     return _checkFiniteMatrix(
       Matrix.complex(rToY * math.cos(newAngle), rToY * math.sin(newAngle)),
