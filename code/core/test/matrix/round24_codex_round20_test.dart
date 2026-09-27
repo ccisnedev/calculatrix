@@ -229,17 +229,19 @@ void main() {
     );
 
     group(
-      'Invariant: every 2x2 fixture from the round 17 to 23 test files '
-      'either fails closed with matrix-out-of-precision-range or returns '
-      'finite, non-NaN bounds covering the exact-dyadic reference error',
+      'Invariant: every 2x2 fixture from the round 17 to 23 test files, '
+      'plus round 21\'s own double.minPositive-scale fixtures, either '
+      'fails closed with matrix-out-of-precision-range or returns finite, '
+      'non-NaN bounds covering the exact-dyadic reference error',
       () {
-        test('round 17 through round 23 fixtures', () {
+        test('round 17 through round 21 fixtures', () {
           final double t50 = math.pow(2.0, -50).toDouble();
           final double s498 = math.pow(2.0, -498).toDouble();
           final double t52 = math.pow(2.0, -52).toDouble();
           final double s498a = 2 * s498;
           final double s498b = s498 * (1 + t52);
           final double s498c = -s498 * (1 - t52);
+          final double s = double.minPositive;
 
           final List<List<double>> fixtures = <List<double>>[
             // round17_codex_round13_test.dart
@@ -267,6 +269,12 @@ void main() {
             // round23_codex_round19_test.dart
             <double>[-1e20, 1e-150, -2e-150, -1e20],
             <double>[1e20, 1e-150, 4e-150, 1e20],
+            // round25_codex_round21_test.dart: halving an odd multiple of
+            // double.minPositive loses a bit with no room left to record
+            // it, and the repeated-root radius rescale can underflow a
+            // genuinely nonzero radius to exactly 0.
+            <double>[5 * s, 2 * s, -2 * s, 0],
+            <double>[-5 * s, -2 * s, 2 * s, 0],
           ];
 
           for (final List<double> f in fixtures) {
