@@ -230,11 +230,12 @@ void main() {
 
     group(
       'Invariant: every 2x2 fixture from the round 17 to 23 test files, '
-      'plus round 21\'s own double.minPositive-scale fixtures, either '
-      'fails closed with matrix-out-of-precision-range or returns finite, '
-      'non-NaN bounds covering the exact-dyadic reference error',
+      'plus round 21 and round 22\'s own double.minPositive-scale '
+      'fixtures, either fails closed with matrix-out-of-precision-range '
+      'or returns finite, non-NaN bounds covering the exact-dyadic '
+      'reference error',
       () {
-        test('round 17 through round 21 fixtures', () {
+        test('round 17 through round 22 fixtures', () {
           final double t50 = math.pow(2.0, -50).toDouble();
           final double s498 = math.pow(2.0, -498).toDouble();
           final double t52 = math.pow(2.0, -52).toDouble();
@@ -242,6 +243,10 @@ void main() {
           final double s498b = s498 * (1 + t52);
           final double s498c = -s498 * (1 - t52);
           final double s = double.minPositive;
+          final double t1020 = 8.900295434028806e-308; // 2^-1020
+          final double e512 = math.pow(2.0, -512).toDouble();
+          final double minNormal = 2.2250738585072014e-308;
+          final double halfMinNormal = minNormal / 2;
 
           final List<List<double>> fixtures = <List<double>>[
             // round17_codex_round13_test.dart
@@ -275,6 +280,15 @@ void main() {
             // genuinely nonzero radius to exactly 0.
             <double>[5 * s, 2 * s, -2 * s, 0],
             <double>[-5 * s, -2 * s, 2 * s, 0],
+            // round26_codex_round22_test.dart: a rescale that lands in the
+            // subnormal range while staying nonzero can still lose most of
+            // its bits without underflowing all the way to zero.
+            <double>[t1020, t1020, -t1020, -t1020],
+            <double>[0, 4 * s, -2 * s, 0],
+            <double>[0, 4 * s, 2 * s, 0],
+            <double>[1.0, halfMinNormal, halfMinNormal, 1.0],
+            <double>[0, e512, 0.7 * e512, 0],
+            <double>[minNormal, 1.0, 1.0, minNormal - 3 * s],
           ];
 
           for (final List<double> f in fixtures) {
