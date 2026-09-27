@@ -1876,6 +1876,171 @@ class Matrix {
     return (isComplex: false, lambda1: lambda1, lambda2: lambda2);
   }
 
+  /// Exact decomposition of `a + b` into a computed sum and its exactly
+  /// representable rounding error: `a + b == sum + error` as real numbers,
+  /// with `error` itself an exactly representable `double` (Knuth's
+  /// TwoSum). Needed by [_exactRealEigen2x2]'s Codex round 17 compensated
+  /// arithmetic because `dart:math` has no native fused multiply-add:
+  /// without this exact residual, a single rounded subtraction silently
+  /// discards low-order bits that later turn out to be the whole answer
+  /// (Codex round 17, finding 1). Works for any magnitude ordering of `a`
+  /// and `b`, unlike the cheaper "fast-two-sum".
+  static (double sum, double error) _twoSum(double a, double b) {
+    final double sum = a + b;
+    final double bVirtual = sum - a;
+    final double aVirtual = sum - bVirtual;
+    final double bRoundoff = b - bVirtual;
+    final double aRoundoff = a - aVirtual;
+    final double error = aRoundoff + bRoundoff;
+    return (sum, error);
+  }
+
+  /// Splits a `double` into a high and low half whose exact sum recovers
+  /// the original value (`hi + lo == a`, both exactly representable),
+  /// each carrying roughly half of `a`'s significant bits (Veltkamp's
+  /// algorithm). `134217729.0` is `2^27 + 1`, the standard splitter
+  /// constant for IEEE 754 doubles' 53-bit mantissa. Used by [_twoProduct]
+  /// to form the exact cross terms of a product.
+  static (double hi, double lo) _split(double a) {
+    const double splitter = 134217729.0;
+    final double t = splitter * a;
+    final double hi = t - (t - a);
+    final double lo = a - hi;
+    return (hi, lo);
+  }
+
+  /// Exact decomposition of `a * b` into a computed product and its
+  /// exactly representable rounding error: `a * b == product + error` as
+  /// real numbers (Dekker's TwoProduct, built from two [_split] calls).
+  /// `product` is bit-for-bit the same value plain `a * b` computes (IEEE
+  /// 754 correctly rounds a single multiplication), so existing underflow
+  /// checks that compare a plain product against `0` remain valid against
+  /// [_twoProduct]'s `product`.
+  static (double product, double error) _twoProduct(double a, double b) {
+    final double product = a * b;
+    final (double aHi, double aLo) = _split(a);
+    final (double bHi, double bLo) = _split(b);
+    final double error =
+        ((aHi * bHi - product) + (aHi * bLo) + (aLo * bHi)) + (aLo * bLo);
+    return (product, error);
+  }
+
+  /// Codex round 17 (P4): computes the 2x2 closed form's centered
+  /// discriminant `((a-d)/2)^2 + b*c` with the error-free transforms above
+  /// instead of plain floating point arithmetic, plus a rigorous bound on
+  /// the residual rounding error left over after compensation.
+  ///
+  /// Plain floating point forms `a - d` as a single rounded subtraction,
+  /// which for `a` and `d` close to each other discards exactly the
+  /// low-order bits the true difference is made of (Codex round 17,
+  /// finding 1: `a = 1.0000000000000002`, `d = -1`, whose exact half
+  /// difference has an ULP-scale excess above `1` that a single squaring
+  /// of the once-rounded difference throws away, hiding a genuine sign
+  /// split between the two eigenvalues behind a discriminant that rounds
+  /// to exactly `0`). [_twoSum] instead recovers `(a-d)/2` as an exact
+  /// `hi + lo` pair; the hi part is squared with [_twoProduct] (itself
+  /// exact), and the first-order cross-term correction
+  /// `2 * halfDiffHi * halfDiffLo` for the low half is added in (the low
+  /// half's own square is second-order smaller again and is left to the
+  /// returned error bound rather than the value). `b * c` is likewise
+  /// compensated with [_twoProduct]. The dominant, potentially cancelling
+  /// terms (`sqHi`, `bcHi`) are summed first, in a single step (exact by
+  /// Sterbenz's lemma whenever they are comparable in magnitude and
+  /// opposite in sign, which is exactly when cancellation would otherwise
+  /// bite), and only then are the smaller residual corrections added: this
+  /// order matters, because summing a term with its own tiny correction
+  /// before subtracting a comparable-magnitude term would round the
+  /// correction away before it could ever help.
+  ///
+  /// The returned `error` bounds the second-order noise left over after
+  /// compensation (`cancellationScale`, the larger of the two
+  /// pre-cancellation magnitudes, scaled by
+  /// [CalculatrixNumericPolicy.unitRoundoff] squared, since compensation
+  /// has already removed the first-order term a naive bound would need)
+  /// plus ordinary relative rounding on the final value, both wrapped in
+  /// [CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor] as a
+  /// safety factor. This discriminant governs the real/complex/repeated
+  /// branch decision itself, so it deliberately carries no additional
+  /// input-uncertainty floor: Codex round 17's finding 1 specifically
+  /// requires a genuine, resolvable, ULP-scale discriminant to be
+  /// recognized as such, not swallowed by an overly conservative bound.
+  static ({double value, double error}) _compensatedDiscriminant(
+    double a,
+    double b,
+    double c,
+    double d,
+  ) {
+    final (double adSum, double adSumError) = _twoSum(a, -d);
+    final double halfDiffHi = adSum / 2;
+    final double halfDiffLo = adSumError / 2;
+    final (double sqHi, double sqErr) = _twoProduct(halfDiffHi, halfDiffHi);
+    final double crossTerm = 2 * halfDiffHi * halfDiffLo;
+    final (double bcHi, double bcErr) = _twoProduct(b, c);
+    final double dominant = sqHi + bcHi;
+    final double correction = sqErr + crossTerm + bcErr;
+    final double value = dominant + correction;
+    final double cancellationScale = math.max(sqHi.abs(), bcHi.abs());
+    final double error =
+        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            CalculatrixNumericPolicy.unitRoundoff *
+            CalculatrixNumericPolicy.unitRoundoff *
+            cancellationScale +
+        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            CalculatrixNumericPolicy.unitRoundoff *
+            value.abs();
+    return (value: value, error: error);
+  }
+
+  /// Codex round 17 (P4): companion to [_compensatedDiscriminant] for the
+  /// determinant `a*d - b*c`, whose own cancellation directly amplifies
+  /// into the smaller-magnitude eigenvalue `det / lambda1` (Codex round
+  /// 17, finding 2: for `[[2.2, 1], [-1.21, 0]]`, this amplification was
+  /// entirely unaccounted for, so round 16's `zeroTolerance` under-stated
+  /// the actual error by five orders of magnitude). Uses the same
+  /// dominant-terms-first, corrections-second summation order as
+  /// [_compensatedDiscriminant], for the same reason.
+  ///
+  /// Unlike [_compensatedDiscriminant], the returned `error` keeps round
+  /// 16's original first-order backward-error floor
+  /// (`K * unitRoundoff * cancellationScale`) in addition to the
+  /// second-order compensation residual: `det` is a raw function of the
+  /// caller's own four entries, which this codebase already treats as
+  /// carrying their own `unitRoundoff`-scale backward uncertainty (round
+  /// 15/16 precedent for the operand-spectrum gate). Removing that floor
+  /// here would let compensation claim more resolving power over the
+  /// *caller's own input* than a general-purpose numeric library should
+  /// assume; the fixes this round actually needs (finding 2's missing
+  /// `lambda1`-error-through-division term, and finding 1's discriminant
+  /// fix above) are additive corrections to that floor, not a replacement
+  /// of it. [_exactRealEigen2x2]'s own doc comment explains why keeping
+  /// this floor is compatible with finding 1's requirement that
+  /// [Matrix.log]/[Matrix.power] still raise log-undefined.
+  static ({double value, double error}) _compensatedDeterminant(
+    double a,
+    double b,
+    double c,
+    double d,
+  ) {
+    final (double adHi, double adErr) = _twoProduct(a, d);
+    final (double bcHi, double bcErr) = _twoProduct(b, c);
+    final double dominant = adHi - bcHi;
+    final double correction = adErr - bcErr;
+    final double value = dominant + correction;
+    final double cancellationScale = math.max(adHi.abs(), bcHi.abs());
+    final double error =
+        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            CalculatrixNumericPolicy.unitRoundoff *
+            cancellationScale +
+        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            CalculatrixNumericPolicy.unitRoundoff *
+            CalculatrixNumericPolicy.unitRoundoff *
+            cancellationScale +
+        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            CalculatrixNumericPolicy.unitRoundoff *
+            value.abs();
+    return (value: value, error: error);
+  }
+
   /// Same stable quadratic-formula solver as [_stableRealEigen2x2], but
   /// with no scaled zero-discriminant tolerance: the discriminant's own
   /// computed sign is trusted directly, and only a bit-exact zero counts
@@ -1907,33 +2072,49 @@ class Matrix {
   /// cancellation. On the complex-pair branch, `m` and `w` (the rotation
   /// frequency, `sqrt(-discriminant)`) are returned directly so callers
   /// never need to recompute the discriminant themselves.
-  /// Codex round 16: [zeroTolerance] is this pair's own block-local
-  /// backward-error bound for the real, distinct-eigenvalue branch, meant
-  /// for [_classifyEigenvalue] the same way [_cyclicJacobiEigendecomposition]
-  /// computes one for the exactly-symmetric (cyclic Jacobi) branch. It is 0
-  /// for the exactly-triangular fast path (the eigenvalues are raw diagonal
-  /// entries, with no arithmetic between them at all) and for a repeated
-  /// eigenvalue (computed directly as `effectiveM`, never through a
-  /// cancellation-prone division). For a genuine distinct-eigenvalue pair,
-  /// the smaller-magnitude eigenvalue is always computed as `det / lambda1`
-  /// (see the comments below), so its own resolvable precision is governed
-  /// entirely by how much `det = a*d - b*c` itself can lose to
-  /// cancellation, not by the whole block's own norm: a matrix with one
-  /// huge, unrelated entry (for example `[[4, 1e20], [0, 1]]`) must not
-  /// have its own, perfectly well-resolved, tiny eigenvalue swallowed by a
-  /// tolerance sized off that huge, uninvolved entry. `max(|a*d|, |b*c|)`
-  /// is the largest of the two terms `det`'s own subtraction cancels
-  /// between (whichever of `a*d`/`b*c` dominates already carries the
-  /// larger absolute rounding error), divided by the larger-magnitude
-  /// eigenvalue (`det`'s own share of that error, once divided through by
-  /// `lambda1` to recover `lambda2`).
+  /// Codex round 17 (P4): [lambda1Error]/[lambda2Error] are each real
+  /// eigenvalue's OWN computed error bound (replacing round 16's single
+  /// shared `zeroTolerance`, which was not a genuine bound for either root:
+  /// see [_compensatedDiscriminant] and [_compensatedDeterminant]'s doc
+  /// comments for the two findings that fixed). [_classifyEigenvalue] uses
+  /// each root's own bound directly (`|lambda| <= e => zero`,
+  /// `lambda > e => positive`, `lambda < -e => negative`), never an
+  /// exact-equality or exact-zero check on the raw value. Both are 0 for
+  /// the exactly-triangular fast path (the eigenvalues are raw diagonal
+  /// entries, with no arithmetic between them at all).
+  ///
+  /// The discriminant `D = halfDiff^2 + b*c` and its error bound `E_D` (from
+  /// [_compensatedDiscriminant]) split resolution into three regimes:
+  ///   - `D > E_D`: two genuinely distinct real roots. `lambda1` is the
+  ///     larger-magnitude root, `effectiveM + sign(effectiveM)*sqrt(D)`,
+  ///     safe from cancellation by construction; its error propagates `D`'s
+  ///     own error through the square root (`E_D / (2*sqrt(D))`), the
+  ///     square root's own rounding, and `m`'s own [_twoSum] residual.
+  ///     `lambda2 = det / lambda1` (`det` and its error `E_det` from
+  ///     [_compensatedDeterminant]); its error propagates `E_det` through
+  ///     the division, `lambda1`'s own error through the same division
+  ///     (`|lambda2| * lambda1Error / |lambda1|`, how `lambda1`'s
+  ///     uncertainty moves the quotient), and division rounding.
+  ///   - `D < -E_D`: complex conjugate pair, unchanged from round 16.
+  ///   - `|D| <= E_D` (unresolved, replacing round 16's bit-exact
+  ///     `D == 0` check): the true roots lie within
+  ///     `r = sqrt(E_D + |D|)` of `effectiveM`, so both are reported as
+  ///     repeated at `effectiveM`, with error bound `r + effectiveM`'s own
+  ///     [_twoSum] residual.
+  /// As in round 16, `det`/`lambda1` is preferred in natural (unscaled)
+  /// units whenever finite and not the product of an underflowed factor
+  /// pair, falling back to a self-contained recomputation on the
+  /// whole-block-scaled entries otherwise (its own `m`, discriminant and
+  /// determinant, never mixed with whichever units `lambda1`/`lambda1Error`
+  /// happened to resolve in).
   static ({
     bool isComplex,
     double lambda1,
     double lambda2,
     double m,
     double w,
-    double zeroTolerance,
+    double lambda1Error,
+    double lambda2Error,
   })
   _exactRealEigen2x2(double a, double b, double c, double d) {
     // Round 9 correction, finding 3: an exactly-triangular 2x2 block's
@@ -1952,7 +2133,8 @@ class Matrix {
         lambda2: d,
         m: (a + d) / 2,
         w: 0,
-        zeroTolerance: 0,
+        lambda1Error: 0,
+        lambda2Error: 0,
       );
     }
 
@@ -2013,10 +2195,31 @@ class Matrix {
       }
     }
 
-    final double m = (sa + sd) / 2;
-    final double halfDiff = (sa - sd) / 2;
-    final double det = (sa * sd) - (sb * sc);
-    final double discriminant = (halfDiff * halfDiff) + (sb * sc);
+    // Codex round 17 (P4): the scaled block's own `m`, discriminant and
+    // determinant, each computed with the error-free-transform helpers
+    // above instead of plain floating point, plus the rigorous error bound
+    // each helper derives. This self-contained scaled-unit trio is reused
+    // below both as the fallback when the direct (natural-unit) discriminant
+    // or determinant is unreliable, and, independently, as the source for
+    // the scaled-unit `lambda2` fallback further down: neither fallback
+    // ever mixes natural-unit and scaled-unit quantities.
+    final (double scaledSumHi, double scaledSumErr) = _twoSum(sa, sd);
+    final double m = scaledSumHi / 2;
+    final double mErrorScaled = scaledSumErr.abs() / 2;
+    final ({double value, double error}) scaledDisc = _compensatedDiscriminant(
+      sa,
+      sb,
+      sc,
+      sd,
+    );
+    final ({double value, double error}) scaledDet = _compensatedDeterminant(
+      sa,
+      sb,
+      sc,
+      sd,
+    );
+    final double discriminant = scaledDisc.value;
+    final double det = scaledDet.value;
 
     double rescale(double value) =>
         k == 0 ? value : _scalarScaleByPowerOfTwo(value, k.toDouble());
@@ -2038,16 +2241,34 @@ class Matrix {
     // unscaled discriminant whenever it is reliable, the same "prefer
     // direct when reliable, else fall back to the scaled block" pattern
     // already used for `det`/`lambda2` below.
-    final double directHalfDiff = (a - d) / 2;
+    //
+    // Codex round 17, finding 1: the plain `directHalfDiff * directHalfDiff`
+    // computation this used to be silently threw away exactly the low-order
+    // bits that determine a genuine sign split between the two eigenvalues
+    // (see [_compensatedDiscriminant]'s own doc comment). Compensated
+    // arithmetic recovers them instead of just widening a tolerance around
+    // the wrong answer.
     final double directBc = b * c;
     final bool directBcUnderflowed = b != 0 && c != 0 && directBc == 0;
-    final double directDiscriminant =
-        (directHalfDiff * directHalfDiff) + directBc;
+    final ({double value, double error}) directDisc = _compensatedDiscriminant(
+      a,
+      b,
+      c,
+      d,
+    );
+    final double directDiscriminant = directDisc.value;
     final bool directDiscriminantReliable =
         directDiscriminant.isFinite && !directBcUnderflowed;
+    final (double directSumHi, double directSumErr) = _twoSum(a, d);
+    final double directM = directSumHi / 2;
+    final double directMError = directSumErr.abs() / 2;
     final double effectiveDiscriminant =
         directDiscriminantReliable ? directDiscriminant : discriminant;
-    final double effectiveM = directDiscriminantReliable ? (a + d) / 2 : m;
+    final double effectiveDiscriminantError =
+        directDiscriminantReliable ? directDisc.error : scaledDisc.error;
+    final double effectiveM = directDiscriminantReliable ? directM : m;
+    final double effectiveMError =
+        directDiscriminantReliable ? directMError : mErrorScaled;
     // The direct discriminant/m above are already in natural (unscaled)
     // units when reliable, so they must not be rescaled again; only the
     // scaled-block fallback still needs the `2^k` rescale back to natural
@@ -2055,7 +2276,7 @@ class Matrix {
     double finishScale(double value) =>
         directDiscriminantReliable ? value : rescale(value);
 
-    if (effectiveDiscriminant < 0) {
+    if (effectiveDiscriminant < -effectiveDiscriminantError) {
       final double w = math.sqrt(-effectiveDiscriminant);
       return (
         isComplex: true,
@@ -2063,19 +2284,34 @@ class Matrix {
         lambda2: 0,
         m: finishScale(effectiveM),
         w: finishScale(w),
-        zeroTolerance: 0,
+        lambda1Error: 0,
+        lambda2Error: 0,
       );
     }
 
-    if (effectiveDiscriminant == 0) {
+    if (effectiveDiscriminant.abs() <= effectiveDiscriminantError) {
+      // Codex round 17, finding 1: replaces a bit-exact `D == 0` check.
+      // The true discriminant lies somewhere in
+      // `[-effectiveDiscriminantError, effectiveDiscriminantError]`, so the
+      // true roots lie within `r = sqrt(E_D + |D|)` of `effectiveM`; report
+      // them as repeated at `effectiveM`, with that radius (plus
+      // `effectiveM`'s own rounding residual) as the shared error bound.
+      final double r = math.sqrt(
+        effectiveDiscriminantError + effectiveDiscriminant.abs(),
+      );
+      final double tau =
+          CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+          (r + effectiveMError);
       final double lambda = finishScale(effectiveM);
+      final double lambdaError = finishScale(tau);
       return (
         isComplex: false,
         lambda1: lambda,
         lambda2: lambda,
         m: lambda,
         w: 0,
-        zeroTolerance: 0,
+        lambda1Error: lambdaError,
+        lambda2Error: lambdaError,
       );
     }
 
@@ -2083,10 +2319,22 @@ class Matrix {
     final double signM = effectiveM >= 0 ? 1.0 : -1.0;
     final double q = effectiveM + (signM * sqrtD);
     final double lambda1 = finishScale(q);
+    // Codex round 17: `lambda1`'s own error bound propagates `E_D` through
+    // the square root, the square root's own relative rounding, and
+    // `effectiveM`'s own [_twoSum] residual.
+    final double eSqrtD =
+        effectiveDiscriminantError / (2 * sqrtD) +
+        CalculatrixNumericPolicy.unitRoundoff * sqrtD;
+    final double lambda1Error = finishScale(
+      CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+          (effectiveMError + eSqrtD),
+    );
 
     double lambda2;
+    double lambda2Error;
     if (q == 0) {
       lambda2 = finishScale(effectiveM - (signM * sqrtD));
+      lambda2Error = lambda1Error;
     } else {
       // Round 11 correction, finding 2: `det` above is the determinant of
       // the *scaled* block (`sa*sd - sb*sc`), and a matrix whose own
@@ -2122,21 +2370,48 @@ class Matrix {
       // product is formed.
       final double directAD = a * d;
       final bool directAdUnderflowed = a != 0 && d != 0 && directAD == 0;
-      final double directDet = directAD - directBc;
+      final ({double value, double error}) directDetComp =
+          _compensatedDeterminant(a, b, c, d);
+      final double directDet = directDetComp.value;
       final bool directDetReliable =
           directDet.isFinite && !directAdUnderflowed && !directBcUnderflowed;
       if (directDetReliable) {
         lambda2 = directDet / lambda1;
+        // Codex round 17, finding 2: propagate `E_det` through the
+        // division, `lambda1`'s own error through the same division (how
+        // `lambda1`'s uncertainty moves the quotient), and the division's
+        // own relative rounding. Round 16's `zeroTolerance` accounted for
+        // none of these, underestimating the true error here by five
+        // orders of magnitude.
+        lambda2Error =
+            CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            (directDetComp.error / lambda1.abs() +
+                lambda2.abs() * lambda1Error / lambda1.abs() +
+                CalculatrixNumericPolicy.unitRoundoff * lambda2.abs());
       } else {
         // The `det/q` fallback needs `det` and `q` in the same (scaled)
         // unit system; `q` above may already be in natural, unscaled
         // units when the finding-3 direct discriminant was reliable, so
-        // recompute a scaled-block `q` independently here rather than
-        // reusing whichever units `q` happens to be in.
+        // recompute a scaled-block `q` (and its own error propagation)
+        // independently here rather than reusing whichever units `q`/
+        // `lambda1Error` happen to be in.
         final double sqrtDScaled = math.sqrt(discriminant);
         final double signMScaled = m >= 0 ? 1.0 : -1.0;
         final double qScaled = m + (signMScaled * sqrtDScaled);
-        lambda2 = rescale(det / qScaled);
+        final double eSqrtDScaled =
+            scaledDisc.error / (2 * sqrtDScaled) +
+            CalculatrixNumericPolicy.unitRoundoff * sqrtDScaled;
+        final double lambda1ErrorScaled =
+            CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            (mErrorScaled + eSqrtDScaled);
+        final double lambda2Scaled = det / qScaled;
+        lambda2 = rescale(lambda2Scaled);
+        final double lambda2ErrorScaled =
+            CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            (scaledDet.error / qScaled.abs() +
+                lambda2Scaled.abs() * lambda1ErrorScaled / qScaled.abs() +
+                CalculatrixNumericPolicy.unitRoundoff * lambda2Scaled.abs());
+        lambda2Error = rescale(lambda2ErrorScaled);
       }
     }
 
@@ -2151,30 +2426,14 @@ class Matrix {
     // needs exactly this precise, independent `w` to recover an
     // eigenvalue-offset-from-`m` correction that materializing
     // `lambda1 = m + w` as a single double would otherwise destroy.
-    //
-    // Codex round 16: see this method's own doc comment for why
-    // `zeroTolerance` is derived from `max(|a*d|, |b*c|)` (the two terms
-    // `det` cancels between) divided by the larger-magnitude eigenvalue,
-    // using the original, natural-unit `a`, `b`, `c`, `d` and the final,
-    // already-rescaled `lambda1`/`lambda2`, not the whole block's own norm.
-    final double cancellationScale = math.max((a * d).abs(), (b * c).abs());
-    final double eigenvalueMagnitudeAnchor = math.max(
-      lambda1.abs(),
-      lambda2.abs(),
-    );
-    final double zeroTolerance = eigenvalueMagnitudeAnchor == 0
-        ? 0
-        : CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
-              CalculatrixNumericPolicy.unitRoundoff *
-              cancellationScale /
-              eigenvalueMagnitudeAnchor;
     return (
       isComplex: false,
       lambda1: lambda1,
       lambda2: lambda2,
       m: finishScale(effectiveM),
       w: finishScale(sqrtD),
-      zeroTolerance: zeroTolerance,
+      lambda1Error: lambda1Error,
+      lambda2Error: lambda2Error,
     );
   }
 
@@ -3497,7 +3756,7 @@ class Matrix {
     }
 
     if (rowCount == 2) {
-      final ({bool isComplex, double lambda1, double lambda2, double m, double w, double zeroTolerance})
+      final ({bool isComplex, double lambda1, double lambda2, double m, double w, double lambda1Error, double lambda2Error})
       eigen = _exactRealEigen2x2(
         _rows[0][0],
         _rows[0][1],
@@ -3520,17 +3779,14 @@ class Matrix {
         // genuinely negligible eigenvalue, an artifact of catastrophic
         // cancellation in a nearly-singular 2x2 rather than a meaningful
         // nonzero result, be wrongly rejected as out of the declared range.
-        // round 16 correction: use [eigen]'s own `zeroTolerance` (derived
-        // from the actual `det = a*d - b*c` cancellation this pair's
-        // smaller eigenvalue is computed through, see
-        // [_exactRealEigen2x2]'s doc comment), not the whole block's own
-        // Frobenius norm, which a single huge, otherwise-uninvolved entry
-        // (for example an off-diagonal entry far larger than either
-        // eigenvalue) can inflate enough to wrongly swallow a distinct,
-        // fully resolved, merely small-magnitude eigenvalue as "zero".
+        // Codex round 17: each eigenvalue now carries its own computed
+        // error bound (`lambda1Error`/`lambda2Error`, see
+        // [_exactRealEigen2x2]'s doc comment), not a single tolerance
+        // shared between both roots, which round 17's findings showed was
+        // not a genuine bound for either one.
         _requireEigenvaluesInPrecisionRange(
           <double>[eigen.lambda1, eigen.lambda2],
-          <double>[eigen.zeroTolerance, eigen.zeroTolerance],
+          <double>[eigen.lambda1Error, eigen.lambda2Error],
           operation,
         );
       }
@@ -5355,7 +5611,7 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final ({bool isComplex, double lambda1, double lambda2, double m, double w, double zeroTolerance})
+    final ({bool isComplex, double lambda1, double lambda2, double m, double w, double lambda1Error, double lambda2Error})
     eigen = _exactRealEigen2x2(a, b, c, d);
 
     if (eigen.isComplex) {
@@ -5395,15 +5651,11 @@ class Matrix {
       // and a square root (see _exactRealEigen2x2), so a mathematically
       // nonzero eigenvalue can round to a tiny nonzero residual here just
       // as it can for the operand-spectrum gate (round 15, finding 1).
-      // eigen.zeroTolerance is derived from the actual det = a*d - b*c
-      // cancellation this pair's smaller eigenvalue is computed through
-      // (see _exactRealEigen2x2's doc comment), not the whole block's own
-      // norm, so a matrix with one huge, otherwise-uninvolved entry does
-      // not have its own distinct, small-magnitude eigenvalue wrongly
-      // swallowed as "zero".
+      // Codex round 17: each eigenvalue now carries its own error bound
+      // (see _exactRealEigen2x2's doc comment), not a shared tolerance.
       _requireEigenvaluesInPrecisionRange(
         <double>[l1, l2],
-        <double>[eigen.zeroTolerance, eigen.zeroTolerance],
+        <double>[eigen.lambda1Error, eigen.lambda2Error],
         operation,
       );
     }
@@ -5544,7 +5796,7 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final ({bool isComplex, double lambda1, double lambda2, double m, double w, double zeroTolerance})
+    final ({bool isComplex, double lambda1, double lambda2, double m, double w, double lambda1Error, double lambda2Error})
     eigen = _exactRealEigen2x2(a, b, c, d);
 
     double c1;
@@ -5600,22 +5852,18 @@ class Matrix {
       // subtraction and a square root (see _exactRealEigen2x2), so a
       // mathematically nonzero eigenvalue can round to a tiny nonzero
       // residual here, the same as it can for the operand-spectrum gate
-      // (round 15, finding 1). eigen.zeroTolerance is derived from the
-      // actual det = a*d - b*c cancellation this pair's smaller eigenvalue
-      // is computed through (see _exactRealEigen2x2's doc comment), not
-      // the whole block's own norm, so a matrix with one huge,
-      // otherwise-uninvolved entry does not have its own distinct,
-      // small-magnitude eigenvalue wrongly swallowed as "zero".
-      final double zeroTolerance = eigen.zeroTolerance;
+      // (round 15, finding 1). Codex round 17: each eigenvalue now
+      // classifies against its own error bound (see _exactRealEigen2x2's
+      // doc comment), not a tolerance shared between both roots.
       if (checkOperandRange) {
         _requireEigenvaluesInPrecisionRange(
           <double>[l1, l2],
-          <double>[zeroTolerance, zeroTolerance],
+          <double>[eigen.lambda1Error, eigen.lambda2Error],
           operation,
         );
       }
-      final _EigenvalueSign sign1 = _classifyEigenvalue(l1, zeroTolerance);
-      final _EigenvalueSign sign2 = _classifyEigenvalue(l2, zeroTolerance);
+      final _EigenvalueSign sign1 = _classifyEigenvalue(l1, eigen.lambda1Error);
+      final _EigenvalueSign sign2 = _classifyEigenvalue(l2, eigen.lambda2Error);
       if (sign1 == _EigenvalueSign.negative ||
           sign2 == _EigenvalueSign.negative) {
         throw MatrixDomainError(
@@ -5916,7 +6164,7 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final ({bool isComplex, double lambda1, double lambda2, double m, double w, double zeroTolerance})
+    final ({bool isComplex, double lambda1, double lambda2, double m, double w, double lambda1Error, double lambda2Error})
     eigen = _exactRealEigen2x2(a, b, c, d);
 
     double c0;
@@ -6034,20 +6282,16 @@ class Matrix {
       // subtraction and a square root (see _exactRealEigen2x2), so a
       // mathematically nonzero eigenvalue can round to a tiny nonzero
       // residual here, the same as it can for the operand-spectrum gate
-      // (round 15, finding 1). eigen.zeroTolerance is derived from the
-      // actual det = a*d - b*c cancellation this pair's smaller eigenvalue
-      // is computed through (see _exactRealEigen2x2's doc comment), not
-      // the whole block's own norm, so a matrix with one huge,
-      // otherwise-uninvolved entry does not have its own distinct,
-      // small-magnitude eigenvalue wrongly swallowed as "zero".
-      final double zeroTolerance = eigen.zeroTolerance;
+      // (round 15, finding 1). Codex round 17: each eigenvalue now
+      // classifies against its own error bound (see _exactRealEigen2x2's
+      // doc comment), not a tolerance shared between both roots.
       _requireEigenvaluesInPrecisionRange(
         <double>[l1, l2],
-        <double>[zeroTolerance, zeroTolerance],
+        <double>[eigen.lambda1Error, eigen.lambda2Error],
         operation,
       );
-      final _EigenvalueSign sign1 = _classifyEigenvalue(l1, zeroTolerance);
-      final _EigenvalueSign sign2 = _classifyEigenvalue(l2, zeroTolerance);
+      final _EigenvalueSign sign1 = _classifyEigenvalue(l1, eigen.lambda1Error);
+      final _EigenvalueSign sign2 = _classifyEigenvalue(l2, eigen.lambda2Error);
       if (sign1 == _EigenvalueSign.negative ||
           sign2 == _EigenvalueSign.negative) {
         throw MatrixDomainError(
@@ -6429,4 +6673,24 @@ Matrix debugCyclicJacobiSqrtWithSweepBudget(Matrix matrix, int maxSweeps) {
     operation: 'square root',
     checkOperandRange: true,
   );
+}
+
+/// Testing-only seam (Codex round 17) exposing
+/// [Matrix._exactRealEigen2x2]'s full return record directly, the same
+/// pattern as [debugCyclicJacobiSqrtWithSweepBudget] above. Several
+/// regression tests need the raw per-eigenvalue error bound
+/// (`lambda1Error`/`lambda2Error`) itself, not just an end-to-end
+/// success/failure through the public API.
+@visibleForTesting
+({
+  bool isComplex,
+  double lambda1,
+  double lambda2,
+  double m,
+  double w,
+  double lambda1Error,
+  double lambda2Error,
+})
+debugExactRealEigen2x2(double a, double b, double c, double d) {
+  return Matrix._exactRealEigen2x2(a, b, c, d);
 }

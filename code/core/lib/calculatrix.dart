@@ -13,7 +13,8 @@ export 'src/machine/calculatrix_macro.dart';
 export 'src/machine/calculatrix_program.dart';
 export 'src/machine/commands.dart';
 export 'src/machine/macros.dart';
-export 'src/matrix/matrix.dart' hide debugCyclicJacobiSqrtWithSweepBudget;
+export 'src/matrix/matrix.dart'
+    hide debugCyclicJacobiSqrtWithSweepBudget, debugExactRealEigen2x2;
 export 'src/matrix/matrix_display_formatter.dart';
 export 'src/numeric/numeric_policy.dart';
 export 'src/rpn/rpn_engine.dart';

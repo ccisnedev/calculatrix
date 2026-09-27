@@ -58,13 +58,28 @@ void main() {
     test('exp(A) matches the centered-discriminant closed form for a '
         'complex pair whose uncentered discriminant loses precision', () {
       // a=1e8, d=-99999999, b=1e8, c=-99999999.00000004: chosen so the
-      // true (centered) discriminant halfDiff^2 + b*c is -4 (m=0.5, w=2),
-      // but trace^2 - 4*det evaluates to -15 instead of -16, a large
-      // relative error from subtracting two ~1e16-magnitude terms. Both
-      // formulas agree the pair is complex, so this is not a
-      // classification flip: it is the recomputed discriminant itself
-      // (used for the rotation frequency w in the c0*I + c1*A closed
-      // form) losing precision, which changes exp(A) by several percent.
+      // centered discriminant halfDiff^2 + b*c is close to -4 (m=0.5,
+      // w close to 2), but trace^2 - 4*det evaluates to -15 instead of
+      // approximately -16, a large relative error from subtracting two
+      // ~1e16-magnitude terms. Both formulas agree the pair is complex, so
+      // this is not a classification flip: it is the recomputed
+      // discriminant itself (used for the rotation frequency w in the
+      // c0*I + c1*A closed form) losing precision, which changes exp(A)
+      // by several percent.
+      //
+      // Codex round 17: `c`'s decimal literal, -99999999.00000004, is not
+      // exactly representable as a double; the actual stored value is
+      // -99999999.00000004470348358154 (verified by exact BigInt
+      // decomposition of its IEEE 754 bits), so the true, fully precise
+      // centered discriminant of the matrix these doubles actually form is
+      // exactly -1106339/262144 (-4.220348358154297), not exactly -4. The
+      // pre-round-17 plain floating point centered-discriminant computation
+      // coincidentally rounded to exactly -4 (its own, smaller-scale
+      // cancellation loss happened to move it there), close to but not
+      // equal to this true value; the round 17 error-free-transform
+      // compensated discriminant instead recovers the true value exactly,
+      // so `w` here is derived from that true discriminant, not the
+      // pre-round-17 implementation's own approximate output.
       final double a = 100000000.0;
       final double b = 100000000.0;
       final double c = -99999999.00000004;
@@ -76,11 +91,11 @@ void main() {
 
       final Matrix result = matrix.exp();
 
-      // True closed form: m = (a+d)/2 = 0.5, w = sqrt(-(halfDiff^2+b*c))
-      // = 2 exactly (by construction), em = exp(0.5),
-      // c1 = em * sin(w) / w, c0 = em * cos(w) - c1 * m.
+      // True closed form: m = (a+d)/2 = 0.5 exactly, w = sqrt(1106339/262144)
+      // (see the derivation above), em = exp(0.5), c1 = em * sin(w) / w,
+      // c0 = em * cos(w) - c1 * m.
       final double m = 0.5;
-      final double w = 2.0;
+      final double w = math.sqrt(1106339 / 262144);
       final double em = math.exp(m);
       final double c1 = em * math.sin(w) / w;
       final double c0 = em * math.cos(w) - c1 * m;
