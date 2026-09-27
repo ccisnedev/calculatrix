@@ -2002,6 +2002,95 @@ class Matrix {
     return (value: value, error: error, reliable: reliable);
   }
 
+  /// Codex round 19: [_exactRealEigen2x2] used to fall back to the
+  /// discriminant recomputed on the WHOLE-BLOCK-scaled entries (`sa`, `sb`,
+  /// `sc`, `sd`, scaled by the one power of two nearest
+  /// `max(|a|,|b|,|c|,|d|)`) whenever the direct, natural-unit discriminant
+  /// was not certified reliable. That scale is tuned to keep `a`/`d`
+  /// representable, so whenever `a`/`d` are far larger than `b`/`c` (which
+  /// is exactly what makes the direct discriminant unreliable in the first
+  /// place: `cancellationScale` there can be small even when `a`/`d` are
+  /// huge), the same scale crushes the already-small `b`/`c` down far
+  /// enough that their scaled product underflows to exactly 0, even though
+  /// `b`, `c` and the true `b*c` are each individually representable. For
+  /// `[[-1e20, 1e-150], [-2e-150, -1e20]]`, this spuriously zeroed the
+  /// discriminant's correction term and misclassified the true complex pair
+  /// `-1e20 +/- i*sqrt(2)*1e-150` as a repeated real eigenvalue at `-1e20`
+  /// (wrongly rejected by `log()`/`power(0.25)` as a negative real
+  /// eigenvalue) and, for `[[1e20, 1e-150], [4e-150, 1e20]]`, misclassified
+  /// the true distinct real pair `1e20 +/- 2e-150` as a repeated root with
+  /// a zero error bound instead of one covering that `2e-150` separation.
+  ///
+  /// The discriminant `D = h^2 + b*c` (`h = (a-d)/2`) is a property of the
+  /// CENTERED block alone: it never depends on `m = (a+d)/2` or on the raw
+  /// magnitude of `a`/`d` beyond their difference. This helper instead
+  /// chooses its own power-of-two scale from `max(|h|, |b|, |c|)` alone, so
+  /// `h`, `b` and `c` are rebased together near unit magnitude on their own
+  /// terms, independent of whatever scale `a`/`d` alone might need.
+  ///
+  /// The returned `value`/`error` are in THAT scale, never rescaled back to
+  /// natural units here: for a sufficiently extreme block, the true
+  /// natural-unit discriminant can itself be unrepresentably small (for
+  /// example `2^-1100`), so only a later `sqrt`, taken in this scale and
+  /// then rescaled by a single power of two, ever recovers a representable
+  /// value; the caller is responsible for that rescale, using the returned
+  /// `scale`. `reliable` certifies this recomputation exactly as
+  /// [_compensatedDiscriminant] does its own, so a caller can fall further
+  /// back (to the whole-block-scaled discriminant) when even this centered
+  /// recomputation is not sound, rather than trusting a possibly-corrupted
+  /// zero bound.
+  static ({double value, double error, bool reliable, int scale})
+  _scaledCenteredDiscriminant(double a, double b, double c, double d) {
+    final (double adSum, double adSumError) = _twoSum(a, -d);
+    final double halfDiffHi = adSum / 2;
+    final double halfDiffLo = adSumError / 2;
+    final double maxAbs = <double>[
+      halfDiffHi.abs(),
+      b.abs(),
+      c.abs(),
+    ].reduce(math.max);
+
+    int scale = 0;
+    double sh = halfDiffHi;
+    double shLo = halfDiffLo;
+    double sb = b;
+    double sc = c;
+    if (maxAbs != 0) {
+      scale = (math.log(maxAbs) / math.ln2).round();
+      if (scale != 0) {
+        sh = _scalarScaleByPowerOfTwo(halfDiffHi, -scale.toDouble());
+        shLo = _scalarScaleByPowerOfTwo(halfDiffLo, -scale.toDouble());
+        sb = _scalarScaleByPowerOfTwo(b, -scale.toDouble());
+        sc = _scalarScaleByPowerOfTwo(c, -scale.toDouble());
+      }
+    }
+
+    final (double sqHi, double sqErr) = _twoProduct(sh, sh);
+    final double crossTerm = 2 * sh * shLo;
+    final (double bcHi, double bcErr) = _twoProduct(sb, sc);
+    final double dominant = sqHi + bcHi;
+    final double correction = sqErr + crossTerm + bcErr;
+    final double value = dominant + correction;
+    final double cancellationScale = math.max(sqHi.abs(), bcHi.abs());
+    final double error =
+        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            CalculatrixNumericPolicy.unitRoundoff *
+            CalculatrixNumericPolicy.unitRoundoff *
+            cancellationScale +
+        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            CalculatrixNumericPolicy.unitRoundoff *
+            value.abs();
+    final bool reliable =
+        _isNormalMagnitude(sh) &&
+        _isNormalMagnitude(sqHi) &&
+        _isNormalMagnitude(sqErr) &&
+        _isNormalMagnitude(crossTerm) &&
+        _isNormalMagnitude(bcHi) &&
+        _isNormalMagnitude(bcErr) &&
+        _cancellationWithinDoubleDoubleRange(cancellationScale);
+    return (value: value, error: error, reliable: reliable, scale: scale);
+  }
+
   /// Codex round 17 (P4); Codex round 18, finding 1: companion to
   /// [_compensatedDiscriminant] for the determinant `a*d - b*c`, whose own
   /// cancellation directly amplifies into the smaller-magnitude eigenvalue
@@ -2351,19 +2440,46 @@ class Matrix {
     final (double directSumHi, double directSumErr) = _twoSum(a, d);
     final double directM = directSumHi / 2;
     final double directMError = directSumErr.abs() / 2;
-    final double effectiveDiscriminant =
-        directDiscriminantReliable ? directDiscriminant : discriminant;
-    final double effectiveDiscriminantError =
-        directDiscriminantReliable ? directDisc.error : scaledDisc.error;
-    final double effectiveM = directDiscriminantReliable ? directM : m;
-    final double effectiveMError =
-        directDiscriminantReliable ? directMError : mErrorScaled;
-    // The direct discriminant/m above are already in natural (unscaled)
-    // units when reliable, so they must not be rescaled again; only the
-    // scaled-block fallback still needs the `2^k` rescale back to natural
-    // units.
-    double finishScale(double value) =>
-        directDiscriminantReliable ? value : rescale(value);
+
+    // Codex round 19: prefer the direct discriminant; else the centered,
+    // independently-scaled recomputation (see
+    // [_scaledCenteredDiscriminant]'s doc comment), certified by its own
+    // `reliable` flag; only fall all the way back to the whole-block-scaled
+    // discriminant above (the least precise of the three, since its scale
+    // is tuned to `a`/`d`, not to the discriminant's own terms) when even
+    // the centered recomputation is not sound.
+    final ({double value, double error, bool reliable, int scale})
+    centeredDisc = _scaledCenteredDiscriminant(a, b, c, d);
+    final bool useCenteredDisc =
+        !directDiscriminantReliable && centeredDisc.reliable;
+    final int effectiveScale = directDiscriminantReliable
+        ? 0
+        : (useCenteredDisc ? centeredDisc.scale : k);
+    final double effectiveDiscriminant = directDiscriminantReliable
+        ? directDiscriminant
+        : (useCenteredDisc ? centeredDisc.value : discriminant);
+    final double effectiveDiscriminantError = directDiscriminantReliable
+        ? directDisc.error
+        : (useCenteredDisc ? centeredDisc.error : scaledDisc.error);
+    // `effectiveM` is always the direct, natural-unit mean. Unlike the
+    // discriminant, `m = (a+d)/2` is a single [_twoSum]-compensated
+    // addition, never a product, so it cannot underflow the way `sb*sc`
+    // can; it needs no scaled fallback of its own, and the D38 declared
+    // range keeps `a+d` itself nowhere near double overflow.
+    final double effectiveM = directM;
+    final double effectiveMError = directMError;
+    // Converts a quantity of `sqrt(D)`'s own dimension (one power of the
+    // chosen scale, not two, since `sqrt(x*2^(2*scale)) = sqrt(x)*2^scale`)
+    // computed in whichever units `effectiveDiscriminant` above is in, into
+    // natural units. Never rescale `effectiveDiscriminant` itself before
+    // taking its square root: for a sufficiently extreme block, the true
+    // natural-unit discriminant can itself be unrepresentably small (for
+    // example `2^-1100`, Codex round 18's own finding-3 fixture), so only
+    // the square root, taken in scaled units and rescaled by a single power
+    // of two afterwards, ever recovers a representable value.
+    double toNaturalSqrtScale(double value) => effectiveScale == 0
+        ? value
+        : _scalarScaleByPowerOfTwo(value, effectiveScale.toDouble());
 
     if (effectiveDiscriminant < -effectiveDiscriminantError) {
       final double w = math.sqrt(-effectiveDiscriminant);
@@ -2371,8 +2487,8 @@ class Matrix {
         isComplex: true,
         lambda1: 0,
         lambda2: 0,
-        m: finishScale(effectiveM),
-        w: finishScale(w),
+        m: effectiveM,
+        w: toNaturalSqrtScale(w),
         lambda1Error: 0,
         lambda2Error: 0,
       );
@@ -2390,9 +2506,9 @@ class Matrix {
       );
       final double tau =
           CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
-          (r + effectiveMError);
-      final double lambda = finishScale(effectiveM);
-      final double lambdaError = finishScale(tau);
+          (toNaturalSqrtScale(r) + effectiveMError);
+      final double lambda = effectiveM;
+      final double lambdaError = tau;
       return (
         isComplex: false,
         lambda1: lambda,
@@ -2405,15 +2521,24 @@ class Matrix {
     }
 
     final double sqrtD = math.sqrt(effectiveDiscriminant);
+    // Codex round 19: `sqrtD` above is in whichever units
+    // `effectiveDiscriminant` is in (natural when the direct discriminant
+    // is reliable, otherwise `centeredDisc`'s or the whole-block's own
+    // scale); `effectiveM` is always natural. Combining them directly would
+    // silently mix units exactly when the centered/whole-block fallback is
+    // in play, so `sqrtD` is converted to natural units first via
+    // [toNaturalSqrtScale] before it is ever added to `effectiveM`.
+    final double sqrtDNatural = toNaturalSqrtScale(sqrtD);
     final double signM = effectiveM >= 0 ? 1.0 : -1.0;
-    final double q = effectiveM + (signM * sqrtD);
-    final double lambda1 = finishScale(q);
+    final double q = effectiveM + (signM * sqrtDNatural);
+    final double lambda1 = q;
     // Codex round 17: `lambda1`'s own error bound propagates `E_D` through
     // the square root, the square root's own relative rounding, and
     // `effectiveM`'s own [_twoSum] residual.
     final double eSqrtD =
         effectiveDiscriminantError / (2 * sqrtD) +
         CalculatrixNumericPolicy.unitRoundoff * sqrtD;
+    final double eSqrtDNatural = toNaturalSqrtScale(eSqrtD);
     // Codex round 18, finding 2: `q = effectiveM + signM*sqrtD` above is a
     // single, uncompensated floating point addition of two already-rounded
     // operands, so forming `q` itself rounds again, by up to
@@ -2426,17 +2551,14 @@ class Matrix {
     // own error by about six orders of magnitude (both roots' true error
     // was about 9.2e-17, but the bound omitting this term was about
     // 1.5e-22).
-    final double lambda1Error = finishScale(
-      CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
-          (effectiveMError +
-              eSqrtD +
-              CalculatrixNumericPolicy.unitRoundoff * q.abs()),
-    );
+    final double lambda1Error =
+        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+        (effectiveMError + eSqrtDNatural + CalculatrixNumericPolicy.unitRoundoff * q.abs());
 
     double lambda2;
     double lambda2Error;
     if (q == 0) {
-      lambda2 = finishScale(effectiveM - (signM * sqrtD));
+      lambda2 = effectiveM - (signM * sqrtDNatural);
       lambda2Error = lambda1Error;
     } else {
       // Round 11 correction, finding 2: `det` above is the determinant of
@@ -2484,6 +2606,21 @@ class Matrix {
           !directAdUnderflowed &&
           !directBcUnderflowed &&
           directDetComp.reliable;
+      // Codex round 19: `directDet`'s own magnitude can still be sound even
+      // when `directDetComp.reliable` is false, because that flag also
+      // trips on a Veltkamp-split cross-term landing in the subnormal
+      // range deep inside `b*c`'s own compensation (see
+      // [_compensatedDeterminant]'s doc comment) even when `b*c` itself is
+      // so many orders of magnitude smaller than `a*d` that it contributes
+      // nothing measurable to `det` either way. Distinguish that case (the
+      // top-level products themselves did not underflow and the result is
+      // finite) from a genuinely corrupted `directDet` value (not finite,
+      // or one of the two products itself underflowed to exactly 0): only
+      // the latter needs the whole-block-scaled fallback below, which uses
+      // `discriminant` (Codex round 9/19's own underflow-prone quantity) to
+      // form `qScaled` and can turn a should-be-nonzero bound into `0/0`.
+      final bool directDetValueUsable =
+          directDet.isFinite && !directAdUnderflowed && !directBcUnderflowed;
       if (directDetReliable) {
         lambda2 = directDet / lambda1;
         // Codex round 17, finding 2: propagate `E_det` through the
@@ -2495,6 +2632,31 @@ class Matrix {
         lambda2Error =
             CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
             (directDetComp.error / lambda1.abs() +
+                lambda2.abs() * lambda1Error / lambda1.abs() +
+                CalculatrixNumericPolicy.unitRoundoff * lambda2.abs());
+      } else if (directDetValueUsable) {
+        // Codex round 19: `directDet`'s value is sound (see
+        // `directDetValueUsable`'s doc comment above) but its
+        // error-free-transform certification failed, so its own
+        // `directDetComp.error` cannot be trusted as a tight bound. Use a
+        // first-order, uncompensated error floor instead: the usual
+        // backward-error scale (`unitRoundoff` times the larger of
+        // `directDet`'s own magnitude or the (possibly imprecise) `b*c`
+        // term it could not fully certify), plus whatever `directDetComp`
+        // did manage to report, so the bound is always at least as large
+        // as an ordinary uncompensated computation's rounding error, never
+        // a silently-too-tight or NaN one from the whole-block-scaled
+        // fallback below (whose own `discriminant` shares the exact
+        // underflow bug this round's finding is about, and can turn a
+        // should-be-nonzero bound into `0/0`).
+        lambda2 = directDet / lambda1;
+        final double conservativeDetError =
+            CalculatrixNumericPolicy.unitRoundoff *
+                math.max(directDet.abs(), b.abs() * c.abs()) +
+            directDetComp.error;
+        lambda2Error =
+            CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+            (conservativeDetError / lambda1.abs() +
                 lambda2.abs() * lambda1Error / lambda1.abs() +
                 CalculatrixNumericPolicy.unitRoundoff * lambda2.abs());
       } else {
@@ -2544,8 +2706,8 @@ class Matrix {
       isComplex: false,
       lambda1: lambda1,
       lambda2: lambda2,
-      m: finishScale(effectiveM),
-      w: finishScale(sqrtD),
+      m: effectiveM,
+      w: sqrtDNatural,
       lambda1Error: lambda1Error,
       lambda2Error: lambda2Error,
     );
