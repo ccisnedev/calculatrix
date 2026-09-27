@@ -1907,7 +1907,34 @@ class Matrix {
   /// cancellation. On the complex-pair branch, `m` and `w` (the rotation
   /// frequency, `sqrt(-discriminant)`) are returned directly so callers
   /// never need to recompute the discriminant themselves.
-  static ({bool isComplex, double lambda1, double lambda2, double m, double w})
+  /// Codex round 16: [zeroTolerance] is this pair's own block-local
+  /// backward-error bound for the real, distinct-eigenvalue branch, meant
+  /// for [_classifyEigenvalue] the same way [_cyclicJacobiEigendecomposition]
+  /// computes one for the exactly-symmetric (cyclic Jacobi) branch. It is 0
+  /// for the exactly-triangular fast path (the eigenvalues are raw diagonal
+  /// entries, with no arithmetic between them at all) and for a repeated
+  /// eigenvalue (computed directly as `effectiveM`, never through a
+  /// cancellation-prone division). For a genuine distinct-eigenvalue pair,
+  /// the smaller-magnitude eigenvalue is always computed as `det / lambda1`
+  /// (see the comments below), so its own resolvable precision is governed
+  /// entirely by how much `det = a*d - b*c` itself can lose to
+  /// cancellation, not by the whole block's own norm: a matrix with one
+  /// huge, unrelated entry (for example `[[4, 1e20], [0, 1]]`) must not
+  /// have its own, perfectly well-resolved, tiny eigenvalue swallowed by a
+  /// tolerance sized off that huge, uninvolved entry. `max(|a*d|, |b*c|)`
+  /// is the largest of the two terms `det`'s own subtraction cancels
+  /// between (whichever of `a*d`/`b*c` dominates already carries the
+  /// larger absolute rounding error), divided by the larger-magnitude
+  /// eigenvalue (`det`'s own share of that error, once divided through by
+  /// `lambda1` to recover `lambda2`).
+  static ({
+    bool isComplex,
+    double lambda1,
+    double lambda2,
+    double m,
+    double w,
+    double zeroTolerance,
+  })
   _exactRealEigen2x2(double a, double b, double c, double d) {
     // Round 9 correction, finding 3: an exactly-triangular 2x2 block's
     // eigenvalues are its diagonal entries, exactly, by definition (same
@@ -1919,7 +1946,14 @@ class Matrix {
     // spuriously classifying two genuinely distinct eigenvalues as a
     // repeated one at their mean.
     if (b == 0 || c == 0) {
-      return (isComplex: false, lambda1: a, lambda2: d, m: (a + d) / 2, w: 0);
+      return (
+        isComplex: false,
+        lambda1: a,
+        lambda2: d,
+        m: (a + d) / 2,
+        w: 0,
+        zeroTolerance: 0,
+      );
     }
 
     // Round 12 correction, finding 3: balance `b` and `c` against each
@@ -2029,12 +2063,20 @@ class Matrix {
         lambda2: 0,
         m: finishScale(effectiveM),
         w: finishScale(w),
+        zeroTolerance: 0,
       );
     }
 
     if (effectiveDiscriminant == 0) {
       final double lambda = finishScale(effectiveM);
-      return (isComplex: false, lambda1: lambda, lambda2: lambda, m: lambda, w: 0);
+      return (
+        isComplex: false,
+        lambda1: lambda,
+        lambda2: lambda,
+        m: lambda,
+        w: 0,
+        zeroTolerance: 0,
+      );
     }
 
     final double sqrtD = math.sqrt(effectiveDiscriminant);
@@ -2109,12 +2151,30 @@ class Matrix {
     // needs exactly this precise, independent `w` to recover an
     // eigenvalue-offset-from-`m` correction that materializing
     // `lambda1 = m + w` as a single double would otherwise destroy.
+    //
+    // Codex round 16: see this method's own doc comment for why
+    // `zeroTolerance` is derived from `max(|a*d|, |b*c|)` (the two terms
+    // `det` cancels between) divided by the larger-magnitude eigenvalue,
+    // using the original, natural-unit `a`, `b`, `c`, `d` and the final,
+    // already-rescaled `lambda1`/`lambda2`, not the whole block's own norm.
+    final double cancellationScale = math.max((a * d).abs(), (b * c).abs());
+    final double eigenvalueMagnitudeAnchor = math.max(
+      lambda1.abs(),
+      lambda2.abs(),
+    );
+    final double zeroTolerance = eigenvalueMagnitudeAnchor == 0
+        ? 0
+        : CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+              CalculatrixNumericPolicy.unitRoundoff *
+              cancellationScale /
+              eigenvalueMagnitudeAnchor;
     return (
       isComplex: false,
       lambda1: lambda1,
       lambda2: lambda2,
       m: finishScale(effectiveM),
       w: finishScale(sqrtD),
+      zeroTolerance: zeroTolerance,
     );
   }
 
@@ -3437,7 +3497,7 @@ class Matrix {
     }
 
     if (rowCount == 2) {
-      final ({bool isComplex, double lambda1, double lambda2, double m, double w})
+      final ({bool isComplex, double lambda1, double lambda2, double m, double w, double zeroTolerance})
       eigen = _exactRealEigen2x2(
         _rows[0][0],
         _rows[0][1],
@@ -3447,28 +3507,30 @@ class Matrix {
       if (eigen.isComplex) {
         _requireComplexPairPartsInPrecisionRange(eigen.m, eigen.w, operation);
       } else {
-        // Codex round 15, finding 1: this closed-form eigenvalue pair has
-        // its own backward error from the same source as the iterative
-        // cyclic Jacobi branch above (subtraction, sqrt and division all
-        // carried out in finite precision), not "no rotation noise at
-        // all" as if the closed form were exact. A computed eigenvalue no
-        // floating-point computation on this matrix could ever have
-        // driven closer to true zero than this bound must be classified
-        // as zero before the D38 range check ever sees it, the same way
-        // the Jacobi branch's own block-local tolerance already works;
-        // using an unconditional 0 here instead let a genuinely
-        // negligible eigenvalue, an artifact of catastrophic cancellation
-        // in a nearly-singular 2x2 rather than a meaningful nonzero
-        // result, be wrongly rejected as out of the declared range.
-        final double zeroTolerance = _blockZeroTolerance(<double>[
-          _rows[0][0],
-          _rows[0][1],
-          _rows[1][0],
-          _rows[1][1],
-        ], 2);
+        // Codex round 15, finding 1; Codex round 16: this closed-form
+        // eigenvalue pair has its own backward error from the same source
+        // as the iterative cyclic Jacobi branch above (subtraction, sqrt
+        // and division all carried out in finite precision), not "no
+        // rotation noise at all" as if the closed form were exact. A
+        // computed eigenvalue no floating-point computation on this matrix
+        // could ever have driven closer to true zero than this bound must
+        // be classified as zero before the D38 range check ever sees it,
+        // the same way the Jacobi branch's own block-local tolerance
+        // already works; using an unconditional 0 here instead let a
+        // genuinely negligible eigenvalue, an artifact of catastrophic
+        // cancellation in a nearly-singular 2x2 rather than a meaningful
+        // nonzero result, be wrongly rejected as out of the declared range.
+        // round 16 correction: use [eigen]'s own `zeroTolerance` (derived
+        // from the actual `det = a*d - b*c` cancellation this pair's
+        // smaller eigenvalue is computed through, see
+        // [_exactRealEigen2x2]'s doc comment), not the whole block's own
+        // Frobenius norm, which a single huge, otherwise-uninvolved entry
+        // (for example an off-diagonal entry far larger than either
+        // eigenvalue) can inflate enough to wrongly swallow a distinct,
+        // fully resolved, merely small-magnitude eigenvalue as "zero".
         _requireEigenvaluesInPrecisionRange(
           <double>[eigen.lambda1, eigen.lambda2],
-          <double>[zeroTolerance, zeroTolerance],
+          <double>[eigen.zeroTolerance, eigen.zeroTolerance],
           operation,
         );
       }
@@ -3481,52 +3543,21 @@ class Matrix {
     // caller already raises downstream.
   }
 
-  /// Codex round 15, finding 1: the block-local Weyl backward-error bound
-  /// a computed eigenvalue's own block could not have been driven any
-  /// closer to true zero than, by finite-precision arithmetic alone. This
-  /// is the same bound [_cyclicJacobiEigendecomposition] computes per
-  /// union-find block (Golub and Van Loan's `|computed_i - exact_i| <= c *
-  /// m * unitRoundoff * ||B||_F`, `B` the block, `m` its size), computed
-  /// here directly from [entries] (the block's own entries, in any order)
-  /// and [blockSize] (`m`, the block's row/column count) for a caller,
-  /// such as the general 2x2 closed-form eigenvalue solver, that never
-  /// builds a union-find block of its own. The Frobenius norm is computed
-  /// via a scaled sum of squares (dividing by the block's own largest
-  /// magnitude entry before squaring) so it never overflows for entries
-  /// near the top of the declared precision range, the same technique
-  /// [_cyclicJacobiEigendecomposition] uses.
-  static double _blockZeroTolerance(List<double> entries, int blockSize) {
-    double maxAbs = 0;
-    for (final double entry in entries) {
-      final double abs = entry.abs();
-      if (abs > maxAbs) maxAbs = abs;
-    }
-    if (maxAbs == 0) {
-      return 0;
-    }
-    double sumSquaresScaled = 0;
-    for (final double entry in entries) {
-      final double scaled = entry / maxAbs;
-      sumSquaresScaled += scaled * scaled;
-    }
-    final double frobeniusNorm = maxAbs * math.sqrt(sumSquaresScaled);
-    return CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
-        blockSize *
-        CalculatrixNumericPolicy.unitRoundoff *
-        frobeniusNorm;
-  }
-
   /// Codex round 13, findings 1 and 4 (P1): classifies a computed
   /// eigenvalue as [_EigenvalueSign.zero], [_EigenvalueSign.positive] or
   /// [_EigenvalueSign.negative], BEFORE any D38 declared-precision-range
   /// gate ever runs, so that gate never sees (and never rejects) an
   /// eigenvalue this classifies as zero, regardless of its own computed
   /// floating point sign or magnitude. [zeroTolerance] is the caller's own
-  /// block-local Weyl backward-error bound (see
-  /// [_cyclicJacobiEigendecomposition]'s doc comment); it is exactly 0 for
-  /// a diagonal or general 2x2 caller, which has no Jacobi rotation noise
-  /// at all, so only a mathematically exact zero eigenvalue is ever
-  /// classified as zero there.
+  /// block-local backward-error bound: the `zeroTolerance`
+  /// [_exactRealEigen2x2] itself computes for a general 2x2 caller (Codex
+  /// round 16; see that method's own doc comment for why it is derived
+  /// from the actual cancellation its smaller eigenvalue is computed
+  /// through, not from the whole block's own norm), the Weyl bound
+  /// [_cyclicJacobiEigendecomposition] computes for its own rotation noise,
+  /// or exactly 0 for a diagonal caller, which has no off-diagonal coupling
+  /// and so no rounding noise at all, meaning only a mathematically exact
+  /// zero eigenvalue is ever classified as zero there.
   static _EigenvalueSign _classifyEigenvalue(
     double lambda,
     double zeroTolerance,
@@ -3585,17 +3616,28 @@ class Matrix {
   /// directly from entries already covered by
   /// [_requireEntriesInPrecisionRange].
   ///
-  /// Codex round 13, findings 1 and 4 (P1): [zeroTolerances] is a parallel
-  /// array (exactly 0 per index for a general 2x2 caller, which has no
-  /// Jacobi rotation noise at all); an eigenvalue [_classifyEigenvalue]s as
-  /// zero is skipped here, the same as the old exact-zero check, but now
-  /// covers any eigenvalue within its own block-local backward-error bound,
-  /// of either sign, not only a value that happens to compute to exactly
-  /// 0.0. This is a classification, not a second, looser range check: the
-  /// caller's own per-operation callback (see [_realScalarPower] and
-  /// [Matrix.log]'s exactly-symmetric branch) independently classifies the
-  /// same eigenvalue again to decide what "zero" means for that operation
-  /// (sqrt succeeds with 0, log/power raise log-undefined).
+  /// Codex round 13, findings 1 and 4 (P1); Codex round 16: [zeroTolerances]
+  /// is a parallel array, one entry per eigenvalue, each caller's own
+  /// backward-error bound: the `zeroTolerance` [_exactRealEigen2x2] itself
+  /// computes (a general 2x2 caller; round 16 corrected this from a literal
+  /// 0, since that closed form's smaller eigenvalue is computed as
+  /// `det / lambda1`, so it can round a mathematically nonzero eigenvalue
+  /// to a tiny nonzero residual whenever `det = a*d - b*c` itself loses
+  /// precision to cancellation, see [_exactRealEigen2x2]'s own doc comment
+  /// for why that bound is scaled off `det`'s own cancellation, not the
+  /// whole block's norm), the Weyl backward-error bound
+  /// [_cyclicJacobiEigendecomposition] computes (the exactly-symmetric,
+  /// cyclic Jacobi caller), or exactly 0 (a diagonal caller, which has no
+  /// off-diagonal coupling and so no rounding noise at all). An eigenvalue
+  /// [_classifyEigenvalue]s as zero is skipped
+  /// here, the same as the old exact-zero check, but now covers any
+  /// eigenvalue within its own block-local backward-error bound, of either
+  /// sign, not only a value that happens to compute to exactly 0.0. This is
+  /// a classification, not a second, looser range check: the caller's own
+  /// per-operation callback (see [_realScalarPower] and [Matrix.log]'s
+  /// exactly-symmetric branch) independently classifies the same eigenvalue
+  /// again to decide what "zero" means for that operation (sqrt succeeds
+  /// with 0, log/power raise log-undefined).
   static void _requireEigenvaluesInPrecisionRange(
     List<double> eigenvalues,
     List<double> zeroTolerances,
@@ -5313,7 +5355,7 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final ({bool isComplex, double lambda1, double lambda2, double m, double w})
+    final ({bool isComplex, double lambda1, double lambda2, double m, double w, double zeroTolerance})
     eigen = _exactRealEigen2x2(a, b, c, d);
 
     if (eigen.isComplex) {
@@ -5348,9 +5390,20 @@ class Matrix {
     final double l1 = eigen.lambda1;
     final double l2 = eigen.lambda2;
     if (checkOperandRange) {
+      // Codex round 16: use eigen's own backward-error bound, not a
+      // literal 0, since l1/l2 are computed from a, b, c, d by subtraction
+      // and a square root (see _exactRealEigen2x2), so a mathematically
+      // nonzero eigenvalue can round to a tiny nonzero residual here just
+      // as it can for the operand-spectrum gate (round 15, finding 1).
+      // eigen.zeroTolerance is derived from the actual det = a*d - b*c
+      // cancellation this pair's smaller eigenvalue is computed through
+      // (see _exactRealEigen2x2's doc comment), not the whole block's own
+      // norm, so a matrix with one huge, otherwise-uninvolved entry does
+      // not have its own distinct, small-magnitude eigenvalue wrongly
+      // swallowed as "zero".
       _requireEigenvaluesInPrecisionRange(
         <double>[l1, l2],
-        <double>[0, 0],
+        <double>[eigen.zeroTolerance, eigen.zeroTolerance],
         operation,
       );
     }
@@ -5491,7 +5544,7 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final ({bool isComplex, double lambda1, double lambda2, double m, double w})
+    final ({bool isComplex, double lambda1, double lambda2, double m, double w, double zeroTolerance})
     eigen = _exactRealEigen2x2(a, b, c, d);
 
     double c1;
@@ -5541,28 +5594,44 @@ class Matrix {
     } else {
       final double l1 = eigen.lambda1;
       final double l2 = eigen.lambda2;
+      // Codex round 16: use eigen's own backward-error bound, not a
+      // literal 0, for both the D38 range gate and the sign/zero domain
+      // decisions below, since l1/l2 are computed from a, b, c, d by
+      // subtraction and a square root (see _exactRealEigen2x2), so a
+      // mathematically nonzero eigenvalue can round to a tiny nonzero
+      // residual here, the same as it can for the operand-spectrum gate
+      // (round 15, finding 1). eigen.zeroTolerance is derived from the
+      // actual det = a*d - b*c cancellation this pair's smaller eigenvalue
+      // is computed through (see _exactRealEigen2x2's doc comment), not
+      // the whole block's own norm, so a matrix with one huge,
+      // otherwise-uninvolved entry does not have its own distinct,
+      // small-magnitude eigenvalue wrongly swallowed as "zero".
+      final double zeroTolerance = eigen.zeroTolerance;
       if (checkOperandRange) {
         _requireEigenvaluesInPrecisionRange(
           <double>[l1, l2],
-          <double>[0, 0],
+          <double>[zeroTolerance, zeroTolerance],
           operation,
         );
       }
-      if (l1 < 0 || l2 < 0) {
+      final _EigenvalueSign sign1 = _classifyEigenvalue(l1, zeroTolerance);
+      final _EigenvalueSign sign2 = _classifyEigenvalue(l2, zeroTolerance);
+      if (sign1 == _EigenvalueSign.negative ||
+          sign2 == _EigenvalueSign.negative) {
         throw MatrixDomainError(
           'Logarithm is undefined for matrices with a negative real '
           'eigenvalue.',
           errorId: CalculatrixErrorId.logUndefined,
         );
       }
+      if (sign1 == _EigenvalueSign.zero || sign2 == _EigenvalueSign.zero) {
+        throw MatrixDomainError(
+          'Logarithm is undefined for a zero eigenvalue.',
+          errorId: CalculatrixErrorId.logUndefined,
+        );
+      }
       if (l1 == l2) {
         final double l = l1;
-        if (l == 0) {
-          throw MatrixDomainError(
-            'Logarithm is undefined for a zero eigenvalue.',
-            errorId: CalculatrixErrorId.logUndefined,
-          );
-        }
         // Round 12 correction, finding 9: c1 = 1/l materializes a
         // standalone value that overflows for a subnormal-scale
         // repeated eigenvalue, even though every entry it actually
@@ -5586,12 +5655,9 @@ class Matrix {
           ]),
         );
       } else {
-        if (l1 == 0 || l2 == 0) {
-          throw MatrixDomainError(
-            'Logarithm is undefined for a zero eigenvalue.',
-            errorId: CalculatrixErrorId.logUndefined,
-          );
-        }
+        // Codex round 16: the zero and negative checks above already
+        // classify both l1 and l2 as positive before this branch is
+        // reached, so no further zero check is needed here.
 
         // Round 11 correction, finding 1: `log1p((l1 - l2) / l2)` forms
         // `(l1 - l2) / l2` unconditionally, which overflows to `Infinity`
@@ -5850,7 +5916,7 @@ class Matrix {
     final double b = _rows[0][1];
     final double c = _rows[1][0];
     final double d = _rows[1][1];
-    final ({bool isComplex, double lambda1, double lambda2, double m, double w})
+    final ({bool isComplex, double lambda1, double lambda2, double m, double w, double zeroTolerance})
     eigen = _exactRealEigen2x2(a, b, c, d);
 
     double c0;
@@ -5962,27 +6028,51 @@ class Matrix {
     } else {
       final double l1 = eigen.lambda1;
       final double l2 = eigen.lambda2;
+      // Codex round 16: use eigen's own backward-error bound, not a
+      // literal 0, for both the D38 range gate and the sign/zero domain
+      // decisions below, since l1/l2 are computed from a, b, c, d by
+      // subtraction and a square root (see _exactRealEigen2x2), so a
+      // mathematically nonzero eigenvalue can round to a tiny nonzero
+      // residual here, the same as it can for the operand-spectrum gate
+      // (round 15, finding 1). eigen.zeroTolerance is derived from the
+      // actual det = a*d - b*c cancellation this pair's smaller eigenvalue
+      // is computed through (see _exactRealEigen2x2's doc comment), not
+      // the whole block's own norm, so a matrix with one huge,
+      // otherwise-uninvolved entry does not have its own distinct,
+      // small-magnitude eigenvalue wrongly swallowed as "zero".
+      final double zeroTolerance = eigen.zeroTolerance;
       _requireEigenvaluesInPrecisionRange(
         <double>[l1, l2],
-        <double>[0, 0],
+        <double>[zeroTolerance, zeroTolerance],
         operation,
       );
-      if (l1 < 0 || l2 < 0) {
+      final _EigenvalueSign sign1 = _classifyEigenvalue(l1, zeroTolerance);
+      final _EigenvalueSign sign2 = _classifyEigenvalue(l2, zeroTolerance);
+      if (sign1 == _EigenvalueSign.negative ||
+          sign2 == _EigenvalueSign.negative) {
         throw MatrixDomainError(
           'A negative eigenvalue cannot be raised to a non-integer real '
           'power in the real domain.',
           errorId: CalculatrixErrorId.logUndefined,
         );
       }
-      if (l1 == l2) {
-        final double l = l1;
-        if (l == 0) {
+      // Codex round 16: both eigenvalues classified zero (whether or not
+      // they are literally bit-equal) is the same repeated-zero, genuine
+      // Jordan coupling case a single mathematically exact repeated zero
+      // eigenvalue already was; routing it here instead of into the
+      // distinct-eigenvalue branch below avoids that branch nonsensically
+      // picking one classified-zero value as the "nonzero anchor".
+      final bool bothZero =
+          sign1 == _EigenvalueSign.zero && sign2 == _EigenvalueSign.zero;
+      if (l1 == l2 || bothZero) {
+        if (sign1 == _EigenvalueSign.zero) {
           throw MatrixDomainError(
             'A repeated zero eigenvalue with a genuine Jordan coupling '
             'cannot be raised to a non-integer real power.',
             errorId: CalculatrixErrorId.logUndefined,
           );
         }
+        final double l = l1;
         // Round 12 correction, finding 8: c0 = pow(l,y) - c1*l
         // materializes c1*l, which overflows once pow(l,y) sits near
         // double's max even though every entry it actually feeds into
@@ -6032,7 +6122,11 @@ class Matrix {
           ]),
         );
       } else {
-        if (l1 == 0 || l2 == 0) {
+        // Codex round 16: at most one of sign1/sign2 can be zero here,
+        // since bothZero already routed into the branch above; use the
+        // classification, not a raw == 0 comparison, to decide which
+        // eigenvalue (if either) is the numerically-zero one.
+        if (sign1 == _EigenvalueSign.zero || sign2 == _EigenvalueSign.zero) {
           if (rejectZeroEigenvalue || y < 0) {
             throw MatrixDomainError(
               'A zero eigenvalue cannot be raised to a non-integer real '
@@ -6040,7 +6134,7 @@ class Matrix {
               errorId: CalculatrixErrorId.logUndefined,
             );
           }
-          final double lOther = l1 == 0 ? l2 : l1;
+          final double lOther = sign1 == _EigenvalueSign.zero ? l2 : l1;
           // D38 / Codex round 10, rule A: this branch's nonzero result
           // eigenvalue magnitude is lOther^y, whose log-magnitude is
           // y*ln(lOther); the other result eigenvalue is exactly zero,
