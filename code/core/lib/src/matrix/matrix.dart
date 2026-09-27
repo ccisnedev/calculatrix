@@ -3139,8 +3139,16 @@ class Matrix {
     // Codex round 14, finding 1: validates each operand's own SPECTRUM
     // (not merely its entries) against the D38 declared precision range;
     // see [_requireSpectrumInPrecisionRange]'s doc comment.
-    _requireSpectrumInPrecisionRange('matrix exponent base');
-    exponent._requireSpectrumInPrecisionRange('matrix exponent');
+    // Codex round 15, finding 3: the spectrum checks used to run here,
+    // unconditionally, before the kind dispatch below decided whether the
+    // base/exponent pairing is even one of the supported cases. A pairing
+    // outside all of them (e.g. two general, non-scalar, non-complex-form
+    // matrices) must fall through to the ambiguous-power error regardless
+    // of either operand's magnitude, per D25/D34's kind-based precedence:
+    // deciding a pairing is unsupported takes priority over reporting a
+    // magnitude problem within it. Each spectrum check therefore now runs
+    // only inside the specific branch it actually gates, after that branch
+    // has already been established as a permitted pairing.
     if (isScalar) {
       final double b = scalarValue;
 
@@ -3152,6 +3160,16 @@ class Matrix {
       }
 
       if (b > 0) {
+        // Codex round 15, finding 3: the spectrum checks run here, inside
+        // the permitted positive-scalar-base branch, but still BEFORE the
+        // exponent's own class-support check just below, preserving the
+        // precedence round 9, finding 4 already established for this
+        // branch specifically (a raw-entry precision-range gate firing
+        // before the classify-before-scale check, documented by round
+        // 8_correction_test.dart's own "finding 10" regression, which this
+        // reordering must not disturb).
+        _requireSpectrumInPrecisionRange('matrix exponent base');
+        exponent._requireSpectrumInPrecisionRange('matrix exponent');
         // Classify exponent's own, unscaled structure before scaling it by
         // log(b): scaling every entry by the same finite factor can
         // underflow a genuinely nonzero off-diagonal entry to exactly 0,
@@ -3177,6 +3195,8 @@ class Matrix {
       // (aI + bJ), since complex numbers commute and the branch of
       // log(B) is then unambiguous.
       if (exponent.isComplexForm) {
+        _requireSpectrumInPrecisionRange('matrix exponent base');
+        exponent._requireSpectrumInPrecisionRange('matrix exponent');
         // Codex round 14, finding 2 (site B): [_internalLog] of a negative
         // scalar always returns exactly `Matrix.complex(ln(-b), math.pi)`
         // (one exact turn); when the exponent's own imaginary part is
@@ -3212,6 +3232,8 @@ class Matrix {
     // complex-form (aI + bJ) subalgebra commutes unconditionally, so it is
     // the only pairing with an unambiguous result.
     if (isComplexForm && exponent.isComplexForm) {
+      _requireSpectrumInPrecisionRange('matrix exponent base');
+      exponent._requireSpectrumInPrecisionRange('matrix exponent');
       // Codex round 14, finding 2 (site B): a complex-form base whose own
       // imaginary part is exactly zero is a real number wearing
       // complex-form clothing; [_internalLog]'s angle for it, `atan2(0,
@@ -3425,9 +3447,28 @@ class Matrix {
       if (eigen.isComplex) {
         _requireComplexPairPartsInPrecisionRange(eigen.m, eigen.w, operation);
       } else {
+        // Codex round 15, finding 1: this closed-form eigenvalue pair has
+        // its own backward error from the same source as the iterative
+        // cyclic Jacobi branch above (subtraction, sqrt and division all
+        // carried out in finite precision), not "no rotation noise at
+        // all" as if the closed form were exact. A computed eigenvalue no
+        // floating-point computation on this matrix could ever have
+        // driven closer to true zero than this bound must be classified
+        // as zero before the D38 range check ever sees it, the same way
+        // the Jacobi branch's own block-local tolerance already works;
+        // using an unconditional 0 here instead let a genuinely
+        // negligible eigenvalue, an artifact of catastrophic cancellation
+        // in a nearly-singular 2x2 rather than a meaningful nonzero
+        // result, be wrongly rejected as out of the declared range.
+        final double zeroTolerance = _blockZeroTolerance(<double>[
+          _rows[0][0],
+          _rows[0][1],
+          _rows[1][0],
+          _rows[1][1],
+        ], 2);
         _requireEigenvaluesInPrecisionRange(
           <double>[eigen.lambda1, eigen.lambda2],
-          <double>[0, 0],
+          <double>[zeroTolerance, zeroTolerance],
           operation,
         );
       }
@@ -3438,6 +3479,41 @@ class Matrix {
     // matrix-function classes at all; leave its rejection to the more
     // specific error (ambiguous-power or unsupported-matrix-function) its
     // caller already raises downstream.
+  }
+
+  /// Codex round 15, finding 1: the block-local Weyl backward-error bound
+  /// a computed eigenvalue's own block could not have been driven any
+  /// closer to true zero than, by finite-precision arithmetic alone. This
+  /// is the same bound [_cyclicJacobiEigendecomposition] computes per
+  /// union-find block (Golub and Van Loan's `|computed_i - exact_i| <= c *
+  /// m * unitRoundoff * ||B||_F`, `B` the block, `m` its size), computed
+  /// here directly from [entries] (the block's own entries, in any order)
+  /// and [blockSize] (`m`, the block's row/column count) for a caller,
+  /// such as the general 2x2 closed-form eigenvalue solver, that never
+  /// builds a union-find block of its own. The Frobenius norm is computed
+  /// via a scaled sum of squares (dividing by the block's own largest
+  /// magnitude entry before squaring) so it never overflows for entries
+  /// near the top of the declared precision range, the same technique
+  /// [_cyclicJacobiEigendecomposition] uses.
+  static double _blockZeroTolerance(List<double> entries, int blockSize) {
+    double maxAbs = 0;
+    for (final double entry in entries) {
+      final double abs = entry.abs();
+      if (abs > maxAbs) maxAbs = abs;
+    }
+    if (maxAbs == 0) {
+      return 0;
+    }
+    double sumSquaresScaled = 0;
+    for (final double entry in entries) {
+      final double scaled = entry / maxAbs;
+      sumSquaresScaled += scaled * scaled;
+    }
+    final double frobeniusNorm = maxAbs * math.sqrt(sumSquaresScaled);
+    return CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
+        blockSize *
+        CalculatrixNumericPolicy.unitRoundoff *
+        frobeniusNorm;
   }
 
   /// Codex round 13, findings 1 and 4 (P1): classifies a computed
@@ -3470,17 +3546,31 @@ class Matrix {
   /// four exact half-integer cases directly before ever calling
   /// math.cos, so that argument reduction, not floating point
   /// coincidence, is what supplies the exact zero and +/-1 results.
+  ///
+  /// Codex round 15, finding 2: `round()` on a `double` returns a native
+  /// `int`, which on the native VM is a wrapping 64-bit signed type. For
+  /// `y` at or beyond 2^63, `(y / 2).round()` is itself a huge but valid
+  /// `int`, but multiplying it by the literal `2` overflows and wraps to a
+  /// negative value, so the subtraction below silently produces the wrong
+  /// reduced argument instead of the true one (or a range error, depending
+  /// on platform). `roundToDouble()` returns a `double` instead, so the
+  /// whole computation (`/2`, rounding, `*2`, subtraction) stays in
+  /// floating point throughout: doubles do not wrap, they only lose
+  /// fractional precision, which is already lost (harmlessly, since every
+  /// finite double at or beyond 2^52 has no fractional part left to lose)
+  /// long before 2^63.
   static double _cosPi(double y) {
-    final double r = y - (2 * (y / 2).round());
+    final double r = y - (2 * (y / 2).roundToDouble());
     if (r == 0) return 1;
     if (r == 1 || r == -1) return -1;
     if (r == 0.5 || r == -0.5) return 0;
     return math.cos(r * math.pi);
   }
 
-  /// The `sin(y*pi)` counterpart to [_cosPi]; see its doc comment.
+  /// The `sin(y*pi)` counterpart to [_cosPi]; see its doc comment, including
+  /// the round 15, finding 2 correction against native `int` wraparound.
   static double _sinPi(double y) {
-    final double r = y - (2 * (y / 2).round());
+    final double r = y - (2 * (y / 2).roundToDouble());
     if (r == 0 || r == 1 || r == -1) return 0;
     if (r == 0.5) return 1;
     if (r == -0.5) return -1;
