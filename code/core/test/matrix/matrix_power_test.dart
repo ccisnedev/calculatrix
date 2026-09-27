@@ -167,6 +167,32 @@ void main() {
       );
     });
 
+    test(
+      'row 7d (D25 row 7, Codex round 19): zero base, positive fractional '
+      'scalar exponent is zero',
+      () {
+        final Matrix result = Matrix.scalar(0).power(Matrix.scalar(0.5));
+        expect(result, Matrix.scalar(0));
+      },
+    );
+
+    test(
+      'row 7e (D25 row 7, Codex round 19): zero base, negative fractional '
+      'scalar exponent is non-finite',
+      () {
+        expect(
+          () => Matrix.scalar(0).power(Matrix.scalar(-0.5)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError e) => e.errorId,
+              'errorId',
+              CalculatrixErrorId.nonFinite,
+            ),
+          ),
+        );
+      },
+    );
+
     test('row 8: zero base with a matrix exponent needs log 0, which is undefined', () {
       final Matrix y = Matrix.complex(0, math.pi);
 

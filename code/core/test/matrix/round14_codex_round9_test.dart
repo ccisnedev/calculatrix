@@ -95,14 +95,6 @@ Matcher throwsOutOfPrecisionRange() => throwsA(
   ),
 );
 
-Matcher throwsLogUndefined() => throwsA(
-  isA<MatrixDomainError>().having(
-    (MatrixDomainError e) => e.errorId,
-    'errorId',
-    CalculatrixErrorId.logUndefined,
-  ),
-);
-
 void main() {
   group(
     'Codex round 9 finding 1: exp underflow-before-multiply, now converted '
@@ -191,31 +183,34 @@ void main() {
     'repeated negative real eigenvalues',
     () {
       test(
-        'sqrt([[-1e100,1e-150],[-2e-150,-1e100]]) now raises log-undefined '
-        'again, converted a second time by Codex round 18\'s removal of the '
-        'determinant\'s input-uncertainty floor: that floor (added to fix '
-        'this very finding) was itself masking the sign of a genuinely '
-        'negative repeated eigenvalue behind an oversized error bound on '
-        'some fixtures, so round 18 removed it and put the discriminant and '
-        'determinant on one shared pure-forward-error model instead. For '
-        'this fixture, the repeated eigenvalue is unambiguously negative '
-        'under that model, so the sign check now rejects it before '
-        'execution ever reaches the entries-level rule A range check that '
-        'the intermediate (round 9) fix relied on. Reference (mpmath, '
-        'dps=700, needed because a*d~1e200 and b*c~-2e-300 span about 500 '
-        'decimal orders of magnitude, so a lower dps silently rounds the '
-        'discriminant correction away; independently cross-checked by '
-        'squaring the computed root back to the original matrix): the '
-        'exact eigenvalue is negative, so this negative-eigenvalue, non-'
-        'integer real power is undefined in the real domain regardless of '
-        'the rule A range check the round 9 fix used to observe first.',
+        'sqrt([[-1e100,1e-150],[-2e-150,-1e100]]) raises out-of-precision-'
+        'range again: this fixture\'s true eigenvalues are the complex '
+        'pair -1e100 +/- i*sqrt(2)*1e-150 (h=(a-d)/2=0 exactly, so '
+        'D=h^2+b*c=b*c=-2e-300 < 0), the same underflow shape as the two '
+        'Codex round 19 counterexamples at 1e20 scale, just at 1e100 '
+        'scale instead. Between round 18 and round 19, this test instead '
+        'expected log-undefined, on the theory that the repeated '
+        'eigenvalue was negative-real: that was the round 18-era whole-'
+        'block-scaled discriminant fallback\'s own sb*sc underflowing to '
+        'exactly 0 (the scale that keeps a/d representable near 1e100 '
+        'crushes the already-tiny b/c to a magnitude whose product '
+        'underflows), spuriously reporting a repeated real root at '
+        '-1e100 and masking this exact regression rather than reflecting '
+        'genuinely correct behavior. Codex round 19 fixed the fallback to '
+        'scale the centered discriminant (h, b, c) by its own power of '
+        'two, independent of a/d\'s magnitude, so this fixture is '
+        'correctly classified as complex again, and sqrt() reaches the '
+        'entries-level rule A range check (the result\'s real/imaginary '
+        'parts are far below the declared minimum magnitude), the same '
+        'outcome the original Codex round 9 fix observed before round 18 '
+        'temporarily masked it.',
         () {
           final Matrix m = Matrix(<List<double>>[
             <double>[-1e100, 1e-150],
             <double>[-2e-150, -1e100],
           ]);
 
-          expect(() => m.sqrt(), throwsLogUndefined());
+          expect(() => m.sqrt(), throwsOutOfPrecisionRange());
         },
       );
     },
