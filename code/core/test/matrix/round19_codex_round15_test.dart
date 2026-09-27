@@ -84,17 +84,26 @@ Matcher throwsAmbiguousPower() => throwsA(
 void main() {
   group('Codex round 15', () {
     group('finding 1: numerical-zero eigenvalues in a 2x2 spectrum', () {
+      // Codex round 18 removed the general 2x2 closed form's mixed error
+      // model (a determinant input-uncertainty floor that no longer matches
+      // the discriminant's own pure-forward-error bound; see
+      // round22_codex_round18_test.dart). Under that shared, tighter model,
+      // this fixture's residual eigenvalue no longer falls inside its own
+      // block-local backward-error tolerance: it resolves as a genuinely
+      // nonzero 4.661462957000128e-156 (positive-residual fixture) /
+      // -4.66146295700013e-156 (negative-residual fixture), both below
+      // matrixFunctionMinMagnitude=1e-150. The correct D38 outcome for both
+      // fixtures is therefore matrix-out-of-precision-range, not the
+      // identity these tests originally expected.
       test(
         'a nearly-singular 2x2 operand whose true eigenvalues are '
-        'approximately 2s and a tiny numerical-zero residual: s = 1e-140, '
-        'Y = [[s,s],[s,s*(1+2^-50)]] has true eigenvalues approximately 2s '
-        'and -s*2^-50/2 (about -4.89e-156), well within this 2x2 block\'s '
-        'own backward-error bound (10 * 2 * unitRoundoff * '
-        'frobeniusNorm(block), about 4.44e-155, since the block\'s '
-        'Frobenius norm is about 2s). scalar(1).power(Y) must classify '
-        'that residual eigenvalue zero before the D38 range check ever '
-        'sees it, and log(1) = 0 makes the scaled-and-exponentiated result '
-        'the identity',
+        'approximately 2s and a tiny, now-resolvable-as-nonzero residual: '
+        's = 1e-140, Y = [[s,s],[s,s*(1+2^-50)]] has true eigenvalues '
+        'approximately 2s and -s*2^-50/2 (about -4.89e-156); under Codex '
+        'round 18\'s pure-forward-error model this resolves as the '
+        'genuinely nonzero 4.661462957000128e-156, below '
+        'matrixFunctionMinMagnitude=1e-150, so scalar(1).power(Y) must now '
+        'raise matrix-out-of-precision-range',
         () {
           final double s = 1e-140;
           final double d = math.pow(2.0, -50) as double;
@@ -103,24 +112,22 @@ void main() {
             <double>[s, s * (1 + d)],
           ]);
 
-          final Matrix result = Matrix.scalar(1).power(y);
-
-          expect(result.at(0, 0), 1.0);
-          expect(result.at(0, 1), 0.0);
-          expect(result.at(1, 0), 0.0);
-          expect(result.at(1, 1), 1.0);
+          expect(() => Matrix.scalar(1).power(y), throwsOutOfPrecisionRange());
         },
       );
 
       test(
-        'the same numerical-zero classification also applies to a general '
-        '(non-symmetric) 2x2 operand, not only a symmetric one: '
+        'the same now-resolvable-as-nonzero classification also applies to '
+        'a general (non-symmetric) 2x2 operand, not only a symmetric one: '
         'Y2 = [[s,s*(1+2^-50)],[s,s]] has off-diagonal entries s*(1+2^-50) '
         'and s that differ, so Y2 is not exactly symmetric, yet its true '
         'eigenvalues are the same order of magnitude as the symmetric case '
         'above (approximately 2s and -s*2^-50/2), and both route through '
         'the identical general-2x2 branch of '
-        '[Matrix._requireSpectrumInPrecisionRange]',
+        '[Matrix._requireSpectrumInPrecisionRange]; under Codex round 18\'s '
+        'pure-forward-error model this resolves as the genuinely nonzero '
+        '-4.66146295700013e-156, below matrixFunctionMinMagnitude=1e-150, '
+        'so scalar(1).power(Y2) must now raise matrix-out-of-precision-range',
         () {
           final double s = 1e-140;
           final double d = math.pow(2.0, -50) as double;
@@ -129,12 +136,10 @@ void main() {
             <double>[s, s],
           ]);
 
-          final Matrix result = Matrix.scalar(1).power(y2);
-
-          expect(result.at(0, 0), 1.0);
-          expect(result.at(0, 1), 0.0);
-          expect(result.at(1, 0), 0.0);
-          expect(result.at(1, 1), 1.0);
+          expect(
+            () => Matrix.scalar(1).power(y2),
+            throwsOutOfPrecisionRange(),
+          );
         },
       );
     });

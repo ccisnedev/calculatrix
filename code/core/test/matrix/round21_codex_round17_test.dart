@@ -77,6 +77,14 @@ Matcher throwsLogUndefined() => throwsA(
   ),
 );
 
+Matcher throwsOutOfPrecisionRange() => throwsA(
+  isA<MatrixDomainError>().having(
+    (MatrixDomainError e) => e.errorId,
+    'errorId',
+    CalculatrixErrorId.matrixOutOfPrecisionRange,
+  ),
+);
+
 void main() {
   group('Codex round 17', () {
     group(
@@ -157,8 +165,12 @@ void main() {
     );
 
     group(
-      'Regression: the s=1e-140 fixtures (Codex round 16) still classify '
-      'their numerically-zero eigenvalue as zero, both signs',
+      'Regression: the s=1e-140 fixtures (Codex round 16) now resolve their '
+      'residual eigenvalue as genuinely nonzero and below '
+      'matrixFunctionMinMagnitude, both signs (superseded by Codex round '
+      '18\'s removal of the general 2x2 closed form\'s mixed error model; '
+      'see round22_codex_round18_test.dart and round20_codex_round16_test.'
+      'dart)',
       () {
         const double s = 1e-140;
         const double delta = 8.881784197001252e-16;
@@ -168,11 +180,11 @@ void main() {
             <double>[s, s],
             <double>[s, s * (1 + delta)],
           ]);
-          expect(() => m.sqrt(), returnsNormally);
-          expect(() => m.log(), throwsLogUndefined());
+          expect(() => m.sqrt(), throwsOutOfPrecisionRange());
+          expect(() => m.log(), throwsOutOfPrecisionRange());
           expect(
             () => m.power(Matrix.scalar(0.5)),
-            throwsLogUndefined(),
+            throwsOutOfPrecisionRange(),
           );
         });
 
@@ -181,11 +193,11 @@ void main() {
             <double>[s, s],
             <double>[s, s * (1 - delta)],
           ]);
-          expect(() => m.sqrt(), returnsNormally);
-          expect(() => m.log(), throwsLogUndefined());
+          expect(() => m.sqrt(), throwsOutOfPrecisionRange());
+          expect(() => m.log(), throwsOutOfPrecisionRange());
           expect(
             () => m.power(Matrix.scalar(0.5)),
-            throwsLogUndefined(),
+            throwsOutOfPrecisionRange(),
           );
         });
       },

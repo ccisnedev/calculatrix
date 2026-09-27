@@ -1964,7 +1964,7 @@ class Matrix {
   /// input-uncertainty floor: Codex round 17's finding 1 specifically
   /// requires a genuine, resolvable, ULP-scale discriminant to be
   /// recognized as such, not swallowed by an overly conservative bound.
-  static ({double value, double error}) _compensatedDiscriminant(
+  static ({double value, double error, bool reliable}) _compensatedDiscriminant(
     double a,
     double b,
     double c,
@@ -1988,34 +1988,62 @@ class Matrix {
         CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
             CalculatrixNumericPolicy.unitRoundoff *
             value.abs();
-    return (value: value, error: error);
+    // Codex round 18, finding 3: see [_compensatedDeterminant]'s matching
+    // doc comment; the same Veltkamp-split-exactness risk applies here to
+    // the half-difference square and the cross-product `b*c`.
+    final bool reliable =
+        _isNormalMagnitude(halfDiffHi) &&
+        _isNormalMagnitude(sqHi) &&
+        _isNormalMagnitude(sqErr) &&
+        _isNormalMagnitude(crossTerm) &&
+        _isNormalMagnitude(bcHi) &&
+        _isNormalMagnitude(bcErr) &&
+        _cancellationWithinDoubleDoubleRange(cancellationScale);
+    return (value: value, error: error, reliable: reliable);
   }
 
-  /// Codex round 17 (P4): companion to [_compensatedDiscriminant] for the
-  /// determinant `a*d - b*c`, whose own cancellation directly amplifies
-  /// into the smaller-magnitude eigenvalue `det / lambda1` (Codex round
-  /// 17, finding 2: for `[[2.2, 1], [-1.21, 0]]`, this amplification was
-  /// entirely unaccounted for, so round 16's `zeroTolerance` under-stated
-  /// the actual error by five orders of magnitude). Uses the same
+  /// Codex round 17 (P4); Codex round 18, finding 1: companion to
+  /// [_compensatedDiscriminant] for the determinant `a*d - b*c`, whose own
+  /// cancellation directly amplifies into the smaller-magnitude eigenvalue
+  /// `det / lambda1` (Codex round 17, finding 2: for
+  /// `[[2.2, 1], [-1.21, 0]]`, this amplification was entirely
+  /// unaccounted for, so round 16's `zeroTolerance` under-stated the
+  /// actual error by five orders of magnitude). Uses the same
   /// dominant-terms-first, corrections-second summation order as
   /// [_compensatedDiscriminant], for the same reason.
   ///
-  /// Unlike [_compensatedDiscriminant], the returned `error` keeps round
-  /// 16's original first-order backward-error floor
-  /// (`K * unitRoundoff * cancellationScale`) in addition to the
-  /// second-order compensation residual: `det` is a raw function of the
-  /// caller's own four entries, which this codebase already treats as
-  /// carrying their own `unitRoundoff`-scale backward uncertainty (round
-  /// 15/16 precedent for the operand-spectrum gate). Removing that floor
-  /// here would let compensation claim more resolving power over the
-  /// *caller's own input* than a general-purpose numeric library should
-  /// assume; the fixes this round actually needs (finding 2's missing
-  /// `lambda1`-error-through-division term, and finding 1's discriminant
-  /// fix above) are additive corrections to that floor, not a replacement
-  /// of it. [_exactRealEigen2x2]'s own doc comment explains why keeping
-  /// this floor is compatible with finding 1's requirement that
-  /// [Matrix.log]/[Matrix.power] still raise log-undefined.
-  static ({double value, double error}) _compensatedDeterminant(
+  /// Codex round 18, finding 1: this used to also add a first-order
+  /// `K * unitRoundoff * cancellationScale` input-uncertainty floor,
+  /// treating `a`, `b`, `c`, `d` as themselves carrying their own
+  /// backward uncertainty. That mixed two different error models between
+  /// this method and [_compensatedDiscriminant] (which never carried such
+  /// a floor), and the two roots derived from them
+  /// (`lambda1 = m + sign(m)*sqrt(D)`, from the discriminant alone, and
+  /// `lambda2 = det / lambda1`) could then disagree by many orders of
+  /// magnitude about how precisely the SAME stored binary64 entries are
+  /// known, purely as an artifact of which of the two error models
+  /// happened to feed which root. For
+  /// `[[1.0000000000000002, 1], [-1, -1]]`, that mismatch hid a genuine
+  /// negative eigenvalue: `lambda1` (discriminant-derived) resolved its
+  /// true ~1.49e-8 scale correctly, but `lambda2`'s determinant floor
+  /// alone (~7.45e-7) swallowed that same-scale value as "zero" instead of
+  /// "negative", so [Matrix.sqrt] silently accepted an operand with a
+  /// negative real eigenvalue.
+  ///
+  /// The declared error model is pure forward error relative to the
+  /// stored binary64 entries, treated as exact inputs: this codebase makes
+  /// no claim about how `a`, `b`, `c`, `d` themselves were produced, only
+  /// about how precisely this method's own arithmetic (twoProduct,
+  /// subtraction, the final compensating addition) resolves their exact
+  /// mathematical determinant. `error` below is therefore only the
+  /// second-order compensation residual (`cancellationScale` scaled by
+  /// [CalculatrixNumericPolicy.unitRoundoff] squared, since compensation
+  /// has already removed the first-order term a naive bound would need)
+  /// plus ordinary relative rounding on the final value, exactly mirroring
+  /// [_compensatedDiscriminant]'s own formula, both wrapped in
+  /// [CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor] as a
+  /// safety factor.
+  static ({double value, double error, bool reliable}) _compensatedDeterminant(
     double a,
     double b,
     double c,
@@ -2030,16 +2058,78 @@ class Matrix {
     final double error =
         CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
             CalculatrixNumericPolicy.unitRoundoff *
-            cancellationScale +
-        CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
-            CalculatrixNumericPolicy.unitRoundoff *
             CalculatrixNumericPolicy.unitRoundoff *
             cancellationScale +
         CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
             CalculatrixNumericPolicy.unitRoundoff *
             value.abs();
-    return (value: value, error: error);
+    // Codex round 18, finding 3: the error-free-transform guarantees
+    // (twoSum, twoProduct/Veltkamp split) that make `value`/`error` exact
+    // assume every intermediate term they touch stays a normal double.
+    // Once a term (here, either product's high part or its own rounding
+    // residual) lands in the gradually-underflowing subnormal range, the
+    // split that twoProduct relies on can no longer represent its operand
+    // exactly, silently breaking that guarantee instead of raising any
+    // error. `reliable` is false whenever that risk is live, so a caller
+    // can prefer a differently-scaled recomputation instead of trusting a
+    // `value`/`error` pair whose own derivation may be unsound.
+    final bool reliable =
+        _isNormalMagnitude(adHi) &&
+        _isNormalMagnitude(adErr) &&
+        _isNormalMagnitude(bcHi) &&
+        _isNormalMagnitude(bcErr) &&
+        _cancellationWithinDoubleDoubleRange(cancellationScale);
+    return (value: value, error: error, reliable: reliable);
   }
+
+  /// Smallest positive magnitude at which a double is still "normal"
+  /// (full 53-bit mantissa precision available), `2^-1022`. Zero is exact
+  /// by construction (no precision was ever lost forming it), so it is
+  /// never itself a sign of gradual underflow; only a genuinely nonzero
+  /// value that lands strictly below this threshold (a subnormal, with
+  /// fewer significant bits than a normal double) does.
+  static const double _minNormalDouble = 2.2250738585072014e-308;
+
+  /// Codex round 18, finding 3: true exactly at zero (no precision was
+  /// ever lost forming an exact zero) or at any normal-magnitude double;
+  /// false for a nonzero subnormal, where the Veltkamp split
+  /// [_compensatedDiscriminant]/[_compensatedDeterminant] rely on can no
+  /// longer represent the operand's mantissa exactly, breaking the
+  /// error-free-transform guarantees those two methods otherwise provide.
+  static bool _isNormalMagnitude(double x) =>
+      x == 0 || x.abs() >= _minNormalDouble;
+
+  /// Codex round 18, finding 3 (second underflow mode): a per-term check
+  /// (`_isNormalMagnitude`, above) alone is not enough, because the
+  /// correction a double-double computation would need can itself
+  /// underflow to exactly 0 without ever passing through the subnormal
+  /// range at all, which looks identical to a genuinely exact zero. Double
+  /// (and twoSum/twoProduct's compensated double-double) arithmetic only
+  /// carries about [CalculatrixNumericPolicy.unitRoundoff] squared
+  /// (`~2^-106`) of relative resolving power beyond the dominant term
+  /// (`cancellationScale`, the larger of the two terms being subtracted).
+  /// When `cancellationScale` is small enough that a correction at that
+  /// relative scale would itself round to exactly `0.0` (below
+  /// `double.minPositive`, the smallest representable subnormal), no
+  /// per-term check can tell that residual apart from a real exact zero.
+  /// `[[2*s, s*(1+t)], [-s*(1-t), 0]]` at `s = 2^-498`, `t = 2^-52` hits
+  /// exactly this: the dominant term is `s^2 ~ 2^-996`, but the true
+  /// discriminant correction lives near `s^2*t^2 ~ 2^-1100`, below even the
+  /// smallest subnormal double (`2^-1074`), so it rounds to exactly `0`
+  /// even though every twoSum/twoProduct step above executed exactly.
+  static final double _doubleDoubleUnderflowFloor =
+      double.minPositive /
+      (CalculatrixNumericPolicy.unitRoundoff *
+          CalculatrixNumericPolicy.unitRoundoff);
+
+  /// True when `cancellationScale` (the dominant term two compensated
+  /// quantities are cancelling against) is either exactly `0` (nothing to
+  /// cancel) or large enough that double-double arithmetic's own
+  /// resolving power (see [_doubleDoubleUnderflowFloor]) would not itself
+  /// underflow the correction to a false exact zero.
+  static bool _cancellationWithinDoubleDoubleRange(double cancellationScale) =>
+      cancellationScale == 0 ||
+      cancellationScale.abs() >= _doubleDoubleUnderflowFloor;
 
   /// Same stable quadratic-formula solver as [_stableRealEigen2x2], but
   /// with no scaled zero-discriminant tolerance: the discriminant's own
@@ -2206,18 +2296,10 @@ class Matrix {
     final (double scaledSumHi, double scaledSumErr) = _twoSum(sa, sd);
     final double m = scaledSumHi / 2;
     final double mErrorScaled = scaledSumErr.abs() / 2;
-    final ({double value, double error}) scaledDisc = _compensatedDiscriminant(
-      sa,
-      sb,
-      sc,
-      sd,
-    );
-    final ({double value, double error}) scaledDet = _compensatedDeterminant(
-      sa,
-      sb,
-      sc,
-      sd,
-    );
+    final ({double value, double error, bool reliable}) scaledDisc =
+        _compensatedDiscriminant(sa, sb, sc, sd);
+    final ({double value, double error, bool reliable}) scaledDet =
+        _compensatedDeterminant(sa, sb, sc, sd);
     final double discriminant = scaledDisc.value;
     final double det = scaledDet.value;
 
@@ -2250,15 +2332,22 @@ class Matrix {
     // the wrong answer.
     final double directBc = b * c;
     final bool directBcUnderflowed = b != 0 && c != 0 && directBc == 0;
-    final ({double value, double error}) directDisc = _compensatedDiscriminant(
-      a,
-      b,
-      c,
-      d,
-    );
+    final ({double value, double error, bool reliable}) directDisc =
+        _compensatedDiscriminant(a, b, c, d);
     final double directDiscriminant = directDisc.value;
+    // Codex round 18, finding 3: a finite result and no full underflow to
+    // exactly 0 are not enough; the compensation itself must also still be
+    // sound (see [_compensatedDiscriminant]'s `reliable` doc comment).
+    // `[[2*s, s*(1+t)], [-s*(1-t), 0]]` at `s = 2^-498`, `t = 2^-52` is a
+    // case where every raw entry is a normal double, `b*c` itself does not
+    // underflow, yet the discriminant's own 104-bit cancellation drives an
+    // internal correction term into the subnormal range, silently breaking
+    // the error-free-transform guarantee; only the whole-block-scaled
+    // recomputation below keeps every intermediate term normal there.
     final bool directDiscriminantReliable =
-        directDiscriminant.isFinite && !directBcUnderflowed;
+        directDiscriminant.isFinite &&
+        !directBcUnderflowed &&
+        directDisc.reliable;
     final (double directSumHi, double directSumErr) = _twoSum(a, d);
     final double directM = directSumHi / 2;
     final double directMError = directSumErr.abs() / 2;
@@ -2325,9 +2414,23 @@ class Matrix {
     final double eSqrtD =
         effectiveDiscriminantError / (2 * sqrtD) +
         CalculatrixNumericPolicy.unitRoundoff * sqrtD;
+    // Codex round 18, finding 2: `q = effectiveM + signM*sqrtD` above is a
+    // single, uncompensated floating point addition of two already-rounded
+    // operands, so forming `q` itself rounds again, by up to
+    // `unitRoundoff * |q|`. `eSqrtD` above only bounds how far `sqrtD`
+    // itself sits from the true `sqrt(D)` (the square root's own
+    // computation); it says nothing about the further rounding this
+    // addition performs when combining that (already slightly off)
+    // `sqrtD` with `effectiveM` into one double. For
+    // `[[2.2, 1], [-1.21, 0]]`, omitting this term under-stated `lambda1`'s
+    // own error by about six orders of magnitude (both roots' true error
+    // was about 9.2e-17, but the bound omitting this term was about
+    // 1.5e-22).
     final double lambda1Error = finishScale(
       CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
-          (effectiveMError + eSqrtD),
+          (effectiveMError +
+              eSqrtD +
+              CalculatrixNumericPolicy.unitRoundoff * q.abs()),
     );
 
     double lambda2;
@@ -2370,11 +2473,17 @@ class Matrix {
       // product is formed.
       final double directAD = a * d;
       final bool directAdUnderflowed = a != 0 && d != 0 && directAD == 0;
-      final ({double value, double error}) directDetComp =
+      final ({double value, double error, bool reliable}) directDetComp =
           _compensatedDeterminant(a, b, c, d);
       final double directDet = directDetComp.value;
+      // Codex round 18, finding 3: same reasoning as
+      // `directDiscriminantReliable` above, applied to the determinant's
+      // own error-free-transform terms.
       final bool directDetReliable =
-          directDet.isFinite && !directAdUnderflowed && !directBcUnderflowed;
+          directDet.isFinite &&
+          !directAdUnderflowed &&
+          !directBcUnderflowed &&
+          directDetComp.reliable;
       if (directDetReliable) {
         lambda2 = directDet / lambda1;
         // Codex round 17, finding 2: propagate `E_det` through the
@@ -2401,9 +2510,14 @@ class Matrix {
         final double eSqrtDScaled =
             scaledDisc.error / (2 * sqrtDScaled) +
             CalculatrixNumericPolicy.unitRoundoff * sqrtDScaled;
+        // Codex round 18, finding 2: same missing addition-rounding term as
+        // the direct-unit `lambda1Error` above, applied to this
+        // self-contained scaled-unit recomputation.
         final double lambda1ErrorScaled =
             CalculatrixNumericPolicy.jacobiEigenvalueBackwardErrorFactor *
-            (mErrorScaled + eSqrtDScaled);
+            (mErrorScaled +
+                eSqrtDScaled +
+                CalculatrixNumericPolicy.unitRoundoff * qScaled.abs());
         final double lambda2Scaled = det / qScaled;
         lambda2 = rescale(lambda2Scaled);
         final double lambda2ErrorScaled =

@@ -95,6 +95,14 @@ Matcher throwsOutOfPrecisionRange() => throwsA(
   ),
 );
 
+Matcher throwsLogUndefined() => throwsA(
+  isA<MatrixDomainError>().having(
+    (MatrixDomainError e) => e.errorId,
+    'errorId',
+    CalculatrixErrorId.logUndefined,
+  ),
+);
+
 void main() {
   group(
     'Codex round 9 finding 1: exp underflow-before-multiply, now converted '
@@ -183,33 +191,31 @@ void main() {
     'repeated negative real eigenvalues',
     () {
       test(
-        'sqrt([[-1e100,1e-150],[-2e-150,-1e100]]) now raises '
-        'matrix-out-of-precision-range under rule A (converted from the '
-        'previous "must not throw log-undefined" classification): the '
-        'discriminant halfDiff^2+b*c is still representable, so the old '
-        'log-undefined misclassification this test guarded against is '
-        'gone, but rule A also requires every NONZERO ENTRY of the '
-        'computed result to be in the declared range, not just its '
-        'eigenvalues (sqrt itself can never fail the eigenvalue-side '
-        'check, since 0.5*ln(|lambda|) is always within '
-        '[-172.7, 172.7] whenever the argument-side check already '
-        'passed). Reference (mpmath, dps=700, needed because a*d~1e200 '
-        'and b*c~-2e-300 span about 500 decimal orders of magnitude, so '
-        'a lower dps silently rounds the discriminant correction away; '
-        'independently cross-checked by squaring the computed root back '
-        'to the original matrix): entry00=entry11='
-        '7.071067811865475244008443621048490392848e-201, entry01='
-        '7.071067811865475244008443621048490392848e+49, entry10='
-        '-1.41421356237309504880168872420969807857e+50. entry00/entry11 '
-        'are nonzero but below matrixFunctionMinMagnitude=1e-150, so rule '
-        'A rejects this before the accuracy contract ever applies.',
+        'sqrt([[-1e100,1e-150],[-2e-150,-1e100]]) now raises log-undefined '
+        'again, converted a second time by Codex round 18\'s removal of the '
+        'determinant\'s input-uncertainty floor: that floor (added to fix '
+        'this very finding) was itself masking the sign of a genuinely '
+        'negative repeated eigenvalue behind an oversized error bound on '
+        'some fixtures, so round 18 removed it and put the discriminant and '
+        'determinant on one shared pure-forward-error model instead. For '
+        'this fixture, the repeated eigenvalue is unambiguously negative '
+        'under that model, so the sign check now rejects it before '
+        'execution ever reaches the entries-level rule A range check that '
+        'the intermediate (round 9) fix relied on. Reference (mpmath, '
+        'dps=700, needed because a*d~1e200 and b*c~-2e-300 span about 500 '
+        'decimal orders of magnitude, so a lower dps silently rounds the '
+        'discriminant correction away; independently cross-checked by '
+        'squaring the computed root back to the original matrix): the '
+        'exact eigenvalue is negative, so this negative-eigenvalue, non-'
+        'integer real power is undefined in the real domain regardless of '
+        'the rule A range check the round 9 fix used to observe first.',
         () {
           final Matrix m = Matrix(<List<double>>[
             <double>[-1e100, 1e-150],
             <double>[-2e-150, -1e100],
           ]);
 
-          expect(() => m.sqrt(), throwsOutOfPrecisionRange());
+          expect(() => m.sqrt(), throwsLogUndefined());
         },
       );
     },

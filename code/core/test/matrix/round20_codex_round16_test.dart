@@ -55,6 +55,18 @@
 // solve and, for [exp], a first-order Taylor expansion valid because the
 // fixture's own norm is far below double's relative precision at 1.0), not
 // copied from this implementation's own end-to-end output.
+//
+// Codex round 18 superseded this file's own zero classification for both
+// fixtures below: removing the general 2x2 closed form's mixed error model
+// (a determinant input-uncertainty floor no longer matching the
+// discriminant's own pure-forward-error bound; see
+// round22_codex_round18_test.dart) resolves each fixture's residual
+// eigenvalue as genuinely nonzero, 4.661462957000128e-156
+// (positive-residual) / -4.66146295700013e-156 (negative-residual), rather
+// than as a numerical zero within [Matrix._blockZeroTolerance]. Both
+// magnitudes are below matrixFunctionMinMagnitude=1e-150, so the correct
+// D38 outcome for every operation below is matrix-out-of-precision-range,
+// not the classified-zero outcome this file originally exercised.
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
@@ -99,100 +111,75 @@ void main() {
       <double>[s, s * (1 - d)],
     ]);
 
-    group('sqrt succeeds, the numerically-zero eigenvalue taken as 0', () {
-      test('positive-residual fixture: sqrt does not throw, and squaring '
-          'the result reconstructs the original matrix', () {
-        final Matrix result = positiveResidual.sqrt();
-        final Matrix squared = result * result;
-        for (int r = 0; r < 2; r++) {
-          for (int c = 0; c < 2; c++) {
-            expect(
-              squared.at(r, c),
-              closeTo(positiveResidual.at(r, c), s * 1e-6),
-            );
-          }
-        }
-      });
-
-      test('negative-residual fixture: sqrt does not throw, and squaring '
-          'the result reconstructs the original matrix', () {
-        final Matrix result = negativeResidual.sqrt();
-        final Matrix squared = result * result;
-        for (int r = 0; r < 2; r++) {
-          for (int c = 0; c < 2; c++) {
-            expect(
-              squared.at(r, c),
-              closeTo(negativeResidual.at(r, c), s * 1e-6),
-            );
-          }
-        }
-      });
-    });
-
     group(
-      'log raises log-undefined for the numerically-zero eigenvalue, not '
-      'matrix-out-of-precision-range',
+      'sqrt now raises matrix-out-of-precision-range: Codex round 18 '
+      'resolves the residual eigenvalue as genuinely nonzero and below '
+      'matrixFunctionMinMagnitude, not as a numerical zero',
       () {
         test('positive-residual fixture', () {
-          expect(() => positiveResidual.log(), throwsLogUndefined());
-          expect(
-            () => positiveResidual.log(),
-            isNot(throwsOutOfPrecisionRange()),
-          );
+          expect(() => positiveResidual.sqrt(), throwsOutOfPrecisionRange());
         });
 
         test('negative-residual fixture', () {
-          expect(() => negativeResidual.log(), throwsLogUndefined());
-          expect(
-            () => negativeResidual.log(),
-            isNot(throwsOutOfPrecisionRange()),
-          );
+          expect(() => negativeResidual.sqrt(), throwsOutOfPrecisionRange());
         });
       },
     );
 
     group(
-      'a non-integer power (power(scalar(0.5))) raises log-undefined for '
-      'the numerically-zero eigenvalue, unlike sqrt: power always rejects a '
-      'zero eigenvalue with a non-integer exponent (D25/D34), regardless of '
-      "the exponent's own sign",
+      'log now raises matrix-out-of-precision-range, not log-undefined: '
+      'Codex round 18 resolves the residual eigenvalue as genuinely nonzero '
+      'and below matrixFunctionMinMagnitude, so the D38 range check rejects '
+      'it before log-undefined\'s own zero-eigenvalue domain decision is '
+      'ever reached',
+      () {
+        test('positive-residual fixture', () {
+          expect(() => positiveResidual.log(), throwsOutOfPrecisionRange());
+          expect(() => positiveResidual.log(), isNot(throwsLogUndefined()));
+        });
+
+        test('negative-residual fixture', () {
+          expect(() => negativeResidual.log(), throwsOutOfPrecisionRange());
+          expect(() => negativeResidual.log(), isNot(throwsLogUndefined()));
+        });
+      },
+    );
+
+    group(
+      'a non-integer power (power(scalar(0.5))) now raises '
+      'matrix-out-of-precision-range, not log-undefined: Codex round 18 '
+      'resolves the residual eigenvalue as genuinely nonzero and below '
+      'matrixFunctionMinMagnitude, so the D38 range check rejects it before '
+      "power's own zero-eigenvalue domain decision is ever reached",
       () {
         test('positive-residual fixture', () {
           expect(
             () => positiveResidual.power(Matrix.scalar(0.5)),
-            throwsLogUndefined(),
+            throwsOutOfPrecisionRange(),
           );
         });
 
         test('negative-residual fixture', () {
           expect(
             () => negativeResidual.power(Matrix.scalar(0.5)),
-            throwsLogUndefined(),
+            throwsOutOfPrecisionRange(),
           );
         });
       },
     );
 
     group(
-      'exp succeeds, the numerically-zero eigenvalue contributing nothing '
-      'distinguishable from 0 to the result (its own true contribution, '
-      "order s, is already below 1.0's own double precision, about "
-      '2.22e-16, so the diagonal entries round to exactly 1.0)',
+      'exp now raises matrix-out-of-precision-range: Codex round 18 '
+      'resolves the residual eigenvalue as genuinely nonzero and below '
+      'matrixFunctionMinMagnitude, not as a numerical zero contributing '
+      'nothing distinguishable from 0',
       () {
         test('positive-residual fixture', () {
-          final Matrix result = positiveResidual.exp();
-          expect(result.at(0, 0), closeTo(1.0, 1e-12));
-          expect(result.at(0, 1), closeTo(s, s * 1e-6));
-          expect(result.at(1, 0), closeTo(s, s * 1e-6));
-          expect(result.at(1, 1), closeTo(1.0, 1e-12));
+          expect(() => positiveResidual.exp(), throwsOutOfPrecisionRange());
         });
 
         test('negative-residual fixture', () {
-          final Matrix result = negativeResidual.exp();
-          expect(result.at(0, 0), closeTo(1.0, 1e-12));
-          expect(result.at(0, 1), closeTo(s, s * 1e-6));
-          expect(result.at(1, 0), closeTo(s, s * 1e-6));
-          expect(result.at(1, 1), closeTo(1.0, 1e-12));
+          expect(() => negativeResidual.exp(), throwsOutOfPrecisionRange());
         });
       },
     );
@@ -200,15 +187,22 @@ void main() {
     group(
       'the round 15, finding 1 operand-spectrum gate already covered the '
       'positive-residual sign (round19_codex_round15_test.dart); this '
-      'confirms the negative-residual sign too',
+      'confirms the negative-residual sign too, now updated for Codex '
+      'round 18: the residual eigenvalue resolves as genuinely nonzero and '
+      'below matrixFunctionMinMagnitude, so scalar(1).power(negativeResidual) '
+      'must raise matrix-out-of-precision-range instead of returning the '
+      'identity',
       () {
-        test('scalar(1).power(negativeResidual) is the identity', () {
-          final Matrix result = Matrix.scalar(1).power(negativeResidual);
-          expect(result.at(0, 0), 1.0);
-          expect(result.at(0, 1), 0.0);
-          expect(result.at(1, 0), 0.0);
-          expect(result.at(1, 1), 1.0);
-        });
+        test(
+          'scalar(1).power(negativeResidual) raises '
+          'matrix-out-of-precision-range',
+          () {
+            expect(
+              () => Matrix.scalar(1).power(negativeResidual),
+              throwsOutOfPrecisionRange(),
+            );
+          },
+        );
       },
     );
   });
