@@ -94,15 +94,29 @@ void main() {
     );
 
     test('an RPN NaN literal is non-finite', () {
-      // The infix tokenizer never scans a letter-led token as a number (it
-      // only starts a numeric scan on a digit, a dot, or a signed digit),
-      // so infix "NaN" is not a valid numeric literal to begin with; it
-      // correctly raises syntax-error, covered by the tokenizer tests
-      // above. RPN's token compiler instead parses the whole token with
-      // double.tryParse, which does recognize "NaN", so this is where the
-      // non-finite guard for it applies.
+      // RPN's token compiler parses the whole token with double.tryParse,
+      // which recognizes "NaN", so this is where the non-finite guard for
+      // it applies.
       expect(
         () => Calculatrix.evaluateRpn(<String>['NaN']),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError error) => error.errorId,
+            'errorId',
+            CalculatrixErrorId.nonFinite,
+          ),
+        ),
+      );
+    });
+
+    test('an infix NaN literal is non-finite, not syntax-error', () {
+      // The infix tokenizer does not scan a letter-led token as a number
+      // through the ordinary digit-led numeric scan, but "NaN" is still a
+      // recognized (non-finite) numeric literal (issue #5 bug 4): it must
+      // reach the same non-finite guard as every other non-finite literal,
+      // not raise syntax-error.
+      expect(
+        () => Calculatrix.evaluateInfix('NaN'),
         throwsA(
           isA<MatrixDomainError>().having(
             (MatrixDomainError error) => error.errorId,
