@@ -64,26 +64,58 @@ void main() {
       expect(squared.almostEquals(base, absoluteTolerance: 1e-6), isTrue);
     });
 
-    test('a genuine 2x2 complex-conjugate pair is log-undefined', () {
+    test('a genuine 2x2 complex-conjugate pair off the branch cut has a real '
+        'principal log', () {
       // [[0, -2], [1, 0]]: eigenvalues are +-i*sqrt(2), a genuine complex
-      // pair, and this matrix is not in complex form (aI + bJ), so its log
-      // is not representable; unlike a spurious QR non-convergence this
-      // must raise log-undefined specifically, not an unlabeled domain
-      // error.
+      // pair not in complex form (aI + bJ). Its real part is 0, not on
+      // the closed negative real axis, so the principal branch of the
+      // matrix logarithm is still well-defined and real-valued (issue #5
+      // review round 1, finding 4: this used to be rejected as
+      // log-undefined outright).
       final Matrix base = Matrix(<List<double>>[
         <double>[0, -2],
         <double>[1, 0],
       ]);
 
+      final Matrix result = base.log();
+      expect(result.exp().almostEquals(base, absoluteTolerance: 1e-8), isTrue);
+    });
+
+    test('another 2x2 complex-conjugate pair off the branch cut round trips '
+        'through exp', () {
+      // [[2, -5], [1, 0]]: eigenvalues are 1+-2i, complex conjugate,
+      // matrix not in complex form (diagonal entries differ).
+      final Matrix base = Matrix(<List<double>>[
+        <double>[2, -5],
+        <double>[1, 0],
+      ]);
+
+      final Matrix result = base.log();
+      expect(result.exp().almostEquals(base, absoluteTolerance: 1e-8), isTrue);
+    });
+
+    test('raising a complex-conjugate-eigenvalue base to a non-integer power '
+        'matches the closed-form principal log (issue #5 review round 1, '
+        'finding 4)', () {
+      // [[1, -2], [0.5, 1]]: eigenvalues 1+-i, complex conjugate pair.
+      // Expected value derived from the closed form c1 = arg(lambda)/b,
+      // c0 = ln|lambda| - a*c1 for eigenvalues a +- bi, b > 0.
+      final Matrix base = Matrix(<List<double>>[
+        <double>[1, -2],
+        <double>[0.5, 1],
+      ]);
+
+      final Matrix result = base.power(Matrix.scalar(0.5));
+
       expect(
-        () => base.log(),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.logUndefined,
-          ),
+        result.almostEquals(
+          Matrix(<List<double>>[
+            <double>[1.098684, -0.910180],
+            <double>[0.227545, 1.098684],
+          ]),
+          absoluteTolerance: 1e-6,
         ),
+        isTrue,
       );
     });
 
