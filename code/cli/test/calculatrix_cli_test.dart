@@ -190,5 +190,21 @@ void main() {
         contains('Division by zero scalar is undefined'),
       );
     });
+
+    test('command mode does not fall back to infix evaluation for an unrecognized token (issue #5 bug 3)', () async {
+      // "2 -3" is a single command-mode argument (it never reaches the CLI
+      // as two separate words). Command mode operands must be parsed as RPN,
+      // not silently re-evaluated as an infix expression: infix would read
+      // this as "2 - 3" and compute -1 without ever reporting that "2 -3" is
+      // not a valid single operand.
+      final ProcessResult command = await Process.run(
+        Platform.resolvedExecutable,
+        <String>['run', 'bin/calculatrix_cli.dart', 'command', '2 -3'],
+        workingDirectory: Directory.current.path,
+      );
+
+      expect(command.exitCode, isNonZero);
+      expect(command.stdout.toString().trim(), isNot('[[-1]]'));
+    });
   });
 }
