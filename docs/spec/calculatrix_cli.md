@@ -216,8 +216,10 @@ Global options, declared by the SDK on every route except the shortcut:
 **Queries and commands.** A query changes nothing. `upgrade` and `uninstall`
 change the installation, so they are SDK commands: each step is previewed,
 `--plan` shows the steps and stops, `--apply` performs them. Neither flag is a
-default: `cx upgrade` alone is rejected, 7. `--apply` is the confirmation;
-there is no interactive prompt. Both commands come from `InstallationPlugin`,
+default: `cx upgrade` alone is rejected, 7. `--apply` goes through the normal
+approval prompt unless `--autoapprove` is given, exactly as in `macss` and
+`inquiry` (`modular_cli_sdk` 0.8.0 `InstallationPlugin`; runbook D26, amended
+2026-09-28). Both commands come from `InstallationPlugin`,
 a standard plugin of the SDK shared with `macss` and `docmd`; `cx` registers
 it with its repository (`ccisnedev/calculatrix`), tag prefix (`cli-v`),
 executable, alias and asset names (8.7).
@@ -315,7 +317,9 @@ offset of the token in the program.
 
 Ids: `unknown-word`, `stack-underflow`, `type-mismatch`, `dimension-mismatch`,
 `singular-matrix`, `non-finite`, `log-undefined`, `ambiguous-power`,
-`no-convergence`, `unsupported-matrix-function`, `matrix-out-of-precision-range`, `syntax-error` (infix only). The ids belong to the core; the CLI only renders
+`syntax-error` (infix only). `no-convergence`, `unsupported-matrix-function`
+and `matrix-out-of-precision-range` are revoked (runbook D35, D37, D38,
+2026-09-28); see spec section 14, R22 to R24. The ids belong to the core; the CLI only renders
 them. The semantics of `power`, the source of `log-undefined` and
 `ambiguous-power`, are in the runbook (D25).
 
@@ -917,7 +921,7 @@ records the ones that affect the whole stage (D25 to D38).
 
 | # | Topic | Decision |
 |---|---|---|
-| R1 | `upgrade`, `uninstall` | SDK commands with `--plan` / `--apply`, no default, no prompt; they come from `InstallationPlugin` (R18). Corrects runbook D3 and D15. |
+| R1 | `upgrade`, `uninstall` | SDK commands with `--plan` / `--apply`, no default; `--apply` goes through the normal approval prompt unless `--autoapprove` is given (runbook D26, amended 2026-09-28); they come from `InstallationPlugin` (R18). Corrects runbook D3 and D15. |
 | R2 | Stdin | Read only with `--stdin`; `'1 2 +' \| cx` shows the banner (G2). |
 | R3 | Shortcut options | None, not even globals (G4). |
 | R4 | Empty program | Error 7 from any source (G12). |
@@ -938,6 +942,6 @@ records the ones that affect the whole stage (D25 to D38).
 | R19 | `power`, closing the table | Order of checks by kinds; `i [[1 0] [0 2]] ^` is `ambiguous-power`; a non-square exponent is `dimension-mismatch` with any base (runbook D34). |
 | R20 | Help precedence | Wins over an incomplete route, a missing argument or option, and the constraints; loses to malformed invocations (8.6). |
 | R21 | Failure of `--apply` | Exit `1` with a structured id; stop at the failed step, no rollback, no retry (section 6). |
-| R22 | `no-convergence` | The cyclic Jacobi sweep, the only iterative method left after runbook D37, raises `no-convergence` (65) when it does not reach its tolerance within its cap; it never returns the unconverged value (runbook D35). |
-| R23 | `unsupported-matrix-function` | `exp`, `log`, `sqrt` and a non-integer real power accept a scalar, the complex form, a diagonal matrix, a symmetric matrix larger than 2x2 (Jacobi) or any 2x2 matrix (closed form, symmetric ones included); any other matrix raises `unsupported-matrix-function` (65), never an approximation (runbook D37). |
-| R24 | `matrix-out-of-precision-range` | `exp`, `log`, `sqrt` and a non-integer real power accept only matrices whose nonzero entries and nonzero eigenvalues have magnitudes between `1e-150` and `1e150`; outside that range, or when a nonzero eigenvalue or a nonzero entry of the result falls outside it (`exp(-1000)`, `exp(710)`), they raise `matrix-out-of-precision-range` (65). Inside it the normwise relative error is at most `1e4 * max(1, kappa) * u`, with `kappa` the relative condition number of the function at the matrix and `u = 2^-53` (about `1e-12` for a well conditioned matrix); a zero result and `sqrt` of a singular matrix get the absolute bounds of runbook D38. The range applies to the argument and the final result only, never to an intermediate value; an eigenvalue within the forward error bound of the solver that computed it is numerically zero (`sqrt` takes it as zero, `log` and a non-integer power of a non-scalar matrix raise `log-undefined`; a scalar zero keeps its own rule, `0^0.5` is `0`); when the solver cannot certify an eigenvalue (for example after underflow in the 2x2 closed form) the operation raises `matrix-out-of-precision-range`; the bounds of the range of the result are widened by a relative `8 * 2^-52 * ln(1e150)`, about `6.1e-13`, while the range of the argument stays strict (runbook D38). |
+| R22 | `no-convergence` | **Revoked 2026-09-28**, with runbook D35: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. The cyclic Jacobi sweep, the only iterative method left after runbook D37, raises `no-convergence` (65) when it does not reach its tolerance within its cap; it never returns the unconverged value (runbook D35). |
+| R23 | `unsupported-matrix-function` | **Revoked 2026-09-28**, with runbook D37: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. `exp`, `log`, `sqrt` and a non-integer real power accept a scalar, the complex form, a diagonal matrix, a symmetric matrix larger than 2x2 (Jacobi) or any 2x2 matrix (closed form, symmetric ones included); any other matrix raises `unsupported-matrix-function` (65), never an approximation (runbook D37). |
+| R24 | `matrix-out-of-precision-range` | **Revoked 2026-09-28**, with runbook D38: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. `exp`, `log`, `sqrt` and a non-integer real power accept only matrices whose nonzero entries and nonzero eigenvalues have magnitudes between `1e-150` and `1e150`; outside that range, or when a nonzero eigenvalue or a nonzero entry of the result falls outside it (`exp(-1000)`, `exp(710)`), they raise `matrix-out-of-precision-range` (65). Inside it the normwise relative error is at most `1e4 * max(1, kappa) * u`, with `kappa` the relative condition number of the function at the matrix and `u = 2^-53` (about `1e-12` for a well conditioned matrix); a zero result and `sqrt` of a singular matrix get the absolute bounds of runbook D38. The range applies to the argument and the final result only, never to an intermediate value; an eigenvalue within the forward error bound of the solver that computed it is numerically zero (`sqrt` takes it as zero, `log` and a non-integer power of a non-scalar matrix raise `log-undefined`; a scalar zero keeps its own rule, `0^0.5` is `0`); when the solver cannot certify an eigenvalue (for example after underflow in the 2x2 closed form) the operation raises `matrix-out-of-precision-range`; the bounds of the range of the result are widened by a relative `8 * 2^-52 * ln(1e150)`, about `6.1e-13`, while the range of the argument stays strict (runbook D38). |
