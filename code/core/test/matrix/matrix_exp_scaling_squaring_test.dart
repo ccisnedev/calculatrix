@@ -20,6 +20,20 @@ void main() {
   group(
     'Matrix.exp - scaling and squaring (issue #13, acceptance 1 and 2)',
     () {
+      test('a=10: [[10 0] [0 10]] exp matches Julia to 1e-12 relative', () {
+        // Julia: A = [10.0 0.0; 0.0 10.0]; exp(A)
+        // -> [22026.465794806718 0; 0 22026.465794806718]
+        final Matrix a = Matrix(<List<double>>[
+          <double>[10, 0],
+          <double>[0, 10],
+        ]);
+        final Matrix result = a.exp();
+        _expectRelativelyClose(result.at(0, 0), 22026.465794806718);
+        _expectRelativelyClose(result.at(1, 1), 22026.465794806718);
+        expect(result.at(0, 1), closeTo(0, 1e-6));
+        expect(result.at(1, 0), closeTo(0, 1e-6));
+      });
+
       test('a=20: [[20 0] [0 20]] exp matches Julia to 1e-12 relative', () {
         // Julia: A = [20.0 0.0; 0.0 20.0]; exp(A)
         // -> [485165195.40979028 0; 0 485165195.40979028]
@@ -158,6 +172,48 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('Matrix.exp - trace shift and exact nilpotent path (issue #13, '
+      'review round 1)', () {
+    test('highly non-normal nilpotent matrix [[400.1 400.1] '
+        '[-400.1 -400.1]] exp equals I + A within 1e-15 relative, since '
+        'A^2 = 0 exactly and expm(A) = I + A + A^2/2! + ... terminates '
+        'after one term', () {
+      final Matrix a = Matrix(<List<double>>[
+        <double>[400.1, 400.1],
+        <double>[-400.1, -400.1],
+      ]);
+      final Matrix result = a.exp();
+      _expectRelativelyClose(result.at(0, 0), 401.1, relativeTolerance: 1e-15);
+      _expectRelativelyClose(result.at(0, 1), 400.1, relativeTolerance: 1e-15);
+      _expectRelativelyClose(result.at(1, 0), -400.1, relativeTolerance: 1e-15);
+      _expectRelativelyClose(result.at(1, 1), -399.1, relativeTolerance: 1e-15);
+    });
+
+    test('Jordan block 5*I + N (3x3, N the superdiagonal ones) exp equals '
+        'e^5 times the closed form within 1e-14 relative', () {
+      final Matrix jordan = Matrix(<List<double>>[
+        <double>[5, 1, 0],
+        <double>[0, 5, 1],
+        <double>[0, 0, 5],
+      ]);
+      final Matrix result = jordan.exp();
+      final double e5 = math.exp(5);
+      _expectRelativelyClose(result.at(0, 0), e5, relativeTolerance: 1e-14);
+      _expectRelativelyClose(result.at(0, 1), e5, relativeTolerance: 1e-14);
+      _expectRelativelyClose(
+        result.at(0, 2),
+        e5 * 0.5,
+        relativeTolerance: 1e-14,
+      );
+      expect(result.at(1, 0), closeTo(0, 1e-6));
+      _expectRelativelyClose(result.at(1, 1), e5, relativeTolerance: 1e-14);
+      _expectRelativelyClose(result.at(1, 2), e5, relativeTolerance: 1e-14);
+      expect(result.at(2, 0), closeTo(0, 1e-6));
+      expect(result.at(2, 1), closeTo(0, 1e-6));
+      _expectRelativelyClose(result.at(2, 2), e5, relativeTolerance: 1e-14);
     });
   });
 }
