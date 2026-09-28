@@ -36,46 +36,79 @@ void main() {
       expect(rpn.stdout.toString().trim(), infix.stdout.toString().trim());
     });
 
-    test('prints computed non-scalar matrices with the compact shared format', () async {
-      final ProcessResult infix = await Process.run(
-        Platform.resolvedExecutable,
-        <String>['run', 'bin/calculatrix_cli.dart', 'infix', '[[1,0],[0,1]] * [[3,4],[5,6]]'],
-        workingDirectory: Directory.current.path,
-      );
+    test(
+      'prints computed non-scalar matrices with the compact shared format',
+      () async {
+        final ProcessResult infix = await Process.run(
+          Platform.resolvedExecutable,
+          <String>[
+            'run',
+            'bin/calculatrix_cli.dart',
+            'infix',
+            '[[1,0],[0,1]] * [[3,4],[5,6]]',
+          ],
+          workingDirectory: Directory.current.path,
+        );
 
-      expect(infix.exitCode, 0);
-      expect(infix.stdout.toString().trim(), '[[3, 4], [5, 6]]');
-    });
+        expect(infix.exitCode, 0);
+        expect(infix.stdout.toString().trim(), '[[3, 4], [5, 6]]');
+      },
+    );
 
-    test('supports matrix multiplied by scalar 1x1 in infix and rpn modes', () async {
-      final ProcessResult infix = await Process.run(
-        Platform.resolvedExecutable,
-        <String>['run', 'bin/calculatrix_cli.dart', 'infix', '[[1,0],[0,1]] * 3'],
-        workingDirectory: Directory.current.path,
-      );
+    test(
+      'supports matrix multiplied by scalar 1x1 in infix and rpn modes',
+      () async {
+        final ProcessResult infix = await Process.run(
+          Platform.resolvedExecutable,
+          <String>[
+            'run',
+            'bin/calculatrix_cli.dart',
+            'infix',
+            '[[1,0],[0,1]] * 3',
+          ],
+          workingDirectory: Directory.current.path,
+        );
 
-      final ProcessResult rpn = await Process.run(
-        Platform.resolvedExecutable,
-        <String>['run', 'bin/calculatrix_cli.dart', 'rpn', '[[1,0],[0,1]]', '3', '*'],
-        workingDirectory: Directory.current.path,
-      );
+        final ProcessResult rpn = await Process.run(
+          Platform.resolvedExecutable,
+          <String>[
+            'run',
+            'bin/calculatrix_cli.dart',
+            'rpn',
+            '[[1,0],[0,1]]',
+            '3',
+            '*',
+          ],
+          workingDirectory: Directory.current.path,
+        );
 
-      expect(infix.exitCode, 0);
-      expect(rpn.exitCode, 0);
-      expect(infix.stdout.toString().trim(), '[[3, 0], [0, 3]]');
-      expect(rpn.stdout.toString().trim(), infix.stdout.toString().trim());
-    });
+        expect(infix.exitCode, 0);
+        expect(rpn.exitCode, 0);
+        expect(infix.stdout.toString().trim(), '[[3, 0], [0, 3]]');
+        expect(rpn.stdout.toString().trim(), infix.stdout.toString().trim());
+      },
+    );
 
-    test('supports primitive command workflows through public command routing', () async {
-      final ProcessResult command = await Process.run(
-        Platform.resolvedExecutable,
-        <String>['run', 'bin/calculatrix_cli.dart', 'command', '3', '4', 'add'],
-        workingDirectory: Directory.current.path,
-      );
+    test(
+      'supports primitive command workflows through public command routing',
+      () async {
+        final ProcessResult command = await Process.run(
+          Platform.resolvedExecutable,
+          <String>[
+            'run',
+            'bin/calculatrix_cli.dart',
+            'command',
+            '3',
+            '4',
+            'add',
+          ],
+          workingDirectory: Directory.current.path,
+        );
 
-      expect(command.exitCode, 0);
-      expect(command.stdout.toString().trim(), '[[7]]');
-    });
+        expect(command.exitCode, 0);
+        expect(command.stdout.toString().trim(), '[[7]]');
+      },
+    );
 
     test('supports determinant through public command routing', () async {
       final ProcessResult command = await Process.run(
@@ -112,22 +145,28 @@ void main() {
     });
 
     test('supports LU decomposition through public command routing', () async {
-      final ProcessResult command = await Process.run(
-        Platform.resolvedExecutable,
-        <String>[
-          'run',
-          'bin/calculatrix_cli.dart',
-          'command',
-          '[[2,1,1],[4,-6,0],[-2,7,2]]',
-          'lu',
-        ],
-        workingDirectory: Directory.current.path,
-      );
+      final ProcessResult command =
+          await Process.run(Platform.resolvedExecutable, <String>[
+            'run',
+            'bin/calculatrix_cli.dart',
+            'command',
+            '[[2,1,1],[4,-6,0],[-2,7,2]]',
+            'lu',
+          ], workingDirectory: Directory.current.path);
 
       expect(command.exitCode, 0);
-      expect(command.stdout.toString(), contains('X0: [[4, -6, 0], [0, 4, 1], [0, 0, 1]]'));
-      expect(command.stdout.toString(), contains('X1: [[1, 0, 0], [0.5, 1, 0], [-0.5, 1, 1]]'));
-      expect(command.stdout.toString(), contains('X2: [[0, 1, 0], [1, 0, 0], [0, 0, 1]]'));
+      expect(
+        command.stdout.toString(),
+        contains('X0: [[4, -6, 0], [0, 4, 1], [0, 0, 1]]'),
+      );
+      expect(
+        command.stdout.toString(),
+        contains('X1: [[1, 0, 0], [0.5, 1, 0], [-0.5, 1, 1]]'),
+      );
+      expect(
+        command.stdout.toString(),
+        contains('X2: [[0, 1, 0], [1, 0, 0], [0, 0, 1]]'),
+      );
     });
 
     test('supports QR decomposition through public command routing', () async {
@@ -145,7 +184,10 @@ void main() {
 
       expect(command.exitCode, 0);
       expect(command.stdout.toString(), contains('X0: [[1, 0], [0, 2]]'));
-      expect(command.stdout.toString(), contains('X1: [[1, 0], [0, 1], [0, 0]]'));
+      expect(
+        command.stdout.toString(),
+        contains('X1: [[1, 0], [0, 1], [0, 0]]'),
+      );
     });
 
     test('supports public macro workflows', () async {
@@ -190,5 +232,24 @@ void main() {
         contains('Division by zero scalar is undefined'),
       );
     });
+
+    test(
+      'command mode does not fall back to infix evaluation for an unrecognized token (issue #5 bug 3)',
+      () async {
+        // "2 -3" is a single command-mode argument (it never reaches the CLI
+        // as two separate words). Command mode operands must be parsed as RPN,
+        // not silently re-evaluated as an infix expression: infix would read
+        // this as "2 - 3" and compute -1 without ever reporting that "2 -3" is
+        // not a valid single operand.
+        final ProcessResult command = await Process.run(
+          Platform.resolvedExecutable,
+          <String>['run', 'bin/calculatrix_cli.dart', 'command', '2 -3'],
+          workingDirectory: Directory.current.path,
+        );
+
+        expect(command.exitCode, isNonZero);
+        expect(command.stdout.toString().trim(), isNot('[[-1]]'));
+      },
+    );
   });
 }

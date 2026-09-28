@@ -278,6 +278,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot multiply ${rowCount}x${columnCount} by '
         '${other.rowCount}x${other.columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -314,7 +315,10 @@ class Matrix {
     if (other.isScalar) {
       final double divisor = other.scalarValue;
       if (divisor == 0) {
-        throw MatrixDomainError('Division by zero scalar is undefined.');
+        throw MatrixDomainError(
+          'Division by zero scalar is undefined.',
+          errorId: CalculatrixErrorId.nonFinite,
+        );
       }
 
       return scale(1 / divisor);
@@ -322,6 +326,7 @@ class Matrix {
 
     throw UnsupportedCalculatrixOperationError(
       'Matrix division is only supported by scalar (1x1) denominator.',
+      errorId: CalculatrixErrorId.typeMismatch,
     );
   }
 
@@ -358,7 +363,10 @@ class Matrix {
       }
 
       if (pivotMagnitude <= absoluteTolerance) {
-        throw MatrixDomainError('Matrix is singular and cannot be inverted.');
+        throw MatrixDomainError(
+          'Matrix is singular and cannot be inverted.',
+          errorId: CalculatrixErrorId.singularMatrix,
+        );
       }
 
       if (pivotRow != pivotColumn) {
@@ -755,11 +763,8 @@ class Matrix {
     // Build P matrix (columns are eigenvectors)
     final List<List<double>> pRows = List<List<double>>.generate(
       n,
-      (int r) => List<double>.generate(
-        n,
-        (int c) => pColumns[c][r],
-        growable: false,
-      ),
+      (int r) =>
+          List<double>.generate(n, (int c) => pColumns[c][r], growable: false),
       growable: false,
     );
 
@@ -845,6 +850,7 @@ class Matrix {
     if (rowCount < 2) {
       throw MatrixShapeError(
         'Minor requires at least a 2x2 matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -879,16 +885,12 @@ class Matrix {
     final int n = rowCount;
     final List<List<double>> result = List<List<double>>.generate(
       n,
-      (int r) => List<double>.generate(
-        n,
-        (int c) {
-          final Matrix minorMatrix = minor(r, c);
-          final double det = minorMatrix.determinant().scalarValue;
-          final double sign = (r + c).isEven ? 1 : -1;
-          return sign * det;
-        },
-        growable: false,
-      ),
+      (int r) => List<double>.generate(n, (int c) {
+        final Matrix minorMatrix = minor(r, c);
+        final double det = minorMatrix.determinant().scalarValue;
+        final double sign = (r + c).isEven ? 1 : -1;
+        return sign * det;
+      }, growable: false),
       growable: false,
     );
 
@@ -910,18 +912,21 @@ class Matrix {
       throw MatrixShapeError(
         'dot product requires a column vector (n×1), '
         'got ${rowCount}×$columnCount',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
     if (other.columnCount != 1) {
       throw MatrixShapeError(
         'dot product requires a column vector (n×1), '
         'got ${other.rowCount}×${other.columnCount}',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
     if (rowCount != other.rowCount) {
       throw MatrixShapeError(
         'dot product requires vectors of the same dimension, '
         'got ${rowCount}×1 and ${other.rowCount}×1',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -941,12 +946,14 @@ class Matrix {
       throw MatrixShapeError(
         'cross product requires a 3×1 column vector, '
         'got ${rowCount}×$columnCount',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
     if (other.columnCount != 1 || other.rowCount != 3) {
       throw MatrixShapeError(
         'cross product requires a 3×1 column vector, '
         'got ${other.rowCount}×${other.columnCount}',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1157,12 +1164,7 @@ class Matrix {
   }
 
   /// Computes the Wilkinson shift from a trailing 2x2 block.
-  static double _wilkinsonShift(
-    double a,
-    double b,
-    double c,
-    double d,
-  ) {
+  static double _wilkinsonShift(double a, double b, double c, double d) {
     final double trace = a + d;
     final double det = (a * d) - (b * c);
     final double discriminant = (trace * trace) - (4 * det);
@@ -1238,7 +1240,6 @@ class Matrix {
       }
     }
   }
-
 
   LuDecomposition luDecomposition({
     double absoluteTolerance =
@@ -1336,6 +1337,7 @@ class Matrix {
       throw MatrixShapeError(
         'QR decomposition requires row count >= column count, found '
         '${rowCount}x${columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1459,9 +1461,12 @@ class Matrix {
         );
       }
 
-      final Matrix next = (current + (inverseCurrent * scaledTarget)).scale(0.5);
+      final Matrix next = (current + (inverseCurrent * scaledTarget)).scale(
+        0.5,
+      );
       final double stepNorm = (next - current)._infinityNorm();
-      final double residualNorm = ((next * next) - scaledTarget)._infinityNorm();
+      final double residualNorm = ((next * next) - scaledTarget)
+          ._infinityNorm();
 
       current = next;
       if (stepNorm <= threshold && residualNorm <= threshold) {
@@ -1525,6 +1530,18 @@ class Matrix {
   ///
   /// Complex-form 2x2 matrices use the principal branch:
   /// log(a + bi) = ln(r) + θ·i, where r = sqrt(a² + b²), θ = atan2(b, a)
+  ///
+  /// A general (non complex-form) 2x2 matrix uses a closed form driven by
+  /// its eigenvalues, rather than [diagonalization]: this is what makes a
+  /// defective 2x2 base (a repeated eigenvalue with only one independent
+  /// eigenvector, so diagonalization's eigenvector matrix P is singular)
+  /// still have a well-defined log. Two real eigenvalues use
+  /// [_log2x2ClosedForm]; a genuine complex-conjugate pair (off the closed
+  /// negative real axis, so never on the branch cut) uses
+  /// [_log2x2ComplexConjugateClosedForm] instead of raising
+  /// `log-undefined`. `log-undefined` is still raised for a real
+  /// eigenvalue `<= 0` (on or across the branch cut) or a singular matrix.
+  /// Sizes above 2x2 keep using [diagonalization], unchanged from before.
   Matrix log({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -1536,6 +1553,7 @@ class Matrix {
       if (source == 0) {
         throw MatrixDomainError(
           'Logarithm is undefined for zero in the real domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
       if (source > 0) {
@@ -1552,11 +1570,33 @@ class Matrix {
       if (radius <= absoluteTolerance) {
         throw MatrixDomainError(
           'Logarithm is undefined for zero magnitude in the complex domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
 
       final double angle = math.atan2(b, a);
       return Matrix.complex(math.log(radius), angle);
+    }
+
+    if (rowCount == 2) {
+      final List<double> realEigenvalues = _realEigenvalues2x2(
+        absoluteTolerance,
+      );
+
+      if (realEigenvalues.isEmpty) {
+        return _log2x2ComplexConjugateClosedForm(absoluteTolerance);
+      }
+      for (final double eigenvalue in realEigenvalues) {
+        if (eigenvalue <= absoluteTolerance) {
+          throw MatrixDomainError(
+            'Logarithm is undefined for matrices with non-positive real '
+            'eigenvalues.',
+            errorId: CalculatrixErrorId.logUndefined,
+          );
+        }
+      }
+
+      return _log2x2ClosedForm(realEigenvalues, absoluteTolerance);
     }
 
     final Diagonalization decomposition = diagonalization(
@@ -1575,6 +1615,7 @@ class Matrix {
         throw MatrixDomainError(
           'Logarithm is undefined for matrices with non-positive eigenvalues '
           'in the real domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
       logDiagonal[index][index] = math.log(eigenvalue);
@@ -1582,6 +1623,267 @@ class Matrix {
 
     final Matrix p = decomposition.p;
     return p * Matrix(logDiagonal) * p.inverse();
+  }
+
+  /// Computes the real eigenvalues of a 2x2 matrix for [log], without
+  /// throwing for a genuine complex-conjugate pair (unlike [eigenvalues]):
+  /// such a pair simply yields an empty list instead. This is what lets
+  /// [log] tell "no real eigenvalue" (log is undefined; a complex result
+  /// is not representable outside complex form) apart from "some real
+  /// eigenvalue is non-positive" (also log-undefined, but for a real
+  /// input off the domain of ln).
+  List<double> _realEigenvalues2x2(double absoluteTolerance) {
+    final double discriminant = _trace2x2Discriminant(absoluteTolerance);
+    if (discriminant < 0) {
+      return const <double>[];
+    }
+
+    final double trace = _rows[0][0] + _rows[1][1];
+    final double sqrtDiscriminant = math.sqrt(discriminant);
+    return <double>[
+      (trace + sqrtDiscriminant) / 2,
+      (trace - sqrtDiscriminant) / 2,
+    ];
+  }
+
+  // The discriminant of the 2x2 characteristic polynomial, trace^2 -
+  // 4*determinant, snapped to exactly 0 within [absoluteTolerance] so a
+  // matrix with a genuinely repeated eigenvalue (or one that is repeated
+  // up to floating-point noise) is never misclassified as a complex pair
+  // by a discriminant that is negative only by rounding error. Shared by
+  // [_realEigenvalues2x2] and [_log2x2ComplexConjugateClosedForm] so both
+  // agree on exactly the same trace/determinant/discriminant.
+  double _trace2x2Discriminant(double absoluteTolerance) {
+    final double a = _rows[0][0];
+    final double b = _rows[0][1];
+    final double c = _rows[1][0];
+    final double d = _rows[1][1];
+    final double trace = a + d;
+    final double determinantValue = (a * d) - (b * c);
+
+    double discriminant = (trace * trace) - (4 * determinantValue);
+    if (discriminant.abs() <= absoluteTolerance) {
+      discriminant = 0;
+    }
+    return discriminant;
+  }
+
+  /// Computes `log A` for a 2x2 matrix whose eigenvalues are a genuine
+  /// complex-conjugate pair `a +/- bi` (`b > 0`), by the same Sylvester
+  /// closed form as [_log2x2ClosedForm], `f(A) = c1*A + c0*I`, solved in
+  /// real arithmetic instead of going through complex numbers.
+  ///
+  /// Writing `log(a+bi) = c1*(a+bi) + c0` and its conjugate equation for
+  /// `log(a-bi)`, subtracting and adding the two gives:
+  ///   `c1 = arg(a+bi) / b`
+  ///   `c0 = ln|a+bi| - a*c1`
+  /// (both real, since the imaginary parts of the two equations cancel by
+  /// construction). A genuine complex-conjugate pair (`b > 0`) can never
+  /// sit on the branch cut of `log` (the closed negative real axis is
+  /// purely real), so this never raises `log-undefined`; only a real
+  /// eigenvalue `<= 0`, or a singular matrix (which always has real
+  /// eigenvalues for a 2x2, so never reaches this method), does.
+  Matrix _log2x2ComplexConjugateClosedForm(double absoluteTolerance) {
+    final double discriminant = _trace2x2Discriminant(absoluteTolerance);
+    final double trace = _rows[0][0] + _rows[1][1];
+
+    final double realPart = trace / 2;
+    final double imagPart = math.sqrt(-discriminant) / 2;
+
+    final double magnitude = math.sqrt(
+      (realPart * realPart) + (imagPart * imagPart),
+    );
+    final double angle = math.atan2(imagPart, realPart);
+
+    final double c1 = angle / imagPart;
+    final double c0 = math.log(magnitude) - (realPart * c1);
+
+    return scale(c1) + Matrix.identity(rowCount).scale(c0);
+  }
+
+  /// Computes `log A` for a 2x2 matrix directly from its two real
+  /// eigenvalues via Sylvester's formula for a function of a 2x2 matrix,
+  /// `f(A) = c1*A + c0*I`. This works even when `A` is defective (a
+  /// repeated eigenvalue with only one independent eigenvector, e.g. the
+  /// Jordan block `[[1, 1], [0, 1]]`): [diagonalization] cannot
+  /// diagonalize such a matrix (its eigenvector matrix P is singular), but
+  /// this closed form never needs P at all.
+  ///
+  /// For a repeated eigenvalue this uses the derivative of `f`,
+  /// `f'(x) = 1/x`, which is the limit of the distinct-eigenvalue formula
+  /// as one eigenvalue approaches the other, and is exact whether or not
+  /// `A` is actually defective (for `A = lambda * I` it reduces to
+  /// `log(lambda) * I`, as expected).
+  Matrix _log2x2ClosedForm(
+    List<double> realEigenvalues,
+    double absoluteTolerance,
+  ) {
+    final double lambda1 = realEigenvalues[0];
+    final double lambda2 = realEigenvalues[1];
+
+    final double c1;
+    final double c0;
+    if ((lambda1 - lambda2).abs() <= absoluteTolerance) {
+      final double lambda = (lambda1 + lambda2) / 2;
+      c1 = 1 / lambda;
+      c0 = math.log(lambda) - 1;
+    } else {
+      final double logLambda1 = math.log(lambda1);
+      final double logLambda2 = math.log(lambda2);
+      c1 = (logLambda1 - logLambda2) / (lambda1 - lambda2);
+      c0 = logLambda1 - (c1 * lambda1);
+    }
+
+    return scale(c1) + Matrix.identity(rowCount).scale(c0);
+  }
+
+  /// Computes `this ^ exponent` per the power dispatch table (issue #5,
+  /// spec section 3): `B^Y = exp(Y * log B)`, using the principal log/exp.
+  Matrix power(Matrix exponent) {
+    if (!isSquare) {
+      throw MatrixShapeError(
+        'Power base must be square, found ${rowCount}x$columnCount.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+    if (!exponent.isSquare) {
+      throw MatrixShapeError(
+        'Power exponent must be square, found '
+        '${exponent.rowCount}x${exponent.columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+    if (!isScalar && !exponent.isScalar && rowCount != exponent.rowCount) {
+      throw MatrixShapeError(
+        'Power base ${rowCount}x$rowCount and exponent '
+        '${exponent.rowCount}x${exponent.rowCount} must be the same size.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+
+    if (exponent.isScalar) {
+      return _powerByScalarExponent(exponent.scalarValue);
+    }
+    return _powerByMatrixExponent(exponent);
+  }
+
+  Matrix _powerByScalarExponent(double y) {
+    final bool integerExponent = y == y.roundToDouble();
+
+    if (isScalar) {
+      final double b = scalarValue;
+      if (integerExponent || b >= 0) {
+        return Matrix.scalar(_checkFiniteScalar(math.pow(b, y).toDouble()));
+      }
+      final Matrix scaled = log().scale(y);
+      return _checkFiniteMatrix(scaled.exp());
+    }
+
+    if (integerExponent) {
+      return _integerMatrixPower(y);
+    }
+    final Matrix scaled = log().scale(y);
+    return _checkFiniteMatrix(scaled.exp());
+  }
+
+  Matrix _powerByMatrixExponent(Matrix exponent) {
+    if (isScalar) {
+      final double b = scalarValue;
+      if (b == 0) {
+        throw MatrixDomainError(
+          '0 raised to a matrix power requires log(0), which is undefined.',
+          errorId: CalculatrixErrorId.logUndefined,
+        );
+      }
+      if (b > 0) {
+        final Matrix scaled = exponent.scale(math.log(b));
+        return _checkFiniteMatrix(scaled.exp());
+      }
+      if (exponent.isComplexForm) {
+        final Matrix product = log() * exponent;
+        return _checkFiniteMatrix(product.exp());
+      }
+      throw MatrixDomainError(
+        'A negative scalar base raised to a non-complex matrix exponent is '
+        'ambiguous: the branch of the logarithm is not determined.',
+        errorId: CalculatrixErrorId.ambiguousPower,
+      );
+    }
+
+    if (isComplexForm && exponent.isComplexForm) {
+      final Matrix product = log() * exponent;
+      return _checkFiniteMatrix(product.exp());
+    }
+
+    throw MatrixDomainError(
+      'A matrix base raised to a matrix exponent is ambiguous outside the '
+      'scalar, positive-scalar-base and complex-form cases.',
+      errorId: CalculatrixErrorId.ambiguousPower,
+    );
+  }
+
+  /// Integer power of a square, non-scalar matrix via exponentiation by
+  /// squaring (or by squaring the inverse, for a negative exponent).
+  ///
+  /// [exponent] is taken and driven entirely as a `double` (never rounded
+  /// or negated through `int`): `int` on the native VM is a wrapping
+  /// 64-bit type, so `exponent.round()`/`.abs()` silently clamp or
+  /// overflow for magnitudes near or beyond 2^63 (e.g. the minimum 64-bit
+  /// int negated overflows back to itself). A `double` has no such trap —
+  /// every finite double is an exact dyadic rational, so halving it via
+  /// `count / 2` and reading its parity via `count % 2` stay exact for any
+  /// whole-number magnitude a double can represent, which is exactly what
+  /// binary exponentiation needs. `count` reaches 0 in O(log2(|exponent|))
+  /// iterations even for exponents like 1e30, instead of the O(|exponent|)
+  /// iterations a naive repeated-multiplication loop would need (which
+  /// would never finish for such an exponent). Each squaring/multiplication
+  /// step is finiteness-checked so an overflowing result raises
+  /// `non-finite` instead of silently returning `Infinity` entries.
+  Matrix _integerMatrixPower(double exponent) {
+    if (exponent == 0) {
+      return Matrix.identity(rowCount);
+    }
+
+    final bool negative = exponent < 0;
+    Matrix base = negative ? _inverse() : this;
+    double count = negative ? -exponent : exponent;
+    Matrix result = Matrix.identity(rowCount);
+
+    while (count > 0) {
+      if (count % 2 == 1) {
+        result = _checkFiniteMatrix(result * base);
+      }
+      count = (count / 2).floorToDouble();
+      if (count > 0) {
+        base = _checkFiniteMatrix(base * base);
+      }
+    }
+
+    return result;
+  }
+
+  static double _checkFiniteScalar(double value) {
+    if (!value.isFinite) {
+      throw MatrixDomainError(
+        'Result is not a finite number.',
+        errorId: CalculatrixErrorId.nonFinite,
+      );
+    }
+    return value;
+  }
+
+  static Matrix _checkFiniteMatrix(Matrix matrix) {
+    for (int row = 0; row < matrix.rowCount; row++) {
+      for (int column = 0; column < matrix.columnCount; column++) {
+        if (!matrix.at(row, column).isFinite) {
+          throw MatrixDomainError(
+            'Result is not a finite number.',
+            errorId: CalculatrixErrorId.nonFinite,
+          );
+        }
+      }
+    }
+    return matrix;
   }
 
   /// Computes a matrix-first singular value decomposition.
@@ -1601,17 +1903,13 @@ class Matrix {
     final Matrix vT = v.transpose();
     final int n = columnCount;
 
-    final List<double> singularValues = List<double>.generate(
-      n,
-      (int index) {
-        final double lambda = decomposition.d.at(index, index);
-        if (lambda <= absoluteTolerance) {
-          return 0;
-        }
-        return math.sqrt(lambda);
-      },
-      growable: false,
-    );
+    final List<double> singularValues = List<double>.generate(n, (int index) {
+      final double lambda = decomposition.d.at(index, index);
+      if (lambda <= absoluteTolerance) {
+        return 0;
+      }
+      return math.sqrt(lambda);
+    }, growable: false);
 
     final List<List<double>> sRows = List<List<double>>.generate(
       n,
@@ -1640,11 +1938,13 @@ class Matrix {
         continue;
       }
 
-      final Matrix projected = this * Matrix(
-        vColumn
-            .map((double value) => <double>[value])
-            .toList(growable: false),
-      );
+      final Matrix projected =
+          this *
+          Matrix(
+            vColumn
+                .map((double value) => <double>[value])
+                .toList(growable: false),
+          );
       final double sigma = singularValues[column];
       for (int row = 0; row < rowCount; row++) {
         final double normalized = projected.at(row, 0) / sigma;
@@ -1654,11 +1954,7 @@ class Matrix {
       }
     }
 
-    return SvdDecomposition(
-      u: Matrix(uRows),
-      s: Matrix(sRows),
-      vT: vT,
-    );
+    return SvdDecomposition(u: Matrix(uRows), s: Matrix(sRows), vT: vT);
   }
 
   Matrix transpose() {
@@ -1680,6 +1976,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot append ${row.rowCount}x${row.columnCount} row operand to '
         '${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1694,6 +1991,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot append ${column.rowCount}x${column.columnCount} column operand '
         'to ${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1712,42 +2010,41 @@ class Matrix {
   Matrix deleteRow(int rowIndex) {
     _requireRowIndex(rowIndex);
     if (rowCount == 1) {
-      throw MatrixShapeError('Cannot delete the only row in a matrix.');
+      throw MatrixShapeError(
+        'Cannot delete the only row in a matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     return Matrix(
-      List<List<double>>.generate(
-        rowCount - 1,
-        (int targetIndex) {
-          final int sourceIndex = targetIndex < rowIndex
-              ? targetIndex
-              : targetIndex + 1;
-          return List<double>.from(_rows[sourceIndex]);
-        },
-        growable: false,
-      ),
+      List<List<double>>.generate(rowCount - 1, (int targetIndex) {
+        final int sourceIndex = targetIndex < rowIndex
+            ? targetIndex
+            : targetIndex + 1;
+        return List<double>.from(_rows[sourceIndex]);
+      }, growable: false),
     );
   }
 
   Matrix deleteColumn(int columnIndex) {
     _requireColumnIndex(columnIndex);
     if (columnCount == 1) {
-      throw MatrixShapeError('Cannot delete the only column in a matrix.');
+      throw MatrixShapeError(
+        'Cannot delete the only column in a matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     return Matrix(
       List<List<double>>.generate(
         rowCount,
-        (int rowIndex) => List<double>.generate(
-          columnCount - 1,
-          (int targetIndex) {
-            final int sourceIndex = targetIndex < columnIndex
-                ? targetIndex
-                : targetIndex + 1;
-            return _rows[rowIndex][sourceIndex];
-          },
-          growable: false,
-        ),
+        (int rowIndex) =>
+            List<double>.generate(columnCount - 1, (int targetIndex) {
+              final int sourceIndex = targetIndex < columnIndex
+                  ? targetIndex
+                  : targetIndex + 1;
+              return _rows[rowIndex][sourceIndex];
+            }, growable: false),
         growable: false,
       ),
     );
@@ -1767,15 +2064,11 @@ class Matrix {
     _requireColumnIndex(columnIndex);
 
     return Matrix(
-      List<List<double>>.generate(
-        rowCount,
-        (int rowIndex) {
-          final List<double> row = List<double>.from(_rows[rowIndex]);
-          row.insert(columnIndex + 1, _rows[rowIndex][columnIndex]);
-          return row;
-        },
-        growable: false,
-      ),
+      List<List<double>>.generate(rowCount, (int rowIndex) {
+        final List<double> row = List<double>.from(_rows[rowIndex]);
+        row.insert(columnIndex + 1, _rows[rowIndex][columnIndex]);
+        return row;
+      }, growable: false),
     );
   }
 
@@ -1802,16 +2095,12 @@ class Matrix {
     }
 
     return Matrix(
-      List<List<double>>.generate(
-        rowCount,
-        (int rowIndex) {
-          final List<double> row = List<double>.from(_rows[rowIndex]);
-          final double moved = row.removeAt(fromIndex);
-          row.insert(toIndex, moved);
-          return row;
-        },
-        growable: false,
-      ),
+      List<List<double>>.generate(rowCount, (int rowIndex) {
+        final List<double> row = List<double>.from(_rows[rowIndex]);
+        final double moved = row.removeAt(fromIndex);
+        row.insert(toIndex, moved);
+        return row;
+      }, growable: false),
     );
   }
 
@@ -1853,11 +2142,17 @@ class Matrix {
 
   static void _validateRectangular(List<List<double>> rows) {
     if (rows.isEmpty) {
-      throw MatrixShapeError('Matrix cannot be empty.');
+      throw MatrixShapeError(
+        'Matrix cannot be empty.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     if (rows.first.isEmpty) {
-      throw MatrixShapeError('Matrix rows cannot be empty.');
+      throw MatrixShapeError(
+        'Matrix rows cannot be empty.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     final int width = rows.first.length;
@@ -1865,15 +2160,21 @@ class Matrix {
       if (row.length != width) {
         throw MatrixShapeError(
           'All rows must have the same number of columns.',
+          errorId: CalculatrixErrorId.dimensionMismatch,
         );
       }
     }
   }
 
-  static void _validateShape(int rowCount, int columnCount, {required String label}) {
+  static void _validateShape(
+    int rowCount,
+    int columnCount, {
+    required String label,
+  }) {
     if (rowCount < 1 || columnCount < 1) {
       throw MatrixShapeError(
         '$label matrix dimensions must be greater than zero.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
   }
@@ -1883,6 +2184,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot perform $operation for ${rowCount}x${columnCount} and '
         '${other.rowCount}x${other.columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
   }
@@ -1894,9 +2196,7 @@ class Matrix {
   /// This enables natural complex arithmetic: `3 + Matrix.i` promotes 3 to
   /// `3·I₂` before the element-wise addition, yielding `[[3,-1],[1,3]]`.
   static Matrix _promoteScalar(Matrix candidate, Matrix reference) {
-    if (candidate.isScalar &&
-        reference.isSquare &&
-        reference.rowCount > 1) {
+    if (candidate.isScalar && reference.isSquare && reference.rowCount > 1) {
       return Matrix.identity(reference.rowCount).scale(candidate.scalarValue);
     }
     return candidate;
@@ -1907,6 +2207,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot perform $operation for non-square '
         '${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
   }

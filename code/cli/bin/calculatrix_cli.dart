@@ -58,13 +58,12 @@ void _printUsage() {
   print('  dart run bin/calculatrix_cli.dart infix "3 + 4 * 5"');
   print('  dart run bin/calculatrix_cli.dart rpn 3 4 + 5 *');
   print('  dart run bin/calculatrix_cli.dart command 3 4 add');
-  print('  dart run bin/calculatrix_cli.dart macro append-zero-row [[1,2],[3,4]]');
+  print(
+    '  dart run bin/calculatrix_cli.dart macro append-zero-row [[1,2],[3,4]]',
+  );
 }
 
-void _executeCommandSequence(
-  CalculatrixMachine machine,
-  List<String> tokens,
-) {
+void _executeCommandSequence(CalculatrixMachine machine, List<String> tokens) {
   for (final String rawToken in tokens) {
     final String token = rawToken.trim();
     if (token.isEmpty) {
@@ -153,17 +152,18 @@ void _executeCommandSequence(
   }
 }
 
-bool _tryExecuteParameterizedCommand(
-  CalculatrixMachine machine,
-  String token,
-) {
+bool _tryExecuteParameterizedCommand(CalculatrixMachine machine, String token) {
   if (token.startsWith('pick:')) {
-    machine.execute(PickCommand(_parseSingleIntArgument(token, prefix: 'pick:')));
+    machine.execute(
+      PickCommand(_parseSingleIntArgument(token, prefix: 'pick:')),
+    );
     return true;
   }
 
   if (token.startsWith('roll:')) {
-    machine.execute(RollCommand(_parseSingleIntArgument(token, prefix: 'roll:')));
+    machine.execute(
+      RollCommand(_parseSingleIntArgument(token, prefix: 'roll:')),
+    );
     return true;
   }
 
@@ -184,10 +184,7 @@ bool _tryExecuteParameterizedCommand(
   }
 
   if (token.startsWith('ones:')) {
-    final (int rows, int columns) = _parseShapeArgument(
-      token,
-      prefix: 'ones:',
-    );
+    final (int rows, int columns) = _parseShapeArgument(token, prefix: 'ones:');
     machine.execute(PushOnesCommand(rows, columns));
     return true;
   }
@@ -247,10 +244,7 @@ bool _tryExecuteParameterizedCommand(
   return false;
 }
 
-void _executeMacroWorkflow(
-  CalculatrixMachine machine,
-  List<String> args,
-) {
+void _executeMacroWorkflow(CalculatrixMachine machine, List<String> args) {
   final String macro = args.first.toLowerCase();
 
   switch (macro) {
@@ -261,25 +255,33 @@ void _executeMacroWorkflow(
       machine.executeMacro(CreateIdentityMacro(int.parse(args[1])));
     case 'zeros-like':
       if (args.length != 2) {
-        throw const FormatException('macro zeros-like requires one matrix operand.');
+        throw const FormatException(
+          'macro zeros-like requires one matrix operand.',
+        );
       }
       machine.execute(PushMatrixCommand(_parseOperandLiteral(args[1])));
       machine.executeMacro(const FillZerosLikeTopMacro());
     case 'ones-like':
       if (args.length != 2) {
-        throw const FormatException('macro ones-like requires one matrix operand.');
+        throw const FormatException(
+          'macro ones-like requires one matrix operand.',
+        );
       }
       machine.execute(PushMatrixCommand(_parseOperandLiteral(args[1])));
       machine.executeMacro(const FillOnesLikeTopMacro());
     case 'append-zero-row':
       if (args.length != 2) {
-        throw const FormatException('macro append-zero-row requires one matrix operand.');
+        throw const FormatException(
+          'macro append-zero-row requires one matrix operand.',
+        );
       }
       machine.execute(PushMatrixCommand(_parseOperandLiteral(args[1])));
       machine.executeMacro(const AppendZeroRowMacro());
     case 'append-zero-column':
       if (args.length != 2) {
-        throw const FormatException('macro append-zero-column requires one matrix operand.');
+        throw const FormatException(
+          'macro append-zero-column requires one matrix operand.',
+        );
       }
       machine.execute(PushMatrixCommand(_parseOperandLiteral(args[1])));
       machine.executeMacro(const AppendZeroColumnMacro());
@@ -309,7 +311,9 @@ String _formatCommandResults(CalculatrixMachine machine) {
     throw const FormatException('Command workflow did not leave any results.');
   }
 
-  final List<Matrix> stack = machine.stackSnapshot.reversed.toList(growable: false);
+  final List<Matrix> stack = machine.stackSnapshot.reversed.toList(
+    growable: false,
+  );
   return List<String>.generate(
     stack.length,
     (int index) => 'X$index: ${MatrixDisplayFormatter.compact(stack[index])}',
@@ -318,7 +322,11 @@ String _formatCommandResults(CalculatrixMachine machine) {
 }
 
 Matrix _parseOperandLiteral(String token) {
-  return Calculatrix.evaluateInfix(token);
+  // Command mode operands are RPN tokens, not infix expressions. Falling
+  // back to evaluateInfix here let an unrecognized token such as "2 -3"
+  // (a single command-mode argument) silently compute -1 as an infix
+  // subtraction instead of being rejected as an invalid operand.
+  return Calculatrix.evaluateRpn(<String>[token]);
 }
 
 int _parseSingleIntArgument(String token, {required String prefix}) {

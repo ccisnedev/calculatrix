@@ -37,7 +37,9 @@ class MatrixDisplayFormatter {
       growable: false,
     );
 
-    final List<int> widths = List<int>.generate(matrix.columnCount, (int column) {
+    final List<int> widths = List<int>.generate(matrix.columnCount, (
+      int column,
+    ) {
       int maxWidth = 0;
       for (int row = 0; row < matrix.rowCount; row++) {
         final int cellWidth = cells[row][column].length;
@@ -49,7 +51,9 @@ class MatrixDisplayFormatter {
     }, growable: false);
 
     return List<String>.generate(matrix.rowCount, (int row) {
-      final String content = List<String>.generate(matrix.columnCount, (int column) {
+      final String content = List<String>.generate(matrix.columnCount, (
+        int column,
+      ) {
         return cells[row][column].padLeft(widths[column]);
       }, growable: false).join(' ');
       return '[$content]';
@@ -65,12 +69,26 @@ class MatrixDisplayFormatter {
       return value.toInt().toString();
     }
 
-    String text = value.toStringAsPrecision(12);
-    if (text.contains('.')) {
-      text = text.replaceAll(RegExp(r'0+$'), '');
-      text = text.replaceAll(RegExp(r'\.$'), '');
+    final String raw = value.toStringAsPrecision(12);
+
+    // Split off any exponent suffix (e.g. "e+20", "E-15") before trimming
+    // trailing zeros, so the trim only ever touches the mantissa and never
+    // corrupts the exponent digits themselves.
+    final int exponentIndex = raw.indexOf(RegExp(r'[eE]'));
+    final String mantissa = exponentIndex == -1
+        ? raw
+        : raw.substring(0, exponentIndex);
+    final String exponentSuffix = exponentIndex == -1
+        ? ''
+        : raw.substring(exponentIndex);
+
+    String trimmedMantissa = mantissa;
+    if (trimmedMantissa.contains('.')) {
+      trimmedMantissa = trimmedMantissa.replaceAll(RegExp(r'0+$'), '');
+      trimmedMantissa = trimmedMantissa.replaceAll(RegExp(r'\.$'), '');
     }
-    return text;
+
+    return '$trimmedMantissa$exponentSuffix';
   }
 
   /// Formats a complex-form matrix as `a + bi` or `a - bi`.

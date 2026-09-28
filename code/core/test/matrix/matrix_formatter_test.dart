@@ -9,17 +9,11 @@ void main() {
     ]);
 
     test('renders compact one-line matrix output', () {
-      expect(
-        MatrixDisplayFormatter.compact(matrix),
-        '[[1, 2], [30, 400]]',
-      );
+      expect(MatrixDisplayFormatter.compact(matrix), '[[1, 2], [30, 400]]');
     });
 
     test('renders expanded aligned matrix output', () {
-      expect(
-        MatrixDisplayFormatter.expanded(matrix),
-        '[ 1   2]\n[30 400]',
-      );
+      expect(MatrixDisplayFormatter.expanded(matrix), '[ 1   2]\n[30 400]');
     });
   });
 
@@ -69,7 +63,27 @@ void main() {
     });
 
     test('decimal complex: 1.5 + 2.5i', () {
-      expect(MatrixDisplayFormatter.complex(Matrix.complex(1.5, 2.5)), '1.5 + 2.5i');
+      expect(
+        MatrixDisplayFormatter.complex(Matrix.complex(1.5, 2.5)),
+        '1.5 + 2.5i',
+      );
+    });
+  });
+
+  group('MatrixDisplayFormatter large exponent display (issue #5 bug 1)', () {
+    test('1e20 preserves the exponent instead of trimming its digits', () {
+      expect(MatrixDisplayFormatter.compact(Matrix.scalar(1e20)), '[[1e+20]]');
+    });
+
+    test('a mantissa with trailing zeros still trims down to the exponent', () {
+      expect(
+        MatrixDisplayFormatter.compact(Matrix.scalar(1.5e30)),
+        '[[1.5e+30]]',
+      );
+    });
+
+    test('a negative exponent keeps its sign and digits intact', () {
+      expect(MatrixDisplayFormatter.compact(Matrix.scalar(1e-20)), '[[1e-20]]');
     });
   });
 }
