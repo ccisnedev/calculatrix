@@ -539,7 +539,13 @@ class Calculatrix {
       final int position = positioned.position;
       final _InfixValidationFrame frame = frames.last;
 
-      if (frame.bareClosed && token != ')') {
+      // A postfix operator (e.g. "%") is exempt from the bare-function
+      // guard below: it applies unambiguously to whatever value already
+      // resolved the pending function ("(root 0)%" and "root 0 %" mean
+      // the same thing either way), unlike a further binary operator or
+      // function, which would be ambiguous about how much of the
+      // expression the original bare function's argument covers.
+      if (frame.bareClosed && token != ')' && !_isPostfixOperator(token)) {
         throw ExpressionSyntaxError(
           'A bare function argument must be parenthesized to combine it '
           'with further operators near "$token".',
