@@ -250,9 +250,13 @@ class Calculatrix {
     }
 
     if (decoded.isEmpty) {
+      // syntax-error is infix only (spec section 6): an empty matrix
+      // literal is well-formed syntax that names an impossible shape, in
+      // both RPN and infix, so this is dimension-mismatch, not
+      // syntax-error.
       throw MatrixShapeError(
         'Matrix literal cannot be empty.',
-        errorId: CalculatrixErrorId.syntaxError,
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
