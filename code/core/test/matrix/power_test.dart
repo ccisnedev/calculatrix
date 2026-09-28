@@ -10,17 +10,20 @@ import 'package:test/test.dart';
 
 void main() {
   group('Matrix.power (D25 dispatch table, issue #5)', () {
-    test('row 1: scalar^scalar, negative base and non-integer exponent gives the complex principal value', () {
-      // -4 0.5 ^ -> [[0 -2] [2 0]]
-      final Matrix result = Matrix.scalar(-4).power(Matrix.scalar(0.5));
-      expect(result.almostEquals(Matrix.complex(0, 2)), isTrue);
-    });
+    test(
+      'row 1: scalar^scalar, negative base and non-integer exponent gives the complex principal value',
+      () {
+        // -4 0.5 ^ -> [[0 -2] [2 0]]
+        final Matrix result = Matrix.scalar(-4).power(Matrix.scalar(0.5));
+        expect(result.almostEquals(Matrix.complex(0, 2)), isTrue);
+      },
+    );
 
     test('row 2: scalar>0 ^ square matrix uses exp(ln B * Y)', () {
       // e πi ^ -> [[-1 0] [0 -1]]
-      final Matrix result = Matrix.scalar(math.e).power(
-        Matrix.complex(0, math.pi),
-      );
+      final Matrix result = Matrix.scalar(
+        math.e,
+      ).power(Matrix.complex(0, math.pi));
       expect(
         result.almostEquals(
           Matrix(<List<double>>[
@@ -79,22 +82,25 @@ void main() {
       );
     });
 
-    test('row 4: singular base with a negative integer exponent is singular-matrix', () {
-      final Matrix singular = Matrix(<List<double>>[
-        <double>[1, 2],
-        <double>[2, 4],
-      ]);
-      expect(
-        () => singular.power(Matrix.scalar(-1)),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.singularMatrix,
+    test(
+      'row 4: singular base with a negative integer exponent is singular-matrix',
+      () {
+        final Matrix singular = Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[2, 4],
+        ]);
+        expect(
+          () => singular.power(Matrix.scalar(-1)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.singularMatrix,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('row 5: square ^ non-integer scalar uses exp(y * log B)', () {
       // [[2 0] [0 3]] 0.5 ^ -> [[1.414 0] [0 1.732]]
@@ -115,27 +121,30 @@ void main() {
       );
     });
 
-    test('row 6: square (not complex, not scalar) ^ square (not scalar) is ambiguous-power', () {
-      // [[1 1] [0 1]] [[0 1] [1 0]] ^
-      final Matrix base = Matrix(<List<double>>[
-        <double>[1, 1],
-        <double>[0, 1],
-      ]);
-      final Matrix exponent = Matrix(<List<double>>[
-        <double>[0, 1],
-        <double>[1, 0],
-      ]);
-      expect(
-        () => base.power(exponent),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.ambiguousPower,
+    test(
+      'row 6: square (not complex, not scalar) ^ square (not scalar) is ambiguous-power',
+      () {
+        // [[1 1] [0 1]] [[0 1] [1 0]] ^
+        final Matrix base = Matrix(<List<double>>[
+          <double>[1, 1],
+          <double>[0, 1],
+        ]);
+        final Matrix exponent = Matrix(<List<double>>[
+          <double>[0, 1],
+          <double>[1, 0],
+        ]);
+        expect(
+          () => base.power(exponent),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.ambiguousPower,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('row 7: 0 ^ positive scalar is 0', () {
       final Matrix result = Matrix.scalar(0).power(Matrix.scalar(1));
@@ -161,19 +170,22 @@ void main() {
       );
     });
 
-    test('row 8: 0 ^ matrix exponent requires log(0), which is log-undefined', () {
-      // 0 πi ^
-      expect(
-        () => Matrix.scalar(0).power(Matrix.complex(0, math.pi)),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.logUndefined,
+    test(
+      'row 8: 0 ^ matrix exponent requires log(0), which is log-undefined',
+      () {
+        // 0 πi ^
+        expect(
+          () => Matrix.scalar(0).power(Matrix.complex(0, math.pi)),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('row 9: non-square base ^ anything is dimension-mismatch', () {
       // [[1 2]] 2 ^
@@ -225,23 +237,26 @@ void main() {
       );
     });
 
-    test('row 12: scalar<0 ^ square (not complex, not scalar) is ambiguous-power', () {
-      // -2 [[1 0] [0 2]] ^
-      final Matrix exponent = Matrix(<List<double>>[
-        <double>[1, 0],
-        <double>[0, 2],
-      ]);
-      expect(
-        () => Matrix.scalar(-2).power(exponent),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.ambiguousPower,
+    test(
+      'row 12: scalar<0 ^ square (not complex, not scalar) is ambiguous-power',
+      () {
+        // -2 [[1 0] [0 2]] ^
+        final Matrix exponent = Matrix(<List<double>>[
+          <double>[1, 0],
+          <double>[0, 2],
+        ]);
+        expect(
+          () => Matrix.scalar(-2).power(exponent),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.ambiguousPower,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('row 13: any ^ any that overflows is non-finite', () {
       // 10 400 ^
@@ -257,14 +272,17 @@ void main() {
       );
     });
 
-    test('integer power by binary exponentiation does not hang for huge exponents', () {
-      // A real fix for a hang at exponents like -2^63: the identity matrix
-      // raised to an extreme integer power must resolve immediately instead
-      // of looping once per unit of the exponent's magnitude.
-      final Matrix identity = Matrix.identity(2);
-      expect(identity.power(Matrix.scalar(9223372036854775807)), identity);
-      expect(identity.power(Matrix.scalar(-9223372036854775807)), identity);
-    });
+    test(
+      'integer power by binary exponentiation does not hang for huge exponents',
+      () {
+        // A real fix for a hang at exponents like -2^63: the identity matrix
+        // raised to an extreme integer power must resolve immediately instead
+        // of looping once per unit of the exponent's magnitude.
+        final Matrix identity = Matrix.identity(2);
+        expect(identity.power(Matrix.scalar(9223372036854775808.0)), identity);
+        expect(identity.power(Matrix.scalar(-9223372036854775808.0)), identity);
+      },
+    );
 
     test('X exp equals e X ^ for a sample of matrices', () {
       final List<Matrix> samples = <Matrix>[

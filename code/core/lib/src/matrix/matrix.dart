@@ -1589,6 +1589,155 @@ class Matrix {
     return p * Matrix(logDiagonal) * p.inverse();
   }
 
+  /// Computes `this ^ exponent` per the power dispatch table (issue #5,
+  /// spec section 3): `B^Y = exp(Y * log B)`, using the principal log/exp.
+  Matrix power(Matrix exponent) {
+    if (!isSquare) {
+      throw MatrixShapeError(
+        'Power base must be square, found ${rowCount}x$columnCount.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+    if (!exponent.isSquare) {
+      throw MatrixShapeError(
+        'Power exponent must be square, found '
+        '${exponent.rowCount}x${exponent.columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+    if (!isScalar && !exponent.isScalar && rowCount != exponent.rowCount) {
+      throw MatrixShapeError(
+        'Power base ${rowCount}x$rowCount and exponent '
+        '${exponent.rowCount}x${exponent.rowCount} must be the same size.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+
+    if (exponent.isScalar) {
+      return _powerByScalarExponent(exponent.scalarValue);
+    }
+    return _powerByMatrixExponent(exponent);
+  }
+
+  Matrix _powerByScalarExponent(double y) {
+    final bool integerExponent = y == y.roundToDouble();
+
+    if (isScalar) {
+      final double b = scalarValue;
+      if (integerExponent || b >= 0) {
+        return Matrix.scalar(_checkFiniteScalar(math.pow(b, y).toDouble()));
+      }
+      final Matrix scaled = log().scale(y);
+      return _checkFiniteMatrix(scaled.exp());
+    }
+
+    if (integerExponent) {
+      return _integerMatrixPower(y);
+    }
+    final Matrix scaled = log().scale(y);
+    return _checkFiniteMatrix(scaled.exp());
+  }
+
+  Matrix _powerByMatrixExponent(Matrix exponent) {
+    if (isScalar) {
+      final double b = scalarValue;
+      if (b == 0) {
+        throw MatrixDomainError(
+          '0 raised to a matrix power requires log(0), which is undefined.',
+          errorId: CalculatrixErrorId.logUndefined,
+        );
+      }
+      if (b > 0) {
+        final Matrix scaled = exponent.scale(math.log(b));
+        return _checkFiniteMatrix(scaled.exp());
+      }
+      if (exponent.isComplexForm) {
+        final Matrix product = log() * exponent;
+        return _checkFiniteMatrix(product.exp());
+      }
+      throw MatrixDomainError(
+        'A negative scalar base raised to a non-complex matrix exponent is '
+        'ambiguous: the branch of the logarithm is not determined.',
+        errorId: CalculatrixErrorId.ambiguousPower,
+      );
+    }
+
+    if (isComplexForm && exponent.isComplexForm) {
+      final Matrix product = log() * exponent;
+      return _checkFiniteMatrix(product.exp());
+    }
+
+    throw MatrixDomainError(
+      'A matrix base raised to a matrix exponent is ambiguous outside the '
+      'scalar, positive-scalar-base and complex-form cases.',
+      errorId: CalculatrixErrorId.ambiguousPower,
+    );
+  }
+
+  /// Integer power of a square, non-scalar matrix via exponentiation by
+  /// squaring (or by squaring the inverse, for a negative exponent).
+  ///
+  /// [exponent] is taken and driven entirely as a `double` (never rounded
+  /// or negated through `int`): `int` on the native VM is a wrapping
+  /// 64-bit type, so `exponent.round()`/`.abs()` silently clamp or
+  /// overflow for magnitudes near or beyond 2^63 (e.g. the minimum 64-bit
+  /// int negated overflows back to itself). A `double` has no such trap —
+  /// every finite double is an exact dyadic rational, so halving it via
+  /// `count / 2` and reading its parity via `count % 2` stay exact for any
+  /// whole-number magnitude a double can represent, which is exactly what
+  /// binary exponentiation needs. `count` reaches 0 in O(log2(|exponent|))
+  /// iterations even for exponents like 1e30, instead of the O(|exponent|)
+  /// iterations a naive repeated-multiplication loop would need (which
+  /// would never finish for such an exponent). Each squaring/multiplication
+  /// step is finiteness-checked so an overflowing result raises
+  /// `non-finite` instead of silently returning `Infinity` entries.
+  Matrix _integerMatrixPower(double exponent) {
+    if (exponent == 0) {
+      return Matrix.identity(rowCount);
+    }
+
+    final bool negative = exponent < 0;
+    Matrix base = negative ? _inverse() : this;
+    double count = negative ? -exponent : exponent;
+    Matrix result = Matrix.identity(rowCount);
+
+    while (count > 0) {
+      if (count % 2 == 1) {
+        result = _checkFiniteMatrix(result * base);
+      }
+      count = (count / 2).floorToDouble();
+      if (count > 0) {
+        base = _checkFiniteMatrix(base * base);
+      }
+    }
+
+    return result;
+  }
+
+  static double _checkFiniteScalar(double value) {
+    if (!value.isFinite) {
+      throw MatrixDomainError(
+        'Result is not a finite number.',
+        errorId: CalculatrixErrorId.nonFinite,
+      );
+    }
+    return value;
+  }
+
+  static Matrix _checkFiniteMatrix(Matrix matrix) {
+    for (int row = 0; row < matrix.rowCount; row++) {
+      for (int column = 0; column < matrix.columnCount; column++) {
+        if (!matrix.at(row, column).isFinite) {
+          throw MatrixDomainError(
+            'Result is not a finite number.',
+            errorId: CalculatrixErrorId.nonFinite,
+          );
+        }
+      }
+    }
+    return matrix;
+  }
+
   /// Computes a matrix-first singular value decomposition.
   ///
   /// Returns matrices (U, S, Vᵀ) such that A ≈ U·S·Vᵀ, where S is diagonal

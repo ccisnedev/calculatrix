@@ -40,19 +40,22 @@ void main() {
       );
     });
 
-    test('a bare function argument followed by an operator is a syntax error', () {
-      // "root9+7" must not silently evaluate to root(9+7) = 4.
-      expect(
-        () => Calculatrix.evaluateInfix('√9+7'),
-        throwsA(
-          isA<ExpressionSyntaxError>().having(
-            (ExpressionSyntaxError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.syntaxError,
+    test(
+      'a bare function argument followed by an operator is a syntax error',
+      () {
+        // "root9+7" must not silently evaluate to root(9+7) = 4.
+        expect(
+          () => Calculatrix.evaluateInfix('√9+7'),
+          throwsA(
+            isA<ExpressionSyntaxError>().having(
+              (ExpressionSyntaxError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.syntaxError,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('parenthesizing the bare function argument makes it valid', () {
       final Matrix result = Calculatrix.evaluateInfix('(√9)+7');
@@ -74,22 +77,32 @@ void main() {
   });
 
   group('Non-finite literals are rejected (issue #5 bug 4)', () {
-    test('an infix numeric literal that overflows to infinity is non-finite', () {
-      expect(
-        () => Calculatrix.evaluateInfix('1e999'),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.nonFinite,
+    test(
+      'an infix numeric literal that overflows to infinity is non-finite',
+      () {
+        expect(
+          () => Calculatrix.evaluateInfix('1e999'),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.nonFinite,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
-    test('an infix NaN literal is non-finite', () {
+    test('an RPN NaN literal is non-finite', () {
+      // The infix tokenizer never scans a letter-led token as a number (it
+      // only starts a numeric scan on a digit, a dot, or a signed digit),
+      // so infix "NaN" is not a valid numeric literal to begin with; it
+      // correctly raises syntax-error, covered by the tokenizer tests
+      // above. RPN's token compiler instead parses the whole token with
+      // double.tryParse, which does recognize "NaN", so this is where the
+      // non-finite guard for it applies.
       expect(
-        () => Calculatrix.evaluateInfix('NaN'),
+        () => Calculatrix.evaluateRpn(<String>['NaN']),
         throwsA(
           isA<MatrixDomainError>().having(
             (MatrixDomainError error) => error.errorId,
@@ -127,20 +140,23 @@ void main() {
     });
   });
 
-  group('RPN never falls back to infix for an unknown word (issue #5 bug 3)', () {
-    test('an unrecognized RPN token raises unknown-word', () {
-      expect(
-        () => Calculatrix.evaluateRpn(<String>['banana']),
-        throwsA(
-          isA<UnknownWordError>().having(
-            (UnknownWordError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.unknownWord,
+  group(
+    'RPN never falls back to infix for an unknown word (issue #5 bug 3)',
+    () {
+      test('an unrecognized RPN token raises unknown-word', () {
+        expect(
+          () => Calculatrix.evaluateRpn(<String>['banana']),
+          throwsA(
+            isA<UnknownWordError>().having(
+              (UnknownWordError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.unknownWord,
+            ),
           ),
-        ),
-      );
-    });
-  });
+        );
+      });
+    },
+  );
 
   group('The ^ operator (issue #5)', () {
     test('binds tighter than * and is right associative', () {
@@ -150,9 +166,7 @@ void main() {
     });
 
     test('evaluates a matrix power through infix', () {
-      final Matrix result = Calculatrix.evaluateInfix(
-        '[[1,1],[0,1]] ^ 3',
-      );
+      final Matrix result = Calculatrix.evaluateInfix('[[1,1],[0,1]] ^ 3');
       expect(
         result,
         Matrix(<List<double>>[
