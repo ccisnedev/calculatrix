@@ -1485,7 +1485,9 @@ class Matrix {
     );
   }
 
-  /// Computes the matrix exponential via scaling and squaring.
+  /// Computes the matrix exponential via a trace shift followed by scaling
+  /// and squaring (or, when what remains is exactly nilpotent, an exact
+  /// finite sum).
   ///
   /// For a square matrix A, expm(A) = I + A + A²/2! + A³/3! + ..., but
   /// summing that series directly on A is only accurate while ‖A‖ stays
@@ -1493,20 +1495,36 @@ class Matrix {
   /// grow past any practical cap, and truncating early is silently wrong
   /// rather than merely imprecise.
   ///
-  /// Scaling and squaring fixes this by using the identity
-  /// `expm(A) = expm(A / 2^s) ^ (2^s)`: choose `s` so that
-  /// `‖A / 2^s‖_inf <= 0.5`, where the Taylor series converges to double
+  /// Trace shift (Ward 1977) is applied first: with mu = trace(A) / n,
+  /// expm(A) = e^mu * expm(A - mu*I). Removing the "mu*I" part of A before
+  /// summing or scaling keeps the working norm smaller and, when what
+  /// remains is exactly nilpotent (a lambda*I + nilpotent matrix, such as a
+  /// Jordan block, or any other matrix whose shifted form happens to be
+  /// nilpotent), lets the exact path below apply instead of scaling and
+  /// squaring, which is not exact even when the input is: repeated squaring
+  /// accumulates rounding error the shifted matrix's own finite series never
+  /// would.
+  ///
+  /// Exact nilpotent path: if B = A - mu*I satisfies B^k = 0 (the exact zero
+  /// matrix, for some k <= n), expm(B) is the exact finite sum
+  /// I + B + B²/2! + ... + B^(k-1)/(k-1)!, with no truncation and no
+  /// scaling/squaring rounding to introduce error.
+  ///
+  /// Otherwise, scaling and squaring proceeds on B using the identity
+  /// `expm(B) = expm(B / 2^s) ^ (2^s)`: choose `s` so that
+  /// `‖B / 2^s‖_inf <= 0.5`, where the Taylor series converges to double
   /// precision in a handful of terms, sum that series, then square the
-  /// result `s` times to undo the scaling.
+  /// result `s` times to undo the scaling, then multiply by e^mu to undo the
+  /// trace shift.
   ///
   /// For pure imaginary matrices θ·J (where J = i), this yields:
   /// expm(θ·J) = [[cos(θ), -sin(θ)], [sin(θ), cos(θ)]] (rotation matrix).
   ///
   /// Throws [MatrixDomainError] with [CalculatrixErrorId.nonFinite] when the
-  /// true result overflows double precision (D25 row 13): squaring back up
-  /// an exponential whose true value is too large to represent yields an
-  /// infinite or NaN entry, which is caught here instead of returned
-  /// silently.
+  /// true result overflows double precision (D25 row 13): squaring back up,
+  /// or multiplying by e^mu, an exponential whose true value is too large to
+  /// represent yields an infinite or NaN entry, which is caught here instead
+  /// of returned silently.
   Matrix exp({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -1518,19 +1536,40 @@ class Matrix {
       return Matrix.scalar(math.exp(scalarValue));
     }
 
-    // Choose s so that ‖A / 2^s‖_inf <= 0.5 (0 when the norm is already
+    // Trace shift: expm(A) = e^mu * expm(A - mu*I), mu = trace(A) / n.
+    final double mu = trace().scalarValue / rowCount;
+    final double muExp = math.exp(mu);
+    final Matrix shifted = this - Matrix.identity(rowCount).scale(mu);
+
+    // Exact nilpotent path: no truncation, no scaling.
+    final int? nilpotencyIndex = _exactNilpotencyIndex(shifted);
+    if (nilpotencyIndex != null) {
+      Matrix sum = Matrix.identity(rowCount);
+      Matrix nilpotentTerm = Matrix.identity(rowCount);
+      double nilpotentFactorial = 1;
+
+      for (int power = 1; power < nilpotencyIndex; power++) {
+        nilpotentFactorial *= power;
+        nilpotentTerm = nilpotentTerm * shifted;
+        sum = sum + nilpotentTerm.scale(1 / nilpotentFactorial);
+      }
+
+      return _checkFiniteMatrix(sum.scale(muExp));
+    }
+
+    // Choose s so that ‖B / 2^s‖_inf <= 0.5 (0 when the norm is already
     // small enough that no scaling is needed).
     const double convergenceNormBound = 0.5;
-    final double norm = _infinityNorm();
+    final double norm = shifted._infinityNorm();
     final int scalingSteps = norm > convergenceNormBound
         ? (math.log(norm / convergenceNormBound) / math.ln2).ceil()
         : 0;
     final double scaleFactor = math.pow(2, scalingSteps).toDouble();
     final Matrix scaledSource = scalingSteps == 0
-        ? this
-        : scale(1 / scaleFactor);
+        ? shifted
+        : shifted.scale(1 / scaleFactor);
 
-    // Taylor series on the scaled matrix: expm(A) = I + A + A²/2! + ...
+    // Taylor series on the scaled matrix: expm(B) = I + B + B²/2! + ...
     // The scaled norm is at most 0.5, so this converges to double precision
     // in well under 50 terms; the cap is only a safety net.
     //
@@ -1557,13 +1596,41 @@ class Matrix {
       }
     }
 
-    // Undo the scaling: expm(A) = expm(A / 2^s) ^ (2^s), by repeated
+    // Undo the scaling: expm(B) = expm(B / 2^s) ^ (2^s), by repeated
     // squaring.
     for (int step = 0; step < scalingSteps; step++) {
       result = result * result;
     }
 
-    return _checkFiniteMatrix(result);
+    // Undo the trace shift: expm(A) = e^mu * expm(A - mu*I).
+    return _checkFiniteMatrix(result.scale(muExp));
+  }
+
+  /// Returns the smallest k in [1, matrix.rowCount] such that matrix^k is
+  /// exactly the zero matrix (every entry bit-identical to 0.0), or null if
+  /// no such k exists. For an n x n nilpotent matrix the nilpotency index is
+  /// always at most n, so checking up to k = n is decisive, not a heuristic
+  /// cutoff.
+  static int? _exactNilpotencyIndex(Matrix matrix) {
+    Matrix power = matrix;
+    for (int k = 1; k <= matrix.rowCount; k++) {
+      if (_isExactZeroMatrix(power)) {
+        return k;
+      }
+      power = power * matrix;
+    }
+    return null;
+  }
+
+  static bool _isExactZeroMatrix(Matrix matrix) {
+    for (int row = 0; row < matrix.rowCount; row++) {
+      for (int column = 0; column < matrix.columnCount; column++) {
+        if (matrix.at(row, column) != 0.0) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   /// Computes the principal matrix logarithm.
