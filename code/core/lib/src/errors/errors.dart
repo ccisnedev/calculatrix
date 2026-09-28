@@ -35,11 +35,27 @@ class CalculatrixError implements Exception {
   final CalculatrixErrorId? errorId;
 
   /// The offending token, when the evaluator knows it.
-  final String? token;
+  ///
+  /// Mutable (not `final`) so the evaluator's per-token dispatch loop can
+  /// enrich an error that was thrown deeper in the call stack (a `Matrix`
+  /// or `RpnEngine` method, which has no notion of "token" or "input
+  /// position") once it is caught back at the token that produced the
+  /// command that threw it. See [enrichToken].
+  String? token;
 
   /// The 1-based character position of [token] in the source program,
-  /// when the evaluator knows it.
-  final int? position;
+  /// when the evaluator knows it. Mutable for the same reason as [token].
+  int? position;
+
+  /// Fills in [token] and [position] from the token that was being
+  /// dispatched when this error was caught, but only where this error does
+  /// not already carry its own (a throw site closer to the actual token,
+  /// such as an unrecognized RPN word, already knows better than the
+  /// generic dispatch loop that is enriching every other error uniformly).
+  void enrichToken(String token, int position) {
+    this.token ??= token;
+    this.position ??= position;
+  }
 
   @override
   String toString() {

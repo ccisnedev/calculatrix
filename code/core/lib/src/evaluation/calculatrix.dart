@@ -9,6 +9,17 @@ import '../matrix/matrix.dart';
 
 class Calculatrix {
   static CalculatrixProgram compileInfix(String expression) {
+    return CalculatrixProgram(
+      _compileRpnCommands(_compileInfixToRpnTokens(expression)),
+    );
+  }
+
+  // Shared by compileInfix and evaluateInfix: tokenizes, validates and
+  // shunting-yards the infix expression down to the same positioned RPN
+  // token stream either caller needs, one of them to compile into a typed
+  // CalculatrixProgram, the other to compile and execute token-by-token so
+  // execution-time errors can be enriched (see _executePositioned).
+  static List<_PositionedToken> _compileInfixToRpnTokens(String expression) {
     final String source = expression.trim();
     if (source.isEmpty) {
       throw ExpressionSyntaxError(
@@ -17,10 +28,9 @@ class Calculatrix {
       );
     }
 
-    final List<String> infixTokens = _tokenizeInfix(source);
+    final List<_PositionedToken> infixTokens = _tokenizeInfixPositioned(source);
     _validateInfixTokens(infixTokens);
-    final List<String> rpnTokens = _toRpn(infixTokens);
-    return _compileRpnTokens(rpnTokens);
+    return _toRpn(infixTokens);
   }
 
   // The infix tokenizer's own token stream, exposed so a caller such as
@@ -31,33 +41,27 @@ class Calculatrix {
   // separate character scan is what let a token such as "-[[3]]" (a signed
   // matrix literal) be mistaken for a binary subtraction.
   static List<String> tokenizeInfixExpression(String expression) {
-    return _tokenizeInfix(expression.trim());
+    return _tokenizeInfixPositioned(
+      expression.trim(),
+    ).map((_PositionedToken token) => token.value).toList();
   }
 
   static Matrix evaluateInfix(String expression) {
     try {
       final CalculatrixMachine machine = CalculatrixMachine();
-      machine.executeProgram(compileInfix(expression));
+      _executePositioned(machine, _compileInfixToRpnTokens(expression));
       return _singleResult(machine, expression: expression, notation: 'infix');
-    } on RpnStackUnderflowError catch (_) {
+    } on RpnStackUnderflowError catch (error) {
       throw ExpressionSyntaxError(
         'Invalid infix expression: $expression',
         errorId: CalculatrixErrorId.syntaxError,
+        token: error.token,
+        position: error.position,
       );
     }
   }
 
   static Matrix evaluateRpn(List<String> tokens) {
-    final CalculatrixMachine machine = CalculatrixMachine();
-    machine.executeProgram(_compileRpnTokens(tokens));
-    return _singleResult(
-      machine,
-      expression: tokens.join(' '),
-      notation: 'RPN',
-    );
-  }
-
-  static CalculatrixProgram _compileRpnTokens(List<String> tokens) {
     if (tokens.isEmpty) {
       throw ExpressionSyntaxError(
         'RPN token list cannot be empty.',
@@ -65,17 +69,83 @@ class Calculatrix {
       );
     }
 
-    final List<CalculatrixCommand> commands = <CalculatrixCommand>[];
-    for (final String rawToken in tokens) {
+    final CalculatrixMachine machine = CalculatrixMachine();
+    _executePositioned(machine, _positionRawRpnTokens(tokens));
+    return _singleResult(
+      machine,
+      expression: tokens.join(' '),
+      notation: 'RPN',
+    );
+  }
+
+  // Assigns each raw RPN token its 1-based character position in the
+  // "input line" (spec section 6): the same string evaluateRpn reports as
+  // the expression, tokens.join(' '), so a caller reading a reported
+  // position can find the token by counting characters into that exact
+  // string. Blank tokens (e.g. from a stray double space) are dropped
+  // here, before compiling, exactly as _compileRpnTokens used to drop
+  // them inline.
+  static List<_PositionedToken> _positionRawRpnTokens(List<String> rawTokens) {
+    final List<_PositionedToken> positioned = <_PositionedToken>[];
+    int cursor = 1;
+    for (final String rawToken in rawTokens) {
       final String token = rawToken.trim();
-      if (token.isEmpty) {
-        continue;
+      if (token.isNotEmpty) {
+        positioned.add(
+          _PositionedToken(token, cursor + rawToken.indexOf(token)),
+        );
       }
-
-      commands.add(_compileRpnToken(token));
+      cursor += rawToken.length + 1; // +1 for the joining space.
     }
+    return positioned;
+  }
 
-    return CalculatrixProgram(commands);
+  // Compiles each already-positioned token to a command, the one place
+  // (per notation) where a raw input token and the command it compiles to
+  // are both in hand at once. A compile-time failure (an unrecognized
+  // word, a non-finite literal, a malformed matrix literal, ...) is
+  // enriched with that token right here. The commands themselves are kept
+  // as their own concrete types (PushScalarCommand, MultiplyCommand, ...)
+  // rather than wrapped, so a CalculatrixProgram built from them stays a
+  // deterministic, typed program a caller can inspect; execution-time
+  // enrichment (stack underflow, a dimension mismatch, ...) is instead the
+  // job of _executePositioned, which dispatches each command with its
+  // token still in hand.
+  static List<CalculatrixCommand> _compileRpnCommands(
+    List<_PositionedToken> tokens,
+  ) {
+    final List<CalculatrixCommand> commands = <CalculatrixCommand>[];
+    for (final _PositionedToken positioned in tokens) {
+      try {
+        commands.add(_compileRpnToken(positioned.value));
+      } on CalculatrixError catch (error) {
+        error.enrichToken(positioned.value, positioned.position);
+        rethrow;
+      }
+    }
+    return commands;
+  }
+
+  // Compiles and runs positioned tokens one at a time against machine, the
+  // choke point where an execution-time domain error (stack underflow, a
+  // dimension mismatch, a singular matrix, ...) is enriched with the token
+  // that produced the command that threw it: Matrix and RpnEngine methods
+  // have no notion of "token" or "input position" themselves, so they
+  // cannot set these on the errors they raise.
+  static void _executePositioned(
+    CalculatrixMachine machine,
+    List<_PositionedToken> tokens,
+  ) {
+    final List<CalculatrixCommand> commands = _compileRpnCommands(tokens);
+    for (int index = 0; index < commands.length; index++) {
+      final _PositionedToken positioned = tokens[index];
+      try {
+        machine.execute(commands[index]);
+      } on CalculatrixError catch (error) {
+        error.enrichToken(positioned.value, positioned.position);
+        rethrow;
+      }
+    }
   }
 
   static CalculatrixCommand _compileRpnToken(String token) {
@@ -333,8 +403,8 @@ class Calculatrix {
     );
   }
 
-  static List<String> _tokenizeInfix(String expression) {
-    final List<String> tokens = <String>[];
+  static List<_PositionedToken> _tokenizeInfixPositioned(String expression) {
+    final List<_PositionedToken> tokens = <_PositionedToken>[];
     int index = 0;
 
     while (index < expression.length) {
@@ -346,8 +416,14 @@ class Calculatrix {
       }
 
       if (_isSignedNumberStart(expression, index, tokens)) {
+        final int start = index;
         final _NumberScanResult scan = _scanNumber(expression, index);
-        tokens.add(_requireParseableNumberToken(scan.token));
+        tokens.add(
+          _PositionedToken(
+            _requireParseableNumberToken(scan.token, start + 1),
+            start + 1,
+          ),
+        );
         index = scan.nextIndex;
         continue;
       }
@@ -355,7 +431,9 @@ class Calculatrix {
       if (_isSignedBracketStart(expression, index, tokens)) {
         final int start = index;
         index = _scanBracketedLiteral(expression, index + 1);
-        tokens.add(expression.substring(start, index));
+        tokens.add(
+          _PositionedToken(expression.substring(start, index), start + 1),
+        );
         continue;
       }
 
@@ -364,7 +442,7 @@ class Calculatrix {
           _isPostfixOperator(char) ||
           char == '(' ||
           char == ')') {
-        tokens.add(char);
+        tokens.add(_PositionedToken(char, index + 1));
         index++;
         continue;
       }
@@ -372,13 +450,21 @@ class Calculatrix {
       if (char == '[') {
         final int start = index;
         index = _scanBracketedLiteral(expression, index);
-        tokens.add(expression.substring(start, index));
+        tokens.add(
+          _PositionedToken(expression.substring(start, index), start + 1),
+        );
         continue;
       }
 
       if (_isNumberStart(char)) {
+        final int start = index;
         final _NumberScanResult scan = _scanNumber(expression, index);
-        tokens.add(_requireParseableNumberToken(scan.token));
+        tokens.add(
+          _PositionedToken(
+            _requireParseableNumberToken(scan.token, start + 1),
+            start + 1,
+          ),
+        );
         index = scan.nextIndex;
         continue;
       }
@@ -386,6 +472,8 @@ class Calculatrix {
       throw ExpressionSyntaxError(
         'Unexpected token near "$char".',
         errorId: CalculatrixErrorId.syntaxError,
+        token: char,
+        position: index + 1,
       );
     }
 
@@ -399,12 +487,13 @@ class Calculatrix {
   /// operand and surface as the wrong id (`unknown-word`) instead of the
   /// syntax error it actually is; this check is infix-only. RPN's own
   /// token compiler already validates numeric literals independently.
-  static String _requireParseableNumberToken(String token) {
+  static String _requireParseableNumberToken(String token, int position) {
     if (double.tryParse(token) == null) {
       throw ExpressionSyntaxError(
         'Invalid numeric literal: $token',
         errorId: CalculatrixErrorId.syntaxError,
         token: token,
+        position: position,
       );
     }
     return token;
@@ -422,13 +511,15 @@ class Calculatrix {
   /// something surprising. Combining a bare function argument with a
   /// further operator now requires parenthesizing it explicitly, e.g.
   /// "(root 9)+7".
-  static void _validateInfixTokens(List<String> tokens) {
+  static void _validateInfixTokens(List<_PositionedToken> tokens) {
     final List<_InfixValidationFrame> frames = <_InfixValidationFrame>[
       _InfixValidationFrame(),
     ];
     bool expectOperand = true;
 
-    for (final String token in tokens) {
+    for (final _PositionedToken positioned in tokens) {
+      final String token = positioned.value;
+      final int position = positioned.position;
       final _InfixValidationFrame frame = frames.last;
 
       if (frame.bareClosed && token != ')') {
@@ -436,6 +527,8 @@ class Calculatrix {
           'A bare function argument must be parenthesized to combine it '
           'with further operators near "$token".',
           errorId: CalculatrixErrorId.syntaxError,
+          token: token,
+          position: position,
         );
       }
 
@@ -444,6 +537,8 @@ class Calculatrix {
           throw ExpressionSyntaxError(
             'Unexpected operand "$token"; an operator was expected.',
             errorId: CalculatrixErrorId.syntaxError,
+            token: token,
+            position: position,
           );
         }
         if (frame.pendingFunctionCount > 0) {
@@ -459,6 +554,8 @@ class Calculatrix {
           throw ExpressionSyntaxError(
             'Unexpected function "$token"; an operator was expected.',
             errorId: CalculatrixErrorId.syntaxError,
+            token: token,
+            position: position,
           );
         }
         // Tracked as a count, not a boolean: consecutive prefix functions
@@ -476,6 +573,8 @@ class Calculatrix {
           throw ExpressionSyntaxError(
             'Unexpected "("; an operator was expected.',
             errorId: CalculatrixErrorId.syntaxError,
+            token: token,
+            position: position,
           );
         }
         // Only the immediately preceding function is parenthesized by this
@@ -495,6 +594,8 @@ class Calculatrix {
           throw ExpressionSyntaxError(
             'Empty parentheses are not a valid operand.',
             errorId: CalculatrixErrorId.syntaxError,
+            token: token,
+            position: position,
           );
         }
         if (frames.length > 1) {
@@ -519,6 +620,8 @@ class Calculatrix {
           throw ExpressionSyntaxError(
             'Unexpected operator "$token"; an operand was expected.',
             errorId: CalculatrixErrorId.syntaxError,
+            token: token,
+            position: position,
           );
         }
         expectOperand = true;
@@ -530,6 +633,8 @@ class Calculatrix {
           throw ExpressionSyntaxError(
             'Unexpected "$token"; an operand was expected.',
             errorId: CalculatrixErrorId.syntaxError,
+            token: token,
+            position: position,
           );
         }
         continue;
@@ -538,6 +643,8 @@ class Calculatrix {
       throw ExpressionSyntaxError(
         'Unsupported token in infix expression: $token',
         errorId: CalculatrixErrorId.syntaxError,
+        token: token,
+        position: position,
       );
     }
 
@@ -549,48 +656,50 @@ class Calculatrix {
     }
   }
 
-  static List<String> _toRpn(List<String> infixTokens) {
-    final List<String> output = <String>[];
-    final List<String> operators = <String>[];
+  static List<_PositionedToken> _toRpn(List<_PositionedToken> infixTokens) {
+    final List<_PositionedToken> output = <_PositionedToken>[];
+    final List<_PositionedToken> operators = <_PositionedToken>[];
 
-    for (final String token in infixTokens) {
+    for (final _PositionedToken positioned in infixTokens) {
+      final String token = positioned.value;
+
       if (_isOperand(token)) {
-        output.add(token);
+        output.add(positioned);
         continue;
       }
 
       if (_isOperator(token)) {
         while (operators.isNotEmpty &&
-            _isOperator(operators.last) &&
+            _isOperator(operators.last.value) &&
             (_isRightAssociative(token)
-                ? _precedence(operators.last) > _precedence(token)
-                : _precedence(operators.last) >= _precedence(token))) {
+                ? _precedence(operators.last.value) > _precedence(token)
+                : _precedence(operators.last.value) >= _precedence(token))) {
           output.add(operators.removeLast());
         }
-        operators.add(token);
+        operators.add(positioned);
         continue;
       }
 
       if (_isFunction(token)) {
-        operators.add(token);
+        operators.add(positioned);
         continue;
       }
 
       if (_isPostfixOperator(token)) {
-        output.add(token);
+        output.add(positioned);
         continue;
       }
 
       if (token == '(') {
-        operators.add(token);
+        operators.add(positioned);
         continue;
       }
 
       if (token == ')') {
         bool foundOpen = false;
         while (operators.isNotEmpty) {
-          final String op = operators.removeLast();
-          if (op == '(') {
+          final _PositionedToken op = operators.removeLast();
+          if (op.value == '(') {
             foundOpen = true;
             break;
           }
@@ -600,10 +709,12 @@ class Calculatrix {
           throw ExpressionSyntaxError(
             'Mismatched parentheses in expression.',
             errorId: CalculatrixErrorId.syntaxError,
+            token: token,
+            position: positioned.position,
           );
         }
 
-        if (operators.isNotEmpty && _isFunction(operators.last)) {
+        if (operators.isNotEmpty && _isFunction(operators.last.value)) {
           output.add(operators.removeLast());
         }
         continue;
@@ -612,15 +723,19 @@ class Calculatrix {
       throw ExpressionSyntaxError(
         'Unsupported token in infix expression: $token',
         errorId: CalculatrixErrorId.syntaxError,
+        token: token,
+        position: positioned.position,
       );
     }
 
     while (operators.isNotEmpty) {
-      final String op = operators.removeLast();
-      if (op == '(' || op == ')') {
+      final _PositionedToken op = operators.removeLast();
+      if (op.value == '(' || op.value == ')') {
         throw ExpressionSyntaxError(
           'Mismatched parentheses in expression.',
           errorId: CalculatrixErrorId.syntaxError,
+          token: op.value,
+          position: op.position,
         );
       }
       output.add(op);
@@ -680,7 +795,7 @@ class Calculatrix {
   static bool _isSignedNumberStart(
     String source,
     int index,
-    List<String> tokens,
+    List<_PositionedToken> tokens,
   ) {
     final String sign = source[index];
     if (sign != '-' && sign != '+') {
@@ -689,9 +804,9 @@ class Calculatrix {
 
     final bool unaryPosition =
         tokens.isEmpty ||
-        _isOperator(tokens.last) ||
-        _isFunction(tokens.last) ||
-        tokens.last == '(';
+        _isOperator(tokens.last.value) ||
+        _isFunction(tokens.last.value) ||
+        tokens.last.value == '(';
 
     if (!unaryPosition) {
       return false;
@@ -714,7 +829,7 @@ class Calculatrix {
   static bool _isSignedBracketStart(
     String source,
     int index,
-    List<String> tokens,
+    List<_PositionedToken> tokens,
   ) {
     final String sign = source[index];
     if (sign != '-' && sign != '+') {
@@ -723,9 +838,9 @@ class Calculatrix {
 
     final bool unaryPosition =
         tokens.isEmpty ||
-        _isOperator(tokens.last) ||
-        _isFunction(tokens.last) ||
-        tokens.last == '(';
+        _isOperator(tokens.last.value) ||
+        _isFunction(tokens.last.value) ||
+        tokens.last.value == '(';
 
     if (!unaryPosition) {
       return false;
@@ -790,6 +905,19 @@ class _NumberScanResult {
 
   final String token;
   final int nextIndex;
+}
+
+// A token paired with its 1-based character position in the source
+// program (the RPN "input line", tokens.join(' '), or the raw infix
+// expression string; spec section 6). Threaded through tokenizing,
+// validation, shunting-yard reordering and command compiling so that
+// whichever input token ultimately causes a domain error is still known
+// by the time that error is thrown or caught.
+class _PositionedToken {
+  const _PositionedToken(this.value, this.position);
+
+  final String value;
+  final int position;
 }
 
 class _InfixValidationFrame {
