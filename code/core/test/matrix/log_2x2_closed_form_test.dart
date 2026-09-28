@@ -87,36 +87,45 @@ void main() {
       );
     });
 
-    test('a 2x2 matrix with a non-positive real eigenvalue is log-undefined', () {
-      final Matrix base = Matrix(<List<double>>[
-        <double>[-1, 0],
-        <double>[0, 2],
-      ]);
+    test(
+      'a 2x2 matrix with a non-positive real eigenvalue is log-undefined',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[-1, 0],
+          <double>[0, 2],
+        ]);
 
-      expect(
-        () => base.log(),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.logUndefined,
+        expect(
+          () => base.log(),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
-    test('distinct positive real eigenvalues match the diagonalization path', () {
-      // A triangular matrix, distinct eigenvalues 3 and 2: exercises the
-      // "distinct eigenvalues" branch of the closed form (as opposed to
-      // the repeated-eigenvalue derivative branch above).
-      final Matrix base = Matrix(<List<double>>[
-        <double>[3, 1],
-        <double>[0, 2],
-      ]);
+    test(
+      'distinct positive real eigenvalues match the diagonalization path',
+      () {
+        // A triangular matrix, distinct eigenvalues 3 and 2: exercises the
+        // "distinct eigenvalues" branch of the closed form (as opposed to
+        // the repeated-eigenvalue derivative branch above).
+        final Matrix base = Matrix(<List<double>>[
+          <double>[3, 1],
+          <double>[0, 2],
+        ]);
 
-      final Matrix result = base.log();
-      expect(result.exp().almostEquals(base, absoluteTolerance: 1e-8), isTrue);
-    });
+        final Matrix result = base.log();
+        expect(
+          result.exp().almostEquals(base, absoluteTolerance: 1e-8),
+          isTrue,
+        );
+      },
+    );
   });
 
   group('Matrix.log domain errors carry log-undefined (issue #5)', () {
@@ -133,23 +142,26 @@ void main() {
       );
     });
 
-    test('log of a non-positive eigenvalue matrix (n > 2) carries log-undefined', () {
-      final Matrix base = Matrix(<List<double>>[
-        <double>[-1, 0, 0],
-        <double>[0, 2, 0],
-        <double>[0, 0, 3],
-      ]);
+    test(
+      'log of a non-positive eigenvalue matrix (n > 2) carries log-undefined',
+      () {
+        final Matrix base = Matrix(<List<double>>[
+          <double>[-1, 0, 0],
+          <double>[0, 2, 0],
+          <double>[0, 0, 3],
+        ]);
 
-      expect(
-        () => base.log(),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.logUndefined,
+        expect(
+          () => base.log(),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.logUndefined,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   });
 }

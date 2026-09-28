@@ -1530,6 +1530,15 @@ class Matrix {
   ///
   /// Complex-form 2x2 matrices use the principal branch:
   /// log(a + bi) = ln(r) + θ·i, where r = sqrt(a² + b²), θ = atan2(b, a)
+  ///
+  /// A general (non complex-form) 2x2 matrix uses a closed form driven by
+  /// its real eigenvalues (see [_log2x2ClosedForm]), rather than
+  /// [diagonalization]: this is what makes a defective 2x2 base (a
+  /// repeated eigenvalue with only one independent eigenvector, so
+  /// diagonalization's eigenvector matrix P is singular) still have a
+  /// well-defined log, and what raises `log-undefined` specifically, not
+  /// an unlabeled domain error, for a genuine complex-conjugate pair. Sizes
+  /// above 2x2 keep using [diagonalization], unchanged from before.
   Matrix log({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -1541,6 +1550,7 @@ class Matrix {
       if (source == 0) {
         throw MatrixDomainError(
           'Logarithm is undefined for zero in the real domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
       if (source > 0) {
@@ -1557,11 +1567,37 @@ class Matrix {
       if (radius <= absoluteTolerance) {
         throw MatrixDomainError(
           'Logarithm is undefined for zero magnitude in the complex domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
 
       final double angle = math.atan2(b, a);
       return Matrix.complex(math.log(radius), angle);
+    }
+
+    if (rowCount == 2) {
+      final List<double> realEigenvalues = _realEigenvalues2x2(
+        absoluteTolerance,
+      );
+
+      if (realEigenvalues.isEmpty) {
+        throw MatrixDomainError(
+          'Logarithm is undefined: this matrix has a complex-conjugate '
+          'eigenvalue pair and is not in complex form (aI + bJ).',
+          errorId: CalculatrixErrorId.logUndefined,
+        );
+      }
+      for (final double eigenvalue in realEigenvalues) {
+        if (eigenvalue <= absoluteTolerance) {
+          throw MatrixDomainError(
+            'Logarithm is undefined for matrices with non-positive real '
+            'eigenvalues.',
+            errorId: CalculatrixErrorId.logUndefined,
+          );
+        }
+      }
+
+      return _log2x2ClosedForm(realEigenvalues, absoluteTolerance);
     }
 
     final Diagonalization decomposition = diagonalization(
@@ -1580,6 +1616,7 @@ class Matrix {
         throw MatrixDomainError(
           'Logarithm is undefined for matrices with non-positive eigenvalues '
           'in the real domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
       logDiagonal[index][index] = math.log(eigenvalue);
@@ -1587,6 +1624,73 @@ class Matrix {
 
     final Matrix p = decomposition.p;
     return p * Matrix(logDiagonal) * p.inverse();
+  }
+
+  /// Computes the real eigenvalues of a 2x2 matrix for [log], without
+  /// throwing for a genuine complex-conjugate pair (unlike [eigenvalues]):
+  /// such a pair simply yields an empty list instead. This is what lets
+  /// [log] tell "no real eigenvalue" (log is undefined; a complex result
+  /// is not representable outside complex form) apart from "some real
+  /// eigenvalue is non-positive" (also log-undefined, but for a real
+  /// input off the domain of ln).
+  List<double> _realEigenvalues2x2(double absoluteTolerance) {
+    final double a = _rows[0][0];
+    final double b = _rows[0][1];
+    final double c = _rows[1][0];
+    final double d = _rows[1][1];
+    final double trace = a + d;
+    final double determinantValue = (a * d) - (b * c);
+
+    double discriminant = (trace * trace) - (4 * determinantValue);
+    if (discriminant.abs() <= absoluteTolerance) {
+      discriminant = 0;
+    }
+
+    if (discriminant < 0) {
+      return const <double>[];
+    }
+
+    final double sqrtDiscriminant = math.sqrt(discriminant);
+    return <double>[
+      (trace + sqrtDiscriminant) / 2,
+      (trace - sqrtDiscriminant) / 2,
+    ];
+  }
+
+  /// Computes `log A` for a 2x2 matrix directly from its two real
+  /// eigenvalues via Sylvester's formula for a function of a 2x2 matrix,
+  /// `f(A) = c1*A + c0*I`. This works even when `A` is defective (a
+  /// repeated eigenvalue with only one independent eigenvector, e.g. the
+  /// Jordan block `[[1, 1], [0, 1]]`): [diagonalization] cannot
+  /// diagonalize such a matrix (its eigenvector matrix P is singular), but
+  /// this closed form never needs P at all.
+  ///
+  /// For a repeated eigenvalue this uses the derivative of `f`,
+  /// `f'(x) = 1/x`, which is the limit of the distinct-eigenvalue formula
+  /// as one eigenvalue approaches the other, and is exact whether or not
+  /// `A` is actually defective (for `A = lambda * I` it reduces to
+  /// `log(lambda) * I`, as expected).
+  Matrix _log2x2ClosedForm(
+    List<double> realEigenvalues,
+    double absoluteTolerance,
+  ) {
+    final double lambda1 = realEigenvalues[0];
+    final double lambda2 = realEigenvalues[1];
+
+    final double c1;
+    final double c0;
+    if ((lambda1 - lambda2).abs() <= absoluteTolerance) {
+      final double lambda = (lambda1 + lambda2) / 2;
+      c1 = 1 / lambda;
+      c0 = math.log(lambda) - 1;
+    } else {
+      final double logLambda1 = math.log(lambda1);
+      final double logLambda2 = math.log(lambda2);
+      c1 = (logLambda1 - logLambda2) / (lambda1 - lambda2);
+      c0 = logLambda1 - (c1 * lambda1);
+    }
+
+    return scale(c1) + Matrix.identity(rowCount).scale(c0);
   }
 
   /// Computes `this ^ exponent` per the power dispatch table (issue #5,
