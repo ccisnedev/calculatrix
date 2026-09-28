@@ -1485,12 +1485,28 @@ class Matrix {
     );
   }
 
-  /// Computes the matrix exponential via Taylor series.
+  /// Computes the matrix exponential via scaling and squaring.
   ///
-  /// For a square matrix A, expm(A) = I + A + A²/2! + A³/3! + ...
+  /// For a square matrix A, expm(A) = I + A + A²/2! + A³/3! + ..., but
+  /// summing that series directly on A is only accurate while ‖A‖ stays
+  /// small: for a moderate-to-large norm, the terms needed for convergence
+  /// grow past any practical cap, and truncating early is silently wrong
+  /// rather than merely imprecise.
+  ///
+  /// Scaling and squaring fixes this by using the identity
+  /// `expm(A) = expm(A / 2^s) ^ (2^s)`: choose `s` so that
+  /// `‖A / 2^s‖_inf <= 0.5`, where the Taylor series converges to double
+  /// precision in a handful of terms, sum that series, then square the
+  /// result `s` times to undo the scaling.
+  ///
   /// For pure imaginary matrices θ·J (where J = i), this yields:
   /// expm(θ·J) = [[cos(θ), -sin(θ)], [sin(θ), cos(θ)]] (rotation matrix).
-  /// Truncates at 50 terms for numerical stability.
+  ///
+  /// Throws [MatrixDomainError] with [CalculatrixErrorId.nonFinite] when the
+  /// true result overflows double precision (D25 row 13): squaring back up
+  /// an exponential whose true value is too large to represent yields an
+  /// infinite or NaN entry, which is caught here instead of returned
+  /// silently.
   Matrix exp({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -1502,23 +1518,52 @@ class Matrix {
       return Matrix.scalar(math.exp(scalarValue));
     }
 
-    // Taylor series: expm(A) = I + A + A²/2! + A³/3! + ...
+    // Choose s so that ‖A / 2^s‖_inf <= 0.5 (0 when the norm is already
+    // small enough that no scaling is needed).
+    const double convergenceNormBound = 0.5;
+    final double norm = _infinityNorm();
+    final int scalingSteps = norm > convergenceNormBound
+        ? (math.log(norm / convergenceNormBound) / math.ln2).ceil()
+        : 0;
+    final double scaleFactor = math.pow(2, scalingSteps).toDouble();
+    final Matrix scaledSource = scalingSteps == 0
+        ? this
+        : scale(1 / scaleFactor);
+
+    // Taylor series on the scaled matrix: expm(A) = I + A + A²/2! + ...
+    // The scaled norm is at most 0.5, so this converges to double precision
+    // in well under 50 terms; the cap is only a safety net.
+    //
+    // Squaring back up `scalingSteps` times roughly doubles the relative
+    // error of the running result at each step (for small errors,
+    // (X + dX)² ≈ X² + 2 X dX), so the series must converge to a tolerance
+    // tighter than the caller's by roughly a factor of `scaleFactor` for the
+    // final, squared-up result to still meet it.
+    final double seriesTolerance = scalingSteps == 0
+        ? absoluteTolerance
+        : absoluteTolerance / scaleFactor;
     Matrix result = Matrix.identity(rowCount);
     Matrix term = Matrix.identity(rowCount);
     double factorial = 1;
 
-    for (int n = 1; n <= 50; n++) {
+    for (int n = 1; n <= 100; n++) {
       factorial *= n;
-      term = term * this;
-      result = result + term.scale(1 / factorial);
+      term = term * scaledSource;
+      final Matrix scaledTerm = term.scale(1 / factorial);
+      result = result + scaledTerm;
 
-      // Check convergence: if term norm is small enough, stop
-      if (term._infinityNorm() / factorial < absoluteTolerance) {
+      if (scaledTerm._infinityNorm() < seriesTolerance) {
         break;
       }
     }
 
-    return result;
+    // Undo the scaling: expm(A) = expm(A / 2^s) ^ (2^s), by repeated
+    // squaring.
+    for (int step = 0; step < scalingSteps; step++) {
+      result = result * result;
+    }
+
+    return _checkFiniteMatrix(result);
   }
 
   /// Computes the principal matrix logarithm.
