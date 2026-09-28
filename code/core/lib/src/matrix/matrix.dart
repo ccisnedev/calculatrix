@@ -278,6 +278,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot multiply ${rowCount}x${columnCount} by '
         '${other.rowCount}x${other.columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -314,7 +315,10 @@ class Matrix {
     if (other.isScalar) {
       final double divisor = other.scalarValue;
       if (divisor == 0) {
-        throw MatrixDomainError('Division by zero scalar is undefined.');
+        throw MatrixDomainError(
+          'Division by zero scalar is undefined.',
+          errorId: CalculatrixErrorId.nonFinite,
+        );
       }
 
       return scale(1 / divisor);
@@ -322,6 +326,7 @@ class Matrix {
 
     throw UnsupportedCalculatrixOperationError(
       'Matrix division is only supported by scalar (1x1) denominator.',
+      errorId: CalculatrixErrorId.typeMismatch,
     );
   }
 
@@ -358,7 +363,10 @@ class Matrix {
       }
 
       if (pivotMagnitude <= absoluteTolerance) {
-        throw MatrixDomainError('Matrix is singular and cannot be inverted.');
+        throw MatrixDomainError(
+          'Matrix is singular and cannot be inverted.',
+          errorId: CalculatrixErrorId.singularMatrix,
+        );
       }
 
       if (pivotRow != pivotColumn) {
@@ -755,11 +763,8 @@ class Matrix {
     // Build P matrix (columns are eigenvectors)
     final List<List<double>> pRows = List<List<double>>.generate(
       n,
-      (int r) => List<double>.generate(
-        n,
-        (int c) => pColumns[c][r],
-        growable: false,
-      ),
+      (int r) =>
+          List<double>.generate(n, (int c) => pColumns[c][r], growable: false),
       growable: false,
     );
 
@@ -845,6 +850,7 @@ class Matrix {
     if (rowCount < 2) {
       throw MatrixShapeError(
         'Minor requires at least a 2x2 matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -879,16 +885,12 @@ class Matrix {
     final int n = rowCount;
     final List<List<double>> result = List<List<double>>.generate(
       n,
-      (int r) => List<double>.generate(
-        n,
-        (int c) {
-          final Matrix minorMatrix = minor(r, c);
-          final double det = minorMatrix.determinant().scalarValue;
-          final double sign = (r + c).isEven ? 1 : -1;
-          return sign * det;
-        },
-        growable: false,
-      ),
+      (int r) => List<double>.generate(n, (int c) {
+        final Matrix minorMatrix = minor(r, c);
+        final double det = minorMatrix.determinant().scalarValue;
+        final double sign = (r + c).isEven ? 1 : -1;
+        return sign * det;
+      }, growable: false),
       growable: false,
     );
 
@@ -910,18 +912,21 @@ class Matrix {
       throw MatrixShapeError(
         'dot product requires a column vector (n×1), '
         'got ${rowCount}×$columnCount',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
     if (other.columnCount != 1) {
       throw MatrixShapeError(
         'dot product requires a column vector (n×1), '
         'got ${other.rowCount}×${other.columnCount}',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
     if (rowCount != other.rowCount) {
       throw MatrixShapeError(
         'dot product requires vectors of the same dimension, '
         'got ${rowCount}×1 and ${other.rowCount}×1',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -941,12 +946,14 @@ class Matrix {
       throw MatrixShapeError(
         'cross product requires a 3×1 column vector, '
         'got ${rowCount}×$columnCount',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
     if (other.columnCount != 1 || other.rowCount != 3) {
       throw MatrixShapeError(
         'cross product requires a 3×1 column vector, '
         'got ${other.rowCount}×${other.columnCount}',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1157,12 +1164,7 @@ class Matrix {
   }
 
   /// Computes the Wilkinson shift from a trailing 2x2 block.
-  static double _wilkinsonShift(
-    double a,
-    double b,
-    double c,
-    double d,
-  ) {
+  static double _wilkinsonShift(double a, double b, double c, double d) {
     final double trace = a + d;
     final double det = (a * d) - (b * c);
     final double discriminant = (trace * trace) - (4 * det);
@@ -1238,7 +1240,6 @@ class Matrix {
       }
     }
   }
-
 
   LuDecomposition luDecomposition({
     double absoluteTolerance =
@@ -1336,6 +1337,7 @@ class Matrix {
       throw MatrixShapeError(
         'QR decomposition requires row count >= column count, found '
         '${rowCount}x${columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1459,9 +1461,12 @@ class Matrix {
         );
       }
 
-      final Matrix next = (current + (inverseCurrent * scaledTarget)).scale(0.5);
+      final Matrix next = (current + (inverseCurrent * scaledTarget)).scale(
+        0.5,
+      );
       final double stepNorm = (next - current)._infinityNorm();
-      final double residualNorm = ((next * next) - scaledTarget)._infinityNorm();
+      final double residualNorm = ((next * next) - scaledTarget)
+          ._infinityNorm();
 
       current = next;
       if (stepNorm <= threshold && residualNorm <= threshold) {
@@ -1601,17 +1606,13 @@ class Matrix {
     final Matrix vT = v.transpose();
     final int n = columnCount;
 
-    final List<double> singularValues = List<double>.generate(
-      n,
-      (int index) {
-        final double lambda = decomposition.d.at(index, index);
-        if (lambda <= absoluteTolerance) {
-          return 0;
-        }
-        return math.sqrt(lambda);
-      },
-      growable: false,
-    );
+    final List<double> singularValues = List<double>.generate(n, (int index) {
+      final double lambda = decomposition.d.at(index, index);
+      if (lambda <= absoluteTolerance) {
+        return 0;
+      }
+      return math.sqrt(lambda);
+    }, growable: false);
 
     final List<List<double>> sRows = List<List<double>>.generate(
       n,
@@ -1640,11 +1641,13 @@ class Matrix {
         continue;
       }
 
-      final Matrix projected = this * Matrix(
-        vColumn
-            .map((double value) => <double>[value])
-            .toList(growable: false),
-      );
+      final Matrix projected =
+          this *
+          Matrix(
+            vColumn
+                .map((double value) => <double>[value])
+                .toList(growable: false),
+          );
       final double sigma = singularValues[column];
       for (int row = 0; row < rowCount; row++) {
         final double normalized = projected.at(row, 0) / sigma;
@@ -1654,11 +1657,7 @@ class Matrix {
       }
     }
 
-    return SvdDecomposition(
-      u: Matrix(uRows),
-      s: Matrix(sRows),
-      vT: vT,
-    );
+    return SvdDecomposition(u: Matrix(uRows), s: Matrix(sRows), vT: vT);
   }
 
   Matrix transpose() {
@@ -1680,6 +1679,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot append ${row.rowCount}x${row.columnCount} row operand to '
         '${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1694,6 +1694,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot append ${column.rowCount}x${column.columnCount} column operand '
         'to ${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
 
@@ -1712,42 +1713,41 @@ class Matrix {
   Matrix deleteRow(int rowIndex) {
     _requireRowIndex(rowIndex);
     if (rowCount == 1) {
-      throw MatrixShapeError('Cannot delete the only row in a matrix.');
+      throw MatrixShapeError(
+        'Cannot delete the only row in a matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     return Matrix(
-      List<List<double>>.generate(
-        rowCount - 1,
-        (int targetIndex) {
-          final int sourceIndex = targetIndex < rowIndex
-              ? targetIndex
-              : targetIndex + 1;
-          return List<double>.from(_rows[sourceIndex]);
-        },
-        growable: false,
-      ),
+      List<List<double>>.generate(rowCount - 1, (int targetIndex) {
+        final int sourceIndex = targetIndex < rowIndex
+            ? targetIndex
+            : targetIndex + 1;
+        return List<double>.from(_rows[sourceIndex]);
+      }, growable: false),
     );
   }
 
   Matrix deleteColumn(int columnIndex) {
     _requireColumnIndex(columnIndex);
     if (columnCount == 1) {
-      throw MatrixShapeError('Cannot delete the only column in a matrix.');
+      throw MatrixShapeError(
+        'Cannot delete the only column in a matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     return Matrix(
       List<List<double>>.generate(
         rowCount,
-        (int rowIndex) => List<double>.generate(
-          columnCount - 1,
-          (int targetIndex) {
-            final int sourceIndex = targetIndex < columnIndex
-                ? targetIndex
-                : targetIndex + 1;
-            return _rows[rowIndex][sourceIndex];
-          },
-          growable: false,
-        ),
+        (int rowIndex) =>
+            List<double>.generate(columnCount - 1, (int targetIndex) {
+              final int sourceIndex = targetIndex < columnIndex
+                  ? targetIndex
+                  : targetIndex + 1;
+              return _rows[rowIndex][sourceIndex];
+            }, growable: false),
         growable: false,
       ),
     );
@@ -1767,15 +1767,11 @@ class Matrix {
     _requireColumnIndex(columnIndex);
 
     return Matrix(
-      List<List<double>>.generate(
-        rowCount,
-        (int rowIndex) {
-          final List<double> row = List<double>.from(_rows[rowIndex]);
-          row.insert(columnIndex + 1, _rows[rowIndex][columnIndex]);
-          return row;
-        },
-        growable: false,
-      ),
+      List<List<double>>.generate(rowCount, (int rowIndex) {
+        final List<double> row = List<double>.from(_rows[rowIndex]);
+        row.insert(columnIndex + 1, _rows[rowIndex][columnIndex]);
+        return row;
+      }, growable: false),
     );
   }
 
@@ -1802,16 +1798,12 @@ class Matrix {
     }
 
     return Matrix(
-      List<List<double>>.generate(
-        rowCount,
-        (int rowIndex) {
-          final List<double> row = List<double>.from(_rows[rowIndex]);
-          final double moved = row.removeAt(fromIndex);
-          row.insert(toIndex, moved);
-          return row;
-        },
-        growable: false,
-      ),
+      List<List<double>>.generate(rowCount, (int rowIndex) {
+        final List<double> row = List<double>.from(_rows[rowIndex]);
+        final double moved = row.removeAt(fromIndex);
+        row.insert(toIndex, moved);
+        return row;
+      }, growable: false),
     );
   }
 
@@ -1853,11 +1845,17 @@ class Matrix {
 
   static void _validateRectangular(List<List<double>> rows) {
     if (rows.isEmpty) {
-      throw MatrixShapeError('Matrix cannot be empty.');
+      throw MatrixShapeError(
+        'Matrix cannot be empty.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     if (rows.first.isEmpty) {
-      throw MatrixShapeError('Matrix rows cannot be empty.');
+      throw MatrixShapeError(
+        'Matrix rows cannot be empty.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
     }
 
     final int width = rows.first.length;
@@ -1865,15 +1863,21 @@ class Matrix {
       if (row.length != width) {
         throw MatrixShapeError(
           'All rows must have the same number of columns.',
+          errorId: CalculatrixErrorId.dimensionMismatch,
         );
       }
     }
   }
 
-  static void _validateShape(int rowCount, int columnCount, {required String label}) {
+  static void _validateShape(
+    int rowCount,
+    int columnCount, {
+    required String label,
+  }) {
     if (rowCount < 1 || columnCount < 1) {
       throw MatrixShapeError(
         '$label matrix dimensions must be greater than zero.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
   }
@@ -1883,6 +1887,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot perform $operation for ${rowCount}x${columnCount} and '
         '${other.rowCount}x${other.columnCount}.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
   }
@@ -1894,9 +1899,7 @@ class Matrix {
   /// This enables natural complex arithmetic: `3 + Matrix.i` promotes 3 to
   /// `3·I₂` before the element-wise addition, yielding `[[3,-1],[1,3]]`.
   static Matrix _promoteScalar(Matrix candidate, Matrix reference) {
-    if (candidate.isScalar &&
-        reference.isSquare &&
-        reference.rowCount > 1) {
+    if (candidate.isScalar && reference.isSquare && reference.rowCount > 1) {
       return Matrix.identity(reference.rowCount).scale(candidate.scalarValue);
     }
     return candidate;
@@ -1907,6 +1910,7 @@ class Matrix {
       throw MatrixShapeError(
         'Cannot perform $operation for non-square '
         '${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
   }
