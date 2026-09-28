@@ -63,7 +63,12 @@ class MatrixShapeError extends CalculatrixError {
 }
 
 class MatrixDomainError extends CalculatrixError {
-  MatrixDomainError(super.message, {super.errorId, super.token, super.position});
+  MatrixDomainError(
+    super.message, {
+    super.errorId,
+    super.token,
+    super.position,
+  });
 }
 
 class MatrixIndexError extends CalculatrixError {
@@ -75,19 +80,39 @@ class RpnStackError extends CalculatrixError {
 }
 
 class RpnStackUnderflowError extends RpnStackError {
-  RpnStackUnderflowError(super.message, {super.errorId, super.token, super.position});
+  RpnStackUnderflowError(
+    super.message, {
+    super.errorId,
+    super.token,
+    super.position,
+  });
 }
 
 class RpnStackRangeError extends RpnStackError {
-  RpnStackRangeError(super.message, {super.errorId, super.token, super.position});
+  RpnStackRangeError(
+    super.message, {
+    super.errorId,
+    super.token,
+    super.position,
+  });
 }
 
 class ExpressionSyntaxError extends CalculatrixError {
-  ExpressionSyntaxError(super.message, {super.errorId, super.token, super.position});
+  ExpressionSyntaxError(
+    super.message, {
+    super.errorId,
+    super.token,
+    super.position,
+  });
 }
 
 class UnsupportedCalculatrixOperationError extends CalculatrixError {
-  UnsupportedCalculatrixOperationError(super.message, {super.errorId, super.token, super.position});
+  UnsupportedCalculatrixOperationError(
+    super.message, {
+    super.errorId,
+    super.token,
+    super.position,
+  });
 }
 
 /// An RPN word that does not name any known operator, function or literal
