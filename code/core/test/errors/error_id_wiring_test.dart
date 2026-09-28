@@ -6,8 +6,8 @@ void main() {
     test('operator * dimension mismatch', () {
       try {
         Matrix(<List<double>>[
-          <double>[1, 2],
-        ]) *
+              <double>[1, 2],
+            ]) *
             Matrix(<List<double>>[
               <double>[1, 2],
             ]);
@@ -171,28 +171,31 @@ void main() {
     });
   });
 
-  group('Matrix throw sites carry the non-finite / type-mismatch ids (issue #5)', () {
-    test('division by a zero scalar is non-finite', () {
-      try {
-        Matrix.scalar(1) / Matrix.scalar(0);
-        fail('expected MatrixDomainError');
-      } on MatrixDomainError catch (error) {
-        expect(error.errorId, CalculatrixErrorId.nonFinite);
-      }
-    });
+  group(
+    'Matrix throw sites carry the non-finite / type-mismatch ids (issue #5)',
+    () {
+      test('division by a zero scalar is non-finite', () {
+        try {
+          Matrix.scalar(1) / Matrix.scalar(0);
+          fail('expected MatrixDomainError');
+        } on MatrixDomainError catch (error) {
+          expect(error.errorId, CalculatrixErrorId.nonFinite);
+        }
+      });
 
-    test('division by a non-scalar denominator is a type mismatch', () {
-      try {
-        Matrix.scalar(1) /
-            Matrix(<List<double>>[
-              <double>[1, 2],
-            ]);
-        fail('expected UnsupportedCalculatrixOperationError');
-      } on UnsupportedCalculatrixOperationError catch (error) {
-        expect(error.errorId, CalculatrixErrorId.typeMismatch);
-      }
-    });
-  });
+      test('division by a non-scalar denominator is a type mismatch', () {
+        try {
+          Matrix.scalar(1) /
+              Matrix(<List<double>>[
+                <double>[1, 2],
+              ]);
+          fail('expected UnsupportedCalculatrixOperationError');
+        } on UnsupportedCalculatrixOperationError catch (error) {
+          expect(error.errorId, CalculatrixErrorId.typeMismatch);
+        }
+      });
+    },
+  );
 
   group('Matrix throw sites carry the singular-matrix id (issue #5)', () {
     test('inverse of a singular matrix', () {

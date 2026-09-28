@@ -108,7 +108,10 @@ void main() {
 
   group('UnknownWordError', () {
     test('carries the unknown-word id, the token and its position', () {
-      final UnknownWordError error = UnknownWordError('frobnicate', position: 5);
+      final UnknownWordError error = UnknownWordError(
+        'frobnicate',
+        position: 5,
+      );
 
       expect(error.errorId, CalculatrixErrorId.unknownWord);
       expect(error.token, 'frobnicate');
