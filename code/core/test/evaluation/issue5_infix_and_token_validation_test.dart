@@ -191,4 +191,36 @@ void main() {
       );
     });
   });
+
+  group('An empty matrix literal is dimension-mismatch, not syntax-error '
+      '(issue #5 spec section 6)', () {
+    test('RPN "[]" carries dimension-mismatch', () {
+      // syntax-error is infix only (spec section 6): "[]" is well-formed
+      // syntax that names an impossible shape, in both notations, so RPN
+      // must report dimension-mismatch here too, not syntax-error.
+      expect(
+        () => Calculatrix.evaluateRpn(<String>['[]']),
+        throwsA(
+          isA<MatrixShapeError>().having(
+            (MatrixShapeError error) => error.errorId,
+            'errorId',
+            CalculatrixErrorId.dimensionMismatch,
+          ),
+        ),
+      );
+    });
+
+    test('infix "[]" also carries dimension-mismatch', () {
+      expect(
+        () => Calculatrix.evaluateInfix('[]'),
+        throwsA(
+          isA<MatrixShapeError>().having(
+            (MatrixShapeError error) => error.errorId,
+            'errorId',
+            CalculatrixErrorId.dimensionMismatch,
+          ),
+        ),
+      );
+    });
+  });
 }
