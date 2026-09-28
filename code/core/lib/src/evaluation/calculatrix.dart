@@ -473,6 +473,19 @@ class Calculatrix {
         continue;
       }
 
+      // "NaN" is not a digit-led token, so the number scan above never
+      // starts on it, but it is still a recognized (non-finite) numeric
+      // literal (issue #5 bug 4): let it through as an ordinary operand
+      // token instead of raising syntax-error here, so the RPN token
+      // compiler's own finite-value check (shared with plain RPN input)
+      // is what rejects it, with the non-finite id instead of
+      // syntax-error.
+      if (expression.startsWith('NaN', index)) {
+        tokens.add(_PositionedToken('NaN', index + 1));
+        index += 3;
+        continue;
+      }
+
       throw ExpressionSyntaxError(
         'Unexpected token near "$char".',
         errorId: CalculatrixErrorId.syntaxError,
