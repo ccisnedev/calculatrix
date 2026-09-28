@@ -1532,13 +1532,16 @@ class Matrix {
   /// log(a + bi) = ln(r) + θ·i, where r = sqrt(a² + b²), θ = atan2(b, a)
   ///
   /// A general (non complex-form) 2x2 matrix uses a closed form driven by
-  /// its real eigenvalues (see [_log2x2ClosedForm]), rather than
-  /// [diagonalization]: this is what makes a defective 2x2 base (a
-  /// repeated eigenvalue with only one independent eigenvector, so
-  /// diagonalization's eigenvector matrix P is singular) still have a
-  /// well-defined log, and what raises `log-undefined` specifically, not
-  /// an unlabeled domain error, for a genuine complex-conjugate pair. Sizes
-  /// above 2x2 keep using [diagonalization], unchanged from before.
+  /// its eigenvalues, rather than [diagonalization]: this is what makes a
+  /// defective 2x2 base (a repeated eigenvalue with only one independent
+  /// eigenvector, so diagonalization's eigenvector matrix P is singular)
+  /// still have a well-defined log. Two real eigenvalues use
+  /// [_log2x2ClosedForm]; a genuine complex-conjugate pair (off the closed
+  /// negative real axis, so never on the branch cut) uses
+  /// [_log2x2ComplexConjugateClosedForm] instead of raising
+  /// `log-undefined`. `log-undefined` is still raised for a real
+  /// eigenvalue `<= 0` (on or across the branch cut) or a singular matrix.
+  /// Sizes above 2x2 keep using [diagonalization], unchanged from before.
   Matrix log({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -1581,11 +1584,7 @@ class Matrix {
       );
 
       if (realEigenvalues.isEmpty) {
-        throw MatrixDomainError(
-          'Logarithm is undefined: this matrix has a complex-conjugate '
-          'eigenvalue pair and is not in complex form (aI + bJ).',
-          errorId: CalculatrixErrorId.logUndefined,
-        );
+        return _log2x2ComplexConjugateClosedForm(absoluteTolerance);
       }
       for (final double eigenvalue in realEigenvalues) {
         if (eigenvalue <= absoluteTolerance) {
@@ -1634,6 +1633,27 @@ class Matrix {
   /// eigenvalue is non-positive" (also log-undefined, but for a real
   /// input off the domain of ln).
   List<double> _realEigenvalues2x2(double absoluteTolerance) {
+    final double discriminant = _trace2x2Discriminant(absoluteTolerance);
+    if (discriminant < 0) {
+      return const <double>[];
+    }
+
+    final double trace = _rows[0][0] + _rows[1][1];
+    final double sqrtDiscriminant = math.sqrt(discriminant);
+    return <double>[
+      (trace + sqrtDiscriminant) / 2,
+      (trace - sqrtDiscriminant) / 2,
+    ];
+  }
+
+  // The discriminant of the 2x2 characteristic polynomial, trace^2 -
+  // 4*determinant, snapped to exactly 0 within [absoluteTolerance] so a
+  // matrix with a genuinely repeated eigenvalue (or one that is repeated
+  // up to floating-point noise) is never misclassified as a complex pair
+  // by a discriminant that is negative only by rounding error. Shared by
+  // [_realEigenvalues2x2] and [_log2x2ComplexConjugateClosedForm] so both
+  // agree on exactly the same trace/determinant/discriminant.
+  double _trace2x2Discriminant(double absoluteTolerance) {
     final double a = _rows[0][0];
     final double b = _rows[0][1];
     final double c = _rows[1][0];
@@ -1645,16 +1665,40 @@ class Matrix {
     if (discriminant.abs() <= absoluteTolerance) {
       discriminant = 0;
     }
+    return discriminant;
+  }
 
-    if (discriminant < 0) {
-      return const <double>[];
-    }
+  /// Computes `log A` for a 2x2 matrix whose eigenvalues are a genuine
+  /// complex-conjugate pair `a +/- bi` (`b > 0`), by the same Sylvester
+  /// closed form as [_log2x2ClosedForm], `f(A) = c1*A + c0*I`, solved in
+  /// real arithmetic instead of going through complex numbers.
+  ///
+  /// Writing `log(a+bi) = c1*(a+bi) + c0` and its conjugate equation for
+  /// `log(a-bi)`, subtracting and adding the two gives:
+  ///   `c1 = arg(a+bi) / b`
+  ///   `c0 = ln|a+bi| - a*c1`
+  /// (both real, since the imaginary parts of the two equations cancel by
+  /// construction). A genuine complex-conjugate pair (`b > 0`) can never
+  /// sit on the branch cut of `log` (the closed negative real axis is
+  /// purely real), so this never raises `log-undefined`; only a real
+  /// eigenvalue `<= 0`, or a singular matrix (which always has real
+  /// eigenvalues for a 2x2, so never reaches this method), does.
+  Matrix _log2x2ComplexConjugateClosedForm(double absoluteTolerance) {
+    final double discriminant = _trace2x2Discriminant(absoluteTolerance);
+    final double trace = _rows[0][0] + _rows[1][1];
 
-    final double sqrtDiscriminant = math.sqrt(discriminant);
-    return <double>[
-      (trace + sqrtDiscriminant) / 2,
-      (trace - sqrtDiscriminant) / 2,
-    ];
+    final double realPart = trace / 2;
+    final double imagPart = math.sqrt(-discriminant) / 2;
+
+    final double magnitude = math.sqrt(
+      (realPart * realPart) + (imagPart * imagPart),
+    );
+    final double angle = math.atan2(imagPart, realPart);
+
+    final double c1 = angle / imagPart;
+    final double c0 = math.log(magnitude) - (realPart * c1);
+
+    return scale(c1) + Matrix.identity(rowCount).scale(c0);
   }
 
   /// Computes `log A` for a 2x2 matrix directly from its two real
