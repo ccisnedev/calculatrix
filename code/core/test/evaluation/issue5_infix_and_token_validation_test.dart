@@ -76,6 +76,48 @@ void main() {
     });
   });
 
+  group('A postfix operator after a bare function argument is not a syntax '
+      'error (issue #5 review round 1, finding 5)', () {
+    // Unlike a further binary operator or function (ambiguous about how
+    // much of the expression the bare function's argument covers), a
+    // postfix operator such as "%" applies unambiguously to whatever
+    // value already resolved the pending bare function: "(root 0)%" and
+    // "root 0 %" mean the same thing either way. This must keep matching
+    // origin/main's behavior, which predates the bare-function guard.
+    test('a postfix operator after a bare function argument is valid', () {
+      final Matrix result = Calculatrix.evaluateInfix('√0%');
+      expect(result, Matrix.scalar(0));
+    });
+
+    test('a postfix operator after a bare function argument of a non-zero '
+        'root is valid', () {
+      final Matrix result = Calculatrix.evaluateInfix('√9%');
+      expect(result, Matrix.scalar(0.3));
+    });
+
+    test(
+      'a postfix operator after nested bare function arguments is valid',
+      () {
+        final Matrix result = Calculatrix.evaluateInfix('√√(16)%');
+        expect(result, Matrix.scalar(0.2));
+      },
+    );
+
+    test('a bare function argument followed by a binary operator is still a '
+        'syntax error', () {
+      expect(
+        () => Calculatrix.evaluateInfix('√9+7'),
+        throwsA(
+          isA<ExpressionSyntaxError>().having(
+            (ExpressionSyntaxError error) => error.errorId,
+            'errorId',
+            CalculatrixErrorId.syntaxError,
+          ),
+        ),
+      );
+    });
+  });
+
   group('Non-finite literals are rejected (issue #5 bug 4)', () {
     test(
       'an infix numeric literal that overflows to infinity is non-finite',
