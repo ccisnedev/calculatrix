@@ -57,6 +57,29 @@ void main() {
         );
       }
     });
+
+    test('block-diagonal [[400 400 0] [-400 -400 0] [0 0 1]] (issue #13, '
+        'review round 2), outside the norm-10 corpus, still matches the '
+        'old truncated-series algorithm to 1e-15 relative (infinity norm): '
+        'the upper block is exactly nilpotent (A^2 = 0 there), so the old '
+        'series terminates after one term regardless of the lack of '
+        'scaling, and is a valid reference here even though its norm is '
+        '800', () {
+      final Matrix matrix = Matrix(<List<double>>[
+        <double>[400, 400, 0],
+        <double>[-400, -400, 0],
+        <double>[0, 0, 1],
+      ]);
+      final Matrix expected = _oldExp(matrix);
+      final Matrix actual = matrix.exp();
+
+      final double relativeError = _relativeInfinityNormError(actual, expected);
+      expect(
+        relativeError,
+        lessThanOrEqualTo(1e-15),
+        reason: 'relative error $relativeError',
+      );
+    });
   });
 }
 

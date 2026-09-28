@@ -216,6 +216,34 @@ void main() {
       _expectRelativelyClose(result.at(2, 2), e5, relativeTolerance: 1e-14);
     });
   });
+
+  group('Matrix.exp - no trace shift on already-exact block structure '
+      '(issue #13, review round 2)', () {
+    test('block-diagonal [[400 400 0] [-400 -400 0] [0 0 1]] exp equals '
+        '[[401 400 0] [-400 -399 0] [0 0 e]] within 1e-15 whole-matrix '
+        'relative infinity-norm error, since the upper block is exactly '
+        'nilpotent (A^2 = 0 there) and the corner is the scalar 1; a trace '
+        'shift with mu = 1/3 destroys this exactness', () {
+      final Matrix a = Matrix(<List<double>>[
+        <double>[400, 400, 0],
+        <double>[-400, -400, 0],
+        <double>[0, 0, 1],
+      ]);
+      final Matrix expected = Matrix(<List<double>>[
+        <double>[401, 400, 0],
+        <double>[-400, -399, 0],
+        <double>[0, 0, math.e],
+      ]);
+      final Matrix result = a.exp();
+      final double relativeError = _relativeInfinityNormError(result, expected);
+      expect(
+        relativeError,
+        lessThanOrEqualTo(1e-15),
+        reason:
+            'expected $expected, got $result (relative error $relativeError)',
+      );
+    });
+  });
 }
 
 void _expectRelativelyClose(
@@ -232,4 +260,28 @@ void _expectRelativelyClose(
     lessThanOrEqualTo(relativeTolerance),
     reason: 'expected $expected, got $actual (relative error $relativeError)',
   );
+}
+
+double _infinityNormOf(Matrix matrix) {
+  double maxRowSum = 0;
+  for (int row = 0; row < matrix.rowCount; row++) {
+    double rowSum = 0;
+    for (int column = 0; column < matrix.columnCount; column++) {
+      rowSum += matrix.at(row, column).abs();
+    }
+    if (rowSum > maxRowSum) {
+      maxRowSum = rowSum;
+    }
+  }
+  return maxRowSum;
+}
+
+double _relativeInfinityNormError(Matrix actual, Matrix expected) {
+  final Matrix difference = actual - expected;
+  final double diffNorm = _infinityNormOf(difference);
+  final double referenceNorm = _infinityNormOf(expected);
+  if (referenceNorm == 0) {
+    return diffNorm == 0 ? 0 : diffNorm;
+  }
+  return diffNorm / referenceNorm;
 }
