@@ -152,5 +152,52 @@ void main() {
         expect(error.position, 2);
       }
     });
+
+    test('leading whitespace in the original input line counts toward the '
+        'offending token\'s 1-based offset (review round 1 follow-up)', () {
+      // "  1/0": two leading spaces before "1/0", so "/" sits at 0-based
+      // index 3 in the original line, i.e. 1-based position 4. The
+      // expression must not be trimmed before positions are computed.
+      try {
+        Calculatrix.evaluateInfix('  1/0');
+        fail('expected MatrixDomainError');
+      } on MatrixDomainError catch (error) {
+        expect(error.errorId, CalculatrixErrorId.nonFinite);
+        expect(error.token, '/');
+        expect(error.position, 4);
+      }
+    });
+  });
+
+  group('RPN positions count leading whitespace in the input line '
+      '(review round 1 follow-up)', () {
+    test('a raw token carrying leading whitespace still reports the '
+        '1-based offset of the token itself, not of the whitespace', () {
+      // A single raw token "  bogus" stands in for a caller that hands
+      // evaluateRpn a token straight off an untrimmed input line: "bogus"
+      // starts at 0-based index 2 within it, i.e. 1-based position 3.
+      try {
+        Calculatrix.evaluateRpn(<String>['  bogus']);
+        fail('expected UnknownWordError');
+      } on UnknownWordError catch (error) {
+        expect(error.errorId, CalculatrixErrorId.unknownWord);
+        expect(error.token, 'bogus');
+        expect(error.position, 3);
+      }
+    });
+
+    test('leading empty tokens (a leading run of whitespace in the joined '
+        'input line) still report the correct 1-based offset', () {
+      // tokens.join(' ') for ['', '', 'bogus'] is "  bogus", the same
+      // input line as the test above, reached a different way.
+      try {
+        Calculatrix.evaluateRpn(<String>['', '', 'bogus']);
+        fail('expected UnknownWordError');
+      } on UnknownWordError catch (error) {
+        expect(error.errorId, CalculatrixErrorId.unknownWord);
+        expect(error.token, 'bogus');
+        expect(error.position, 3);
+      }
+    });
   });
 }
