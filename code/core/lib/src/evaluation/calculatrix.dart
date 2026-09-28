@@ -20,15 +20,22 @@ class Calculatrix {
   // CalculatrixProgram, the other to compile and execute token-by-token so
   // execution-time errors can be enriched (see _executePositioned).
   static List<_PositionedToken> _compileInfixToRpnTokens(String expression) {
-    final String source = expression.trim();
-    if (source.isEmpty) {
+    if (expression.trim().isEmpty) {
       throw ExpressionSyntaxError(
         'Expression cannot be empty.',
         errorId: CalculatrixErrorId.syntaxError,
       );
     }
 
-    final List<_PositionedToken> infixTokens = _tokenizeInfixPositioned(source);
+    // Tokenized untrimmed: _tokenizeInfixPositioned already skips whitespace
+    // characters wherever they fall (its main loop's own `char.trim().isEmpty`
+    // check), so trimming here bought nothing but made every token position
+    // an offset into the trimmed string instead of the original input line
+    // (spec section 6) -- a leading-whitespace expression such as "  1/0"
+    // reported its "/" at position 2 instead of the correct 4.
+    final List<_PositionedToken> infixTokens = _tokenizeInfixPositioned(
+      expression,
+    );
     _validateInfixTokens(infixTokens);
     return _toRpn(infixTokens);
   }
