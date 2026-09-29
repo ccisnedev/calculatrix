@@ -2,11 +2,12 @@
 // row of docs/spec/calculatrix_cli.md section 13 that S2 delivers.
 //
 // Excluded by the runbook's own scope: the version/doctor/upgrade/uninstall
-// rows (S3) and the commands/domain-error-id/"cx verison" suggestion rows
-// (S4). A handful of grammar rows here necessarily surface a domain error
-// from the core evaluator (an ill-formed RPN or infix program); those are
-// asserted only on exit code 65, never on the specific error id, since the
-// id catalog itself is S4's concern. See the PR's "Open points".
+// rows, now covered by stage S3 in installation_test.dart, and the
+// commands/domain-error-id/"cx verison" suggestion rows (S4). A handful of
+// grammar rows here necessarily surface a domain error from the core
+// evaluator (an ill-formed RPN or infix program); those are asserted only
+// on exit code 65, never on the specific error id, since the id catalog
+// itself is S4's concern. See the PR's "Open points".
 import 'dart:convert';
 import 'dart:io';
 
