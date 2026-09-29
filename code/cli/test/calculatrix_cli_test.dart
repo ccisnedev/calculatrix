@@ -218,6 +218,69 @@ void main() {
     });
   });
 
+  // Mirrors "eval rpn: sources" above: `eval infix` shares its options and
+  // its ExactlyOne(expression, file, stdin) constraint with `eval rpn`
+  // (EvalContracts, eval_support.dart's resolveProgramSource), so every
+  // source and rejection case there has an infix counterpart here too.
+  group('eval infix: sources (G1, G2)', () {
+    test(
+      'cx eval infix -f expr.txt reads the expression from a file',
+      () async {
+        final file = File('${tempDir.path}/expr.txt')
+          ..writeAsStringSync('2+3*4');
+        final code = await run(['eval', 'infix', '-f', file.path]);
+        expect(code, ExitCode.ok);
+        expect(out.output, contains('1: 14'));
+      },
+    );
+
+    test('cx eval infix --stdin reads the expression from stdin', () async {
+      final code = await run([
+        'eval',
+        'infix',
+        '--stdin',
+      ], readStdin: () => '2+3*4');
+      expect(code, ExitCode.ok);
+      expect(out.output, contains('1: 14'));
+    });
+
+    test('cx eval infix with no source is rejected: no program (G1)', () async {
+      final code = await run(['eval', 'infix']);
+      expect(code, ExitCode.validationFailed);
+    });
+
+    test(
+      'cx eval infix -f expr.txt EXPRESSION is rejected: two sources (G1)',
+      () async {
+        final file = File('${tempDir.path}/expr.txt')
+          ..writeAsStringSync('2+3*4');
+        final code = await run(['eval', 'infix', '-f', file.path, '2+3*4']);
+        expect(code, ExitCode.validationFailed);
+      },
+    );
+
+    test(
+      'cx eval infix -f expr.txt --stdin is rejected: two sources (G1)',
+      () async {
+        final file = File('${tempDir.path}/expr.txt')
+          ..writeAsStringSync('2+3*4');
+        final code = await run(['eval', 'infix', '-f', file.path, '--stdin']);
+        expect(code, ExitCode.validationFailed);
+      },
+    );
+
+    test('cx eval infix -f empty.txt rejects an empty program (G12)', () async {
+      final file = File('${tempDir.path}/empty.txt')..writeAsStringSync('   ');
+      final code = await run(['eval', 'infix', '-f', file.path]);
+      expect(code, ExitCode.validationFailed);
+    });
+
+    test('cx eval infix --stdin rejects an empty program (G12)', () async {
+      final code = await run(['eval', 'infix', '--stdin'], readStdin: () => '');
+      expect(code, ExitCode.validationFailed);
+    });
+  });
+
   group('eval rpn: option grammar (G6, G7, G8, G9)', () {
     // Moved to explicit strict-mode environment per the 2026-09-29 GNU-order
     // decision: under the default (GNU order), this same invocation is
