@@ -38,33 +38,30 @@ void main() {
   }
 
   group('BannerQuery / renderBanner (issue #26)', () {
-    test(
-      'plain banner with every command registered matches the design '
-      'exactly (issue #26 acceptance: snapshot test)',
-      () async {
-        final output = await buildQuery(
-          version: '0.8.0',
-          registeredCommands: fullCommands,
-        ).execute();
+    test('plain banner with every command registered matches the design '
+        'exactly (issue #26 acceptance: snapshot test)', () async {
+      final output = await buildQuery(
+        version: '0.8.0',
+        registeredCommands: fullCommands,
+      ).execute();
 
-        expect(
-          output.toText(),
-          "  ⎡ ●  ━━ ⎤   cx v0.8.0\n"
-          "  ⎣ ┃   ● ⎦   Calculatrix: matrix-first RPN and infix calculator\n"
-          "\n"
-          "  Commands:\n"
-          "    eval rpn     evaluate an RPN program     cx eval rpn '1 2 +'\n"
-          "    eval infix   evaluate an expression      cx eval infix "
-          '"2^0.5"\n'
-          "    doctor       verify local installation\n"
-          "    upgrade      update to latest version\n"
-          "    uninstall    remove cx\n"
-          "    version      print version\n"
-          "\n"
-          "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",
-        );
-      },
-    );
+      expect(
+        output.toText(),
+        "  ⎡ ●  ━━ ⎤   cx v0.8.0\n"
+        "  ⎣ ┃   ● ⎦   Calculatrix: matrix-first RPN and infix calculator\n"
+        "\n"
+        "  Commands:\n"
+        "    eval rpn     evaluate an RPN program     cx eval rpn '1 2 +'\n"
+        "    eval infix   evaluate an expression      cx eval infix "
+        '"2^0.5"\n'
+        "    doctor       verify local installation\n"
+        "    upgrade      update to latest version\n"
+        "    uninstall    remove cx\n"
+        "    version      print version\n"
+        "\n"
+        "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",
+      );
+    });
 
     test(
       'with only the S2 routes registered, the optional commands are '
@@ -90,13 +87,16 @@ void main() {
       },
     );
 
-    test('with no version known, the logo line drops the version suffix', () async {
-      final output = await buildQuery(
-        registeredCommands: s2Commands,
-      ).execute();
-      expect(output.toText(), startsWith('  ⎡ ●  ━━ ⎤   cx\n'));
-      expect(output.toText(), isNot(contains(' v ')));
-    });
+    test(
+      'with no version known, the logo line drops the version suffix',
+      () async {
+        final output = await buildQuery(
+          registeredCommands: s2Commands,
+        ).execute();
+        expect(output.toText(), startsWith('  ⎡ ●  ━━ ⎤   cx\n'));
+        expect(output.toText(), isNot(contains(' v ')));
+      },
+    );
 
     test('an update notice is appended when given', () async {
       final output = await buildQuery(
@@ -115,22 +115,19 @@ void main() {
       expect(output.toText(), isNot(contains('Update available')));
     });
 
-    test(
-      'color is on only when the terminal, ANSI support and NO_COLOR all '
-      'allow it, and the top-left dot uses the glow color (#2EF2C3) with a '
-      'reset (issue #26 acceptance)',
-      () async {
-        final output = await buildQuery(
-          version: '0.8.0',
-          registeredCommands: s2Commands,
-          hasTerminal: true,
-          supportsAnsiEscapes: true,
-        ).execute();
-        final text = output.toText()!;
-        expect(text, contains('\x1B[38;2;46;242;195m'));
-        expect(text, contains('\x1B[0m'));
-      },
-    );
+    test('color is on only when the terminal, ANSI support and NO_COLOR all '
+        'allow it, and the top-left dot uses the glow color (#2EF2C3) with a '
+        'reset (issue #26 acceptance)', () async {
+      final output = await buildQuery(
+        version: '0.8.0',
+        registeredCommands: s2Commands,
+        hasTerminal: true,
+        supportsAnsiEscapes: true,
+      ).execute();
+      final text = output.toText()!;
+      expect(text, contains('\x1B[38;2;46;242;195m'));
+      expect(text, contains('\x1B[0m'));
+    });
 
     test('color output strips to exactly the plain banner text', () async {
       final colored = await buildQuery(
@@ -173,51 +170,42 @@ void main() {
       expect(output.toText(), isNot(contains('\x1B[')));
     });
 
-    test(
-      'NO_COLOR disables color on an otherwise ANSI-capable terminal '
-      '(https://no-color.org)',
-      () async {
-        final output = await buildQuery(
-          version: '0.8.0',
-          registeredCommands: s2Commands,
-          hasTerminal: true,
-          supportsAnsiEscapes: true,
-          environment: const {'NO_COLOR': '1'},
-        ).execute();
-        expect(output.toText(), isNot(contains('\x1B[')));
-      },
-    );
+    test('NO_COLOR disables color on an otherwise ANSI-capable terminal '
+        '(https://no-color.org)', () async {
+      final output = await buildQuery(
+        version: '0.8.0',
+        registeredCommands: s2Commands,
+        hasTerminal: true,
+        supportsAnsiEscapes: true,
+        environment: const {'NO_COLOR': '1'},
+      ).execute();
+      expect(output.toText(), isNot(contains('\x1B[')));
+    });
 
-    test(
-      'NO_COLOR disables color regardless of its value, even empty '
-      '(https://no-color.org)',
-      () async {
-        final output = await buildQuery(
-          version: '0.8.0',
-          registeredCommands: s2Commands,
-          hasTerminal: true,
-          supportsAnsiEscapes: true,
-          environment: const {'NO_COLOR': ''},
-        ).execute();
-        expect(output.toText(), isNot(contains('\x1B[')));
-      },
-    );
+    test('NO_COLOR disables color regardless of its value, even empty '
+        '(https://no-color.org)', () async {
+      final output = await buildQuery(
+        version: '0.8.0',
+        registeredCommands: s2Commands,
+        hasTerminal: true,
+        supportsAnsiEscapes: true,
+        environment: const {'NO_COLOR': ''},
+      ).execute();
+      expect(output.toText(), isNot(contains('\x1B[')));
+    });
 
-    test(
-      'JSON mode keeps name and tagline and adds version when known '
-      '(issue #26 scope 6)',
-      () async {
-        final output = await buildQuery(
-          version: '0.8.0',
-          registeredCommands: s2Commands,
-        ).execute();
-        expect(output.toJson(), {
-          'name': 'cx',
-          'tagline': 'Calculatrix: matrix-first RPN and infix calculator',
-          'version': '0.8.0',
-        });
-      },
-    );
+    test('JSON mode keeps name and tagline and adds version when known '
+        '(issue #26 scope 6)', () async {
+      final output = await buildQuery(
+        version: '0.8.0',
+        registeredCommands: s2Commands,
+      ).execute();
+      expect(output.toJson(), {
+        'name': 'cx',
+        'tagline': 'Calculatrix: matrix-first RPN and infix calculator',
+        'version': '0.8.0',
+      });
+    });
 
     test('JSON mode omits version when it is not known', () async {
       final output = await buildQuery(registeredCommands: s2Commands).execute();

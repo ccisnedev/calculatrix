@@ -20,83 +20,70 @@ const _nameColumnWidth = 13;
 
 void main() {
   group('banner quickstart (issue #26 scope 3)', () {
-    test(
-      "the quickstart command evaluates through the CLI and prints "
-      "1: [[-1 0] [0 -1]] (i^2 = -1)",
-      () async {
-        final out = MemorySink();
-        final err = MemorySink();
-        final cli = buildCalculatrixCli();
-        // bannerQuickstartCommand is "cx '[[0,-1],[1,0]] 2 ^'"; the quotes
-        // are shell quoting, not part of argv, so the RPN program itself is
-        // the single argument passed below.
-        final code = await cli.run(
-          ["[[0,-1],[1,0]] 2 ^"],
-          stdout: out,
-          stderr: err,
-        );
-        expect(code, ExitCode.ok);
-        expect(out.output, contains('1: [[-1 0] [0 -1]]'));
-      },
-    );
+    test("the quickstart command evaluates through the CLI and prints "
+        "1: [[-1 0] [0 -1]] (i^2 = -1)", () async {
+      final out = MemorySink();
+      final err = MemorySink();
+      final cli = buildCalculatrixCli();
+      // bannerQuickstartCommand is "cx '[[0,-1],[1,0]] 2 ^'"; the quotes
+      // are shell quoting, not part of argv, so the RPN program itself is
+      // the single argument passed below.
+      final code = await cli.run(
+        ["[[0,-1],[1,0]] 2 ^"],
+        stdout: out,
+        stderr: err,
+      );
+      expect(code, ExitCode.ok);
+      expect(out.output, contains('1: [[-1 0] [0 -1]]'));
+    });
   });
 
   group('banner command list (issue #26 scope 4)', () {
-    test(
-      'every command word the banner lists is a route the CLI actually '
-      'registers',
-      () async {
-        final out = MemorySink();
-        final err = MemorySink();
-        final cli = buildCalculatrixCli();
-        final code = await cli.run([], stdout: out, stderr: err);
-        expect(code, ExitCode.ok);
+    test('every command word the banner lists is a route the CLI actually '
+        'registers', () async {
+      final out = MemorySink();
+      final err = MemorySink();
+      final cli = buildCalculatrixCli();
+      final code = await cli.run([], stdout: out, stderr: err);
+      expect(code, ExitCode.ok);
 
-        final registeredNames = cli.catalog.commands
-            .map((c) => c.name)
-            .toSet();
-        final commandLines = out.output
-            .split('\n')
-            .where((line) => line.startsWith(_indent) && line.trim().isNotEmpty);
+      final registeredNames = cli.catalog.commands.map((c) => c.name).toSet();
+      final commandLines = out.output
+          .split('\n')
+          .where((line) => line.startsWith(_indent) && line.trim().isNotEmpty);
 
-        expect(commandLines, isNotEmpty);
-        for (final line in commandLines) {
-          final name = line
-              .substring(_indent.length, _indent.length + _nameColumnWidth)
-              .trim();
+      expect(commandLines, isNotEmpty);
+      for (final line in commandLines) {
+        final name = line
+            .substring(_indent.length, _indent.length + _nameColumnWidth)
+            .trim();
+        expect(
+          registeredNames,
+          contains(name),
+          reason: 'banner lists "$name" but the CLI has no such route',
+        );
+      }
+    });
+
+    test('S3 routes (doctor, upgrade, uninstall, version) are not listed until '
+        'the CLI actually registers them (issue #26 scope 4, does not depend '
+        'on #25)', () async {
+      final out = MemorySink();
+      final err = MemorySink();
+      final cli = buildCalculatrixCli();
+      final code = await cli.run([], stdout: out, stderr: err);
+      expect(code, ExitCode.ok);
+
+      final registeredNames = cli.catalog.commands.map((c) => c.name).toSet();
+      for (final name in ['doctor', 'upgrade', 'uninstall', 'version']) {
+        if (!registeredNames.contains(name)) {
           expect(
-            registeredNames,
-            contains(name),
-            reason: 'banner lists "$name" but the CLI has no such route',
+            out.output,
+            isNot(contains('\n$_indent$name ')),
+            reason: '"$name" is not registered; the banner must not list it',
           );
         }
-      },
-    );
-
-    test(
-      'S3 routes (doctor, upgrade, uninstall, version) are not listed until '
-      'the CLI actually registers them (issue #26 scope 4, does not depend '
-      'on #25)',
-      () async {
-        final out = MemorySink();
-        final err = MemorySink();
-        final cli = buildCalculatrixCli();
-        final code = await cli.run([], stdout: out, stderr: err);
-        expect(code, ExitCode.ok);
-
-        final registeredNames = cli.catalog.commands
-            .map((c) => c.name)
-            .toSet();
-        for (final name in ['doctor', 'upgrade', 'uninstall', 'version']) {
-          if (!registeredNames.contains(name)) {
-            expect(
-              out.output,
-              isNot(contains('\n$_indent$name ')),
-              reason: '"$name" is not registered; the banner must not list it',
-            );
-          }
-        }
-      },
-    );
+      }
+    });
   });
 }

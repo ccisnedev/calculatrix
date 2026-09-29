@@ -217,7 +217,7 @@ Global options, declared by the SDK on every route except the shortcut:
 
 | Route | Kind | Contract | What it does |
 |---|---|---|---|
-| `cx` | query | globals only | Logo, version, the list of routes. Never reads stdin. |
+| `cx` | query | globals only | Logo, version, the list of routes. Never reads stdin. **Amended 2026-09-29 (User, issue #26):** the logo is the branded mark (glow dot `#2EF2C3`, `⎡ ● ⎤` / `⎣ ┃ ● ⎦` frame), colored only when stdout is a terminal that supports ANSI escapes and `NO_COLOR` is unset; the route list shows only routes the CLI actually registers, so `doctor`, `upgrade`, `uninstall` and `version` appear once `InstallationPlugin`/`DoctorPlugin`/`VersionPlugin` register them (8.7), not before. |
 | `cx <program>` | query | one operand; no options, no globals | Same as `cx eval rpn <program>`. |
 | `cx eval rpn [<program>]` | query | `--file`, `--stdin`; `ExactlyOne(program, file, stdin)` | Runs an RPN program on an empty stack and prints the stack. |
 | `cx eval infix [<expression>]` | query | `--file`, `--stdin`; `ExactlyOne(expression, file, stdin)` | Evaluates an infix expression and prints the result. |

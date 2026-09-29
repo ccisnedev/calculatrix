@@ -23,6 +23,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	`cx.cmd` shim. `scripts/dev-install.ps1` now installs `cx.exe` only and
 	removes a legacy `cx.cmd` or `calculatrix.exe` from a previous install.
 	Added `scripts/check-caret.ps1` as a regression check (issue #22).
+- Branded the bare `cx` banner (issue #26): a glow-colored dot (`#2EF2C3`)
+	inside an ASCII frame, the tagline, a `Commands:` block, and a
+	`Quickstart:` line. Color is used only on a real terminal that supports
+	ANSI escapes, and is off when `NO_COLOR` is set. The command list is read
+	from the CLI's own route catalog at call time, so it lists only routes
+	that are actually registered and needs no change once issue #25 adds
+	`doctor`, `upgrade`, `uninstall` and `version`.
 
 ### RPN
 
