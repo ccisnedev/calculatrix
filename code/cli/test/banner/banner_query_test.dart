@@ -47,8 +47,8 @@ void main() {
 
       expect(
         output.toText(),
-        "  ⎡ ●  ━━ ⎤   cx v0.8.0\n"
-        "  ⎣ ┃   ● ⎦   Calculatrix: matrix-first RPN and infix calculator\n"
+        "  ┌● ━┐   cx v0.8.0\n"
+        "  └┃ ●┘   Calculatrix: matrix-first RPN and infix calculator\n"
         "\n"
         "  Commands:\n"
         "    eval rpn     evaluate an RPN program     cx eval rpn '1 2 +'\n"
@@ -74,8 +74,8 @@ void main() {
 
         expect(
           output.toText(),
-          "  ⎡ ●  ━━ ⎤   cx v0.8.0\n"
-          "  ⎣ ┃   ● ⎦   Calculatrix: matrix-first RPN and infix calculator\n"
+          "  ┌● ━┐   cx v0.8.0\n"
+          "  └┃ ●┘   Calculatrix: matrix-first RPN and infix calculator\n"
           "\n"
           "  Commands:\n"
           "    eval rpn     evaluate an RPN program     cx eval rpn '1 2 +'\n"
@@ -93,10 +93,29 @@ void main() {
         final output = await buildQuery(
           registeredCommands: s2Commands,
         ).execute();
-        expect(output.toText(), startsWith('  ⎡ ●  ━━ ⎤   cx\n'));
+        expect(output.toText(), startsWith('  ┌● ━┐   cx\n'));
         expect(output.toText(), isNot(contains(' v ')));
       },
     );
+
+    test('the logo is about as tall as it is wide: 5 columns by 2 rows, '
+        'since a terminal cell is roughly twice as tall as it is wide '
+        '(User, 2026-09-29)', () async {
+      final output = await buildQuery(registeredCommands: s2Commands).execute();
+      final logoRows = output.toText()!.split('\n').take(2);
+      for (final row in logoRows) {
+        expect(row.substring(2, 7).runes.length, 5);
+        expect(row.substring(7, 10), '   ');
+      }
+    });
+
+    test('the logo uses only box-drawing and geometric glyphs, which every '
+        'console font has: no U+23A0..U+23BF bracket pieces, which the '
+        'legacy Windows console cannot draw (User, 2026-09-29)', () async {
+      final output = await buildQuery(registeredCommands: s2Commands).execute();
+      final logo = output.toText()!.split('\n').take(2).join();
+      expect(logo.runes.where((r) => r >= 0x23A0 && r <= 0x23BF), isEmpty);
+    });
 
     test('an update notice is appended when given', () async {
       final output = await buildQuery(
