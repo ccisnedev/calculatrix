@@ -4,6 +4,21 @@ All notable changes to package calculatrix will be documented in this file.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/)
 and the package adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- `Matrix.sqrt()` no longer rejects singular matrices that do have a real
+  principal square root. It previously ran a Newton iteration that inverts
+  the current iterate on every step, which always fails as the iterates
+  approach a singular result. Singular targets are now routed through an
+  eigendecomposition (`A = P D P⁻¹` ⟹ `sqrt(A) = P sqrt(D) P⁻¹`), which
+  succeeds whenever every eigenvalue is real and nonnegative and the zero
+  eigenvalue is semisimple (the matrix is diagonalizable), and continues to
+  raise `MatrixDomainError` otherwise, for example for a nilpotent Jordan
+  block. Verified against Giac to a relative Frobenius error of 1e-12 or
+  better (issue #19).
+
 ## [0.7.0] - 2026-05-21
 
 ### Changed
