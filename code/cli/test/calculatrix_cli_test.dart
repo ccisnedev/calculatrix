@@ -31,18 +31,22 @@ void main() {
     tempDir.deleteSync(recursive: true);
   });
 
-  // The production entry point (bin/calculatrix_cli.dart) always forces
-  // POSIXLY_CORRECT into the environment; tests do the same, so every
-  // assertion below exercises the strict-POSIX grammar the CLI actually
-  // ships with (G6), not cli_router's permutation default.
-  Future<int> run(List<String> args, {StdinReader? readStdin}) {
+  // User decision (2026-09-29): cx follows GNU order by default (an option
+  // may follow an operand; cli_router permutes it in front before the
+  // strict grammar runs), like macss, inquiry and skillwire. The production
+  // entry point (bin/calculatrix_cli.dart) passes nothing, so cli_router
+  // reads POSIXLY_CORRECT from the real process environment; here
+  // [environment] defaults to an empty map (equivalent to a real
+  // environment with no POSIXLY_CORRECT set), so a test gets GNU order
+  // unless it opts into strict POSIX explicitly with
+  // environment: {'POSIXLY_CORRECT': '1'}.
+  Future<int> run(
+    List<String> args, {
+    StdinReader? readStdin,
+    Map<String, String> environment = const {},
+  }) {
     final cli = buildCalculatrixCli(readStdin: readStdin ?? () => '');
-    return cli.run(
-      args,
-      stdout: out,
-      stderr: err,
-      environment: const {'POSIXLY_CORRECT': '1'},
-    );
+    return cli.run(args, stdout: out, stderr: err, environment: environment);
   }
 
   group('banner (G2, G3)', () {
@@ -220,6 +224,60 @@ void main() {
       expect(code, ExitCode.validationFailed);
     });
 
+    // User decision (2026-09-29): cx follows GNU order by default (options
+    // may follow operands), like macss, inquiry and skillwire; only
+    // POSIXLY_CORRECT (read from the real environment) restores strict
+    // POSIX order. Under the default (no POSIXLY_CORRECT, environment: {}),
+    // "--json" after the program and before it are equivalent: cli_router's
+    // GNU permutation moves the option in front of the operand before the
+    // strict grammar runs.
+    test("cx eval rpn --json '1 2 +' and cx eval rpn '1 2 +' --json are "
+        'identical under GNU order (default, no POSIXLY_CORRECT)', () async {
+      final first = await run([
+        'eval',
+        'rpn',
+        '--json',
+        '1 2 +',
+      ], environment: const {});
+      final firstOut = out.output;
+      final firstErr = err.output;
+
+      out = MemorySink();
+      err = MemorySink();
+      final second = await run([
+        'eval',
+        'rpn',
+        '1 2 +',
+        '--json',
+      ], environment: const {});
+
+      expect(second, first);
+      expect(out.output, firstOut);
+      expect(err.output, firstErr);
+      expect(first, ExitCode.ok);
+      expect(jsonDecode(firstOut), {
+        'stack': [3],
+      });
+    });
+
+    // Same invocation as above, but with POSIXLY_CORRECT set: GNU
+    // permutation is off, so the option after the operand is misplaced.
+    // The offending option is `--json` itself, so it was never among the
+    // options "successfully read before the rejection"; the SDK's jsonMode
+    // detection (rejection.options.any((o) => o.spec.name == 'json')) is
+    // therefore false here, and the error is rendered as text, not JSON:
+    // "Error: <message> [<id>]".
+    test("cx eval rpn '1 2 +' --json is misplaced-option, 7, under strict "
+        'POSIX (POSIXLY_CORRECT)', () async {
+      final code = await run(
+        ['eval', 'rpn', '1 2 +', '--json'],
+        environment: const {'POSIXLY_CORRECT': '1'},
+      );
+      expect(code, ExitCode.validationFailed);
+      expect(err.output, contains('[misplaced-option]'));
+      expect(err.output, contains('an option cannot follow an operand'));
+    });
+
     test('cx eval rpn -f (missing value) is rejected, 7', () async {
       final code = await run(['eval', 'rpn', '-f']);
       expect(code, ExitCode.validationFailed);
@@ -271,8 +329,18 @@ void main() {
       },
     );
 
+    // An option written before the route word that declares it is always
+    // misplacedOption: GNU permutation only ever moves an option earlier
+    // relative to operands, never across an unresolved route boundary, so
+    // this stays rejected the same way under either ordering. Kept
+    // explicit here (strict mode) since it is one of the two tests
+    // labeled G6 (the other is above), per the 2026-09-29 GNU-order
+    // decision, even though its outcome does not depend on it.
     test('cx -f prog.rpn eval rpn is misplacedOption, 7 (G6)', () async {
-      final code = await run(['-f', 'prog.rpn', 'eval', 'rpn']);
+      final code = await run(
+        ['-f', 'prog.rpn', 'eval', 'rpn'],
+        environment: const {'POSIXLY_CORRECT': '1'},
+      );
       expect(code, ExitCode.validationFailed);
     });
 
