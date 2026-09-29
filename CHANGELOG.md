@@ -15,6 +15,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	`infix`/`rpn`/`command`/`macro` mode CLI.
 - Added `scripts/dev-install.ps1` to build the CLI from source and install it
 	locally, with a `cx.cmd` alias shim.
+- The executable is named `cx` (`bin/cx.dart`, compiled to `cx.exe`). There is
+	no `calculatrix` executable and no alias of any kind. A `.cmd`/`.bat` shim
+	runs through cmd.exe, which consumes `^` as its own escape character while
+	parsing the command line, before the shim body ever runs, so
+	`cx eval infix '2^0.5'` silently lost the caret through the earlier
+	`cx.cmd` shim. `scripts/dev-install.ps1` now installs `cx.exe` only and
+	removes a legacy `cx.cmd` or `calculatrix.exe` from a previous install.
+	Added `scripts/check-caret.ps1` as a regression check (issue #22).
 
 ### RPN
 

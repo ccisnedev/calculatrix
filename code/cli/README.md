@@ -1,8 +1,11 @@
 # calculatrix_cli
 
-The `calculatrix`/`cx` command-line interface, built on `modular_cli_sdk`.
+The `cx` command-line interface for Calculatrix, built on `modular_cli_sdk`.
 See `docs/spec/calculatrix_cli.md` for the full grammar and behavior, and
 `docs/runbook-cli-stage-0.md` for how the CLI is being built in stages.
+
+The executable is named `cx`. There is no `calculatrix` executable and no
+alias of any kind: `cx` is what you run, directly (issue #22).
 
 ## Install
 
@@ -10,14 +13,15 @@ See `docs/spec/calculatrix_cli.md` for the full grammar and behavior, and
 .\scripts\dev-install.ps1
 ```
 
-Builds `calculatrix.exe` from source and installs it, plus a `cx.cmd` shim,
-under `%LOCALAPPDATA%\calculatrix\bin`, adding that directory to the user
-`PATH` if it is not already there.
+Builds `cx.exe` from source and installs it under
+`%LOCALAPPDATA%\calculatrix\bin`, adding that directory to the user `PATH`
+if it is not already there. A legacy `cx.cmd` shim or `calculatrix.exe` from
+an older install is removed if present.
 
 ## Run
 
 ```bash
-dart run bin/calculatrix_cli.dart
+dart run bin/cx.dart
 ```
 
 ## Try it
@@ -31,6 +35,21 @@ cx eval infix "2+3*4"
 A bare `cx` prints a short banner. `cx <program>` is a shortcut for
 `cx eval rpn <program>`, so a single quoted RPN program can be evaluated
 directly, without typing `eval rpn`.
+
+## A note on `^` in cmd.exe
+
+In cmd.exe (not PowerShell), `^` is the shell's own escape character and is
+consumed while cmd.exe parses the command line, before `cx` ever starts. An
+expression containing `^` must be quoted:
+
+```bat
+cx eval infix "2^0.5"
+```
+
+Typed unquoted, `cx eval infix 2^0.5`, the caret is already gone by the time
+`cx` sees the arguments; no program, alias or executable can recover it,
+because the shell itself consumed the character. `scripts\check-caret.ps1`
+covers both the PowerShell and the cmd.exe form.
 
 ## Global options
 
