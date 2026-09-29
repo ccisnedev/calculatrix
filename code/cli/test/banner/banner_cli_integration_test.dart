@@ -5,6 +5,8 @@
 // applies to its own `quickstartCommand`
 // (`code/cli/lib/modules/global/commands/tui.dart`).
 import 'package:calculatrix_cli/calculatrix_cli.dart';
+import 'package:calculatrix_cli/src/banner/banner_render.dart'
+    show bannerQuickstartCommand;
 import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 import 'package:test/test.dart';
 
@@ -25,11 +27,20 @@ void main() {
       final out = MemorySink();
       final err = MemorySink();
       final cli = buildCalculatrixCli();
-      // bannerQuickstartCommand is "cx '[[0,-1],[1,0]] 2 ^'"; the quotes
-      // are shell quoting, not part of argv, so the RPN program itself is
-      // the single argument passed below.
+      // The guard runs the advertised constant itself, so it follows any
+      // change to it. The constant is `cx '<program>'`: the quotes are
+      // shell quoting, not part of argv, so the program between them is
+      // the single argument.
+      const prefix = "cx '";
+      expect(bannerQuickstartCommand, startsWith(prefix));
+      expect(bannerQuickstartCommand, endsWith("'"));
+      final program = bannerQuickstartCommand.substring(
+        prefix.length,
+        bannerQuickstartCommand.length - 1,
+      );
+      expect(program, isNot(contains("'")));
       final code = await cli.run(
-        ["[[0,-1],[1,0]] 2 ^"],
+        [program],
         stdout: out,
         stderr: err,
       );

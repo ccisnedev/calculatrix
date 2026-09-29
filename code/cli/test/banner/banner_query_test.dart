@@ -123,10 +123,33 @@ void main() {
         registeredCommands: s2Commands,
         hasTerminal: true,
         supportsAnsiEscapes: true,
+        environment: {'COLORTERM': 'truecolor'},
       ).execute();
       final text = output.toText()!;
       expect(text, contains('\x1B[38;2;46;242;195m'));
       expect(text, contains('\x1B[0m'));
+    });
+
+    test('COLORTERM=24bit also selects the 24-bit glow', () async {
+      final output = await buildQuery(
+        registeredCommands: s2Commands,
+        hasTerminal: true,
+        supportsAnsiEscapes: true,
+        environment: {'COLORTERM': '24bit'},
+      ).execute();
+      expect(output.toText(), contains('\x1B[38;2;46;242;195m'));
+    });
+
+    test('without COLORTERM truecolor the glow falls back to bright cyan '
+        '(ANSI 96, issue #26 acceptance)', () async {
+      final output = await buildQuery(
+        registeredCommands: s2Commands,
+        hasTerminal: true,
+        supportsAnsiEscapes: true,
+      ).execute();
+      final text = output.toText()!;
+      expect(text, contains('\x1B[96m●'));
+      expect(text, isNot(contains('\x1B[38;2;')));
     });
 
     test('color output strips to exactly the plain banner text', () async {
