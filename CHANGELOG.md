@@ -6,6 +6,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### CLI
+
+- Rebuilt the `calculatrix`/`cx` CLI on `modular_cli_sdk` (runbook stage S2):
+	a banner on a bare `cx`, `cx eval rpn`, `cx eval infix`, and the `cx
+	<program>` RPN shortcut, following the grammar in
+	`docs/spec/calculatrix_cli.md` section 4. Replaces the previous
+	`infix`/`rpn`/`command`/`macro` mode CLI.
+- Added `scripts/dev-install.ps1` to build the CLI from source and install it
+	locally, with a `cx.cmd` alias shim.
+
 ### RPN
 
 - `ENTER` with an empty draft now duplicates the top of the stack, as `ENTER`

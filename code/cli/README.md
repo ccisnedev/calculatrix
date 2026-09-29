@@ -1,16 +1,18 @@
 # calculatrix_cli
 
-Command-line interface package for Calculatrix.
+The `calculatrix`/`cx` command-line interface, built on `modular_cli_sdk`.
+See `docs/spec/calculatrix_cli.md` for the full grammar and behavior, and
+`docs/runbook-cli-stage-0.md` for how the CLI is being built in stages.
 
-It is a thin adapter over the same public core APIs exposed by
-`package:calculatrix`.
+## Install
 
-## Modes
+```powershell
+.\scripts\dev-install.ps1
+```
 
-- `infix`: evaluate an infix expression through the canonical kernel
-- `rpn`: evaluate an RPN token sequence through the same kernel
-- `command`: execute typed public commands against a stack machine
-- `macro`: execute public macro workflows
+Builds `calculatrix.exe` from source and installs it, plus a `cx.cmd` shim,
+under `%LOCALAPPDATA%\calculatrix\bin`, adding that directory to the user
+`PATH` if it is not already there.
 
 ## Run
 
@@ -18,31 +20,20 @@ It is a thin adapter over the same public core APIs exposed by
 dart run bin/calculatrix_cli.dart
 ```
 
-## Examples
+## Try it
 
 ```bash
-dart run bin/calculatrix_cli.dart infix "[[1,2],[3,4]] * [[2]]"
-dart run bin/calculatrix_cli.dart rpn 3 4 + 5 *
-dart run bin/calculatrix_cli.dart command "[[1,2],[3,4]]" transpose
-dart run bin/calculatrix_cli.dart command "[[1,2],[3,4]]" duplicate-row:0
-dart run bin/calculatrix_cli.dart macro append-zero-row "[[1,2],[3,4]]"
+cx '1 2 +'
+cx eval rpn '1 2 +'
+cx eval infix "2+3*4"
 ```
 
-## Parameterized command syntax
+A bare `cx` prints a short banner. `cx <program>` is a shortcut for
+`cx eval rpn <program>`, so a single quoted RPN program can be evaluated
+directly, without typing `eval rpn`.
 
-- `identity:3`
-- `zeros:2x3`
-- `ones:2x3`
-- `delete-row:1`
-- `delete-column:1`
-- `duplicate-row:0`
-- `duplicate-column:0`
-- `move-row:0:2`
-- `move-column:0:2`
-- `pick:2`
-- `roll:3`
+## Global options
 
-## Exit behavior
-
-- Evaluation and domain errors exit with code `1`.
-- Usage errors exit with code `64` and print help.
+`--json` for machine-readable output, `--quiet`/`-q` to suppress everything
+but the result, `--help`/`-h` for help. Exit codes follow the SDK's own
+`ExitCode` table (0 ok, 7 validation failure, 64 usage error, 65 data error).
