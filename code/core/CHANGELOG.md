@@ -9,27 +9,41 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - `Matrix.sqrt()` no longer rejects singular matrices that do have a real
-  principal square root. It runs the original Newton (Denman-Beavers)
-  iteration first for any matrix that is not structurally singular, so
-  every previously working case, including complex eigenvalue pairs and
-  non-semisimple nonzero eigenvalues, is unchanged. A matrix is
-  structurally singular when its rank falls below its dimension under a
-  strict, machine-epsilon-scaled tolerance, which is deliberately tighter
-  than the caller's own `relativeTolerance`/`absoluteTolerance` so a merely
-  tiny but nonzero eigenvalue is never misclassified as singular. A
-  structurally singular target is instead split into complementary
-  A-invariant subspaces, its range and null space (`V = [basis of
-  range(A) | basis of ker(A)]`, `V⁻¹AV = blockdiag(B, 0)` with `B`
-  nonsingular), with `sqrt(B)` computed by the same unmodified Newton
+  principal square root. It first normalizes the target by its own
+  infinity norm `s` (`sqrt(A) = sqrt(s) * sqrt(A/s)`, rescaling the result
+  back afterward), so every tolerance-based decision that follows acts on
+  a target of norm 1, where a fixed absolute tolerance like `1e-12` is
+  meaningful; without this, a uniformly tiny or uniformly huge but
+  otherwise well-conditioned matrix could be misclassified as singular (or
+  vice versa) purely because of its own absolute scale. It then runs the
+  original Newton (Denman-Beavers) iteration first for any normalized
+  target that is not structurally singular, so every previously working
+  case, including complex eigenvalue pairs and non-semisimple nonzero
+  eigenvalues, is unchanged. A matrix is structurally singular when its
+  rank falls below its dimension under a strict, machine-epsilon-scaled
+  relative tolerance, deliberately tighter than the caller's own
+  `relativeTolerance`/`absoluteTolerance` so a merely tiny but nonzero
+  eigenvalue relative to the target's own norm is never misclassified as
+  singular. A structurally singular target is instead split into
+  complementary A-invariant subspaces, its range and null space (`V =
+  [basis of range(A) | basis of ker(A)]`, `V⁻¹AV = blockdiag(B, 0)` with
+  `B` nonsingular), with `sqrt(B)` computed by the same unmodified Newton
   iteration and `sqrt(A) = V · blockdiag(sqrt(B), 0) · V⁻¹`. This requires
   only that the zero eigenvalue be semisimple (`rank(A) == rank(A²)`); it
   continues to raise `MatrixDomainError` otherwise, for example for a
-  nilpotent Jordan block. Verified against Giac to a relative Frobenius
-  error of 1e-12 or better (issue #19), including three regressions found
-  in review of the first fix: a non-semisimple nonzero eigenvalue on an
-  otherwise singular matrix, a complex eigenvalue pair with a real
-  principal root, and a genuinely nonsingular matrix with a tiny nonzero
-  eigenvalue that a looser rank tolerance would have misrouted.
+  nilpotent Jordan block, and now raises that same error instead of an
+  unrelated shape error on the (structurally unreachable, but guarded)
+  case of an empty range basis. An eigenvalue that is numerically zero
+  relative to the target's own norm is returned as exactly 0, which is
+  backward stable (`X*X` reconstructs `A`) even where it is not
+  forward-accurate. Verified against Giac to a relative Frobenius error of
+  1e-12 or better (issue #19), including four regressions found in review
+  of the first fix: a non-semisimple nonzero eigenvalue on an otherwise
+  singular matrix, a complex eigenvalue pair with a real principal root, a
+  genuinely nonsingular matrix with a tiny nonzero eigenvalue that a
+  looser rank tolerance would have misrouted, and a uniformly tiny (or
+  huge) but well-conditioned matrix that fixed absolute tolerances are not
+  invariant to.
 
 ## [0.7.0] - 2026-05-21
 

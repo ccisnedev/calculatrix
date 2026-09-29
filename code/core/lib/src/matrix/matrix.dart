@@ -1437,10 +1437,29 @@ class Matrix {
       );
     }
 
+    // Every tolerance-based decision below (the structural-singularity
+    // pre-check, and internally, Newton's own convergence check and the
+    // range/null-space split's rank comparisons) is calibrated for a
+    // target whose infinity norm is around 1: that is what makes an
+    // absolute tolerance like 1e-12 meaningful. A matrix that is
+    // uniformly tiny or uniformly huge in absolute terms, but otherwise
+    // perfectly well-conditioned, breaks that calibration in either
+    // direction: e.g. [[1e-20,2e-20],[2e-20,5e-20]] is nonsingular
+    // (det/s^2 = 1) yet every entry sits far below any fixed absolute
+    // tolerance, so it looks structurally singular; a uniformly huge
+    // analogue could just as easily hide genuine singularity above any
+    // fixed absolute tolerance. Normalizing by the target's own norm
+    // first, and rescaling the result back afterward, makes every
+    // downstream tolerance check scale invariant:
+    // sqrt(A) = sqrt(s) * sqrt(A/s) for s = norm(A) > 0, since s*I
+    // commutes with everything A/s does.
+    final Matrix normalized = scale(1 / norm);
+    final double sqrtNorm = math.sqrt(norm);
+
     // Keep main's Newton path as the first attempt, unchanged, but only
-    // when the target is not itself structurally singular. Two different
-    // things can go wrong when the target is singular, and only one of
-    // them is visible from inside the Newton loop:
+    // when the (normalized) target is not itself structurally singular.
+    // Two different things can go wrong when the target is singular, and
+    // only one of them is visible from inside the Newton loop:
     //
     //   1. An intermediate iterate goes exactly singular and `_inverse`
     //      throws mid-loop: this is the failure issue #19 described.
@@ -1459,38 +1478,51 @@ class Matrix {
     // strict, machine-epsilon-scaled tolerance (not the caller's
     // relativeTolerance/absoluteTolerance, which default to 1e-10/1e-12
     // and are the same looseness that let the bug through in the first
-    // place), whether A is structurally singular. This is deliberately
+    // place), whether A/s is structurally singular. This is deliberately
     // stricter than the caller's own tolerance so a merely tiny but
-    // nonzero eigenvalue (e.g. 1e-13 on a unit-norm matrix) is not
-    // misclassified as singular: that case still converges quadratically
-    // through the ordinary Newton path below.
+    // nonzero eigenvalue relative to the target's own norm (e.g. 1e-13
+    // on a unit-norm matrix) is not misclassified as singular: that case
+    // still converges quadratically through the ordinary Newton path
+    // below. Eigenvalues genuinely below this threshold relative to the
+    // target's norm are numerically indistinguishable from zero; the
+    // range/null-space split returns exactly 0 for them, which is
+    // backward stable (X*X reconstructs A to the same tolerance) even
+    // when it is not forward-accurate.
     final double machineEpsilon = 2.220446049250313e-16;
-    final double structuralZeroTolerance =
-        rowCount * machineEpsilon * math.max(norm, 1);
+    final double structuralZeroTolerance = rowCount * machineEpsilon;
     final bool isStructurallySingular =
-        rank(absoluteTolerance: structuralZeroTolerance).scalarValue.round() <
+        normalized
+            .rank(absoluteTolerance: structuralZeroTolerance)
+            .scalarValue
+            .round() <
         rowCount;
 
     if (isStructurallySingular) {
-      return _sqrtViaRangeNullSplit(
-        relativeTolerance: relativeTolerance,
-        absoluteTolerance: absoluteTolerance,
-        maxIterations: maxIterations,
-      );
+      return normalized
+          ._sqrtViaRangeNullSplit(
+            relativeTolerance: relativeTolerance,
+            absoluteTolerance: absoluteTolerance,
+            maxIterations: maxIterations,
+          )
+          .scale(sqrtNorm);
     }
 
     try {
-      return _sqrtViaNewton(
-        relativeTolerance: relativeTolerance,
-        absoluteTolerance: absoluteTolerance,
-        maxIterations: maxIterations,
-      );
+      return normalized
+          ._sqrtViaNewton(
+            relativeTolerance: relativeTolerance,
+            absoluteTolerance: absoluteTolerance,
+            maxIterations: maxIterations,
+          )
+          .scale(sqrtNorm);
     } on MatrixDomainError {
-      return _sqrtViaRangeNullSplit(
-        relativeTolerance: relativeTolerance,
-        absoluteTolerance: absoluteTolerance,
-        maxIterations: maxIterations,
-      );
+      return normalized
+          ._sqrtViaRangeNullSplit(
+            relativeTolerance: relativeTolerance,
+            absoluteTolerance: absoluteTolerance,
+            maxIterations: maxIterations,
+          )
+          .scale(sqrtNorm);
     }
   }
 
@@ -1619,6 +1651,19 @@ class Matrix {
     );
 
     final int rangeDimension = pivotColumns.length;
+    if (rangeDimension == 0) {
+      // A completely empty range basis would make V degenerate (built
+      // only from the null space) and leave no block to extract B from.
+      // This cannot happen for a target whose caller (sqrt) has already
+      // normalized it to infinity norm 1, since the row achieving that
+      // norm always has a pivot. Guarded anyway, so an unexpected input
+      // (this method is also reachable directly in tests) raises a clear
+      // domain error instead of an empty-matrix shape error from the
+      // Matrix constructor below.
+      throw MatrixDomainError(
+        'Square root is undefined for this matrix in the real domain.',
+      );
+    }
     if (rangeDimension != rankA || rangeDimension + nullBasis.length != n) {
       // Should not happen given the rank(A) == rank(A²) check above; a
       // defensive guard against an unforeseen numerical edge case.
