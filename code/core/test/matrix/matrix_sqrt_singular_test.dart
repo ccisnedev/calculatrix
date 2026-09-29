@@ -1,12 +1,17 @@
 // Acceptance test for issue #19: Matrix.sqrt() must return the real
 // principal square root of a singular matrix whose zero eigenvalue is
 // semisimple, instead of rejecting every singular input outright. This
-// also covers three regressions found in review of the first fix: a
+// also covers four regressions found in review of the first fix: a
 // singular target can still have a non-semisimple *nonzero* eigenvalue
 // (handled by the ordinary Newton path once the zero eigenvalue is split
-// off), complex eigenvalue pairs with a real principal root, and a
-// genuinely nonsingular matrix with a tiny (but nonzero) eigenvalue that
-// rank()'s tolerance must not misclassify as singular.
+// off), complex eigenvalue pairs with a real principal root, a genuinely
+// nonsingular matrix with a tiny (but nonzero) eigenvalue that rank()'s
+// tolerance must not misclassify as singular, and a target whose entries
+// are all uniformly tiny or huge in absolute terms (well-conditioned once
+// its own scale is factored out, but every fixed absolute tolerance either
+// misclassifies it as singular or misses genuine singularity, depending on
+// direction). The fix normalizes by the target's own norm before any
+// tolerance-based decision: sqrt(A) = sqrt(s) * sqrt(A/s) for s = norm(A).
 //
 // Reference: Giac (the black-box reference for calculatrix), not Julia or
 // numpy. The fixture file
@@ -45,7 +50,7 @@ void main() {
       );
       final List<dynamic> cases =
           jsonDecode(fixtureFile.readAsStringSync()) as List<dynamic>;
-      expect(cases.length, greaterThanOrEqualTo(5));
+      expect(cases.length, greaterThanOrEqualTo(7));
     });
 
     final List<dynamic> cases =
@@ -144,6 +149,40 @@ void main() {
         reason:
             'X*X should reconstruct the original matrix $value, '
             'got $squared (relative Frobenius error $reconstructionError)',
+      );
+    });
+  });
+
+  group('Matrix.sqrt() regression: scale invariance (probe found after the '
+      'first three regressions were fixed)', () {
+    test('a genuinely tiny eigenvalue relative to the target\'s own norm is '
+        'numerically indistinguishable from zero; returning exactly 0 for '
+        'it is backward stable (X*X reconstructs A) even though it is not '
+        'forward-accurate (diag(1e-17,1) may return diag(0,1))', () {
+      // diag(1e-17,1) has norm 1, so 1e-17 sits far below the strict
+      // structural-singularity tolerance (rowCount*machineEpsilon, about
+      // 4.4e-16 for a 2x2 here) relative to that norm. This routes to the
+      // range/null-space split, which returns exactly 0 for the
+      // eigenvalue it cannot resolve. That is not forward-accurate (the
+      // true value is sqrt(1e-17) = 3.16e-9, not 0), but it is backward
+      // stable: (X*X - A) is at most 1e-17 in an entry that was already
+      // 1e-17, well within the backward tolerance below.
+      final Matrix value = Matrix(<List<double>>[
+        <double>[1e-17, 0],
+        <double>[0, 1],
+      ]);
+
+      final Matrix actual = value.sqrt();
+      final Matrix squared = actual * actual;
+      final double backwardResidual = _relativeFrobeniusError(squared, value);
+
+      expect(
+        backwardResidual,
+        lessThanOrEqualTo(1e-14),
+        reason:
+            'X*X should reconstruct $value to within backward tolerance, '
+            'got $squared from sqrt() result $actual '
+            '(relative Frobenius error $backwardResidual)',
       );
     });
   });

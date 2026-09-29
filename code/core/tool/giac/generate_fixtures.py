@@ -208,6 +208,20 @@ SQRT_CASES: list[tuple[str, str, list[list[float]], str]] = [
         [[1e-13, 0], [0, 1]],
         "evalf(mat2list([[1e-13,0],[0,1]]^(0.5)))",
     ),
+    (
+        "regression: uniformly tiny nonsingular matrix, scale not "
+        "invariant without normalization (1e-20*[[1,2],[2,5]])",
+        "[[1/10^20,2/10^20],[2/10^20,5/10^20]]",
+        [[1e-20, 2e-20], [2e-20, 5e-20]],
+        "evalf(mat2list([[1e-20,2e-20],[2e-20,5e-20]]^(0.5)))",
+    ),
+    (
+        "regression: uniformly huge nonsingular matrix, same shape scaled "
+        "up (1e20*[[1,2],[2,5]])",
+        "[[10^20,2*10^20],[2*10^20,5*10^20]]",
+        [[1e20, 2e20], [2e20, 5e20]],
+        "evalf(mat2list([[1e20,2e20],[2e20,5e20]]^(0.5)))",
+    ),
 ]
 
 # Not fixtured (no numeric reference; Giac itself refuses this matrix,
