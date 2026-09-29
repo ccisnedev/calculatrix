@@ -1,0 +1,15 @@
+// Giac input used to derive the expected values asserted in
+// calculatrix_cli_test.dart's "Giac-verified numeric results" group.
+//
+// Run with (WSL Ubuntu, giac 1.9.0):
+//   wsl -d Ubuntu -- bash -c "giac < '/mnt/c/.../giac_reference.giac'" | tr -d '\000'
+//
+// Each print(...) line labels the value that follows it in giac's own
+// transcript (giac echoes the print's own return value, 0, before the
+// comma-separated result: "0,<value>").
+Digits:=20;
+print("div"); evalf(2/3);
+print("sqrt"); evalf(sqrt(2));
+print("pow"); evalf(2^0.5);
+print("matmul"); evalf([[1,2],[3,4]]*[[5,6],[7,8]]);
+print("neg"); evalf(1-2);

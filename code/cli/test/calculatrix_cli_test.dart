@@ -341,4 +341,159 @@ void main() {
       },
     );
   });
+
+  // Every non-trivial numeric result below is independently checked against
+  // Giac (WSL Ubuntu, giac 1.9.0), the black-box numerical reference. The
+  // exact Giac input is test/fixtures/giac_reference.giac; it was run as:
+  //   wsl -d Ubuntu -- bash -c "giac < '/mnt/c/.../giac_reference.giac'" |
+  //     tr -d '\000'
+  // and produced (Digits:=20, so 20 significant decimal digits):
+  //   div    (2/3)                       -> 0.66666666666666666666
+  //   sqrt   (sqrt(2))                   -> 1.4142135623730950488
+  //   pow    (2^0.5)                     -> 1.4142135623730950488
+  //   matmul ([[1,2],[3,4]]*[[5,6],[7,8]]) -> [[19,22],[43,50]] (exact)
+  //   neg    (1-2)                       -> -1.0000000000000000000 (exact)
+  //
+  // core exposes no RPN/infix word for matrix inverse (InverseCommand in
+  // core/lib/src/machine/commands.dart is never wired to a token the RPN or
+  // infix compiler recognizes, and Matrix's own `/` operator only supports
+  // a scalar, i.e. 1x1, denominator -- matrix-by-matrix division throws
+  // typeMismatch), so a Giac-checked matrix inverse case cannot be built
+  // through `cx eval rpn`/`cx eval infix` in this stage; that vocabulary is
+  // reserved for the S4 commands catalog. Not tested here for that reason.
+  group('Giac-verified numeric results (non-trivial)', () {
+    // Relative-tolerance comparison against a Giac-derived expected value,
+    // matching the CLI's own JSON number (an int or a double per
+    // eval_support.dart's _jsonNumber).
+    void expectNearGiac(num actual, double expected) {
+      final double diff = (actual.toDouble() - expected).abs();
+      final double scale = expected.abs() == 0 ? 1.0 : expected.abs();
+      expect(
+        diff / scale,
+        lessThanOrEqualTo(1e-12),
+        reason: 'actual=$actual expected=$expected (giac)',
+      );
+    }
+
+    void expectMatrixNearGiac(Object? actual, List<List<double>> expected) {
+      final rows = actual! as List;
+      expect(rows.length, expected.length);
+      for (var r = 0; r < expected.length; r++) {
+        final row = rows[r] as List;
+        expect(row.length, expected[r].length);
+        for (var c = 0; c < expected[r].length; c++) {
+          expectNearGiac(row[c] as num, expected[r][c]);
+        }
+      }
+    }
+
+    // 2/3: non-terminating division. Giac: evalf(2/3) = 0.666...6 (20 d.p).
+    test("cx eval rpn '2 3 /' matches Giac's 2/3 within 1e-12", () async {
+      final code = await run(['eval', 'rpn', '--json', '2 3 /']);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final stack = decoded['stack'] as List;
+      expectNearGiac(stack.single as num, 0.66666666666666666666);
+    });
+
+    test("cx eval infix '2/3' matches Giac's 2/3 within 1e-12", () async {
+      final code = await run(['eval', 'infix', '--json', '2/3']);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final stack = decoded['stack'] as List;
+      expectNearGiac(stack.single as num, 0.66666666666666666666);
+    });
+
+    // sqrt(2). Giac: evalf(sqrt(2)) = 1.4142135623730950488.
+    test("cx eval rpn '2 √' matches Giac's sqrt(2) within 1e-12", () async {
+      final code = await run(['eval', 'rpn', '--json', '2 √']);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final stack = decoded['stack'] as List;
+      expectNearGiac(stack.single as num, 1.4142135623730950488);
+    });
+
+    test("cx eval infix '√2' matches Giac's sqrt(2) within 1e-12", () async {
+      final code = await run(['eval', 'infix', '--json', '√2']);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final stack = decoded['stack'] as List;
+      expectNearGiac(stack.single as num, 1.4142135623730950488);
+    });
+
+    // 2^0.5: non-integer power, same value as sqrt(2) by construction.
+    // Giac: evalf(2^0.5) = 1.4142135623730950488.
+    test("cx eval rpn '2 0.5 ^' matches Giac's 2^0.5 within 1e-12", () async {
+      final code = await run(['eval', 'rpn', '--json', '2 0.5 ^']);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final stack = decoded['stack'] as List;
+      expectNearGiac(stack.single as num, 1.4142135623730950488);
+    });
+
+    test("cx eval infix '2^0.5' matches Giac's 2^0.5 within 1e-12", () async {
+      final code = await run(['eval', 'infix', '--json', '2^0.5']);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final stack = decoded['stack'] as List;
+      expectNearGiac(stack.single as num, 1.4142135623730950488);
+    });
+
+    // Matrix product [[1,2],[3,4]] * [[5,6],[7,8]]. Giac:
+    // evalf([[1,2],[3,4]]*[[5,6],[7,8]]) = [[19,22],[43,50]] (exact).
+    test('cx eval rpn matrix product matches Giac within 1e-12', () async {
+      final code = await run([
+        'eval',
+        'rpn',
+        '--json',
+        '[[1,2],[3,4]] [[5,6],[7,8]] *',
+      ]);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final stack = decoded['stack'] as List;
+      expectMatrixNearGiac(stack.single, <List<double>>[
+        <double>[19, 22],
+        <double>[43, 50],
+      ]);
+    });
+
+    test('cx eval infix matrix product matches Giac within 1e-12', () async {
+      final code = await run([
+        'eval',
+        'infix',
+        '--json',
+        '[[1,2],[3,4]]*[[5,6],[7,8]]',
+      ]);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final stack = decoded['stack'] as List;
+      expectMatrixNearGiac(stack.single, <List<double>>[
+        <double>[19, 22],
+        <double>[43, 50],
+      ]);
+    });
+
+    // Negative-number RPN program via the shortcut. The coordinator's
+    // literal "cx 1 -2 +" is three unquoted argv tokens, which G4 already
+    // rejects as extraArgument, 64 (see "cx -1 2 + unquoted is
+    // extraArgument" above); the grammar only accepts a negative-number
+    // RPN program as a single quoted argument, e.g. cx '1 -2 +', the same
+    // pattern the existing "cx '-1 2 +'" test above already exercises.
+    // Giac: evalf(1-2) = -1 (exact), so this is an exact-value assertion,
+    // not a tolerance one; still run through the JSON path via eval rpn
+    // for a machine-checked value, plus the shortcut's own text output.
+    test("cx '1 -2 +' (shortcut) matches Giac's 1-2 exactly", () async {
+      final code = await run(['1 -2 +']);
+      expect(code, ExitCode.ok);
+      expect(out.output, contains('1: -1'));
+    });
+
+    test("cx eval rpn '1 -2 +' matches Giac's 1-2 within 1e-12", () async {
+      final code = await run(['eval', 'rpn', '--json', '1 -2 +']);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final stack = decoded['stack'] as List;
+      expectNearGiac(stack.single as num, -1.0);
+    });
+  });
 }
