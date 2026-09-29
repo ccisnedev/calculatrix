@@ -15,21 +15,10 @@
 //
 // Open point 2: the spec's section 13 row "cx --json version -> version as
 // JSON, 0 (GNU order, G6 amended 2026-09-29)" does not hold against the
-// pinned cli_router 0.2.1: `_readOption` (cli_router-0.2.1/lib/src/trie.dart
-// line 990, `_peekIsLiteralChild`) refuses to read *any* option, global or
-// not, whenever the very next token could still continue the route (here,
-// 'version' is a literal child of the root the option precedes); it reports
-// `misplacedOption` instead of reading the option, exactly as it does for a
-// route-specific option before its own route ("cx -f prog.rpn eval rpn",
-// same table, "permutation never crosses a route boundary"). GNU
-// permutation itself (`_normalizeForPermute`) never repairs this either: it
-// only reorders tokens that follow an already-consumed run of literal route
-// words, and no route word is consumed yet when the option is the very
-// first token. So `cx --json version` is `misplaced-option`, exit 7,
-// unconditionally, with or without `POSIXLY_CORRECT` -- not only under it,
-// as the spec's row implies. This reproduces on every root-level route,
-// version included, and predates this stage's own changes; it is not a
-// `CliInstallationConfig` gap and is flagged here, not worked around.
+// pinned cli_router 0.2.1, which rejects any option before the first route
+// word as misplaced-option, exit 7, with or without POSIXLY_CORRECT. The
+// test for that row asserts the spec and is skipped until
+// ccisnedev/cli_router#10 is fixed; nothing here works around it.
 //
 // No test here calls `cx upgrade --apply`/`cx uninstall --apply` down a path
 // that would let `ReplaceInstallation` actually run: doing so through the
@@ -99,13 +88,30 @@ void main() {
       expect(decoded['version'], cxVersion);
     });
 
-    test('cx --json version is misplaced-option, exit 7 (open point 2: the '
-        'spec table says 0, GNU order; the pinned cli_router 0.2.1 never '
-        'permutes an option that precedes the very first route word, global '
-        'or not)', () async {
-      final code = await run(['--json', 'version']);
+    test(
+      'cx --json version prints version as JSON, exit 0 (spec section 13, '
+      'GNU order)',
+      () async {
+        final code = await run(['--json', 'version']);
+        expect(code, ExitCode.ok);
+        final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+        expect(decoded['name'], 'cx');
+        expect(decoded['version'], cxVersion);
+      },
+      skip:
+          'Blocked on ccisnedev/cli_router#10: 0.2.1 rejects a global option '
+          'before the first route word as misplaced-option, exit 7.',
+    );
+
+    test('cx version junk is extra-argument, exit 64', () async {
+      final code = await run(['version', 'junk']);
+      expect(code, ExitCode.invalidUsage);
+      expect(err.output, contains('extra-argument'));
+    });
+
+    test('cx --json=garbage version is rejected, exit 7', () async {
+      final code = await run(['--json=garbage', 'version']);
       expect(code, ExitCode.validationFailed);
-      expect(err.output, contains('misplaced-option'));
     });
 
     test('the CLI and VersionPlugin agree on cxVersion at build time', () {
