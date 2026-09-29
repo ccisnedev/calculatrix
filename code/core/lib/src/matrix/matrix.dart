@@ -1536,6 +1536,27 @@ class Matrix {
   /// an exponential whose true value is too large to represent yields an
   /// infinite or NaN entry, which is caught here instead of returned
   /// silently.
+  /// Returns `matrix * e^mu`. When e^mu alone is not a normal double (it
+  /// underflows below 2^-1022 or overflows) while the scaled entries may
+  /// still be representable, e^mu is applied in k equal factors e^(mu/k),
+  /// each a normal double, so an entry is rounded once at the end instead of
+  /// being flushed to zero (or to infinity) before it is multiplied.
+  static Matrix _scaleByExp(Matrix matrix, double mu) {
+    final double direct = math.exp(mu);
+    const double smallestNormal = 2.2250738585072014e-308;
+    if (direct.isFinite && direct >= smallestNormal) {
+      return matrix.scale(direct);
+    }
+    const double safeExponent = 700;
+    final int factors = (mu.abs() / safeExponent).ceil();
+    final double factor = math.exp(mu / factors);
+    Matrix result = matrix;
+    for (int i = 0; i < factors; i++) {
+      result = result.scale(factor);
+    }
+    return result;
+  }
+
   Matrix exp({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -1677,7 +1698,7 @@ class Matrix {
         sum = sum + nilpotentTerm.scale(1 / nilpotentFactorial);
       }
 
-      return _checkFiniteMatrix(sum.scale(math.exp(mu)));
+      return _checkFiniteMatrix(_scaleByExp(sum, mu));
     }
 
     // Choose s so that ‖block / 2^s‖_inf <= 0.5 (0 when the norm is
