@@ -50,10 +50,15 @@ void main() {
   }
 
   group('banner (G2, G3)', () {
-    test('cx prints a banner and exits 0', () async {
+    test('cx prints a banner naming the program cx and exits 0', () async {
       final code = await run([]);
       expect(code, ExitCode.ok);
-      expect(out.output, contains('calculatrix'));
+      expect(out.output, contains('cx'));
+      // The executable is `cx`; there is no `calculatrix` command name
+      // anywhere (issue #22). "Calculatrix" the product name, capitalized,
+      // in prose is fine and does not trip this: the lowercase word
+      // "calculatrix" is what would read as a command name.
+      expect(out.output, isNot(contains('calculatrix')));
     });
 
     test('cx ignores stdin and still prints the banner (G2)', () async {
@@ -62,7 +67,13 @@ void main() {
         readStdin: () => fail('stdin must not be read'),
       );
       expect(code, ExitCode.ok);
-      expect(out.output, contains('calculatrix'));
+      expect(out.output, contains('cx'));
+      expect(out.output, isNot(contains('calculatrix')));
+    });
+
+    test('the CLI is named cx, with no alias, in its own metadata', () {
+      final cli = buildCalculatrixCli();
+      expect(cli.hostMetadata?.name, 'cx');
     });
 
     test('cx help prints help and exits 0, not a program (G3)', () async {
