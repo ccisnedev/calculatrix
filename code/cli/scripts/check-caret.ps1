@@ -1,4 +1,4 @@
-# check-caret.ps1 — Regression check for issue #22 (`cx`, not `calculatrix`,
+# check-caret.ps1: regression check for issue #22 (`cx`, not `calculatrix`,
 # and no `.cmd`/`.bat` alias shim of any kind, because such a shim runs
 # through cmd.exe, which consumes `^` while parsing the command line before
 # the shim body ever runs).
@@ -34,7 +34,7 @@ function Test-CaretInvocation {
     return $false
 }
 
-# PowerShell: cx eval infix '2^0.5' — '2^0.5' has no spaces, so PowerShell
+# PowerShell: cx eval infix '2^0.5'. '2^0.5' has no spaces, so PowerShell
 # passes it to cx unquoted on the underlying command line.
 $psOutput = & cx eval infix '2^0.5' 2>&1
 $psExit = $LASTEXITCODE
@@ -42,7 +42,7 @@ if (-not (Test-CaretInvocation -Label 'PowerShell' -Output $psOutput -ExitCode $
     $anyFailed = $true
 }
 
-# cmd.exe: cx eval infix "2^0.5" — quoted, which is what the README asks
+# cmd.exe: cx eval infix "2^0.5", quoted, which is what the README asks
 # cmd.exe users to do; cmd.exe strips the quotes and cx receives 2^0.5.
 $cmdOutput = & cmd /c 'cx eval infix "2^0.5"' 2>&1
 $cmdExit = $LASTEXITCODE

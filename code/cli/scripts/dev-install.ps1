@@ -1,4 +1,4 @@
-# dev-install.ps1 — Build from source and install the Calculatrix CLI locally (Windows)
+# dev-install.ps1: build from source and install the Calculatrix CLI locally (Windows)
 #
 # Usage: .\scripts\dev-install.ps1
 # Run from code/cli/
