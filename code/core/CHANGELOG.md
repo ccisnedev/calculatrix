@@ -9,15 +9,27 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - `Matrix.sqrt()` no longer rejects singular matrices that do have a real
-  principal square root. It previously ran a Newton iteration that inverts
-  the current iterate on every step, which always fails as the iterates
-  approach a singular result. Singular targets are now routed through an
-  eigendecomposition (`A = P D P⁻¹` ⟹ `sqrt(A) = P sqrt(D) P⁻¹`), which
-  succeeds whenever every eigenvalue is real and nonnegative and the zero
-  eigenvalue is semisimple (the matrix is diagonalizable), and continues to
-  raise `MatrixDomainError` otherwise, for example for a nilpotent Jordan
-  block. Verified against Giac to a relative Frobenius error of 1e-12 or
-  better (issue #19).
+  principal square root. It runs the original Newton (Denman-Beavers)
+  iteration first for any matrix that is not structurally singular, so
+  every previously working case, including complex eigenvalue pairs and
+  non-semisimple nonzero eigenvalues, is unchanged. A matrix is
+  structurally singular when its rank falls below its dimension under a
+  strict, machine-epsilon-scaled tolerance, which is deliberately tighter
+  than the caller's own `relativeTolerance`/`absoluteTolerance` so a merely
+  tiny but nonzero eigenvalue is never misclassified as singular. A
+  structurally singular target is instead split into complementary
+  A-invariant subspaces, its range and null space (`V = [basis of
+  range(A) | basis of ker(A)]`, `V⁻¹AV = blockdiag(B, 0)` with `B`
+  nonsingular), with `sqrt(B)` computed by the same unmodified Newton
+  iteration and `sqrt(A) = V · blockdiag(sqrt(B), 0) · V⁻¹`. This requires
+  only that the zero eigenvalue be semisimple (`rank(A) == rank(A²)`); it
+  continues to raise `MatrixDomainError` otherwise, for example for a
+  nilpotent Jordan block. Verified against Giac to a relative Frobenius
+  error of 1e-12 or better (issue #19), including three regressions found
+  in review of the first fix: a non-semisimple nonzero eigenvalue on an
+  otherwise singular matrix, a complex eigenvalue pair with a real
+  principal root, and a genuinely nonsingular matrix with a tiny nonzero
+  eigenvalue that a looser rank tolerance would have misrouted.
 
 ## [0.7.0] - 2026-05-21
 

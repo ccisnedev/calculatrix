@@ -1437,20 +1437,79 @@ class Matrix {
       );
     }
 
-    // The Newton iteration below inverts the current iterate on every
-    // step, so it can never converge when the target itself is singular:
-    // the iterates approach a singular matrix as they converge, and
-    // inverting that near-singular (then exactly singular) iterate
-    // throws long before convergence, even when a real principal square
-    // root exists (issue #19). Route singular targets through an
-    // eigendecomposition instead: it needs no inversion of anything
-    // derived from the (possibly singular) target itself, only of the
-    // eigenvector matrix, which is invertible whenever the target is
-    // diagonalizable.
-    if (rank(absoluteTolerance: absoluteTolerance).scalarValue < rowCount) {
-      return _singularPrincipalSquareRoot(absoluteTolerance: absoluteTolerance);
+    // Keep main's Newton path as the first attempt, unchanged, but only
+    // when the target is not itself structurally singular. Two different
+    // things can go wrong when the target is singular, and only one of
+    // them is visible from inside the Newton loop:
+    //
+    //   1. An intermediate iterate goes exactly singular and `_inverse`
+    //      throws mid-loop: this is the failure issue #19 described.
+    //   2. Subtler, and silent: along a genuinely zero eigenvalue
+    //      direction, the Denman-Beavers iterate for that component
+    //      halves every step (linear convergence, not Newton's usual
+    //      quadratic rate). It can cross the loop's own relative-tolerance
+    //      exit threshold while still many orders of magnitude away from
+    //      zero, so the loop returns "successfully", with no throw, no
+    //      residual in X*X - A (squaring a tiny leftover makes it
+    //      negligible), and no signal at all that the entry should have
+    //      been exactly zero.
+    //
+    // Case 2 cannot be caught after the fact by verifying Newton's
+    // output, so it is avoided instead by checking beforehand, with a
+    // strict, machine-epsilon-scaled tolerance (not the caller's
+    // relativeTolerance/absoluteTolerance, which default to 1e-10/1e-12
+    // and are the same looseness that let the bug through in the first
+    // place), whether A is structurally singular. This is deliberately
+    // stricter than the caller's own tolerance so a merely tiny but
+    // nonzero eigenvalue (e.g. 1e-13 on a unit-norm matrix) is not
+    // misclassified as singular: that case still converges quadratically
+    // through the ordinary Newton path below.
+    final double machineEpsilon = 2.220446049250313e-16;
+    final double structuralZeroTolerance =
+        rowCount * machineEpsilon * math.max(norm, 1);
+    final bool isStructurallySingular =
+        rank(absoluteTolerance: structuralZeroTolerance).scalarValue.round() <
+        rowCount;
+
+    if (isStructurallySingular) {
+      return _sqrtViaRangeNullSplit(
+        relativeTolerance: relativeTolerance,
+        absoluteTolerance: absoluteTolerance,
+        maxIterations: maxIterations,
+      );
     }
 
+    try {
+      return _sqrtViaNewton(
+        relativeTolerance: relativeTolerance,
+        absoluteTolerance: absoluteTolerance,
+        maxIterations: maxIterations,
+      );
+    } on MatrixDomainError {
+      return _sqrtViaRangeNullSplit(
+        relativeTolerance: relativeTolerance,
+        absoluteTolerance: absoluteTolerance,
+        maxIterations: maxIterations,
+      );
+    }
+  }
+
+  /// The Newton (Denman-Beavers averaging) iteration for the principal
+  /// square root, Y(k+1) = (Y(k) + Y(k)⁻¹·A) / 2 starting from Y(0) = I,
+  /// with scaling and squaring to keep the target's norm bounded. This is
+  /// the original algorithm, unmodified by issue #19: it inverts the
+  /// current iterate on every step, so it raises "undefined in the real
+  /// domain" the moment that iterate itself goes exactly singular, and
+  /// "did not converge" if it exhausts [maxIterations] without meeting
+  /// its own (relative) tolerance. [sqrt] independently verifies whatever
+  /// this returns against the true target, since a singular target can
+  /// make this converge "successfully" here while still being
+  /// inaccurate; see [sqrt] for why.
+  Matrix _sqrtViaNewton({
+    required double relativeTolerance,
+    required double absoluteTolerance,
+    required int maxIterations,
+  }) {
     Matrix scaledTarget = this;
     int scalingSteps = 0;
     while (scaledTarget._infinityNorm() > 4) {
@@ -1489,6 +1548,7 @@ class Matrix {
     }
 
     final Matrix result = current.scale(math.pow(2, scalingSteps).toDouble());
+    final double norm = _infinityNorm();
     final double residualNorm = ((result * result) - this)._infinityNorm();
     if (residualNorm <= math.max(absoluteTolerance, relativeTolerance * norm)) {
       return result;
@@ -1499,152 +1559,141 @@ class Matrix {
     );
   }
 
-  /// Computes the real principal square root of a singular matrix via
-  /// eigendecomposition: A = P D P⁻¹ ⟹ sqrt(A) = P sqrt(D) P⁻¹, where
-  /// sqrt(D) takes the nonnegative square root of each eigenvalue on the
-  /// diagonal (issue #19).
+  /// Computes the principal square root of a matrix whose Newton iterate
+  /// went singular mid-iteration (issue #19), by splitting off the part
+  /// of the matrix that actually causes the singularity: its range
+  /// (column space) and null space.
   ///
-  /// This only succeeds when every eigenvalue is real and nonnegative and
-  /// the zero eigenvalue (like every other eigenvalue here) is semisimple,
-  /// i.e. its geometric multiplicity (the dimension of its eigenspace)
-  /// equals its algebraic multiplicity (how many times it is a root of the
-  /// characteristic polynomial): that is exactly what makes the matrix
-  /// diagonalizable, so P is invertible. A nilpotent Jordan block such as
-  /// [[0,1],[0,0]] has eigenvalue 0 with algebraic multiplicity 2 but
-  /// geometric multiplicity 1 (a 1-dimensional eigenspace), so it fails
-  /// this check and correctly has no real square root.
+  /// For any square A, range(A) and ker(A) are complementary A-invariant
+  /// subspaces (ℝⁿ = range(A) ⊕ ker(A)) exactly when the zero eigenvalue
+  /// is semisimple, which holds if and only if rank(A) == rank(A²) (the
+  /// ascent of the zero eigenvalue is at most 1: it has no nontrivial
+  /// Jordan block). When that holds:
   ///
-  /// Unlike [diagonalization], which picks a single eigenvector per
-  /// eigenvalue occurrence (and so can pick the same eigenvector twice for
-  /// a repeated eigenvalue, leaving P singular), this method computes a
-  /// full null-space basis of (A - λI) for each distinct eigenvalue λ, so
-  /// repeated semisimple eigenvalues get as many independent eigenvectors
-  /// as their multiplicity.
-  Matrix _singularPrincipalSquareRoot({required double absoluteTolerance}) {
+  ///   - Build V = [basis of range(A) | basis of ker(A)]. Then
+  ///     V⁻¹·A·V = blockdiag(B, 0), where B is A restricted to its own
+  ///     range: it is nonsingular, because Bv = 0 for v in range(A) would
+  ///     put v in range(A) ∩ ker(A) = {0}.
+  ///   - sqrt(A) = V · blockdiag(sqrt(B), 0) · V⁻¹, and sqrt(B) is
+  ///     computed with the very same Newton iteration above, which never
+  ///     goes singular for B (B is nonsingular by construction). This
+  ///     means complex eigenvalue pairs and non-semisimple *nonzero*
+  ///     eigenvalues on B are handled exactly as the unmodified Newton
+  ///     path already handles them for any nonsingular target.
+  ///
+  /// When rank(A) != rank(A²), the zero eigenvalue is not semisimple (a
+  /// nilpotent Jordan block, for instance): range(A) and ker(A) overlap,
+  /// there is no real principal square root, and this raises
+  /// MatrixDomainError, unchanged from before issue #19.
+  Matrix _sqrtViaRangeNullSplit({
+    required double relativeTolerance,
+    required double absoluteTolerance,
+    required int maxIterations,
+  }) {
     final int n = rowCount;
 
-    final Matrix eigenvalueColumn;
-    try {
-      eigenvalueColumn = eigenvalues(absoluteTolerance: absoluteTolerance);
-    } on MatrixDomainError {
+    final int rankA = rank(
+      absoluteTolerance: absoluteTolerance,
+    ).scalarValue.round();
+    final int rankASquared = (this * this)
+        .rank(absoluteTolerance: absoluteTolerance)
+        .scalarValue
+        .round();
+
+    if (rankA != rankASquared) {
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
       );
     }
-    final List<double> lambdas = List<double>.generate(
+
+    final Matrix reduced = rref(absoluteTolerance: absoluteTolerance);
+    final List<int> pivotColumns = _pivotColumnIndices(
+      reduced.rows,
       n,
-      (int i) => eigenvalueColumn.at(i, 0),
-      growable: false,
+      absoluteTolerance,
+    );
+    final List<List<double>> nullBasis = _nullSpaceBasis(
+      reduced.rows,
+      n,
+      absoluteTolerance,
     );
 
-    for (final double lambda in lambdas) {
-      if (lambda < -absoluteTolerance) {
-        throw MatrixDomainError(
-          'Square root is undefined for this matrix in the real domain.',
-        );
-      }
-    }
-
-    // Group the eigenvalues into distinct values with their algebraic
-    // multiplicity (how many times each one appears in lambdas).
-    final List<double> distinctEigenvalues = <double>[];
-    final List<int> algebraicMultiplicities = <int>[];
-    for (final double lambda in lambdas) {
-      int index = -1;
-      for (int i = 0; i < distinctEigenvalues.length; i++) {
-        if ((distinctEigenvalues[i] - lambda).abs() <= absoluteTolerance) {
-          index = i;
-          break;
-        }
-      }
-      if (index == -1) {
-        distinctEigenvalues.add(lambda);
-        algebraicMultiplicities.add(1);
-      } else {
-        algebraicMultiplicities[index]++;
-      }
-    }
-
-    final List<List<double>> eigenvectorColumns = <List<double>>[];
-    final List<double> sqrtDiagonal = <double>[];
-
-    for (int i = 0; i < distinctEigenvalues.length; i++) {
-      final double lambda = distinctEigenvalues[i];
-
-      final List<List<double>> shifted = List<List<double>>.generate(
-        n,
-        (int row) => List<double>.generate(
-          n,
-          (int column) => _rows[row][column] - (row == column ? lambda : 0),
-          growable: false,
-        ),
-        growable: false,
+    final int rangeDimension = pivotColumns.length;
+    if (rangeDimension != rankA || rangeDimension + nullBasis.length != n) {
+      // Should not happen given the rank(A) == rank(A²) check above; a
+      // defensive guard against an unforeseen numerical edge case.
+      throw MatrixDomainError(
+        'Square root is undefined for this matrix in the real domain.',
       );
-      final Matrix reduced = Matrix(
-        shifted,
-      ).rref(absoluteTolerance: absoluteTolerance);
-      final List<List<double>> nullSpaceBasis = _nullSpaceBasis(
-        reduced.rows,
-        n,
-        absoluteTolerance,
-      );
-
-      if (nullSpaceBasis.length != algebraicMultiplicities[i]) {
-        throw MatrixDomainError(
-          'Square root is undefined for this matrix in the real domain.',
-        );
-      }
-
-      final double sqrtLambda = math.sqrt(lambda < 0 ? 0 : lambda);
-      for (final List<double> eigenvector in nullSpaceBasis) {
-        eigenvectorColumns.add(eigenvector);
-        sqrtDiagonal.add(sqrtLambda);
-      }
     }
 
-    final Matrix eigenvectorMatrix = Matrix(
+    final List<List<double>> rangeBasis = <List<double>>[
+      for (final int column in pivotColumns)
+        <double>[for (int row = 0; row < n; row++) _rows[row][column]],
+    ];
+
+    final List<List<double>> vColumns = <List<double>>[
+      ...rangeBasis,
+      ...nullBasis,
+    ];
+    final Matrix v = Matrix(
       List<List<double>>.generate(
         n,
         (int row) => List<double>.generate(
           n,
-          (int column) => eigenvectorColumns[column][row],
+          (int column) => vColumns[column][row],
           growable: false,
         ),
         growable: false,
       ),
     );
 
-    final Matrix eigenvectorMatrixInverse;
+    final Matrix vInverse;
     try {
-      eigenvectorMatrixInverse = eigenvectorMatrix._inverse(
-        absoluteTolerance: absoluteTolerance,
-      );
+      vInverse = v._inverse(absoluteTolerance: absoluteTolerance);
     } on MatrixDomainError {
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
       );
     }
 
-    final Matrix sqrtDiagonalMatrix = Matrix(
+    final Matrix transformed = vInverse * this * v;
+    final Matrix b = transformed._extractBlock(
+      List<int>.generate(rangeDimension, (int i) => i),
+    );
+
+    // B is guaranteed nonsingular by construction, so it is safe (and
+    // cheap, given Newton's quadratic convergence) to converge it well
+    // past the caller's tolerance here: any residual left in sqrt(B)
+    // propagates directly into the reconstructed sqrt(A) below, with no
+    // further cancellation to absorb it.
+    final Matrix sqrtB = b._sqrtViaNewton(
+      relativeTolerance: math.min(relativeTolerance, 1e-13),
+      absoluteTolerance: math.min(absoluteTolerance, 1e-14),
+      maxIterations: maxIterations,
+    );
+
+    final Matrix blockDiagonal = Matrix(
       List<List<double>>.generate(
         n,
         (int row) => List<double>.generate(
           n,
-          (int column) => row == column ? sqrtDiagonal[row] : 0,
+          (int column) => row < rangeDimension && column < rangeDimension
+              ? sqrtB.at(row, column)
+              : 0,
           growable: false,
         ),
         growable: false,
       ),
     );
 
-    return eigenvectorMatrix * sqrtDiagonalMatrix * eigenvectorMatrixInverse;
+    return v * blockDiagonal * vInverse;
   }
 
-  /// Returns a basis of the null space of a square matrix already in
-  /// reduced row-echelon form, i.e. every solution direction of `reduced *
-  /// x = 0`, one vector per free (non-pivot) column. Each vector is
-  /// normalized to unit length.
-  List<List<double>> _nullSpaceBasis(
+  /// Returns the pivot column indices of a square matrix already in
+  /// reduced row-echelon form: for each nonzero row (in row order), the
+  /// column of its leading (first) nonzero entry.
+  List<int> _pivotColumnIndices(
     List<List<double>> reduced,
     int n,
     double absoluteTolerance,
@@ -1658,6 +1707,23 @@ class Matrix {
         }
       }
     }
+    return pivotColumns;
+  }
+
+  /// Returns a basis of the null space of a square matrix already in
+  /// reduced row-echelon form, i.e. every solution direction of `reduced *
+  /// x = 0`, one vector per free (non-pivot) column. Each vector is
+  /// normalized to unit length.
+  List<List<double>> _nullSpaceBasis(
+    List<List<double>> reduced,
+    int n,
+    double absoluteTolerance,
+  ) {
+    final List<int> pivotColumns = _pivotColumnIndices(
+      reduced,
+      n,
+      absoluteTolerance,
+    );
     final Set<int> pivotColumnSet = pivotColumns.toSet();
 
     final List<List<double>> basis = <List<double>>[];

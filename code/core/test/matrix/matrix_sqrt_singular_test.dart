@@ -41,8 +41,7 @@ void main() {
       expect(
         fixtureFile.existsSync(),
         isTrue,
-        reason:
-            'run tool/giac/generate_fixtures.py sqrt to (re)generate it',
+        reason: 'run tool/giac/generate_fixtures.py sqrt to (re)generate it',
       );
       final List<dynamic> cases =
           jsonDecode(fixtureFile.readAsStringSync()) as List<dynamic>;
@@ -129,7 +128,8 @@ void main() {
       expect(
         relativeError,
         lessThanOrEqualTo(1e-9),
-        reason: 'expected $expected, got $actual '
+        reason:
+            'expected $expected, got $actual '
             '(relative Frobenius error $relativeError)',
       );
 
@@ -141,7 +141,8 @@ void main() {
       expect(
         reconstructionError,
         lessThanOrEqualTo(1e-9),
-        reason: 'X*X should reconstruct the original matrix $value, '
+        reason:
+            'X*X should reconstruct the original matrix $value, '
             'got $squared (relative Frobenius error $reconstructionError)',
       );
     });
