@@ -162,6 +162,22 @@ Global options, declared by the SDK on every route except the shortcut:
   - `cx eval rpn '1 2 +' --json` is rejected, 7: "options go before the
     program: `cx eval rpn --json '1 2 +'`".
   - `cx eval rpn -f p.rpn --json` is valid: both are options.
+  - An option written before the route word that declares it is always
+    rejected: `cx -f prog.rpn eval rpn` is `misplacedOption`, 7.
+
+  **Amended 2026-09-29 (User):** GNU order by default through `cli_router`
+  0.2.1; strict POSIX with `POSIXLY_CORRECT`. `cx` follows GNU `getopt`
+  order by default, like `macss`, `inquiry` and `skillwire`: an option may
+  follow an operand, and `cli_router` moves it in front of the operand
+  before the strict grammar above runs, so `cx --json version` and
+  `cx eval rpn '1 2 +' --json` are now valid, identical to
+  `cx version --json` and `cx eval rpn --json '1 2 +'` (exit code, stdout,
+  stderr). `POSIXLY_CORRECT`, read from the real process environment
+  (`cx` no longer forces it), restores the strict order documented above:
+  with it set, both examples go back to `misplacedOption`, 7. Permutation
+  never crosses a route boundary, so `cx -f prog.rpn eval rpn` stays
+  `misplacedOption`, 7 either way. The strict-order text above is kept as
+  the grammar `POSIXLY_CORRECT` selects, not as the default.
 - **G7. A flag is present or absent.** A flag never takes a value: `--json` is
   the only form. `--json=true` is rejected, 7: "`--json` takes no value".
   There is no negation: `--no-json` is an unknown option. Absent always means
@@ -826,7 +842,13 @@ design, and go in one issue in `calculatrix`:
   says clusters should be accepted, but `cx` has two short flags and no
   consumer uses them; each form adds error cases (G9). Can be added later.
 - **Free order after the route (GNU).** Rejected: two forms for the same
-  invocation. POSIX order is a standard and has one form.
+  invocation. POSIX order is a standard and has one form. **Amended
+  2026-09-29 (User): GNU order by default through `cli_router` 0.2.1;
+  strict POSIX with `POSIXLY_CORRECT`.** No longer rejected: it is now the
+  default (G6, amended), because the two forms are collapsed into one
+  before the strict grammar runs, so there is only one form again, just a
+  larger one; `POSIXLY_CORRECT` still gives the narrower, single-form POSIX
+  grammar this bullet originally argued for.
 - **Operands before options.** Rejected: it is neither POSIX nor GNU, and `--`
   could not be combined with options.
 - **Stdin read when it is not a terminal.** Rejected: the result would depend
@@ -860,12 +882,12 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx -- '-x'` | program `-x` (G10) |
 | `cx version`, `cx help`, `cx --help` | the route or the help, never a program (G3) |
 | `cx version --json` | version as JSON, 0 |
-| `cx --json version` | `misplacedOption`, 7: `cx version --json` (G6) |
+| `cx --json version` | version as JSON, 0 (GNU order, G6 amended 2026-09-29); `misplacedOption`, 7 with `POSIXLY_CORRECT` |
 | `cx version junk` † | `extraArgument`, 64; today `junk` is ignored |
 | `cx verison` | program `verison`, `unknown-word`, 65, suggests `cx version` |
 | `cx eval rpn '1 2 +'` | prints `1: 3`, 0 |
 | `cx eval rpn --json '1 2 +'` | `{"stack": [3]}`, 0 |
-| `cx eval rpn '1 2 +' --json` | `misplacedOption`, 7: options go before the program (G6) |
+| `cx eval rpn '1 2 +' --json` | `{"stack": [3]}`, 0 (GNU order, G6 amended 2026-09-29); `misplacedOption`, 7 with `POSIXLY_CORRECT` |
 | `cx eval rpn -f prog.rpn` | program from the file, 0 |
 | `cx eval rpn -f prog.rpn --json` | program from the file, JSON, 0 |
 | `cx eval rpn -f nope.rpn` | 7, file not found |
@@ -883,7 +905,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx eval rpn` | 7, no program (G1) |
 | `cx eval rpn --stdin=true` | `unexpectedValue`, 7 (G7) |
 | `cx eval rpn --stdin true` | 7, two sources: `true` is the program (G7) |
-| `cx -f prog.rpn eval rpn` | `misplacedOption`, 7 (G6) |
+| `cx -f prog.rpn eval rpn` | `misplacedOption`, 7 (G6; unchanged by the 2026-09-29 amendment: permutation never crosses a route boundary) |
 | `cx eval rpn -q -h` | help, 0 |
 | `cx eval rpn -qh` | `invalidShortOption`, 7: `-q -h` (G9) |
 | `cx eval rpn --trace '1 2 +'` | `unknownOption`, 7 (not in this stage) |
