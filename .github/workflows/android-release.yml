@@ -12,6 +12,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # This repository also ships CLI releases tagged cli-vX.Y.Z (runbook
+    # docs/runbook-cli-stage-0.md, "Publishing (dogfood)", constraint 2):
+    # without this guard, a cli-v* release would also trigger an Android
+    # build and upload attempt. workflow_dispatch has no tag_name and is
+    # left unguarded, matching its existing manual-run behavior.
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'v')
     defaults:
       run:
         working-directory: code/app
