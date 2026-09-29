@@ -101,8 +101,8 @@ void main() {
   // (lib/src/modular_cli.dart:671, 961, 978, 992, 1091;
   // lib/src/module_builder.dart:681, 740). Fixing this requires changing
   // modular_cli_sdk itself (or cli_router, which defines none of this); it
-  // is out of scope for calculatrix's own code. Reported upstream rather
-  // than fixed here.
+  // is out of scope for calculatrix's own code. Filed upstream as
+  // ccisnedev/modular_cli_sdk#38.
   group(
     'usage lines name cx (issue #22 acceptance item 3, PR #23 review)',
     () {
@@ -121,9 +121,7 @@ void main() {
         },
       );
     },
-    skip:
-        'blocked on modular_cli_sdk 0.8.1: HelpRenderer takes no program '
-        'name (see the group comment above for exact file/line references)',
+    skip: 'Blocked on ccisnedev/modular_cli_sdk#38',
   );
 
   group('cx <program> shortcut', () {
