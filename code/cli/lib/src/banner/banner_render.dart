@@ -96,11 +96,15 @@ String renderBanner({
   final glow = trueColor ? _glowTrueColor : _glowFallback;
 
   final versionSuffix = version == null ? '' : ' v$version';
+  // 5 columns by 2 rows: a terminal cell is roughly twice as tall as it is
+  // wide, so this reads as square (User, 2026-09-29). The frame uses
+  // box-drawing corners, not the U+23A1..U+23A6 bracket pieces, because
+  // the legacy Windows console's fonts cannot draw those.
   final logo =
-      '  ${c(_white, '⎡')} ${c(glow, '●')}  ${c(_white, '━━')} '
-      '${c(_white, '⎤')}   ${c(_bold, 'cx')}$versionSuffix\n'
-      '  ${c(_white, '⎣')} ${c(_white, '┃')}   ${c(_white, '●')} '
-      '${c(_white, '⎦')}   ${c(_dim, bannerTagline)}';
+      '  ${c(_white, '┌')}${c(glow, '●')} ${c(_white, '━')}'
+      '${c(_white, '┐')}   ${c(_bold, 'cx')}$versionSuffix\n'
+      '  ${c(_white, '└')}${c(_white, '┃')} ${c(_white, '●')}'
+      '${c(_white, '┘')}   ${c(_dim, bannerTagline)}';
 
   final rows = bannerCommands
       .where((cmd) => registeredCommands.contains(cmd.name))

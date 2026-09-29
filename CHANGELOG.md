@@ -24,7 +24,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	removes a legacy `cx.cmd` or `calculatrix.exe` from a previous install.
 	Added `scripts/check-caret.ps1` as a regression check (issue #22).
 - Branded the bare `cx` banner (issue #26): a glow-colored dot (`#2EF2C3`)
-	inside a Unicode bracket frame (`⎡ ⎤ ⎣ ⎦`), the tagline, a `Commands:`
+	inside a square box-drawing frame (`┌● ━┐` / `└┃ ●┘`, 5 columns by 2 rows), the tagline, a `Commands:`
 	block, and a `Quickstart:` line. Color is used only on a real terminal
 	that supports ANSI escapes, and is off when `NO_COLOR` is set. The dot
 	uses 24-bit color when `COLORTERM` is `truecolor` or `24bit`, and bright
