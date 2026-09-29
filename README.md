@@ -95,15 +95,17 @@ flutter test integration_test/calculator_test.dart -d windows
 
 ## Ejemplos CLI
 
+El ejecutable es `cx`, sin alias de ningún tipo (issue #22). Ver
+[code/cli/README.md](code/cli/README.md) para la gramática completa.
+
 ```bash
-dart run code/cli/bin/calculatrix_cli.dart infix "[[1,2],[3,4]] * [[2]]"
-dart run code/cli/bin/calculatrix_cli.dart command "[[1,2],[3,4]]" transpose
-dart run code/cli/bin/calculatrix_cli.dart command "[[4,7],[2,6]]" det
-dart run code/cli/bin/calculatrix_cli.dart command "[[2,1,1],[4,-6,0],[-2,7,2]]" lu
-dart run code/cli/bin/calculatrix_cli.dart command "[[1,0],[0,2]]" qr
-dart run code/cli/bin/calculatrix_cli.dart command "[[2,0],[0,3]]" eig
-dart run code/cli/bin/calculatrix_cli.dart macro append-zero-row "[[1,2],[3,4]]"
+cx '1 2 +'
+cx eval rpn '1 2 +'
+cx eval infix "2+3*4"
 ```
+
+En cmd.exe (no PowerShell), una expresión con `^` debe ir entre comillas,
+por ejemplo `cx eval infix "2^0.5"`.
 
 ## CI/CD
 

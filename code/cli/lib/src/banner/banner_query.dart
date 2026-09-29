@@ -37,14 +37,14 @@ class BannerOutput extends Output {
       'A matrix-first RPN and infix calculator, on the command line.';
 
   @override
-  Map<String, dynamic> toJson() => {'name': 'calculatrix', 'tagline': _tagline};
+  Map<String, dynamic> toJson() => {'name': 'cx', 'tagline': _tagline};
 
   @override
   int get exitCode => ExitCode.ok;
 
   @override
   String? toText() =>
-      'calculatrix\n'
+      'cx (Calculatrix)\n'
       '$_tagline\n'
       "Try: cx '1 2 +', cx eval rpn '1 2 +', cx eval infix '2+3*4'.";
 }

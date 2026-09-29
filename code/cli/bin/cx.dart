@@ -2,7 +2,14 @@ import 'dart:io';
 
 import 'package:calculatrix_cli/calculatrix_cli.dart';
 
-/// The `calculatrix`/`cx` executable entry point.
+/// The `cx` executable entry point.
+///
+/// User decision (2026-09-29, issue #22): the executable is named `cx`,
+/// with no `calculatrix` executable and no alias of any kind (this file
+/// used to be `bin/calculatrix_cli.dart`, compiled to `calculatrix.exe`
+/// with a `cx.cmd` shim on top; see `docs/runbook-cli-stage-0.md` D1,
+/// amended). A `.cmd`/`.bat` shim runs through cmd.exe, which consumes `^`
+/// while parsing the command line before the shim body ever runs.
 ///
 /// User decision (2026-09-29): `cx` follows GNU `getopt`-style option
 /// ordering by default (an option may follow an operand; `cli_router`

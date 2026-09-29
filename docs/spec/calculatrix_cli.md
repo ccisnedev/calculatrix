@@ -2,7 +2,8 @@
 
 Status: Reviewed, 2026-09-24. Every decision is closed (section 14). Nothing
 here is implemented yet.
-Program: `calculatrix`, alias `cx`
+Program: `cx`. No `calculatrix` executable and no alias of any kind
+(issue #22, 2026-09-29, section 14 R25).
 Package: `calculatrix_cli` (`code/cli`)
 Core dependency: `calculatrix` (`code/core`)
 Framework: `modular_cli_sdk` 0.6.0 on `cli_router` 0.2.0, with the standard
@@ -238,7 +239,7 @@ approval prompt unless `--autoapprove` is given, exactly as in `macss` and
 2026-09-28). Both commands come from `InstallationPlugin`,
 a standard plugin of the SDK shared with `macss` and `docmd`; `cx` registers
 it with its repository (`ccisnedev/calculatrix`), tag prefix (`cli-v`),
-executable, alias and asset names (8.7).
+executable and asset names, with no alias (8.7, R25).
 
 **`cx doctor`.** `DoctorPlugin` runs every check contributed to the
 extension point `doctor.checks`. In `cx`, all of them come from
@@ -247,7 +248,6 @@ extension point `doctor.checks`. In `cx`, all of them come from
 | Check | ok | warning | error |
 |---|---|---|---|
 | binary on `PATH` | found | | not found |
-| alias `cx` | resolves to the same binary | | missing, or resolves to another binary |
 | newer release | up to date | a newer `cli-v*` release exists: "run `cx upgrade --apply`" | |
 | release lookup | | the lookup failed (no network, rate limit): the reason is printed | |
 
@@ -259,7 +259,7 @@ error, `78` otherwise (section 6). The release lookup is the same code
 check is an error, the output is the single error shape of section 6 with
 the id `doctor-check-failed`, exit code `78` and every check result under
 `checks`:
-`{"error": {"id": "doctor-check-failed", "message": "1 check failed: alias", "exitCode": 78, "checks": [...]}}`.
+`{"error": {"id": "doctor-check-failed", "message": "1 check failed: path", "exitCode": 78, "checks": [...]}}`.
 
 ## 6. Output and errors
 
@@ -295,7 +295,7 @@ $ cx '5 [[0 -1] [1 0]]'
 | `64` | `ExitCode.invalidUsage` | the invocation does not name a route (`EX_USAGE`) | unknown command, incomplete route, missing or extra operand |
 | `7` | `ExitCode.validationFailed` | the route is right, an option or a value is wrong (SDK convention) | unknown or misplaced option, missing value, repeated option, two program sources, empty program, file not found, `upgrade` without `--plan` or `--apply` |
 | `65` | `ExitCode.dataError` (new) | the program ran and failed (`EX_DATAERR`) | unknown RPN word, stack underflow, dimension mismatch, infix syntax error |
-| `78` | `ExitCode.configError` (new) | `doctor` found an error in the installation (`EX_CONFIG`) | alias `cx` points to another binary |
+| `78` | `ExitCode.configError` (new) | `doctor` found an error in the installation (`EX_CONFIG`) | `cx` is not found on `PATH` |
 
 A failed step carries one of the ids `release-lookup-failed`,
 `download-failed`, `file-access-denied`. The run stops at that step and
@@ -532,8 +532,7 @@ cli.plugin(DoctorPlugin());                         // doctor, doctor.checks
 cli.plugin(InstallationPlugin(                      // upgrade, uninstall,
   repository: 'ccisnedev/calculatrix',              // and its doctor checks
   tagPrefix: 'cli-v',
-  executable: 'calculatrix',
-  alias: 'cx',
+  executable: 'cx',                                 // no alias (R25)
   assets: CxAssets.byPlatform,
 ));
 
@@ -714,7 +713,7 @@ The standard plugins live inside the SDK, as the official plugins of
 |---|---|---|---|---|
 | `VersionPlugin` | `modular_cli.version` | `version` (query) | | `version` |
 | `DoctorPlugin` | `modular_cli.doctor` | `doctor` (query) | declares `doctor.checks` | none |
-| `InstallationPlugin` | `modular_cli.installation` | `upgrade`, `uninstall` (commands) | contributes the checks of section 5 to `doctor.checks` | `repository`, `tagPrefix`, `executable`, `alias`, `assets` |
+| `InstallationPlugin` | `modular_cli.installation` | `upgrade`, `uninstall` (commands) | contributes the checks of section 5 to `doctor.checks` | `repository`, `tagPrefix`, `executable`, `assets`; no `alias` (R25) |
 
 `InstallationPlugin` requires `modular_cli.doctor`: a CLI that registers it
 without `DoctorPlugin` does not build. A CLI can contribute its own checks to
@@ -932,7 +931,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx eval rpn --bogus --help` | `unknownOption`, 7 (8.6) |
 | `cx doctor`, all checks ok | 0 |
 | `cx doctor`, newer release or no network | warning printed, 0 |
-| `cx doctor`, alias `cx` points elsewhere | error printed, 78 |
+| `cx doctor`, `cx` not found on `PATH` | error printed, 78 |
 | `cx install` | program `install`, `unknown-word`, 65 |
 | `cx 2 3 *` in Git Bash | the shell expands `*`; the CLI sees several operands and rejects them, 64 (G4) |
 
@@ -967,3 +966,4 @@ records the ones that affect the whole stage (D25 to D38).
 | R22 | `no-convergence` | **Revoked 2026-09-28**, with runbook D35: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. The cyclic Jacobi sweep, the only iterative method left after runbook D37, raises `no-convergence` (65) when it does not reach its tolerance within its cap; it never returns the unconverged value (runbook D35). |
 | R23 | `unsupported-matrix-function` | **Revoked 2026-09-28**, with runbook D37: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. `exp`, `log`, `sqrt` and a non-integer real power accept a scalar, the complex form, a diagonal matrix, a symmetric matrix larger than 2x2 (Jacobi) or any 2x2 matrix (closed form, symmetric ones included); any other matrix raises `unsupported-matrix-function` (65), never an approximation (runbook D37). |
 | R24 | `matrix-out-of-precision-range` | **Revoked 2026-09-28**, with runbook D38: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. `exp`, `log`, `sqrt` and a non-integer real power accept only matrices whose nonzero entries and nonzero eigenvalues have magnitudes between `1e-150` and `1e150`; outside that range, or when a nonzero eigenvalue or a nonzero entry of the result falls outside it (`exp(-1000)`, `exp(710)`), they raise `matrix-out-of-precision-range` (65). Inside it the normwise relative error is at most `1e4 * max(1, kappa) * u`, with `kappa` the relative condition number of the function at the matrix and `u = 2^-53` (about `1e-12` for a well conditioned matrix); a zero result and `sqrt` of a singular matrix get the absolute bounds of runbook D38. The range applies to the argument and the final result only, never to an intermediate value; an eigenvalue within the forward error bound of the solver that computed it is numerically zero (`sqrt` takes it as zero, `log` and a non-integer power of a non-scalar matrix raise `log-undefined`; a scalar zero keeps its own rule, `0^0.5` is `0`); when the solver cannot certify an eigenvalue (for example after underflow in the 2x2 closed form) the operation raises `matrix-out-of-precision-range`; the bounds of the range of the result are widened by a relative `8 * 2^-52 * ln(1e150)`, about `6.1e-13`, while the range of the argument stays strict (runbook D38). |
+| R25 | Executable name (issue #22) | The built executable is named `cx`; there is no `calculatrix` executable and no alias of any kind, replacing R11's context and the "alias `cx`" doctor check of section 5 and R17 (a future `InstallationPlugin` registration, section 8.7, names only `executable: 'cx'`, with no `alias`). Help, usage, banner and error messages name the program `cx`. Typed unquoted in cmd.exe, `cx eval infix 2^0.5` still loses the `^`: cmd.exe consumes it as its own escape character while parsing the command line, before any executable starts, so no alias or executable can recover it; the achievable contract is that `cx` receives exactly the argv the calling shell produced. Replaces runbook D1. |

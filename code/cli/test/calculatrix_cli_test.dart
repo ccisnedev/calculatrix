@@ -50,10 +50,15 @@ void main() {
   }
 
   group('banner (G2, G3)', () {
-    test('cx prints a banner and exits 0', () async {
+    test('cx prints a banner naming the program cx and exits 0', () async {
       final code = await run([]);
       expect(code, ExitCode.ok);
-      expect(out.output, contains('calculatrix'));
+      expect(out.output, contains('cx'));
+      // The executable is `cx`; there is no `calculatrix` command name
+      // anywhere (issue #22). "Calculatrix" the product name, capitalized,
+      // in prose is fine and does not trip this: the lowercase word
+      // "calculatrix" is what would read as a command name.
+      expect(out.output, isNot(contains('calculatrix')));
     });
 
     test('cx ignores stdin and still prints the banner (G2)', () async {
@@ -62,7 +67,13 @@ void main() {
         readStdin: () => fail('stdin must not be read'),
       );
       expect(code, ExitCode.ok);
-      expect(out.output, contains('calculatrix'));
+      expect(out.output, contains('cx'));
+      expect(out.output, isNot(contains('calculatrix')));
+    });
+
+    test('the CLI is named cx, with no alias, in its own metadata', () {
+      final cli = buildCalculatrixCli();
+      expect(cli.hostMetadata?.name, 'cx');
     });
 
     test('cx help prints help and exits 0, not a program (G3)', () async {
@@ -75,6 +86,43 @@ void main() {
       expect(code, ExitCode.ok);
     });
   });
+
+  // Skipped, not deleted: both fail today (RED, confirmed) and cannot be
+  // made to pass from calculatrix code. Every "Usage: ..." line the CLI
+  // ever prints comes from modular_cli_sdk 0.8.1's HelpRenderer, whose
+  // constructor is `HelpRenderer(this.catalog)`
+  // (lib/src/help_renderer.dart:13), taking no program-name parameter, and
+  // whose `renderCommand` builds the line as `'Usage: ${_usageOf(contract)}'`
+  // (lib/src/help_renderer.dart:45) purely from the route, with no CLI
+  // identity woven in anywhere. `ModularCli(name: 'cx', ...)` stores that
+  // name on `hostMetadata` (lib/src/modular_cli.dart), but nothing threads
+  // it into `HelpRenderer`: every call site constructs it as
+  // `HelpRenderer(_catalog)` with no name argument
+  // (lib/src/modular_cli.dart:671, 961, 978, 992, 1091;
+  // lib/src/module_builder.dart:681, 740). Fixing this requires changing
+  // modular_cli_sdk itself (or cli_router, which defines none of this); it
+  // is out of scope for calculatrix's own code. Filed upstream as
+  // ccisnedev/modular_cli_sdk#38.
+  group(
+    'usage lines name cx (issue #22 acceptance item 3, PR #23 review)',
+    () {
+      test('cx --help prints a Usage: line naming cx', () async {
+        final code = await run(['--help']);
+        expect(code, ExitCode.ok);
+        expect(out.output, contains('Usage: cx'));
+      });
+
+      test(
+        'an option error under eval infix prints a Usage: line naming cx',
+        () async {
+          final code = await run(['eval', 'infix', '--bogus']);
+          expect(code, ExitCode.validationFailed);
+          expect(err.output, contains('Usage: cx eval infix'));
+        },
+      );
+    },
+    skip: 'Blocked on ccisnedev/modular_cli_sdk#38',
+  );
 
   group('cx <program> shortcut', () {
     test("cx '-1 2 +' evaluates and exits 0", () async {

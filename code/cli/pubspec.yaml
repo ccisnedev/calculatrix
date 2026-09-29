@@ -3,6 +3,13 @@ description: Command-line interface for Calculatrix.
 version: 0.8.0
 publish_to: 'none'
 
+# The executable is `cx`, built from bin/cx.dart, with no alias of any kind
+# (issue #22). `dart compile exe` (scripts/dev-install.ps1) does not read
+# this, but a `dart pub global activate` install would, so it is declared
+# here too.
+executables:
+  cx: cx
+
 environment:
   sdk: ^3.8.1
 
