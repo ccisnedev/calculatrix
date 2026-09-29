@@ -276,20 +276,23 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
       `cx.exe` only, with no `cx.cmd` shim (the fastest dogfood loop, no
       release needed). Amended 2026-09-29 (D40): the earlier plan called for
       a `cx.cmd` shim; there is no shim of any kind.
-- [ ] `scripts/build.ps1` / `build.sh`.
-- [ ] `.github/workflows/cli-release.yml`: on a push to `main` that changes
+- [x] `scripts/build.ps1` / `build.sh`.
+- [x] `.github/workflows/cli-release.yml`: on a push to `main` that changes
       `code/cli/pubspec.yaml`, if the tag `cli-vX.Y.Z` does not exist: run
       `dart test`, create the release, build Windows and Linux binaries, upload
       them.
-- [ ] Guard the two app workflows with the tag filter.
-- [ ] `scripts/install.ps1` / `install.sh`: download the newest `cli-v*`
+- [x] Guard the two app workflows with the tag filter.
+- [x] `scripts/install.ps1` / `install.sh`: download the newest `cli-v*`
       release, install it, create `cx`, add it to `PATH`.
-- [ ] `cx upgrade` and `cx uninstall` from `InstallationPlugin` (D26, D33),
+- [x] `cx upgrade` and `cx uninstall` from `InstallationPlugin` (D26, D33),
       as commands with `--plan` and `--apply`.
-- [ ] `cx version` and `cx doctor` from `VersionPlugin` and `DoctorPlugin`,
+- [x] `cx version` and `cx doctor` from `VersionPlugin` and `DoctorPlugin`,
       with the checks of `InstallationPlugin` (D31, D33).
-- [ ] Check that `cx` does not collide with an existing command on the
-      machine (`Get-Command cx`).
+- [x] Check that `cx` does not collide with an existing command on the
+      machine (`Get-Command cx`). Done in `install.ps1`/`install.sh`
+      themselves, at install time, rather than as a separate script: they
+      warn (not fail) when `cx` already resolves to a different path than
+      the one the installer is about to write.
 
 ## Steps (one PR each)
 

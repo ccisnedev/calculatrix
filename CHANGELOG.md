@@ -23,6 +23,25 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	`cx.cmd` shim. `scripts/dev-install.ps1` now installs `cx.exe` only and
 	removes a legacy `cx.cmd` or `calculatrix.exe` from a previous install.
 	Added `scripts/check-caret.ps1` as a regression check (issue #22).
+- Wired `cx version`, `cx doctor`, `cx upgrade` and `cx uninstall` from
+	`modular_cli_sdk`'s standard plugins (runbook stage S3, D26, D31, D33,
+	D40): `VersionPlugin`, `DoctorPlugin`, and `InstallationPlugin` configured
+	with the `cli-v` tag prefix, per-platform asset names, and no alias.
+	Contributed a small `path` doctor check of our own, since
+	`InstallationPlugin` no longer provides one as of `modular_cli_sdk` 0.8.0.
+- Added `.github/workflows/cli-release.yml` (check-version, create-release,
+	build matrix, publish-release), modeled on `ccisnedev/inquiry`'s release
+	workflow: on a push to `main` that changes `code/cli/pubspec.yaml`, it
+	tags and releases `cli-vX.Y.Z`, building `cx.exe`/`cx` for Windows and
+	Linux. Guarded `android-release.yml` and `windows-release.yml` so a
+	`cli-v*` release no longer also triggers an Android or Windows app build.
+- Added `scripts/build.ps1`/`build.sh` (compile and package a release
+	archive) and `scripts/install.ps1`/`install.sh` (download and install the
+	newest `cli-v*` release, with no alias, without ever calling
+	`releases/latest`), served from `https://calculatrix.ccisne.dev` via
+	`pages-release.yml`.
+- Amended ADR 0002 section 8 for the `cli-v` tag prefix, since this
+	repository's app releases already use `vX.Y.Z`.
 
 ### RPN
 
