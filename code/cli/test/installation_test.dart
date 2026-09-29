@@ -3,17 +3,11 @@
 // docs/spec/calculatrix_cli.md section 13 that calculatrix_cli_test.dart
 // (stage S2) explicitly excludes.
 //
-// Open point 1: docs/spec/calculatrix_cli.md section 13 documents
-// "cx upgrade --apply, no network -> release-lookup-failed, 1", but
-// modular_cli_sdk 0.8.1's InstallationPlugin throws every release-lookup
-// failure (installation_plugin.dart lines 549, 557, 570, 601) with
-// `exitCode: ExitCode.apiError` (2), never `ExitCode.genericError` (1). This
-// is a spec/SDK documentation mismatch, not a config gap: the tests below
-// assert the SDK's actual, unmodified behavior (exit code 2). The spec
-// table's "1" should be corrected in a documentation-only follow-up; see the
-// PR body.
+// A failed release lookup exits 2 (`ExitCode.apiError`, what
+// InstallationPlugin throws), as docs/spec/calculatrix_cli.md section 6
+// and section 13 record since the 2026-09-29 amendment.
 //
-// Open point 2: the spec's section 13 row "cx --json version -> version as
+// Open point: the spec's section 13 row "cx --json version -> version as
 // JSON, 0 (GNU order, G6 amended 2026-09-29)" does not hold against the
 // pinned cli_router 0.2.1, which rejects any option before the first route
 // word as misplaced-option, exit 7, with or without POSIXLY_CORRECT. The
@@ -252,9 +246,7 @@ void main() {
         platformOps: platformOps,
       );
 
-      // Open point above: the spec table says exit code 1; the SDK's own
-      // InstallationPlugin (0.8.1) uses ExitCode.apiError (2) for every
-      // release-lookup-failed, so 2 is what this asserts.
+      // Spec section 13: release-lookup-failed, 2.
       expect(code, ExitCode.apiError);
       expect(err.output, contains('release-lookup-failed'));
       expect(platformOps.calls, isEmpty);
