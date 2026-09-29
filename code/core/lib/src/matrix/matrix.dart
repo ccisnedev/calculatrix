@@ -1485,12 +1485,78 @@ class Matrix {
     );
   }
 
-  /// Computes the matrix exponential via Taylor series.
+  /// Computes the matrix exponential by splitting A into its independent
+  /// diagonal blocks (up to a permutation) and exponentiating each block
+  /// separately, via scaling and squaring or, when the shifted block is
+  /// exactly nilpotent, an exact finite sum.
   ///
-  /// For a square matrix A, expm(A) = I + A + A²/2! + A³/3! + ...
+  /// For a square matrix A, expm(A) = I + A + A²/2! + A³/3! + ..., but
+  /// summing that series directly on A is only accurate while ‖A‖ stays
+  /// small: for a moderate-to-large norm, the terms needed for convergence
+  /// grow past any practical cap, and truncating early is silently wrong
+  /// rather than merely imprecise.
+  ///
+  /// Block decomposition: build the coupling graph on A's indices (i ~ j
+  /// when A[i][j] != 0 or A[j][i] != 0) and take its connected components.
+  /// Up to permuting rows and columns, A is block-diagonal over these
+  /// components (every entry connecting two different components is zero
+  /// in both directions), so expm(A) is block-diagonal too, with expm of
+  /// each block on the diagonal and zero elsewhere: exponentiating each
+  /// block on its own, smaller matrix avoids mixing an ill-conditioned
+  /// block's error into a well-conditioned one, and lets the per-block
+  /// shift below apply independently to each block's own mean eigenvalue
+  /// rather than a single shift for the whole matrix.
+  ///
+  /// Per block B (m x m): let mu = trace(B) / m. If B - mu*I is exactly
+  /// nilpotent (its power reaches the exact zero matrix within m steps),
+  /// expm(B) = e^mu * (I + N + N²/2! + ... ), computed as an exact finite
+  /// sum, with no truncation and no scaling/squaring rounding to introduce
+  /// error: this is what lets a matrix like lambda*I + nilpotent (not
+  /// itself nilpotent, since its diagonal is lambda, not zero) still use
+  /// the exact path. A whole-matrix shift was tried in an earlier revision
+  /// and reverted because a single mu applied across independent blocks
+  /// with different traces perturbs every block, destroying exactness
+  /// everywhere; computing mu per block (after decomposition) avoids that.
+  ///
+  /// Otherwise, plain scaling and squaring proceeds on B itself (no
+  /// shift), using the identity `expm(B) = expm(B / 2^s) ^ (2^s)`: choose
+  /// `s` so that `‖B / 2^s‖_inf <= 0.5`, where the Taylor series converges
+  /// to double precision in a handful of terms, sum that series, then
+  /// square the result `s` times to undo the scaling.
+  ///
+  /// A 1x1 block is just e^b (the shift and nilpotency check above already
+  /// reduce to this: mu = b exactly, B - mu*I is the exact 1x1 zero
+  /// matrix, and the finite sum is the single term e^mu = e^b).
+  ///
   /// For pure imaginary matrices θ·J (where J = i), this yields:
   /// expm(θ·J) = [[cos(θ), -sin(θ)], [sin(θ), cos(θ)]] (rotation matrix).
-  /// Truncates at 50 terms for numerical stability.
+  ///
+  /// Throws [MatrixDomainError] with [CalculatrixErrorId.nonFinite] when the
+  /// true result overflows double precision (D25 row 13): squaring back up
+  /// an exponential whose true value is too large to represent yields an
+  /// infinite or NaN entry, which is caught here instead of returned
+  /// silently.
+  /// Returns `matrix * e^mu`. When e^mu alone is not a normal double (it
+  /// underflows below 2^-1022 or overflows) while the scaled entries may
+  /// still be representable, e^mu is applied in k equal factors e^(mu/k),
+  /// each a normal double, so an entry is rounded once at the end instead of
+  /// being flushed to zero (or to infinity) before it is multiplied.
+  static Matrix _scaleByExp(Matrix matrix, double mu) {
+    final double direct = math.exp(mu);
+    const double smallestNormal = 2.2250738585072014e-308;
+    if (direct.isFinite && direct >= smallestNormal) {
+      return matrix.scale(direct);
+    }
+    const double safeExponent = 700;
+    final int factors = (mu.abs() / safeExponent).ceil();
+    final double factor = math.exp(mu / factors);
+    Matrix result = matrix;
+    for (int i = 0; i < factors; i++) {
+      result = result.scale(factor);
+    }
+    return result;
+  }
+
   Matrix exp({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -1502,23 +1568,212 @@ class Matrix {
       return Matrix.scalar(math.exp(scalarValue));
     }
 
-    // Taylor series: expm(A) = I + A + A²/2! + A³/3! + ...
-    Matrix result = Matrix.identity(rowCount);
-    Matrix term = Matrix.identity(rowCount);
+    final List<List<int>> components = _connectedComponents();
+    if (components.length == 1) {
+      return _expBlock(this, absoluteTolerance: absoluteTolerance);
+    }
+
+    final List<List<double>> assembled = List<List<double>>.generate(
+      rowCount,
+      (_) => List<double>.filled(columnCount, 0, growable: false),
+      growable: false,
+    );
+
+    for (final List<int> component in components) {
+      final Matrix block = _extractBlock(component);
+      final Matrix blockExp = _expBlock(
+        block,
+        absoluteTolerance: absoluteTolerance,
+      );
+      for (int row = 0; row < component.length; row++) {
+        for (int column = 0; column < component.length; column++) {
+          assembled[component[row]][component[column]] = blockExp.at(
+            row,
+            column,
+          );
+        }
+      }
+    }
+
+    return _checkFiniteMatrix(Matrix(assembled));
+  }
+
+  /// Returns the connected components of the coupling graph on this
+  /// matrix's indices (i ~ j when at(i, j) != 0 or at(j, i) != 0), each as
+  /// an ascending list of original indices. A diagonal-only entry never
+  /// links two different indices, so an all-zero row and column outside
+  /// the diagonal makes that index its own singleton component.
+  List<List<int>> _connectedComponents() {
+    final int size = rowCount;
+    final List<bool> visited = List<bool>.filled(size, false);
+    final List<List<int>> components = <List<int>>[];
+
+    for (int start = 0; start < size; start++) {
+      if (visited[start]) {
+        continue;
+      }
+      final List<int> component = <int>[];
+      final List<int> queue = <int>[start];
+      visited[start] = true;
+      int head = 0;
+      while (head < queue.length) {
+        final int node = queue[head++];
+        component.add(node);
+        for (int neighbor = 0; neighbor < size; neighbor++) {
+          if (visited[neighbor]) {
+            continue;
+          }
+          if (at(node, neighbor) != 0.0 || at(neighbor, node) != 0.0) {
+            visited[neighbor] = true;
+            queue.add(neighbor);
+          }
+        }
+      }
+      component.sort();
+      components.add(component);
+    }
+
+    return components;
+  }
+
+  /// Extracts the principal submatrix of this matrix at the given
+  /// (ascending) indices, preserving their relative order.
+  Matrix _extractBlock(List<int> indices) {
+    final int size = indices.length;
+    return Matrix(
+      List<List<double>>.generate(
+        size,
+        (int row) => List<double>.generate(
+          size,
+          (int column) => at(indices[row], indices[column]),
+          growable: false,
+        ),
+        growable: false,
+      ),
+    );
+  }
+
+  /// Computes expm(block) for a single block, per the algorithm documented
+  /// on [exp]: an exact finite sum when block - mu*I is exactly nilpotent
+  /// (mu = trace(block) / size), otherwise plain scaling and squaring on
+  /// block itself.
+  static Matrix _expBlock(Matrix block, {required double absoluteTolerance}) {
+    final int size = block.rowCount;
+
+    if (size == 1) {
+      return Matrix.scalar(math.exp(block.scalarValue));
+    }
+
+    double traceValue = 0;
+    for (int i = 0; i < size; i++) {
+      traceValue += block.at(i, i);
+    }
+    final double mu = traceValue / size;
+
+    final Matrix shifted = Matrix(
+      List<List<double>>.generate(
+        size,
+        (int row) => List<double>.generate(
+          size,
+          (int column) => row == column
+              ? block.at(row, column) - mu
+              : block.at(row, column),
+          growable: false,
+        ),
+        growable: false,
+      ),
+    );
+
+    // Exact nilpotent path (after the per-block shift): no truncation, no
+    // scaling.
+    final int? nilpotencyIndex = _exactNilpotencyIndex(shifted);
+    if (nilpotencyIndex != null) {
+      Matrix sum = Matrix.identity(size);
+      Matrix nilpotentTerm = Matrix.identity(size);
+      double nilpotentFactorial = 1;
+
+      for (int power = 1; power < nilpotencyIndex; power++) {
+        nilpotentFactorial *= power;
+        nilpotentTerm = nilpotentTerm * shifted;
+        sum = sum + nilpotentTerm.scale(1 / nilpotentFactorial);
+      }
+
+      return _checkFiniteMatrix(_scaleByExp(sum, mu));
+    }
+
+    // Choose s so that ‖block / 2^s‖_inf <= 0.5 (0 when the norm is
+    // already small enough that no scaling is needed).
+    const double convergenceNormBound = 0.5;
+    final double norm = block._infinityNorm();
+    final int scalingSteps = norm > convergenceNormBound
+        ? (math.log(norm / convergenceNormBound) / math.ln2).ceil()
+        : 0;
+    final double scaleFactor = math.pow(2, scalingSteps).toDouble();
+    final Matrix scaledSource = scalingSteps == 0
+        ? block
+        : block.scale(1 / scaleFactor);
+
+    // Taylor series on the scaled block: expm(B) = I + B + B²/2! + ...
+    // The scaled norm is at most 0.5, so this converges to double precision
+    // in well under 50 terms; the cap is only a safety net.
+    //
+    // Squaring back up `scalingSteps` times roughly doubles the relative
+    // error of the running result at each step (for small errors,
+    // (X + dX)² ≈ X² + 2 X dX), so the series must converge to a tolerance
+    // tighter than the caller's by roughly a factor of `scaleFactor` for the
+    // final, squared-up result to still meet it.
+    final double seriesTolerance = scalingSteps == 0
+        ? absoluteTolerance
+        : absoluteTolerance / scaleFactor;
+    Matrix result = Matrix.identity(size);
+    Matrix term = Matrix.identity(size);
     double factorial = 1;
 
-    for (int n = 1; n <= 50; n++) {
+    for (int n = 1; n <= 100; n++) {
       factorial *= n;
-      term = term * this;
-      result = result + term.scale(1 / factorial);
+      term = term * scaledSource;
+      final Matrix scaledTerm = term.scale(1 / factorial);
+      result = result + scaledTerm;
 
-      // Check convergence: if term norm is small enough, stop
-      if (term._infinityNorm() / factorial < absoluteTolerance) {
+      if (scaledTerm._infinityNorm() < seriesTolerance) {
         break;
       }
     }
 
-    return result;
+    // Undo the scaling: expm(B) = expm(B / 2^s) ^ (2^s), by repeated
+    // squaring.
+    for (int step = 0; step < scalingSteps; step++) {
+      result = result * result;
+    }
+
+    return _checkFiniteMatrix(result);
+  }
+
+  /// Returns the smallest k in [1, matrix.rowCount] such that matrix^k is
+  /// exactly the zero matrix (every entry bit-identical to 0.0), or null if
+  /// no such k exists. For an n x n nilpotent matrix the nilpotency index is
+  /// always at most n, so checking up to k = n is decisive, not a heuristic
+  /// cutoff.
+  static int? _exactNilpotencyIndex(Matrix matrix) {
+    Matrix power = matrix;
+    for (int k = 1; k <= matrix.rowCount; k++) {
+      if (_isExactZeroMatrix(power)) {
+        return k;
+      }
+      power = power * matrix;
+    }
+    return null;
+  }
+
+  static bool _isExactZeroMatrix(Matrix matrix) {
+    for (int row = 0; row < matrix.rowCount; row++) {
+      for (int column = 0; column < matrix.columnCount; column++) {
+        if (matrix.at(row, column) != 0.0) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   /// Computes the principal matrix logarithm.
