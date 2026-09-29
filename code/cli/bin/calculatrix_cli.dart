@@ -4,15 +4,17 @@ import 'package:calculatrix_cli/calculatrix_cli.dart';
 
 /// The `calculatrix`/`cx` executable entry point.
 ///
-/// Forces `POSIXLY_CORRECT` into the environment `cli_router` sees,
-/// regardless of whether the real process environment set it, so this CLI's
-/// option/operand ordering (G6) is strict POSIX (options before operands)
-/// every time it runs, on every shell and every OS, rather than depending on
-/// whichever value a caller's own environment happened to carry in. This is
-/// a deliberate S2 reading of a spec that leaves POSIXLY_CORRECT's absence
-/// to the platform's own default; see the PR's "Open points".
+/// User decision (2026-09-29): `cx` follows GNU `getopt`-style option
+/// ordering by default (an option may follow an operand; `cli_router`
+/// permutes it in front before the strict grammar runs), like macss,
+/// inquiry and skillwire. This entry point passes no `environment` to
+/// [ModularCli.run], so `cli_router` reads `POSIXLY_CORRECT` straight from
+/// the real process environment (`Platform.environment`, the SDK's own
+/// default when the parameter is omitted): unset, GNU order applies; set to
+/// any value, strict POSIX order applies instead. Amends the previous S2
+/// reading, which forced `POSIXLY_CORRECT` unconditionally; see G6 in
+/// docs/spec/calculatrix_cli.md and D27 in docs/runbook-cli-stage-0.md.
 Future<void> main(List<String> args) async {
-  final environment = {...Platform.environment, 'POSIXLY_CORRECT': '1'};
   final cli = buildCalculatrixCli();
-  exitCode = await cli.run(args, environment: environment);
+  exitCode = await cli.run(args);
 }

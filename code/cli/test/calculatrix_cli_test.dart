@@ -219,8 +219,15 @@ void main() {
   });
 
   group('eval rpn: option grammar (G6, G7, G8, G9)', () {
+    // Moved to explicit strict-mode environment per the 2026-09-29 GNU-order
+    // decision: under the default (GNU order), this same invocation is
+    // accepted instead (see the two tests below), so this one is only
+    // misplacedOption once POSIXLY_CORRECT is set.
     test('cx eval rpn PROGRAM --json is misplacedOption, 7 (G6)', () async {
-      final code = await run(['eval', 'rpn', '1 2 +', '--json']);
+      final code = await run(
+        ['eval', 'rpn', '1 2 +', '--json'],
+        environment: const {'POSIXLY_CORRECT': '1'},
+      );
       expect(code, ExitCode.validationFailed);
     });
 
