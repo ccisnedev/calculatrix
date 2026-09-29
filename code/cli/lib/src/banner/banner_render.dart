@@ -70,11 +70,12 @@ const String _white = '\x1B[97m';
 const String _cyan = '\x1B[36m';
 
 /// `#2EF2C3`, the icon's glow color (`code/design/logo.svg`), as a 24-bit
-/// ANSI foreground escape (User decision, 2026-09-29, issue #26). On a
-/// terminal that ignores 24-bit color this is meant to read as the nearest
-/// bright cyan (ANSI 96); this function always emits the 24-bit form, since
-/// detecting truecolor support is not part of this issue's scope.
-const String _glow = '\x1B[38;2;46;242;195m';
+/// ANSI foreground escape (User decision, 2026-09-29, issue #26), used when
+/// the terminal advertises truecolor.
+const String _glowTrueColor = '\x1B[38;2;46;242;195m';
+
+/// The nearest 16-color fallback for [_glowTrueColor]: bright cyan (ANSI 96).
+const String _glowFallback = '\x1B[96m';
 
 /// Renders the `cx` banner (issue #26): the logo, name and version, the
 /// tagline, the "Commands:" list (only entries in [registeredCommands]) and
@@ -82,18 +83,21 @@ const String _glow = '\x1B[38;2;46;242;195m';
 ///
 /// [color] decides whether ANSI escapes are emitted at all; stripping them
 /// from a colored render always yields the render with `color: false` for
-/// the same other arguments.
+/// the same other arguments. [trueColor] picks the 24-bit glow over its
+/// ANSI 96 fallback and only matters when [color] is on.
 String renderBanner({
   String? version,
   String? updateNotice,
   required bool color,
+  bool trueColor = false,
   Set<String> registeredCommands = const {'eval rpn', 'eval infix'},
 }) {
   String c(String code, String text) => color ? '$code$text$_reset' : text;
+  final glow = trueColor ? _glowTrueColor : _glowFallback;
 
   final versionSuffix = version == null ? '' : ' v$version';
   final logo =
-      '  ${c(_white, '⎡')} ${c(_glow, '●')}  ${c(_white, '━━')} '
+      '  ${c(_white, '⎡')} ${c(glow, '●')}  ${c(_white, '━━')} '
       '${c(_white, '⎤')}   ${c(_bold, 'cx')}$versionSuffix\n'
       '  ${c(_white, '⎣')} ${c(_white, '┃')}   ${c(_white, '●')} '
       '${c(_white, '⎦')}   ${c(_dim, bannerTagline)}';

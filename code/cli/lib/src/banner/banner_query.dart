@@ -59,6 +59,13 @@ class BannerQuery implements Query<BannerInput, BannerOutput> {
       _hasTerminal() &&
       _supportsAnsiEscapes();
 
+  /// Whether the terminal advertises 24-bit color through `COLORTERM`
+  /// (`truecolor` or `24bit`); otherwise the glow uses its ANSI 96 fallback.
+  bool get _trueColor {
+    final colorTerm = _readEnvironmentVariable('COLORTERM')?.toLowerCase();
+    return colorTerm == 'truecolor' || colorTerm == '24bit';
+  }
+
   @override
   Future<BannerOutput> execute() async => BannerOutput(
     version: _version,
@@ -66,6 +73,7 @@ class BannerQuery implements Query<BannerInput, BannerOutput> {
       version: _version,
       updateNotice: _updateNotice,
       color: _color,
+      trueColor: _trueColor,
       registeredCommands: _registeredCommands,
     ),
   );

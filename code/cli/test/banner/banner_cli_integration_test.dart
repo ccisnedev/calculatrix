@@ -39,11 +39,7 @@ void main() {
         bannerQuickstartCommand.length - 1,
       );
       expect(program, isNot(contains("'")));
-      final code = await cli.run(
-        [program],
-        stdout: out,
-        stderr: err,
-      );
+      final code = await cli.run([program], stdout: out, stderr: err);
       expect(code, ExitCode.ok);
       expect(out.output, contains('1: [[-1 0] [0 -1]]'));
     });
