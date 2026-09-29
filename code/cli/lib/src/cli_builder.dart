@@ -1,17 +1,54 @@
 import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 
 import 'banner/banner_query.dart';
+import 'doctor/binary_on_path_check.dart';
 import 'eval/eval_contracts.dart';
 import 'eval/eval_infix_query.dart';
 import 'eval/eval_output.dart';
 import 'eval/eval_rpn_query.dart';
 import 'stdin_reader.dart';
 
-/// Builds the `cx` CLI (spec section 4, runbook stage S2): the bare banner,
-/// `eval rpn`, `eval infix`, and the `cx <program>` RPN shortcut (G3).
-/// [readStdin] is the only injection seam a test needs: the real process's
-/// standard input has no clean fake, so production code reaches it only
-/// through this one indirection (see [StdinReader]).
+/// `cx`'s own version, reported by `cx version`, `cx doctor` and
+/// `cx upgrade` (spec section 8.7: `VersionPlugin` and `ModularCli` are
+/// required to agree). ADR 0002 section 2 lets a shell version
+/// independently of the core package; this is not the core's version.
+const cxVersion = '0.8.0';
+
+/// `owner/repo` on GitHub `cx upgrade`, `cx uninstall` and `cx doctor` look
+/// releases up in (runbook D26, D31; spec 8.3, 8.7). The same repository
+/// also hosts the app's own `vX.Y.Z` releases, which is why [cxTagPrefix]
+/// exists: without it, a release lookup here could not tell the two apart.
+const cxRepository = 'ccisnedev/calculatrix';
+
+/// The prefix this CLI's own release tags carry. Runbook D31/issue #25: the
+/// app already tags its releases `vX.Y.Z`, so `cx`'s own tags are
+/// `cli-vX.Y.Z`, and the release lookup only ever considers tags starting
+/// with this prefix, never `GET .../releases/latest` (which would be
+/// ambiguous in a repository with two tag families).
+const cxTagPrefix = 'cli-v';
+
+/// [Platform.operatingSystem] -> release asset name, matching what
+/// `.github/workflows/cli-release.yml` (runbook S3) builds and uploads for
+/// each platform `cx` ships a compiled binary for.
+const cxAssets = {
+  'windows': 'cx-windows-x64.zip',
+  'linux': 'cx-linux-x64.tar.gz',
+};
+
+/// Builds the `cx` CLI (spec section 4; runbook stages S2 and S3): the bare
+/// banner, `eval rpn`, `eval infix`, the `cx <program>` RPN shortcut (G3),
+/// and the standard plugins `version`, `doctor`, `upgrade` and `uninstall`
+/// (spec 8.7; runbook D26, D31, D33).
+///
+/// [readStdin] is the injection seam a test needs for standard input: the
+/// real process's standard input has no clean fake, so production code
+/// reaches it only through this one indirection (see [StdinReader]).
+/// [releaseSource] and [platformOps] are the equivalent seams for
+/// `InstallationPlugin` (its own release lookup and OS-specific shell
+/// operations); [pathLookup] is the seam for [BinaryOnPathDoctorPlugin]'s
+/// own `PATH` search. All three default to the real thing and exist only so
+/// a test can supply a fake, exactly as `modular_cli_sdk`'s own test suite
+/// does (`test/plugins/installation_doubles.dart`).
 ///
 /// User decision (2026-09-29, issue #22): the executable is named `cx`,
 /// with no alias of any kind. A `.cmd`/`.bat` alias shim runs through
@@ -19,8 +56,13 @@ import 'stdin_reader.dart';
 /// shim body ever runs, so it silently mangled `cx eval infix '2^0.5'`.
 /// Naming the program itself `cx` means the shell that invokes it passes
 /// its argv straight through, with nothing in between.
-ModularCli buildCalculatrixCli({StdinReader readStdin = readAllStdin}) {
-  final cli = ModularCli(name: 'cx', version: '0.8.0', suggestionDistance: 2);
+ModularCli buildCalculatrixCli({
+  StdinReader readStdin = readAllStdin,
+  CliReleaseSource? releaseSource,
+  PlatformOps? platformOps,
+  PathLookup? pathLookup,
+}) {
+  final cli = ModularCli(name: 'cx', version: cxVersion, suggestionDistance: 2);
 
   cli.query<BannerInput, BannerOutput>(
     '',
@@ -28,6 +70,24 @@ ModularCli buildCalculatrixCli({StdinReader readStdin = readAllStdin}) {
     globals: true,
     contract: CliContract.none,
     description: 'Print a short banner.',
+  );
+
+  cli.plugin(VersionPlugin(version: cxVersion));
+  cli.plugin(const DoctorPlugin());
+  cli.plugin(
+    BinaryOnPathDoctorPlugin(executable: 'cx', pathLookup: pathLookup),
+  );
+  cli.plugin(
+    InstallationPlugin(
+      config: const CliInstallationConfig(
+        repository: cxRepository,
+        tagPrefix: cxTagPrefix,
+        executable: 'cx',
+        assets: cxAssets,
+      ),
+      releaseSource: releaseSource,
+      platformOps: platformOps,
+    ),
   );
 
   cli.module('eval', (m) {
