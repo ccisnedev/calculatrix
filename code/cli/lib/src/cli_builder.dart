@@ -1,12 +1,26 @@
 import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 
 import 'banner/banner_query.dart';
+import 'commands/commands_contracts.dart';
+import 'commands/commands_list_query.dart';
+import 'commands/commands_search_query.dart';
+import 'commands/commands_show_query.dart';
 import 'doctor/binary_on_path_check.dart';
 import 'eval/eval_contracts.dart';
 import 'eval/eval_infix_query.dart';
 import 'eval/eval_output.dart';
 import 'eval/eval_rpn_query.dart';
+import 'shortcut/program_shortcut_query.dart';
 import 'stdin_reader.dart';
+
+/// `cx <program>`'s own contract (spec section 4, G4): one required
+/// positional, no options, not even the global ones (`globals: false`
+/// where this is registered). Not [EvalContracts.rpn], which declares
+/// `--file`/`--stdin` and an optional `program`: those belong to the full
+/// `eval rpn` route, never to this shorter, options-free spelling of it.
+final CliContract _programShortcutContract = CliContract(
+  positionals: [CliPositional.string('program', required: true)],
+);
 
 /// `cx`'s own version, reported by `cx version`, `cx doctor` and
 /// `cx upgrade` (spec section 8.7: `VersionPlugin` and `ModularCli` are
@@ -120,11 +134,45 @@ ModularCli buildCalculatrixCli({
     );
   });
 
-  cli.shortcut(
+  cli.module('commands', (m) {
+    m.query<ShowInput, ShowOutput>(
+      'show <name>',
+      (req) => ShowQuery(ShowInput.fromCliRequest(req)),
+      globals: true,
+      contract: CommandsContracts.show,
+      description: 'Show a command of the registry.',
+    );
+
+    m.query<SearchInput, SearchOutput>(
+      'search <text>',
+      (req) => SearchQuery(SearchInput.fromCliRequest(req)),
+      globals: true,
+      contract: CommandsContracts.search,
+      description: 'Search the registry.',
+    );
+
+    m.query<ListInput, ListOutput>(
+      'list',
+      (req) => ListQuery(ListInput.fromCliRequest(req)),
+      globals: true,
+      contract: CommandsContracts.list,
+      description: 'List the registry, grouped by category.',
+    );
+  });
+
+  // Not `cli.shortcut('<program>', target: 'eval rpn', ...)`: a shortcut
+  // dispatches through the exact same body as its target, with no seam to
+  // add a route suggestion to this path alone (issue #41, AC6; see
+  // ProgramShortcutQuery). `eval rpn` above stays the one and only
+  // registration of its own body.
+  cli.query<EvalRpnInput, EvalOutput>(
     '<program>',
-    target: 'eval rpn',
+    (req) => ProgramShortcutQuery(
+      EvalRpnQuery(EvalRpnInput.fromCliRequest(req), readStdin: readStdin),
+      routeSuggest: (String word) => cli.suggest(word),
+    ),
     globals: false,
-    contract: CliContract.none,
+    contract: _programShortcutContract,
     description: 'Shortcut for "eval rpn <program>".',
   );
 
