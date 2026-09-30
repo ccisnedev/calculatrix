@@ -54,13 +54,19 @@ const List<BannerCommand> bannerCommands = [
     'evaluate an expression',
     'cx eval infix "2^0.5"',
   ),
+  BannerCommand('commands show', 'show one word of the registry', 'cx commands show dup'),
+  BannerCommand('commands search', 'search the registry', 'cx commands search column'),
+  BannerCommand('commands list', 'list the registry by category'),
   BannerCommand('doctor', 'verify local installation'),
   BannerCommand('upgrade', 'update to latest version'),
   BannerCommand('uninstall', 'remove cx'),
   BannerCommand('version', 'print version'),
 ];
 
-const int _nameColumnWidth = 13;
+// 16, not 13: wide enough for "commands search" (15 characters), the
+// longest name the banner lists since issue #41 added the `commands`
+// module's rows.
+const int _nameColumnWidth = 16;
 const int _descriptionColumnWidth = 28;
 
 const String _reset = '\x1B[0m';
