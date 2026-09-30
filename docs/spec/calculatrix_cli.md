@@ -223,7 +223,7 @@ Global options, declared by the SDK on every route except the shortcut:
 | `cx eval infix [<expression>]` | query | `--file`, `--stdin`; `ExactlyOne(expression, file, stdin)` | Evaluates an infix expression and prints the result. |
 | `cx commands list` | query | `--category <name>` (value: enumeration from the registry, optional) | Lists the commands by category. |
 | `cx commands show <name>` | query | one operand | The entry of one command, by name or alias. |
-| `cx commands search <text>` | query | one operand | Finds commands by name, alias, HP name, search terms or description. |
+| `cx commands search <text>` | query | one operand | Finds commands by name, alias, HP reference, search terms or description. |
 | `cx version` | query | globals only | Prints the CLI version. From `VersionPlugin` (8.7). |
 | `cx doctor` | query | globals only | Runs the checks contributed by the plugins (below). Changes nothing. From `DoctorPlugin` (8.7). |
 | `cx upgrade` | command | `--plan` or `--apply` (SDK) | Installs the newest `cli-vX.Y.Z` release. From `InstallationPlugin` (8.7). |
@@ -264,7 +264,11 @@ the id `doctor-check-failed`, exit code `78` and every check result under
 ## 6. Output and errors
 
 **Text (default).** HP 50g style: one line per level, level 1 at the bottom,
-spaces inside matrices (runbook D12, D13).
+spaces inside matrices (runbook D12, D13). Numbers go through the display
+formatter of core, the same one the app uses: at most 12 significant digits,
+trailing zeros removed (runbook D45). `[[1 2] [3 4]] -1 ^` prints
+`[[-2 1] [1.5 -0.5]]`. The stored value is unchanged, and JSON keeps the full
+double.
 
 ```text
 $ cx '5 [[0 -1] [1 0]]'
@@ -352,9 +356,10 @@ entry opens from a long press on a key.
 
 | Field | Example for `append-cols` |
 |---|---|
-| Name and aliases | `append-cols` (no aliases) |
+| Name and aliases | `append-cols` (no aliases); a name is a word, a symbol or short form is an alias (runbook D41) |
+| Definition | primitive; a defined word shows its RPN program, for example `inverse` is `-1 power` (runbook D43) |
 | Search terms | `hcat`, `horzcat`, `concatenate`, `column` |
-| HP 50g equivalent | none; closest `COL+` |
+| HP 50g reference | none; closest `COL+`. Informative only, never a word of the language (runbook D42) |
 | Category | matrix |
 | Stack effect | `A B → [A B]` |
 | Preconditions | A and B have the same number of rows |
@@ -376,11 +381,24 @@ error suggests `append-cols`.
 **Examples are executable.** A core test runs every example and compares its
 result, so an entry cannot drift from what the command does.
 
+**Defined words.** An entry is primitive or defined by an RPN program over
+other words (runbook D43): `inverse` is `-1 power` and `sqrt` is `0.5 power`,
+because in Calculatrix everything is a matrix. A defined word gives the same
+result as its definition, bit for bit (runbook D44), and an error inside it
+names the word the user wrote: `[[1 2] [2 4]] inverse` is `singular-matrix`
+with `token: inverse`.
+
+**The HP 50g is inspiration, not adoption** (runbook D42). The goal is its
+level of reliability and usability, then more; never compatibility. HP names
+such as `->ARRY` are not words of the language; the HP reference of an entry
+only helps `cx commands search` find it.
+
 ### Finding a command
 
-- `cx commands search <text>` matches name, aliases, HP name, search terms and
+- `cx commands search <text>` matches name, aliases, HP reference, search terms and
   description: `search column` finds `append-cols` and `vector`.
-- `cx commands show <alias>` resolves the alias: `show ^` shows `power`.
+- `cx commands show <alias>` resolves the alias: `show ^` shows `power`, and
+  `show √` shows `sqrt` with its definition.
 - `cx commands list --category matrix` lists one category. The categories are
   an enumeration taken from the registry, so an unknown category is error 7
   with the valid ones in the message.
@@ -911,6 +929,13 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx eval rpn -qh` | `invalidShortOption`, 7: `-q -h` (G9) |
 | `cx eval rpn --trace '1 2 +'` | `unknownOption`, 7 (not in this stage) |
 | `cx eval rpn '1 +'` | `stack-underflow`, 65 |
+| `cx '9 sqrt'`, `cx '9 √'`, `cx '9 SQRT'` | prints `1: 3`, 0 (D41) |
+| `cx '2 3 pwr'`, `cx '2 3 power'` | prints `1: 8`, 0 |
+| `cx '2 3 add'` | prints `1: 5`, 0: `add` is a name, `+` its alias (D41) |
+| `cx '[[1 2] [3 4]] inverse'` | prints `1: [[-2 1] [1.5 -0.5]]`, 0 (D43, D45) |
+| `cx '[[1 2] [2 4]] inverse'` | `singular-matrix`, 65, `token: inverse` (D43) |
+| `cx '-4 sqrt'` | the same result as `cx '-4 0.5 ^'`, bit for bit (D44) |
+| `cx '1 2 2 ->ARRY'` | `unknown-word`, 65 (D42) |
 | `cx eval infix '-1+2'` | prints `1: 1`, 0 |
 | `cx eval infix '1 2 +'` | `syntax-error`, 65 (section 10, fix 2) |
 | `cx eval` | `incomplete`, 64, lists `rpn` and `infix` |
@@ -920,6 +945,8 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx commands show` | `missingArgument`, 64 |
 | `cx commands show power` | the entry, 0 |
 | `cx commands show ^` | the entry of `power`, 0 |
+| `cx commands show inverse` | the entry, with the definition `-1 power`, 0 |
+| `cx commands search ->arry` | the entry of `vector`, by its HP reference, 0 |
 | `cx commands search hcat` | the entry of `append-cols`, 0 |
 | `cx commands shwo power` | `incomplete`, 64, suggests `show` |
 | `cx commands list --category nope` | 7, lists the valid categories |
@@ -940,7 +967,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 ## 14. Decisions of the review of 2026-09-24
 
 Every question of the draft is closed. The user decided each one; the runbook
-records the ones that affect the whole stage (D25 to D38).
+records the ones that affect the whole stage (D25 to D45).
 
 | # | Topic | Decision |
 |---|---|---|
@@ -969,3 +996,8 @@ records the ones that affect the whole stage (D25 to D38).
 | R23 | `unsupported-matrix-function` | **Revoked 2026-09-28**, with runbook D37: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. `exp`, `log`, `sqrt` and a non-integer real power accept a scalar, the complex form, a diagonal matrix, a symmetric matrix larger than 2x2 (Jacobi) or any 2x2 matrix (closed form, symmetric ones included); any other matrix raises `unsupported-matrix-function` (65), never an approximation (runbook D37). |
 | R24 | `matrix-out-of-precision-range` | **Revoked 2026-09-28**, with runbook D38: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. `exp`, `log`, `sqrt` and a non-integer real power accept only matrices whose nonzero entries and nonzero eigenvalues have magnitudes between `1e-150` and `1e150`; outside that range, or when a nonzero eigenvalue or a nonzero entry of the result falls outside it (`exp(-1000)`, `exp(710)`), they raise `matrix-out-of-precision-range` (65). Inside it the normwise relative error is at most `1e4 * max(1, kappa) * u`, with `kappa` the relative condition number of the function at the matrix and `u = 2^-53` (about `1e-12` for a well conditioned matrix); a zero result and `sqrt` of a singular matrix get the absolute bounds of runbook D38. The range applies to the argument and the final result only, never to an intermediate value; an eigenvalue within the forward error bound of the solver that computed it is numerically zero (`sqrt` takes it as zero, `log` and a non-integer power of a non-scalar matrix raise `log-undefined`; a scalar zero keeps its own rule, `0^0.5` is `0`); when the solver cannot certify an eigenvalue (for example after underflow in the 2x2 closed form) the operation raises `matrix-out-of-precision-range`; the bounds of the range of the result are widened by a relative `8 * 2^-52 * ln(1e150)`, about `6.1e-13`, while the range of the argument stays strict (runbook D38). |
 | R25 | Executable name (issue #22) | The built executable is named `cx`; there is no `calculatrix` executable and no alias of any kind, replacing R11's context and the "alias `cx`" doctor check of section 5 and R17 (a future `InstallationPlugin` registration, section 8.7, names only `executable: 'cx'`, with no `alias`). Help, usage, banner and error messages name the program `cx`. Typed unquoted in cmd.exe, `cx eval infix 2^0.5` still loses the `^`: cmd.exe consumes it as its own escape character while parsing the command line, before any executable starts, so no alias or executable can recover it; the achievable contract is that `cx` receives exactly the argv the calling shell produced. Replaces runbook D1. |
+| R26 | Command names (2026-09-29) | A name is a lowercase word or hyphenated words (`sqrt`, `inverse`, `append-cols`); symbols and short forms are aliases (`+`, `^`, `√`, `pwr`, `inv`) (runbook D41). |
+| R27 | The HP 50g (2026-09-29) | Inspiration, not adoption: parity is the level of reliability and usability, never compatibility; HP names are not words or aliases, only an informative reference that search matches (runbook D42). |
+| R28 | Defined words (2026-09-29) | An entry is primitive or an RPN program over other words; `inverse` is `-1 power`, `sqrt` is `0.5 power`; errors name the user's word; recursive definitions are rejected when the registry is built (runbook D43). |
+| R29 | One implementation per concept (2026-09-29) | `power` uses the exact algorithm for `-1` and `1/2`; a defined word and its definition are bitwise identical, checked by a core test (runbook D44). |
+| R30 | Display (2026-09-29) | CLI text output uses the core display formatter, 12 significant digits; JSON keeps the full double (runbook D45). |
