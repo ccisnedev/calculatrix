@@ -33,6 +33,18 @@ jobs:
 
       - run: flutter build web --release
 
+      # cx's own installers (runbook docs/runbook-cli-stage-0.md, "Publishing
+      # (dogfood)") are served from this same site, at
+      # https://calculatrix.ccisne.dev/install.ps1 and /install.sh, mirroring
+      # how ccisnedev/inquiry serves its installers from its own Pages site.
+      # code/cli/scripts/install.ps1 and install.sh are the source of truth;
+      # this only copies them into the build output.
+      - name: Copy CLI installers into the web build
+        working-directory: ${{ github.workspace }}
+        run: |
+          cp code/cli/scripts/install.ps1 code/app/build/web/install.ps1
+          cp code/cli/scripts/install.sh code/app/build/web/install.sh
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: code/app/build/web

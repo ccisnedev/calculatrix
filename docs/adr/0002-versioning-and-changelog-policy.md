@@ -154,6 +154,27 @@ the release tag, and `v0.7.1` was already tagged and published on GitHub.
 - History rewriting allowed by section 1 stops at the most recent published
   tag.
 
+*Amended 2026-09-29, from `docs/runbook-cli-stage-0.md` ("Publishing
+(dogfood)", constraint 1).* The `cx` CLI (`code/cli`) is versioned and
+released independently of core and the app (see section 3): it gets its own
+prefix, `cli-vX.Y.Z`, rather than `vX.Y.Z`.
+
+- A CLI release is tagged `cli-vX.Y.Z`, using the version from
+  `code/cli/pubspec.yaml`, on the exact revision `.github/workflows/cli-release.yml`
+  built it from.
+- `vX.Y.Z` remains reserved for app releases (Android, Windows, the web
+  deployment). The two prefixes exist because both kinds of release live in
+  this one repository and share its tag namespace: without a prefix,
+  `GET /repos/{owner}/{repo}/releases/latest` would resolve to whichever kind
+  happens to be newest, which is exactly the ambiguity `cx upgrade` and the
+  `install.ps1`/`install.sh` installers avoid by listing releases and
+  filtering by tag prefix instead of ever calling that endpoint.
+- A `cli-v*` release is never marked "latest" on GitHub (`gh release edit
+  --latest=false`), since GitHub tracks only one latest release per
+  repository and that designation is meant for the app.
+- Everything else in this section applies unchanged: `cli-v*` tags are
+  immutable once published, and a fix ships as the next patch version.
+
 ## Consequences
 
 - The project gets one authoritative release number without forcing fake core

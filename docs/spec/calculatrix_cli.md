@@ -286,12 +286,14 @@ $ cx '5 [[0 -1] [1 0]]'
 - Numbers are JSON numbers. `Infinity` and `NaN` never appear: a non-finite
   value is the error `non-finite`.
 
-**Exit codes.** Six values, never mixed:
+**Exit codes.** Eight values, never mixed:
 
 | Code | Name in the SDK | Meaning | Examples |
 |---|---|---|---|
 | `0` | `ExitCode.ok` | success | |
-| `1` | `ExitCode.genericError` | a step of `upgrade --apply` or `uninstall --apply` failed, or the release lookup of `upgrade` failed | no network, access denied |
+| `1` | `ExitCode.genericError` | a step of `upgrade --apply` or `uninstall --apply` failed | download failed, access denied |
+| `2` | `ExitCode.apiError` | the release lookup of `upgrade` failed (`release-lookup-failed`, amended 2026-09-29 to match `InstallationPlugin`) | no network, GitHub API error |
+| `4` | `ExitCode.notFound` | the newest `cli-v*` release has no asset for this platform (`asset-not-found`) | a release published without the Linux archive |
 | `64` | `ExitCode.invalidUsage` | the invocation does not name a route (`EX_USAGE`) | unknown command, incomplete route, missing or extra operand |
 | `7` | `ExitCode.validationFailed` | the route is right, an option or a value is wrong (SDK convention) | unknown or misplaced option, missing value, repeated option, two program sources, empty program, file not found, `upgrade` without `--plan` or `--apply` |
 | `65` | `ExitCode.dataError` (new) | the program ran and failed (`EX_DATAERR`) | unknown RPN word, stack underflow, dimension mismatch, infix syntax error |
@@ -925,7 +927,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx upgrade` | 7, needs `--plan` or `--apply` |
 | `cx upgrade --plan` | the steps, nothing changes, 0 |
 | `cx uninstall --apply` | removes the CLI, 0 |
-| `cx upgrade --apply`, no network | `release-lookup-failed`, 1; nothing changed |
+| `cx upgrade --apply`, no network | `release-lookup-failed`, 2; nothing changed |
 | `cx eval rpn --help` | help of the route, 0 (8.6) |
 | `cx commands show --help` | help of the route, 0 (8.6) |
 | `cx eval rpn --bogus --help` | `unknownOption`, 7 (8.6) |

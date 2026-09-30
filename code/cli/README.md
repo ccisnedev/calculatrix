@@ -7,7 +7,7 @@ See `docs/spec/calculatrix_cli.md` for the full grammar and behavior, and
 The executable is named `cx`. There is no `calculatrix` executable and no
 alias of any kind: `cx` is what you run, directly (issue #22).
 
-## Install
+## Install (from source, for development)
 
 ```powershell
 .\scripts\dev-install.ps1
@@ -17,6 +17,31 @@ Builds `cx.exe` from source and installs it under
 `%LOCALAPPDATA%\calculatrix\bin`, adding that directory to the user `PATH`
 if it is not already there. A legacy `cx.cmd` shim or `calculatrix.exe` from
 an older install is removed if present.
+
+## Install (a published release)
+
+```powershell
+irm https://calculatrix.ccisne.dev/install.ps1 | iex
+```
+
+```bash
+curl -fsSL https://calculatrix.ccisne.dev/install.sh | bash
+```
+
+Downloads the newest `cli-v*` release from GitHub (never `releases/latest`,
+since this repository's app releases are also tagged, as `vX.Y.Z`) and
+installs `cx` with no alias of any kind. See `scripts/install.ps1` and
+`install.sh` for what each one does step by step, and
+`.github/workflows/cli-release.yml` for how a `cli-v*` release is built.
+
+## Update, check and remove an install
+
+```bash
+cx upgrade --plan     # preview
+cx upgrade --apply     # install the newest cli-v* release over this one
+cx doctor              # check PATH and whether a newer release exists
+cx uninstall --apply   # remove this install
+```
 
 ## Run
 

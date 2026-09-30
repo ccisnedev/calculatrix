@@ -17,7 +17,8 @@ dependencies:
   calculatrix:
     path: ../core
   cli_router: ^0.2.1
-  modular_cli_sdk: ^0.8.1
+  modular_cli_sdk: ^0.8.2
+  path: ^1.9.1
 
 dev_dependencies:
   lints: ^5.0.0

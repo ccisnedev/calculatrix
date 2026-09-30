@@ -69,7 +69,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D30 | JSON of `eval` is `{"stack": [...]}`, level 1 last; a 1x1 matrix is a number, any other matrix an array of rows. Errors are `{"error": {"id", "message", "token", "position"}}`, with `position` 1-based. | User, 2026-09-24 (R16) |
 | D31 | `cx doctor` checks the binary on `PATH` and the newest `cli-v*` release (amended 2026-09-29, D40: no alias check, since `cx` has no alias). States ok, warning, error; a newer release and a failed lookup are warnings, printed, never skipped; exit 78 when any check is an error. The checks are contributions to the extension point `doctor.checks` (D33), and `macss` and `docmd` adopt them. | User, 2026-09-24 (R17); amended, User, 2026-09-29 |
 | D32 | Not in this stage: `--trace` and `--show-rpn` (recorded in `docs/roadmap.md`, Stage 9). `CliRequest.flags` is removed in `cli_router` 0.2.0, with no deprecation period. | User, 2026-09-24 (R14, R15) |
-| D34 | From the Codex review of the design: (1) `power` follows the order of checks of the D25 table, by kinds, never by a numerical commutation test; (2) a matrix base with no real logarithm is `log-undefined` in this stage, and its representation is deferred; (3) `-h`/`--help` wins over `incomplete`, `missingArgument`, `missingRequiredOption` and the contract constraints, and loses to `unknownCommand`, `extraArgument` and the option errors (spec 8.6); (4) a failed step of `upgrade --apply` or `uninstall --apply`, or a failed release lookup, exits `1` (`ExitCode.genericError`) with the id `release-lookup-failed`, `download-failed` or `file-access-denied`; the run stops at that step, reports the steps done, and neither rolls back nor retries (spec section 6). | User, 2026-09-24 |
+| D34 | From the Codex review of the design: (1) `power` follows the order of checks of the D25 table, by kinds, never by a numerical commutation test; (2) a matrix base with no real logarithm is `log-undefined` in this stage, and its representation is deferred; (3) `-h`/`--help` wins over `incomplete`, `missingArgument`, `missingRequiredOption` and the contract constraints, and loses to `unknownCommand`, `extraArgument` and the option errors (spec 8.6); (4) a failed step of `upgrade --apply` or `uninstall --apply`, exits `1` (`ExitCode.genericError`) with the id `download-failed` or `file-access-denied`, and a failed release lookup exits `2` (`ExitCode.apiError`, `release-lookup-failed`; amended 2026-09-29 to match `InstallationPlugin`); the run stops at that step, reports the steps done, and neither rolls back nor retries (spec section 6). | User, 2026-09-24 |
 | D33 | `modular_cli_sdk` gets a plugin system modeled on `modular_api` (`CliPlugin` with a manifest and `setup(host)`; the host registers routes and extension points, nothing else for now). `version`, `doctor`, `upgrade` and `uninstall` are standard plugins inside the SDK (`VersionPlugin`, `DoctorPlugin`, `InstallationPlugin`), like health and openapi in `modular_api`. Every plugin is registered explicitly with `cli.plugin(...)`. `DoctorPlugin` declares `doctor.checks`; `InstallationPlugin` requires it and contributes its checks. No `modular_cli_installer` package, no install plugin. Spec section 8.7. | User, 2026-09-24 (R18) |
 | D35 | **Revoked 2026-09-28**: came from an automated Codex review round on PR #7, not a user need, and removed capability that main had; issue #5 is being rebuilt minimally in `feat/core-issue5-minimal`, keeping main's eigenvalues, `exp`, `sqrt` and `inverse`; PR #7 is closed unmerged. Kept below for history. From the Codex review of the core PR (calculatrix#7): an iterative method of the core (matrix exponential by scaling and squaring, square root, logarithm) that reaches its iteration cap without meeting its tolerance raises the new id `no-convergence` (65), never the unconverged value. Every intermediate result is checked for finiteness (`non-finite`). | Claude, 2026-09-25 |
 | D36 | One JSON error shape for every error: `{"error": {"id", "message", "exitCode", ...}}`, `id` in kebab-case (the SDK maps each router rejection kind to one id), extra fields only when they apply (`token`, `position`, `contract`, `details`). `isRetryable` is removed; `CommandException.exitCode` is required. Spec section 6. | User, 2026-09-25 |
@@ -276,20 +276,23 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
       `cx.exe` only, with no `cx.cmd` shim (the fastest dogfood loop, no
       release needed). Amended 2026-09-29 (D40): the earlier plan called for
       a `cx.cmd` shim; there is no shim of any kind.
-- [ ] `scripts/build.ps1` / `build.sh`.
-- [ ] `.github/workflows/cli-release.yml`: on a push to `main` that changes
+- [x] `scripts/build.ps1` / `build.sh`.
+- [x] `.github/workflows/cli-release.yml`: on a push to `main` that changes
       `code/cli/pubspec.yaml`, if the tag `cli-vX.Y.Z` does not exist: run
       `dart test`, create the release, build Windows and Linux binaries, upload
       them.
-- [ ] Guard the two app workflows with the tag filter.
-- [ ] `scripts/install.ps1` / `install.sh`: download the newest `cli-v*`
+- [x] Guard the two app workflows with the tag filter.
+- [x] `scripts/install.ps1` / `install.sh`: download the newest `cli-v*`
       release, install it, create `cx`, add it to `PATH`.
-- [ ] `cx upgrade` and `cx uninstall` from `InstallationPlugin` (D26, D33),
+- [x] `cx upgrade` and `cx uninstall` from `InstallationPlugin` (D26, D33),
       as commands with `--plan` and `--apply`.
-- [ ] `cx version` and `cx doctor` from `VersionPlugin` and `DoctorPlugin`,
+- [x] `cx version` and `cx doctor` from `VersionPlugin` and `DoctorPlugin`,
       with the checks of `InstallationPlugin` (D31, D33).
-- [ ] Check that `cx` does not collide with an existing command on the
-      machine (`Get-Command cx`).
+- [x] Check that `cx` does not collide with an existing command on the
+      machine (`Get-Command cx`). Done in `install.ps1`/`install.sh`
+      themselves, at install time, rather than as a separate script: they
+      warn (not fail) when `cx` already resolves to a different path than
+      the one the installer is about to write.
 
 ## Steps (one PR each)
 

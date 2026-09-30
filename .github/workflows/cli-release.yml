@@ -1,0 +1,216 @@
+# CLI release workflow, modeled on ccisnedev/inquiry's release.yml (4-job
+# pattern: check-version -> create-release -> build (matrix) -> publish-release).
+#
+# Adapted for calculatrix (runbook docs/runbook-cli-stage-0.md, "Publishing
+# (dogfood)", D19, D31):
+#   - the tag prefix is `cli-v`, not `v`, since `vX.Y.Z` already names app
+#     releases in this repository (constraint 1 in the runbook);
+#   - the version comes from code/cli/pubspec.yaml, not code/core's;
+#   - assets are named cx-windows-x64.zip / cx-linux-x64.tar.gz and the
+#     binary inside each is cx.exe / cx with no alias of any kind (issue
+#     #22, D40): there is nothing to copy alongside it, since cx has no
+#     assets/ directory the way inquiry does;
+#   - `dart analyze` and `dart test` run for both code/core and code/cli,
+#     since the CLI depends on core as a path dependency.
+#
+# WORKAROUND (Windows only): Windows Defender on the windows-2025 /
+# windows-latest runner image quarantines dart.exe from the toolcache after
+# `dart test` runs. Symptom: `dart pub get`, `dart analyze`, `dart test`
+# succeed, but `dart compile exe` fails with "dart not recognized" even
+# though $env:DART_HOME still points at a now-empty directory.
+#
+# Mitigation: before compiling, wipe the dart toolcache dir and the temp
+# zip, then re-run dart-lang/setup-dart. Applied only on Windows.
+#
+# This workflow never creates a release when merged as-is: it only fires on
+# a push to main that changes code/cli/pubspec.yaml. Merging the PR that
+# bumps code/cli/pubspec.yaml's version to 0.8.0 will trigger the first
+# `cli-v0.8.0` release the next time it runs on main.
+
+name: CLI Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'code/cli/pubspec.yaml'
+      - '.github/workflows/cli-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  # --- Job 1: Check version --------------------------------------------
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from pubspec.yaml
+        id: read
+        run: |
+          VERSION=$(grep -E '^version:' code/cli/pubspec.yaml | sed -E 's/^version:\s*//' | tr -d '[:space:]')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version in pubspec: $VERSION"
+
+      - name: Check if tag already exists
+        id: check
+        run: |
+          TAG="cli-v${{ steps.read.outputs.version }}"
+          if git ls-remote --tags --exit-code origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists on remote. Skipping release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag $TAG not found. Proceeding with release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # --- Job 2: Create draft release --------------------------------------
+  create-release:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create git tag
+        run: |
+          TAG="cli-v${{ needs.check-version.outputs.version }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub release draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="cli-v${{ needs.check-version.outputs.version }}"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            --draft
+
+  # --- Job 3: Build + upload (matrix: Windows + Linux) ------------------
+  build:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            asset: cx-windows-x64.zip
+          - os: ubuntu-latest
+            asset: cx-linux-x64.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+
+      # -- Windows Defender workaround (Windows only) --
+      - name: Exclude toolcache from Windows Defender
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "C:\hostedtoolcache" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "D:\a" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionProcess "dart.exe" -ErrorAction SilentlyContinue
+          $dartCache = "C:\hostedtoolcache\windows\dart"
+          if (Test-Path $dartCache) {
+            Remove-Item -Recurse -Force $dartCache
+          }
+
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Test core
+        working-directory: code/core
+        run: |
+          dart pub get
+          dart analyze
+          dart test
+
+      - name: Test cli
+        working-directory: code/cli
+        run: |
+          dart pub get
+          dart analyze
+          dart test
+
+      # -- Windows Defender workaround before compile (Windows only) --
+      - name: Clean dart cache to force re-download
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dartCache = "C:\hostedtoolcache\windows\dart"
+          if (Test-Path $dartCache) {
+            Write-Host "Removing $dartCache"
+            Remove-Item -Recurse -Force $dartCache
+          }
+          $dartZip = "D:\a\_temp\dartsdk-windows-x64-release.zip"
+          if (Test-Path $dartZip) {
+            Write-Host "Removing $dartZip"
+            Remove-Item -Force $dartZip
+          }
+
+      - name: Re-setup Dart (ensure SDK present before compile)
+        if: runner.os == 'Windows'
+        uses: dart-lang/setup-dart@v1
+
+      # -- Compile and package. scripts/build.ps1 and scripts/build.sh do
+      # both, and produce the release archive named exactly as
+      # `matrix.asset`: they are the same scripts a contributor can run
+      # locally to reproduce this build without pushing anything. --
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: code/cli
+        run: .\scripts\build.ps1
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        working-directory: code/cli
+        run: ./scripts/build.sh
+
+      # -- Upload --
+      - name: Upload release asset
+        working-directory: code/cli
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "cli-v${{ needs.check-version.outputs.version }}" ${{ matrix.asset }} --clobber
+        shell: bash
+
+  # --- Job 4: Publish release after all assets are present --------------
+  publish-release:
+    needs: [check-version, create-release, build]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify release assets before publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="cli-v${{ needs.check-version.outputs.version }}"
+          ASSETS=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          echo "$ASSETS"
+
+          for asset in cx-windows-x64.zip cx-linux-x64.tar.gz; do
+            if ! echo "$ASSETS" | grep -qx "$asset"; then
+              echo "Missing expected asset: $asset"
+              exit 1
+            fi
+          done
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="cli-v${{ needs.check-version.outputs.version }}"
+          # --latest=false: this repository also ships app releases tagged
+          # vX.Y.Z (constraint 3 in the runbook). GitHub tracks a single
+          # "Latest" release per repository; letting a cli-v* release claim
+          # it would make releases/latest resolve to the CLI instead of the
+          # app, which is exactly the ambiguity install.ps1/install.sh and
+          # `cx upgrade` are written to avoid by never calling that endpoint.
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest=false

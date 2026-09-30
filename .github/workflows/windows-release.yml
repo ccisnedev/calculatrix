@@ -12,6 +12,12 @@ jobs:
   build:
     runs-on: windows-2022
     timeout-minutes: 60
+    # This repository also ships CLI releases tagged cli-vX.Y.Z (runbook
+    # docs/runbook-cli-stage-0.md, "Publishing (dogfood)", constraint 2):
+    # without this guard, a cli-v* release would also trigger a Windows app
+    # build and upload attempt. workflow_dispatch has no tag_name and is
+    # left unguarded, matching its existing manual-run behavior.
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'v')
 
     steps:
       - uses: actions/checkout@v4
