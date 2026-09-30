@@ -1511,6 +1511,78 @@ void main() {
       );
     },
   );
+
+  group('CalculatrixSession - dup/over/swap/rot agree with duplicate/over/'
+      'swap/rotate at stack depths 0 to 3 (AC4, issue #39)', () {
+    // Correction to the issue text: dup/over/swap/rot have no command of
+    // their own on the session either (D44). Each action runs the
+    // registered word (duplicate/over/swap/rotate) through
+    // Calculatrix.executeWordOn, so it must give the same resulting stack,
+    // or the same error id with the stack left exactly as it was, as
+    // evaluating that word directly through evaluateRpnStack.
+    final Map<String, void Function(CalculatrixSession)> actionByWord =
+        <String, void Function(CalculatrixSession)>{
+          'duplicate': (CalculatrixSession s) => s.dupRpn(),
+          'over': (CalculatrixSession s) => s.overRpn(),
+          'swap': (CalculatrixSession s) => s.swapRpn(),
+          'rotate': (CalculatrixSession s) => s.rotRpn(),
+        };
+
+    void seed(CalculatrixSession target, int depth) {
+      target.setMode(CalculatrixMode.rpn);
+      for (int i = 1; i <= depth; i++) {
+        target.input('$i');
+        target.enter();
+      }
+    }
+
+    actionByWord.forEach((
+      String word,
+      void Function(CalculatrixSession) action,
+    ) {
+      for (int depth = 0; depth <= 3; depth++) {
+        test('$word at depth $depth', () {
+          final List<String> seedTokens = List<String>.generate(
+            depth,
+            (int i) => '${i + 1}',
+          );
+
+          final CalculatrixSession target = CalculatrixSession();
+          seed(target, depth);
+          final List<Matrix> stackBefore = List<Matrix>.of(target.rpnStack);
+          action(target);
+
+          if (target.hasError) {
+            expect(
+              () => Calculatrix.evaluateRpnStack(<String>[...seedTokens, word]),
+              throwsA(
+                isA<CalculatrixError>().having(
+                  (CalculatrixError error) => error.runtimeType,
+                  'runtimeType',
+                  target.lastError.runtimeType,
+                ),
+              ),
+              reason: 'depth $depth',
+            );
+            // A failed action never changes the stack (issue #39, AC4).
+            expect(
+              target.rpnStack,
+              orderedEquals(stackBefore),
+              reason: 'depth $depth',
+            );
+          } else {
+            expect(
+              target.rpnStack,
+              orderedEquals(
+                Calculatrix.evaluateRpnStack(<String>[...seedTokens, word]),
+              ),
+              reason: 'depth $depth',
+            );
+          }
+        });
+      }
+    });
+  });
 }
 
 // Regression fixture for round 4 defect 2: a macro whose first command
@@ -1526,6 +1598,6 @@ class _NegateThenSwapMacro implements CalculatrixMacro {
 
   @override
   Iterable<CalculatrixCommand> expand(CalculatrixMachine machine) {
-    return const <CalculatrixCommand>[NegateCommand(), SwapCommand()];
+    return const <CalculatrixCommand>[NegateCommand(), RollCommand(2)];
   }
 }

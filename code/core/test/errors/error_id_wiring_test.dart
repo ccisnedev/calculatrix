@@ -212,9 +212,9 @@ void main() {
   });
 
   group('RpnEngine throw sites carry the stack-underflow id (issue #5)', () {
-    test('dup on an empty stack', () {
+    test('pick(1) on an empty stack', () {
       try {
-        RpnEngine().dup();
+        RpnEngine().pick(1);
         fail('expected RpnStackUnderflowError');
       } on RpnStackUnderflowError catch (error) {
         expect(error.errorId, CalculatrixErrorId.stackUnderflow);
@@ -230,30 +230,30 @@ void main() {
       }
     });
 
-    test('swap with fewer than two values', () {
+    test('roll(2) with fewer than two values', () {
       try {
-        (RpnEngine()..push(Matrix.scalar(1))).swap();
+        (RpnEngine()..push(Matrix.scalar(1))).roll(2);
         fail('expected RpnStackUnderflowError');
       } on RpnStackUnderflowError catch (error) {
         expect(error.errorId, CalculatrixErrorId.stackUnderflow);
       }
     });
 
-    test('over with fewer than two values', () {
+    test('pick(2) with fewer than two values', () {
       try {
-        (RpnEngine()..push(Matrix.scalar(1))).over();
+        (RpnEngine()..push(Matrix.scalar(1))).pick(2);
         fail('expected RpnStackUnderflowError');
       } on RpnStackUnderflowError catch (error) {
         expect(error.errorId, CalculatrixErrorId.stackUnderflow);
       }
     });
 
-    test('rot with fewer than three values', () {
+    test('roll(3) with fewer than three values', () {
       try {
         (RpnEngine()
               ..push(Matrix.scalar(1))
               ..push(Matrix.scalar(2)))
-            .rot();
+            .roll(3);
         fail('expected RpnStackUnderflowError');
       } on RpnStackUnderflowError catch (error) {
         expect(error.errorId, CalculatrixErrorId.stackUnderflow);

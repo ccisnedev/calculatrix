@@ -161,18 +161,6 @@ void main() {
       );
     });
 
-    test('duplicates top value with dup', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(9);
-
-      final Matrix duplicated = engine.dup();
-
-      expect(duplicated, Matrix.scalar(9));
-      expect(engine.depth, 2);
-      expect(engine.pop(), Matrix.scalar(9));
-      expect(engine.pop(), Matrix.scalar(9));
-    });
-
     test('drops top value with drop', () {
       final RpnEngine engine = RpnEngine();
       engine.pushScalar(1);
@@ -185,55 +173,10 @@ void main() {
       expect(engine.peek(), Matrix.scalar(1));
     });
 
-    test('swaps top two values with swap', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(1);
-      engine.pushScalar(2);
-
-      engine.swap();
-
-      expect(engine.pop(), Matrix.scalar(1));
-      expect(engine.pop(), Matrix.scalar(2));
-    });
-
-    test('copies second value to top with over', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(3);
-      engine.pushScalar(7);
-
-      final Matrix copied = engine.over();
-
-      expect(copied, Matrix.scalar(3));
-      expect(engine.depth, 3);
-      expect(engine.pop(), Matrix.scalar(3));
-      expect(engine.pop(), Matrix.scalar(7));
-      expect(engine.pop(), Matrix.scalar(3));
-    });
-
-    test('throws underflow for dup on empty stack', () {
-      final RpnEngine engine = RpnEngine();
-
-      expect(() => engine.dup(), throwsA(isA<RpnStackUnderflowError>()));
-    });
-
     test('throws underflow for drop on empty stack', () {
       final RpnEngine engine = RpnEngine();
 
       expect(() => engine.drop(), throwsA(isA<RpnStackUnderflowError>()));
-    });
-
-    test('throws underflow for swap with fewer than two values', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(1);
-
-      expect(() => engine.swap(), throwsA(isA<RpnStackUnderflowError>()));
-    });
-
-    test('throws underflow for over with fewer than two values', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(1);
-
-      expect(() => engine.over(), throwsA(isA<RpnStackUnderflowError>()));
     });
 
     test('pick copies nth value from top using 1-based indexing', () {
@@ -267,44 +210,21 @@ void main() {
       expect(engine.pop(), Matrix.scalar(20));
     });
 
-    test('rot rotates top three values', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(1);
-      engine.pushScalar(2);
-      engine.pushScalar(3);
-
-      final Matrix moved = engine.rot();
-
-      expect(moved, Matrix.scalar(1));
-      expect(engine.pop(), Matrix.scalar(1));
-      expect(engine.pop(), Matrix.scalar(3));
-      expect(engine.pop(), Matrix.scalar(2));
-    });
-
-    test('pick throws range error for invalid index', () {
+    test('pick throws range error for a malformed index, underflow beyond depth', () {
       final RpnEngine engine = RpnEngine();
       engine.pushScalar(1);
 
       expect(() => engine.pick(0), throwsA(isA<RpnStackRangeError>()));
-      expect(() => engine.pick(2), throwsA(isA<RpnStackRangeError>()));
+      expect(() => engine.pick(2), throwsA(isA<RpnStackUnderflowError>()));
       expect(() => engine.pick(0), throwsA(isA<RpnStackError>()));
     });
 
-    test('roll throws range error for invalid index', () {
+    test('roll throws range error for a malformed index, underflow beyond depth', () {
       final RpnEngine engine = RpnEngine();
       engine.pushScalar(1);
 
       expect(() => engine.roll(0), throwsA(isA<RpnStackRangeError>()));
-      expect(() => engine.roll(2), throwsA(isA<RpnStackRangeError>()));
-    });
-
-    test('rot throws underflow with fewer than three values', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(1);
-      engine.pushScalar(2);
-
-      expect(() => engine.rot(), throwsA(isA<RpnStackUnderflowError>()));
-      expect(() => engine.rot(), throwsA(isA<RpnStackError>()));
+      expect(() => engine.roll(2), throwsA(isA<RpnStackUnderflowError>()));
     });
 
     test('applyUnary throws stack error on empty stack', () {

@@ -53,12 +53,12 @@ void main() {
       expect(() => snapshot.add(Matrix.scalar(9)), throwsUnsupportedError);
     });
 
-    test('duplicates and drops values through typed stack commands', () {
+    test('duplicates (1 pick) and drops values through typed stack commands', () {
       final CalculatrixMachine machine = CalculatrixMachine();
 
       machine.executeAll(<CalculatrixCommand>[
         const PushScalarCommand(9),
-        const DupCommand(),
+        const PickCommand(1),
         const DropCommand(),
       ]);
 
@@ -67,14 +67,14 @@ void main() {
       expect(machine.stackSnapshot, orderedEquals(<Matrix>[Matrix.scalar(9)]));
     });
 
-    test('swaps and copies values through typed stack commands', () {
+    test('swaps (2 roll) and copies (2 pick) values through typed stack commands', () {
       final CalculatrixMachine machine = CalculatrixMachine();
 
       machine.executeAll(<CalculatrixCommand>[
         const PushScalarCommand(3),
         const PushScalarCommand(7),
-        const SwapCommand(),
-        const OverCommand(),
+        const RollCommand(2),
+        const PickCommand(2),
       ]);
 
       expect(
@@ -109,14 +109,14 @@ void main() {
       );
     });
 
-    test('rotates top three values through a typed command', () {
+    test('rotates top three values through a typed command (3 roll)', () {
       final CalculatrixMachine machine = CalculatrixMachine();
 
       machine.executeAll(<CalculatrixCommand>[
         const PushScalarCommand(1),
         const PushScalarCommand(2),
         const PushScalarCommand(3),
-        const RotCommand(),
+        const RollCommand(3),
       ]);
 
       expect(
@@ -158,13 +158,13 @@ void main() {
       expect(machine.depth, 1);
     });
 
-    test('surfaces stack range errors through typed commands', () {
+    test('surfaces stack range and underflow errors through typed commands', () {
       final CalculatrixMachine machine = CalculatrixMachine();
 
       machine.execute(const PushScalarCommand(1));
 
       expect(() => machine.execute(const PickCommand(0)), throwsA(isA<RpnStackRangeError>()));
-      expect(() => machine.execute(const RollCommand(2)), throwsA(isA<RpnStackRangeError>()));
+      expect(() => machine.execute(const RollCommand(2)), throwsA(isA<RpnStackUnderflowError>()));
     });
 
     test('pushes zeros, ones, and identity matrices through typed commands', () {
