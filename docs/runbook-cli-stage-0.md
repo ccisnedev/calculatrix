@@ -175,10 +175,10 @@ product `Y · log B` does not matter for them.
 | 2 | scalar > 0 | square matrix | `exp(ln B · Y)` | `e πi ^` gives `[[-1 0] [0 -1]]` |
 | 3 | complex, or scalar < 0 | complex | `exp(Y · log B)` | `i i ^` gives `[[0.2079 0] [0 0.2079]]`, which is e^(-π/2) |
 | 4 | square | integer scalar | repeated multiplication; a negative integer uses the inverse; a singular B with a negative integer is `singular-matrix` | `[[1 1] [0 1]] 3 ^` gives `[[1 3] [0 1]]` |
-| 5 | square | non-integer scalar | `exp(y · log B)`. A base that is not a scalar and not complex, with a real eigenvalue ≤ 0, is `log-undefined` (deferred, see below) | `[[2 0] [0 3]] 0.5 ^` gives `[[1.4142 0] [0 1.7321]]`; `[[1 1] [0 1]] 0.5 ^` gives `[[1 0.5] [0 1]]`, with a base that is not diagonalizable |
+| 5 | square | non-integer scalar | `exp(y · log B)`. A base that is not a scalar and not complex, with a real eigenvalue ≤ 0, is `log-undefined` (deferred, see below). Exception, amended 2026-09-29 (D44): y = 1/2 is the principal matrix square root, the same algorithm as `sqrt`, so a singular base with no negative eigenvalue has a result (`[[0 0] [0 4]] 0.5 ^` gives `[[0 0] [0 2]]`); a base with no real square root is `log-undefined` | `[[2 0] [0 3]] 0.5 ^` gives `[[1.4142 0] [0 1.7321]]`; `[[1 1] [0 1]] 0.5 ^` gives `[[1 0.5] [0 1]]`, with a base that is not diagonalizable |
 | 6 | any other pair with Y not a scalar (order of checks, below) | square, not scalar | `ambiguous-power`: `exp(Y log B)` and `exp(log B · Y)` differ when Y and log B do not commute. Case 3 is the exception | `[[1 1] [0 1]] [[0 1] [1 0]] ^`: `log B` is `[[0 1] [0 0]]`, and the two orders give `[[1 0] [0 2.7183]]` and `[[2.7183 0] [0 1]]` |
 | 7 | 0 | scalar | Y > 0 gives 0; `0 0 ^` gives 1; Y < 0 is `non-finite` | `0 -1 ^` |
-| 8 | 0, or a singular matrix, where the case needs `log B` | | `log-undefined` | `0 πi ^` |
+| 8 | 0, or a singular matrix, where the case needs `log B` (never for y = 1/2, case 5) | | `log-undefined` | `0 πi ^` |
 | 9 | not square | any | `dimension-mismatch` | `[[1 2]] 2 ^` |
 | 10 | any | not square | `dimension-mismatch` | `2 [[1 2]] ^`, `[[1 0] [0 1]] [[1 2]] ^` |
 | 11 | n x n | m x m, n ≠ m, neither scalar | `dimension-mismatch` | `[[1 0] [0 1]] [[1 0 0] [0 1 0] [0 0 1]] ^` |
