@@ -47,7 +47,8 @@ class CalculatrixSession {
   Matrix? get rpnTopValue => _machine.top;
 
   List<String> get rpnStackLiterals {
-    return _machine.stackSnapshot.reversed
+    return _machine.stackSnapshot
+        .reversed
         .map(_serializeMatrix)
         .toList(growable: false);
   }
@@ -137,9 +138,7 @@ class CalculatrixSession {
       return;
     }
 
-    if (_infixDraft.isEmpty &&
-        _currentValue != null &&
-        _lastOperator.isNotEmpty) {
+    if (_infixDraft.isEmpty && _currentValue != null && _lastOperator.isNotEmpty) {
       _infixDraft =
           '${_expressionSeedFromCurrentValue()}$_lastOperator$_lastOperand';
     }
@@ -298,9 +297,7 @@ class CalculatrixSession {
     }
 
     try {
-      _memoryValue = _memoryValue == null
-          ? operand.scale(-1)
-          : _memoryValue! - operand;
+      _memoryValue = _memoryValue == null ? operand.scale(-1) : _memoryValue! - operand;
       _clearError();
     } on CalculatrixError catch (error) {
       _lastError = error;
@@ -391,9 +388,9 @@ class CalculatrixSession {
   }
 
   Matrix _evaluateExpression(String expression) {
-    final String normalized = _normalizeSessionPercentExpression(
-      expression,
-    ).replaceAll('×', '*').replaceAll('÷', '/');
+    final String normalized = _normalizeSessionPercentExpression(expression)
+        .replaceAll('×', '*')
+        .replaceAll('÷', '/');
 
     return Calculatrix.evaluateInfix(normalized);
   }
@@ -410,9 +407,7 @@ class CalculatrixSession {
   // all; a raw scan that does not even track bracket depth would find it
   // first).
   void _saveLastOperation(String expression) {
-    final String normalized = expression
-        .replaceAll('×', '*')
-        .replaceAll('÷', '/');
+    final String normalized = expression.replaceAll('×', '*').replaceAll('÷', '/');
 
     List<String> tokens;
     try {
@@ -655,9 +650,7 @@ class CalculatrixSession {
   }
 
   String _currentInfixOperandExpression(String expression) {
-    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(
-      expression,
-    );
+    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(expression);
     return context?.rightExpression ?? expression;
   }
 
@@ -736,9 +729,9 @@ class CalculatrixSession {
   // "[[1 2] [3 4]]" apart, so this delegates to the same bracket-aware
   // tokenizer the core uses for RPN programs rather than a second one.
   List<Matrix> _parseDraftTokens(String draft) {
-    return Calculatrix.tokenizeRpnLine(
-      draft,
-    ).map(_parseDraftOperand).toList(growable: false);
+    return Calculatrix.tokenizeRpnLine(draft)
+        .map(_parseDraftOperand)
+        .toList(growable: false);
   }
 
   /// Toggles the sign of the last token in a multi-operand rpn draft,
@@ -852,8 +845,7 @@ class CalculatrixSession {
       // action only clears memory, so "MC" with no pending draft must
       // leave repeat-equals intact, matching the empty-draft case there).
       _syncCommittedValueFromRpnStack(
-        invalidateRepeatEquals:
-            _machine.mutationCount != mutationCountBeforeAction,
+        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
       );
     } on FormatException catch (error) {
       _lastError = error;
@@ -870,14 +862,12 @@ class CalculatrixSession {
       // content in place without changing how many elements are on the
       // stack (e.g. negating the top), which depth alone cannot detect.
       _syncCommittedValueFromRpnStack(
-        invalidateRepeatEquals:
-            _machine.mutationCount != mutationCountBeforeAction,
+        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
       );
     } on CalculatrixError catch (error) {
       _lastError = error;
       _syncCommittedValueFromRpnStack(
-        invalidateRepeatEquals:
-            _machine.mutationCount != mutationCountBeforeAction,
+        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
       );
     }
   }
@@ -893,7 +883,9 @@ class CalculatrixSession {
     }
   }
 
-  void _syncCommittedValueFromRpnStack({bool invalidateRepeatEquals = false}) {
+  void _syncCommittedValueFromRpnStack({
+    bool invalidateRepeatEquals = false,
+  }) {
     _currentValue = _machine.top;
     if (invalidateRepeatEquals) {
       _clearRepeatState();
@@ -993,9 +985,7 @@ class CalculatrixSession {
   }
 
   String _normalizeSessionPercentExpression(String expression) {
-    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(
-      expression,
-    );
+    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(expression);
     if (context != null) {
       final String normalizedLeft = _normalizeSessionPercentExpression(
         context.leftExpression,
@@ -1016,9 +1006,8 @@ class CalculatrixSession {
     required String normalizedLeftExpression,
     required String rightExpression,
   }) {
-    final _InfixPercentContext? percentContext = _tryParseInfixPercentContext(
-      rightExpression,
-    );
+    final _InfixPercentContext? percentContext =
+        _tryParseInfixPercentContext(rightExpression);
     if (percentContext == null) {
       return _normalizeStandalonePercentExpression(rightExpression);
     }
@@ -1046,9 +1035,8 @@ class CalculatrixSession {
   }
 
   String _normalizeStandalonePercentExpression(String expression) {
-    final _InfixPercentContext? percentContext = _tryParseInfixPercentContext(
-      expression,
-    );
+    final _InfixPercentContext? percentContext =
+        _tryParseInfixPercentContext(expression);
     if (percentContext == null) {
       return expression;
     }
@@ -1116,11 +1104,7 @@ class CalculatrixSession {
       }
 
       buffer.write('[');
-      for (
-        int columnIndex = 0;
-        columnIndex < matrix.columnCount;
-        columnIndex++
-      ) {
+      for (int columnIndex = 0; columnIndex < matrix.columnCount; columnIndex++) {
         if (columnIndex > 0) {
           buffer.write(',');
         }
