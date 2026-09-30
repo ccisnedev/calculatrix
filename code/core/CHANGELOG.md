@@ -11,17 +11,22 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 - A core command registry (spec section 7): `CalculatrixCommandRegistry`
   resolves an RPN word to a `CalculatrixCommandEntry` by name or alias,
   case-insensitively, carrying the documentation fields spec section 7
-  requires (search terms, HP 50g equivalent, category, stack effect,
+  requires (search terms, HP 50g reference, category, stack effect,
   preconditions, description, executable examples, errors, see also) plus
   how to build its `CalculatrixCommand`. `Calculatrix._compileRpnToken` now
   resolves every non-literal RPN word through
   `CalculatrixCommandRegistry.standard` instead of a hardcoded switch; a
   word the registry does not know still raises `unknown-word` as before.
-  This PR registers the operators the compiler already knew (`+`, `-`,
-  `*`, `/`, `√`, `%`), with no new math, and adds `power`, with aliases
-  `pwr` and `^` (runbook D14, D18). `vector`, `rows`, `append-rows`,
-  `append-cols`, the `cx commands` route and "did you mean" are left to
-  follow-up PRs (issue #32).
+  This PR registers the operators the compiler already knew, named per
+  runbook D41 (names are words, symbols are aliases): `add` (`+`),
+  `subtract` (`-`), `multiply` (`*`), `divide` (`/`), `percent` (`%`), and
+  `power`, with aliases `pwr` and `^` (runbook D14, D18). `sqrt` (alias
+  `√`) is also registered, still as a primitive command; its defined-word
+  form (`0.5 power`, runbook D43, D44) is left to a follow-up PR, along
+  with `vector`, `rows`, `append-rows`, `append-cols`, the `cx commands`
+  route and "did you mean" (issue #32). The entry field `hp50gEquivalent`
+  is named `hp50gReference` instead: purely informative, never resolved as
+  a word (runbook D42, "the HP 50g is inspiration, not adoption").
 
 ### Fixed
 

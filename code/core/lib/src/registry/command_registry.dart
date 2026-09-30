@@ -37,7 +37,7 @@ final class CalculatrixCommandEntry {
     required this.name,
     this.aliases = const <String>[],
     this.searchTerms = const <String>[],
-    this.hp50gEquivalent,
+    this.hp50gReference,
     required this.category,
     required this.stackEffect,
     this.preconditions,
@@ -64,8 +64,11 @@ final class CalculatrixCommandEntry {
   /// program raises `unknown-word` (spec section 7, runbook D29).
   final List<String> searchTerms;
 
-  /// The closest HP 50g command name, or null when there is none.
-  final String? hp50gEquivalent;
+  /// The closest HP 50g command name, or null when there is none. Purely
+  /// informative (runbook D42, "the HP 50g is inspiration, not adoption"):
+  /// never resolved by [CalculatrixCommandRegistry.lookup], so an HP-only
+  /// spelling such as "->ARRY" is never a name or alias of any entry.
+  final String? hp50gReference;
 
   /// The registry category this entry belongs to (spec section 7).
   final CalculatrixCommandCategory category;
@@ -154,14 +157,19 @@ final class CalculatrixCommandRegistry {
 
   /// The registry of every word `_compileRpnToken` recognizes today (issue
   /// #32): the operators the RPN compiler used to resolve through its own
-  /// hardcoded switch, with no new math. Follow-up PRs add `vector`,
-  /// `rows`, `append-rows`, `append-cols` and the rest of spec section 7.
+  /// hardcoded switch, with no new math. Names are words of the language
+  /// and their historical symbols are aliases (runbook D41); `sqrt` stays
+  /// a primitive command here, its defined-word form (`0.5 power`, runbook
+  /// D43, D44) is step S4b of the runbook, not this PR. Follow-up PRs add
+  /// `vector`, `rows`, `append-rows`, `append-cols` and the rest of spec
+  /// section 7.
   static final CalculatrixCommandRegistry
   standard = CalculatrixCommandRegistry(<CalculatrixCommandEntry>[
     CalculatrixCommandEntry(
-      name: '+',
-      searchTerms: const <String>['add', 'plus', 'sum'],
-      hp50gEquivalent: '+',
+      name: 'add',
+      aliases: const <String>['+'],
+      searchTerms: const <String>['plus', 'sum'],
+      hp50gReference: '+',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A B -> A+B',
       preconditions:
@@ -170,15 +178,17 @@ final class CalculatrixCommandRegistry {
       description: 'Adds A and B element-wise.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('2 3 +', Matrix.scalar(5)),
+        CalculatrixCommandExample('2 3 add', Matrix.scalar(5)),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
-      seeAlso: const <String>['-'],
+      seeAlso: const <String>['subtract'],
       build: () => const AddCommand(),
     ),
     CalculatrixCommandEntry(
-      name: '-',
-      searchTerms: const <String>['subtract', 'minus', 'difference'],
-      hp50gEquivalent: '-',
+      name: 'subtract',
+      aliases: const <String>['-'],
+      searchTerms: const <String>['minus', 'difference'],
+      hp50gReference: '-',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A B -> A-B',
       preconditions:
@@ -187,15 +197,17 @@ final class CalculatrixCommandRegistry {
       description: 'Subtracts B from A element-wise.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('5 3 -', Matrix.scalar(2)),
+        CalculatrixCommandExample('5 3 subtract', Matrix.scalar(2)),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
-      seeAlso: const <String>['+'],
+      seeAlso: const <String>['add'],
       build: () => const SubtractCommand(),
     ),
     CalculatrixCommandEntry(
-      name: '*',
-      searchTerms: const <String>['multiply', 'times', 'product'],
-      hp50gEquivalent: '*',
+      name: 'multiply',
+      aliases: const <String>['*'],
+      searchTerms: const <String>['times', 'product'],
+      hp50gReference: '*',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A B -> A*B',
       preconditions: "A's columns equal B's rows, or either is a scalar (1x1)",
@@ -204,40 +216,46 @@ final class CalculatrixCommandRegistry {
           'a scalar.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('4 5 *', Matrix.scalar(20)),
+        CalculatrixCommandExample('4 5 multiply', Matrix.scalar(20)),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
-      seeAlso: const <String>['/'],
+      seeAlso: const <String>['divide'],
       build: () => const MultiplyCommand(),
     ),
     CalculatrixCommandEntry(
-      name: '/',
-      searchTerms: const <String>['divide', 'quotient'],
-      hp50gEquivalent: '/',
+      name: 'divide',
+      aliases: const <String>['/'],
+      searchTerms: const <String>['quotient'],
+      hp50gReference: '/',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A B -> A/B',
       preconditions: 'B is a scalar (1x1) and not zero',
       description: 'Divides A by the scalar B.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('10 4 /', Matrix.scalar(2.5)),
+        CalculatrixCommandExample('10 4 divide', Matrix.scalar(2.5)),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.typeMismatch,
         CalculatrixErrorId.nonFinite,
       ],
-      seeAlso: const <String>['*'],
+      seeAlso: const <String>['multiply'],
       build: () => const DivideCommand(),
     ),
     CalculatrixCommandEntry(
-      name: '√',
-      searchTerms: const <String>['sqrt', 'root', 'square-root'],
-      hp50gEquivalent: '√',
+      name: 'sqrt',
+      aliases: const <String>['√'],
+      searchTerms: const <String>['root', 'square-root'],
+      hp50gReference: '√',
       category: CalculatrixCommandCategory.arithmetic,
-      stackEffect: 'X -> sqrt(X)',
+      stackEffect: 'X -> X^(1/2)',
       preconditions: 'X is square (a scalar is 1x1, and therefore square)',
       description:
           'The principal square root of X; a negative scalar gives the '
-          'imaginary unit scaled accordingly.',
+          'imaginary unit scaled accordingly. A primitive command in this '
+          'PR: its defined-word form (0.5 power) is runbook step S4b.',
       examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample('9 sqrt', Matrix.scalar(3)),
         CalculatrixCommandExample('9 √', Matrix.scalar(3)),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
@@ -245,14 +263,15 @@ final class CalculatrixCommandRegistry {
       build: () => const SqrtCommand(),
     ),
     CalculatrixCommandEntry(
-      name: '%',
-      searchTerms: const <String>['percent'],
-      hp50gEquivalent: '%',
+      name: 'percent',
+      aliases: const <String>['%'],
+      hp50gReference: '%',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'X -> X/100',
       description: 'X as a fraction of 100, e.g. "50 %" gives 0.5.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('50 %', Matrix.scalar(0.5)),
+        CalculatrixCommandExample('50 percent', Matrix.scalar(0.5)),
       ],
       build: () => const PercentCommand(),
     ),
@@ -260,7 +279,7 @@ final class CalculatrixCommandRegistry {
       name: 'power',
       aliases: const <String>['pwr', '^'],
       searchTerms: const <String>['exponent', 'raise'],
-      hp50gEquivalent: '^',
+      hp50gReference: '^',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'B Y -> B^Y',
       preconditions:
@@ -282,7 +301,7 @@ final class CalculatrixCommandRegistry {
         CalculatrixErrorId.nonFinite,
         CalculatrixErrorId.singularMatrix,
       ],
-      seeAlso: const <String>['√'],
+      seeAlso: const <String>['sqrt'],
       build: () => const PowerCommand(),
     ),
   ]);
