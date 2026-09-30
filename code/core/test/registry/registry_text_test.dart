@@ -14,8 +14,8 @@ final List<RegExp> _forbiddenPatterns = <RegExp>[
   RegExp('runbook', caseSensitive: false),
   RegExp('issue #', caseSensitive: false),
   RegExp(r'#\d+'),
-  RegExp(r'\bD\d{1,3}\b'),
-  RegExp(r'\bR\d{1,3}\b'),
+  RegExp(r'\bD\d+\b'),
+  RegExp(r'\bR\d+\b'),
   RegExp(r'\bAC\d+\b', caseSensitive: false),
   RegExp(r'\bS\d[a-z]\b', caseSensitive: false),
   RegExp('spec section', caseSensitive: false),
@@ -36,6 +36,7 @@ Iterable<String> _userFacingStrings(CalculatrixCommandEntry entry) {
     if (entry.definition != null) entry.definition!,
     if (entry.hp50gReference != null) entry.hp50gReference!,
     ...entry.seeAlso,
+    for (final CalculatrixErrorId error in entry.errors) error.id,
     for (final CalculatrixCommandExample example in entry.examples)
       example.program,
   ];
