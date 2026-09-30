@@ -69,6 +69,46 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   and error cases exactly (D44, one implementation per concept). A search
   term is never a resolvable word: using one in a program still raises
   `unknown-word`.
+- The rest of the core RPN vocabulary, 1-based indices (runbook step S4d,
+  decision D46, issue #39): every remaining command from the runbook's
+  "Command names" table is now a registry entry, in four new categories
+  (`CalculatrixCommandCategory.stack`, `construction`, `structure`,
+  `linearAlgebra`). Stack words: `pick` and `roll` (both 1-based, level 1
+  is the top; a malformed index is `type-mismatch`, an in-range-but-too-deep
+  index is `stack-underflow`, never `stack-range`) and `drop`, all
+  primitive, backed by the existing `RpnEngine.pick`/`roll`/`drop`.
+  `duplicate` (alias `dup`), `over`, `swap` and `rotate` (alias `rot`) are
+  now defined words (`1 pick`, `2 pick`, `2 roll`, `3 roll`), with no
+  implementation of their own: the app's typed `PickCommand`/`RollCommand`
+  and `CalculatrixSession.dupRpn`/`overRpn`/`swapRpn`/`rotRpn` all execute
+  the registered word by name through the one shared compile path, so an
+  app action and its RPN word always agree, including on errors (D44,
+  "one implementation per concept"). This removes the former dedicated
+  `DupCommand`/`OverCommand`/`SwapCommand`/`RotCommand` classes and
+  `RpnEngine.dup`/`over`/`swap`/`rot` methods; the HP 50g calls its
+  malformed-index case for `PICK`/`ROLL` a plain "bad argument value",
+  which this package maps to `type-mismatch`, not a new error id.
+  Construction words: `zeros`, `ones` and `identity` build new matrices
+  from scalar dimensions (HP 50g `CON`/`IDN`); `0 zeros`/`0 ones`/`0
+  identity` raise `dimension-mismatch`, like `0 vector`. Structure words:
+  `transpose`, and the 1-based `delete-row`, `delete-col`, `duplicate-row`,
+  `duplicate-col`, `move-row` and `move-col`, sharing `Matrix`'s existing
+  0-based row/column methods after converting the index (D46, AC2).
+  Linear algebra words: `determinant` (alias `det`), `trace`, `rank`,
+  `frobenius-norm` (alias `norm`), `spectral-norm`, `eigenvalues` (alias
+  `eig`), `diagonalize`, `cofactors`, `adjugate` (alias `adj`), `dot`,
+  `cross`, `rref`, `lu` and `qr`, all primitive, each backed by the
+  existing `Matrix` method of the same computation, with no new algorithm.
+  `diagonalize` and `lu`/`qr` push several results at once (`P D`, `P L
+  U`, `Q R`), with the whole push atomic through
+  `CalculatrixMachine.executeAtomic` (issue #39, AC5): a mid-push failure
+  leaves the stack exactly as it was, never partially applied. `exp` and
+  `ln` (arithmetic category) round out the transcendental pair alongside
+  `power`; `ln` is named for the natural logarithm because `log` is left
+  free for a future base-10 word (D46). Every new word's preconditions,
+  examples and `seeAlso` follow spec section 7 exactly like the words
+  registered in earlier PRs; none of them introduce a new
+  `CalculatrixErrorId`.
 
 ### Fixed
 
