@@ -59,6 +59,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	stack.
 - `⌫` with no draft and an empty stack no longer shows `Error`. The `DROP`
 	command itself still fails on an empty stack.
+- Matrix literals accept rows with no whitespace between them,
+	`[[0 -1][1 0]]`, the logo's form and the HP 50g's own notation, in RPN
+	and infix. It means the same as `[[0 -1] [1 0]]` (issue #29). Shipped in
+	`cx` 0.8.1.
 
 ## [0.7.1] - 2026-05-30
 
