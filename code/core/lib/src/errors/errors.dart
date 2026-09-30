@@ -26,10 +26,22 @@ enum CalculatrixErrorId {
 }
 
 class CalculatrixError implements Exception {
-  CalculatrixError(this.message, {this.errorId, this.token, this.position});
+  CalculatrixError(
+    this.message, {
+    this.errorId,
+    this.token,
+    this.position,
+    this.suggestions = const <String>[],
+  });
 
   /// Human-readable explanation of the failure.
   final String message;
+
+  /// "Did you mean" candidates (spec section 7, "Did you mean"), closest
+  /// first. Empty when there is nothing close enough, or when this error
+  /// has no notion of a suggestion at all. Only [UnknownWordError] sets
+  /// this today, from [CalculatrixCommandRegistry.suggest].
+  final List<String> suggestions;
 
   /// The structured domain error id (spec section 6), when known.
   final CalculatrixErrorId? errorId;
@@ -135,13 +147,29 @@ class UnsupportedCalculatrixOperationError extends CalculatrixError {
 /// (spec section 6). RPN never falls back to the infix evaluator for an
 /// unrecognized token; it raises this instead.
 class UnknownWordError extends CalculatrixError {
-  UnknownWordError(String token, {int? position})
+  UnknownWordError(String token, {int? position, List<String> suggestions = const <String>[]})
     : super(
-        'Unknown word: $token',
+        suggestions.isEmpty
+            ? 'Unknown word: $token'
+            : 'Unknown word: $token. Did you mean ${_didYouMean(suggestions)}?',
         errorId: CalculatrixErrorId.unknownWord,
         token: token,
         position: position,
+        suggestions: suggestions,
       );
+
+  /// Renders `suggestions` as a message fragment: one name alone, two
+  /// joined by "or", three or more comma-separated with "or" before the
+  /// last (`"append-cols"`, `"a or b"`, `"a, b or c"`).
+  static String _didYouMean(List<String> suggestions) {
+    if (suggestions.length == 1) return '"${suggestions.single}"';
+    final String last = suggestions.last;
+    final String head = suggestions
+        .take(suggestions.length - 1)
+        .map((String s) => '"$s"')
+        .join(', ');
+    return '$head or "$last"';
+  }
 }
 
 /// MR/MRC in rpn mode with nothing stored in memory. Raised only after any

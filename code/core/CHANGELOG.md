@@ -109,6 +109,16 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   examples and `seeAlso` follow spec section 7 exactly like the words
   registered in earlier PRs; none of them introduce a new
   `CalculatrixErrorId`.
+- "Did you mean" for RPN words (spec section 7, "Did you mean"; issue #41):
+  `CalculatrixCommandRegistry.suggest(word)` ranks the registry's entries
+  by restricted edit distance (Damerau-OSA) to their name and aliases,
+  with an exact match on a search term ranked first (`hcat` suggests
+  `append-cols` even though `hcat` is never a word). A dependency-free
+  reimplementation, not a call into `modular_cli_sdk`'s own
+  `CommandCatalog.suggest`: the app needs the very same suggestions
+  without depending on a CLI package. `UnknownWordError` now carries these
+  candidates in a new `suggestions` field (`CalculatrixError.suggestions`,
+  empty by default), and appends them to its own message when not empty.
 
 ### Fixed
 
