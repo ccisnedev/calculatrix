@@ -48,6 +48,27 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   defined (`0.5 power`), both sharing `power`'s exact algorithm for those
   exponents instead of a separate implementation (D44, one implementation
   per concept).
+- `vector`, `rows`, `append-cols` and `append-rows` (runbook step S4c, issue
+  #37): four new primitive registry entries in the new `matrix` category
+  (`CalculatrixCommandCategory`), none of them aliased (runbook D29, R12).
+  `vector` (`x1 ... xn n -> [[x1] ... [xn]]`, HP 50g reference `→ARRY`)
+  builds a column matrix from `n` scalars, reading the stack depth at run
+  time; `n` must be a non-negative integer scalar (`type-mismatch`
+  otherwise), fewer than `n` items below it is `stack-underflow`, and `0
+  vector` raises `dimension-mismatch`, since an empty matrix has no
+  representation (`Matrix`'s own constructor already rejects zero rows).
+  `rows` (`[[...]] -> [row1] ... [rown] n`, HP 50g reference `ROW→`)
+  splits a matrix into its rows plus their count. `append-cols` (`A B ->
+  [A B]`, search terms `hcat`, `horzcat`, `concatenate`, `column`) and
+  `append-rows` (`A B -> A over B`, search terms `vcat`, `vertcat`,
+  `concatenate`, `row`) generalize the existing single-row/column append to
+  any operand of matching size, raising `dimension-mismatch` otherwise.
+  `Matrix.appendRows`/`Matrix.appendColumns` are the single implementation
+  behind these two words and behind the existing `appendRow`/`appendColumn`
+  (and their commands), which keep their current single-row/column results
+  and error cases exactly (D44, one implementation per concept). A search
+  term is never a resolvable word: using one in a program still raises
+  `unknown-word`.
 
 ### Fixed
 

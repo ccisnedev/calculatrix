@@ -9,22 +9,33 @@ import '../matrix/matrix.dart';
 /// (deferred to a follow-up PR) can validate its argument against the
 /// registry itself instead of an arbitrary string (spec section 7,
 /// "the categories are an enumeration taken from the registry").
-enum CalculatrixCommandCategory { arithmetic }
+enum CalculatrixCommandCategory { arithmetic, matrix }
 
 /// One example RPN program from a registry entry's documentation (spec
 /// section 7, "Examples"). Executable, not prose: a core test runs every
 /// registered example and compares its result, so an entry's documentation
 /// cannot drift from what the command actually does (issue #32, AC6).
 final class CalculatrixCommandExample {
-  const CalculatrixCommandExample(this.program, this.expected);
+  /// An example whose program leaves a single value on the stack.
+  CalculatrixCommandExample(this.program, Matrix expected)
+    : expectedStack = <Matrix>[expected];
+
+  /// An example whose program leaves several values on the stack, bottom to
+  /// top (e.g. `rows`, issue #37, AC3: `[[1 2] [3 4]] rows` leaves three
+  /// values, not one).
+  CalculatrixCommandExample.stack(this.program, this.expectedStack);
 
   /// The RPN program to run, e.g. "2 3 pwr". Tokenized the same way any
   /// other RPN input is (see [Calculatrix.tokenizeRpnLine]), so a
   /// space-separated matrix literal in an example is not split apart.
   final String program;
 
-  /// The single value [program] must leave on the stack.
-  final Matrix expected;
+  /// The full stack [program] must leave, bottom to top.
+  final List<Matrix> expectedStack;
+
+  /// The single value [program] must leave on the stack. Only meaningful
+  /// when [expectedStack] holds exactly one value.
+  Matrix get expected => expectedStack.single;
 }
 
 /// One entry of the core command registry (spec section 7): the fields the
@@ -436,6 +447,135 @@ final class CalculatrixCommandRegistry {
       ],
       seeAlso: const <String>['sqrt', 'inverse'],
       build: () => const PowerCommand(),
+    ),
+    CalculatrixCommandEntry(
+      name: 'vector',
+      searchTerms: const <String>[],
+      hp50gReference: '→ARRY',
+      category: CalculatrixCommandCategory.matrix,
+      stackEffect: 'x1 ... xn n -> [[x1] ... [xn]]',
+      preconditions:
+          'n is a non-negative integer scalar; the stack holds at least n '
+          'more scalars below n',
+      description:
+          'Builds the n x 1 column matrix [[x1] ... [xn]] from the n '
+          'scalars below the count n (issue #37, S4c). "0 vector" raises '
+          'dimension-mismatch: an empty matrix has no representation '
+          '(Matrix itself rejects zero rows), so a zero-length vector is '
+          'not buildable.',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample(
+          '0 1 2 vector',
+          Matrix(<List<double>>[
+            <double>[0],
+            <double>[1],
+          ]),
+        ),
+        CalculatrixCommandExample(
+          '5 1 vector',
+          Matrix(<List<double>>[
+            <double>[5],
+          ]),
+        ),
+        CalculatrixCommandExample(
+          '1 2 3 3 vector',
+          Matrix(<List<double>>[
+            <double>[1],
+            <double>[2],
+            <double>[3],
+          ]),
+        ),
+      ],
+      errors: const <CalculatrixErrorId>[
+        CalculatrixErrorId.typeMismatch,
+        CalculatrixErrorId.stackUnderflow,
+        CalculatrixErrorId.dimensionMismatch,
+      ],
+      seeAlso: const <String>['rows', 'append-cols', 'append-rows'],
+      build: () => const VectorCommand(),
+    ),
+    CalculatrixCommandEntry(
+      name: 'rows',
+      searchTerms: const <String>[],
+      hp50gReference: 'ROW→',
+      category: CalculatrixCommandCategory.matrix,
+      stackEffect: '[[...]] -> [row1] ... [rown] n',
+      description:
+          'Splits a matrix into its rows, each a 1 x m matrix, followed by '
+          'the row count n at level 1 (issue #37, S4c). A scalar has a '
+          'single row, itself.',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample.stack('[[1 2] [3 4]] rows', <Matrix>[
+          Matrix(<List<double>>[
+            <double>[1, 2],
+          ]),
+          Matrix(<List<double>>[
+            <double>[3, 4],
+          ]),
+          Matrix.scalar(2),
+        ]),
+        CalculatrixCommandExample.stack('7 rows', <Matrix>[
+          Matrix.scalar(7),
+          Matrix.scalar(1),
+        ]),
+      ],
+      errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
+      seeAlso: const <String>['vector', 'append-rows'],
+      build: () => const RowsCommand(),
+    ),
+    CalculatrixCommandEntry(
+      name: 'append-cols',
+      searchTerms: const <String>['hcat', 'horzcat', 'concatenate', 'column'],
+      category: CalculatrixCommandCategory.matrix,
+      stackEffect: 'A B -> [A B]',
+      preconditions: 'A and B have the same number of rows',
+      description:
+          'Places the columns of B to the right of A (issue #37, S4c): a '
+          'generalization of the single-column append to any matrix B of '
+          'matching row count, sharing its implementation (runbook D44).',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample(
+          '0 1 2 vector -1 0 2 vector append-cols',
+          Matrix(<List<double>>[
+            <double>[0, -1],
+            <double>[1, 0],
+          ]),
+        ),
+        CalculatrixCommandExample(
+          '[[1 2] [3 4]] [[5 6 7] [8 9 10]] append-cols',
+          Matrix(<List<double>>[
+            <double>[1, 2, 5, 6, 7],
+            <double>[3, 4, 8, 9, 10],
+          ]),
+        ),
+      ],
+      errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
+      seeAlso: const <String>['append-rows', 'vector'],
+      build: () => const AppendColsCommand(),
+    ),
+    CalculatrixCommandEntry(
+      name: 'append-rows',
+      searchTerms: const <String>['vcat', 'vertcat', 'concatenate', 'row'],
+      category: CalculatrixCommandCategory.matrix,
+      stackEffect: 'A B -> A over B',
+      preconditions: 'A and B have the same number of columns',
+      description:
+          'Places the rows of B below A (issue #37, S4c): a generalization '
+          'of the single-row append to any matrix B of matching column '
+          'count, sharing its implementation (runbook D44).',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample(
+          '[[1 2]] [[3 4] [5 6]] append-rows',
+          Matrix(<List<double>>[
+            <double>[1, 2],
+            <double>[3, 4],
+            <double>[5, 6],
+          ]),
+        ),
+      ],
+      errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
+      seeAlso: const <String>['append-cols', 'vector', 'rows'],
+      build: () => const AppendRowsCommand(),
     ),
   ]);
 }
