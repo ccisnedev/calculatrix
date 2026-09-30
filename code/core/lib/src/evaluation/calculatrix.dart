@@ -86,6 +86,19 @@ class Calculatrix {
     return _runRpn(tokens).stackSnapshot;
   }
 
+  /// Compiles `word` through the command registry, exactly as any RPN
+  /// token is compiled (a primitive word to its own command, a defined
+  /// word such as `over` (runbook D43) to the commands its definition
+  /// program compiles to, recursively), and runs the result on `machine`
+  /// as one atomic unit. Used by [CalculatrixSession]'s dup/over/swap/rot
+  /// actions so a defined word runs through this one compile path instead
+  /// of a hand-written command that would duplicate its own definition
+  /// (D44, issue #39): `over` on the session behaves exactly as typing
+  /// "2 pick" does anywhere else.
+  static void executeWordOn(CalculatrixMachine machine, String word) {
+    machine.executeAtomic(_compileWord(word));
+  }
+
   static CalculatrixMachine _runRpn(List<String> tokens) {
     if (tokens.isEmpty) {
       throw ExpressionSyntaxError(

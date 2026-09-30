@@ -61,6 +61,27 @@ final class CalculatrixMachine {
     }
   }
 
+  // Like execute(), but for a whole group of commands taken as one unit:
+  // a single snapshot is taken before the first command, and any command
+  // in the group throwing restores the stack all the way back to that one
+  // snapshot, not just to the state before the failing command. Needed for
+  // a defined word's expansion (e.g. "over" compiling to "2 pick"): a
+  // reader of the word must see it either fully apply or not apply at all,
+  // never left with just its literal operand (the "2") pushed and nothing
+  // else (D44, issue #39).
+  void executeAtomic(Iterable<CalculatrixCommand> commands) {
+    final List<Matrix> snapshot = _engine.stack;
+    try {
+      for (final CalculatrixCommand command in commands) {
+        command.executeOn(_engine);
+      }
+    } catch (_) {
+      _engine.restore(snapshot);
+      rethrow;
+    }
+    _mutationCount++;
+  }
+
   void executeProgram(CalculatrixProgram program) {
     executeAll(program.commands);
   }

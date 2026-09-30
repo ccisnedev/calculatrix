@@ -36,19 +36,12 @@ class RpnEngine {
     push(Matrix.scalar(value));
   }
 
-  Matrix dup() {
-    if (_stack.isEmpty) {
-      throw RpnStackUnderflowError(
-        'Cannot dup from an empty RPN stack.',
-        errorId: CalculatrixErrorId.stackUnderflow,
-      );
-    }
-
-    final Matrix top = _stack.last;
-    _stack.add(top);
-    return top;
-  }
-
+  // pick, roll and drop are the only stack-shuffling primitives the engine
+  // itself implements. dup, swap, over and rot are not engine methods:
+  // they are pure RPN definitions (1 pick, 2 roll, 2 pick, 3 roll) that
+  // compile down to these same primitives, so there is exactly one
+  // implementation of "read/move the nth value from the top" (D44) and a
+  // defined word never duplicates engine logic of its own (issue #39).
   Matrix drop() {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError(
@@ -58,33 +51,6 @@ class RpnEngine {
     }
 
     return _stack.removeLast();
-  }
-
-  void swap() {
-    if (_stack.length < 2) {
-      throw RpnStackUnderflowError(
-        'Swap requires at least two values in the stack.',
-        errorId: CalculatrixErrorId.stackUnderflow,
-      );
-    }
-
-    final int top = _stack.length - 1;
-    final Matrix a = _stack[top];
-    _stack[top] = _stack[top - 1];
-    _stack[top - 1] = a;
-  }
-
-  Matrix over() {
-    if (_stack.length < 2) {
-      throw RpnStackUnderflowError(
-        'Over requires at least two values in the stack.',
-        errorId: CalculatrixErrorId.stackUnderflow,
-      );
-    }
-
-    final Matrix second = _stack[_stack.length - 2];
-    _stack.add(second);
-    return second;
   }
 
   Matrix pick(int indexFromTop) {
@@ -102,17 +68,6 @@ class RpnEngine {
     final Matrix value = _stack.removeAt(sourceIndex);
     _stack.add(value);
     return value;
-  }
-
-  Matrix rot() {
-    if (_stack.length < 3) {
-      throw RpnStackUnderflowError(
-        'Rot requires at least three values in the stack.',
-        errorId: CalculatrixErrorId.stackUnderflow,
-      );
-    }
-
-    return roll(3);
   }
 
   Matrix peek() {
@@ -207,6 +162,12 @@ class RpnEngine {
     return value.scale(0.01);
   }
 
+  // A malformed index (less than 1) is a range error: it can never be valid,
+  // regardless of how deep the stack is. An index that is well-formed but
+  // reaches past the current depth (including the empty-stack case, where
+  // every index from 1 up is out of reach) is a stack-underflow: there
+  // simply are not enough values yet, the same condition drop reports
+  // (AC4, issue #39).
   void _requireValidRange(int indexFromTop) {
     if (indexFromTop < 1) {
       throw RpnStackRangeError(
@@ -214,16 +175,10 @@ class RpnEngine {
       );
     }
 
-    if (_stack.isEmpty) {
-      throw RpnStackUnderflowError(
-        'Stack is empty.',
-        errorId: CalculatrixErrorId.stackUnderflow,
-      );
-    }
-
     if (indexFromTop > _stack.length) {
-      throw RpnStackRangeError(
+      throw RpnStackUnderflowError(
         'Stack index $indexFromTop exceeds current depth ${_stack.length}.',
+        errorId: CalculatrixErrorId.stackUnderflow,
       );
     }
   }
