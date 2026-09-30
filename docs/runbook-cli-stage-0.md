@@ -82,6 +82,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D43 | A registry entry is either primitive (it builds a core command) or defined (an RPN program over other words of the registry, like a user program of the HP or a colon definition of Forth, but inside the registry). `inverse` is defined as `-1 power` and `sqrt` as `0.5 power`: in Calculatrix everything is a matrix, and `power` already covers both. `cx commands show` prints the definition. An error raised inside a defined word reports the word the user wrote and its position (`[[1 2] [2 4]] inverse` is `singular-matrix` with `token: inverse`). A definition that reaches itself, directly or through other words, is rejected when the registry is built. | User, 2026-09-29 |
 | D44 | One implementation per concept. `power` uses the exact algorithm of an exponent that has one: repeated multiplication for an integer, the inverse for `-1`, the matrix square root for `1/2`. A defined word and its definition give bitwise identical results, and a core test checks it for every defined word on its examples and on the rows of the D25 table that apply. A word whose definition is not yet identical stays primitive until it is. Found on 2026-09-29: `-4 √` gives `[[0 -2] [2 0]]` but `-4 0.5 ^` gives rounding noise. | User, 2026-09-29 |
 | D45 | The text output of the CLI uses the display formatter of core, the one the app uses: at most 12 significant digits (the STD display of the HP 50g), trailing zeros removed, so `[[1 2] [3 4]] -1 ^` prints `[[-2 1] [1.5 -0.5]]` instead of `-1.9999999999999996`. The stored value never changes, and `--json` keeps the full double. | User, 2026-09-29 |
+| D46 | The rest of the core vocabulary gets the names of the table "Command names" (step S4d): stack, construction, structure and linear algebra words, `exp` and `ln` (`log` stays free for base 10), `frobenius-norm` with alias `norm`, `duplicate` with alias `dup`, `rotate` with alias `rot` (a rotation matrix, if ever needed, is a product of matrices and is studied then). `duplicate`, `over`, `swap` and `rotate` are defined as `1 pick`, `2 pick`, `2 roll` and `3 roll`. Every index is 1-based: stack levels (level 1 is the top) and the rows and columns of a matrix, as in mathematical notation (a11 is the first entry) and in MATLAB, Julia and R; the conversion to the 0-based indices of the core happens once, in the words. Mathematical language comes first. | User, 2026-09-30 |
 
 ## Command catalog (proposal)
 
@@ -152,12 +153,46 @@ informative reference, never a word of the language (D42).
 | `append-rows` | none (D29) | primitive | none (closest: `ROW+`) | `A B` gives A over B; A and B need the same number of columns |
 | `rows` | none | primitive | `ROW→` | `[[...]]` gives `[row1] ... [rown] n` |
 | `exp` | none | primitive | `EXP` | `X` gives e^X |
+| `ln` | none | primitive | `LN` | `X` gives the principal logarithm of X (`Matrix.log`) |
+| `negate` | `neg` | primitive | `NEG` | `A` gives -A |
+| `pick` | none | primitive | `PICK` | `n pick` copies level n to the top |
+| `roll` | none | primitive | `ROLL` | `n roll` moves level n to the top |
+| `drop` | none | primitive | `DROP` | removes level 1 |
+| `duplicate` | `dup` | `1 pick` (D46) | `DUP` | `A` gives `A A` |
+| `over` | none | `2 pick` (D46) | `OVER` | `A B` gives `A B A` |
+| `swap` | none | `2 roll` (D46) | `SWAP` | `A B` gives `B A` |
+| `rotate` | `rot` | `3 roll` (D46) | `ROT` | `A B C` gives `B C A` |
+| `zeros` | none | primitive | `CON` (with 0) | `r c zeros` gives the r x c zero matrix |
+| `ones` | none | primitive | `CON` (with 1) | `r c ones` gives the r x c matrix of ones |
+| `identity` | none | primitive | `IDN` | `n identity` gives the n x n identity |
+| `transpose` | none | primitive | `TRN` | `A` gives the transpose of A |
+| `delete-row` | none | primitive | `ROW-` | `A i delete-row` removes row i |
+| `delete-col` | none | primitive | `COL-` | `A j delete-col` removes column j |
+| `duplicate-row` | none | primitive | none | `A i duplicate-row` inserts a copy of row i after it |
+| `duplicate-col` | none | primitive | none | `A j duplicate-col` inserts a copy of column j after it |
+| `move-row` | none | primitive | none (closest: `RSWP`) | `A i k move-row` moves row i to position k |
+| `move-col` | none | primitive | none (closest: `CSWP`) | `A j k move-col` moves column j to position k |
+| `determinant` | `det` | primitive | `DET` | `A` gives det A |
+| `trace` | none | primitive | `TRACE` | `A` gives the sum of the diagonal |
+| `rank` | none | primitive | `RANK` | `A` gives the rank |
+| `frobenius-norm` | `norm` | primitive | `FNORM` | `A` gives the Frobenius norm |
+| `spectral-norm` | none | primitive | `SNRM` | `A` gives the 2-norm |
+| `eigenvalues` | `eig` | primitive | `EGVL` | `A` gives the eigenvalues |
+| `diagonalize` | none | primitive | none (closest: `EGV`) | `A` gives `P D`, with A = P D P^-1 |
+| `cofactors` | none | primitive | none | `A` gives the cofactor matrix |
+| `adjugate` | `adj` | primitive | none | `A` gives the adjugate |
+| `dot` | none | primitive | `DOT` | `A B` gives the dot product |
+| `cross` | none | primitive | `CROSS` | `A B` gives the cross product |
+| `rref` | none | primitive | `RREF` | `A` gives the reduced row echelon form |
+| `lu` | none | primitive | `LU` | `A` gives `P L U`, with P A = L U |
+| `qr` | none | primitive | `QR` | `A` gives `Q R`, with A = Q R |
 
 Matching is case-insensitive. A row vector is `1 2 2 vector transpose`, or
 the literal `[[1 2]]`. Search terms (D29) are not aliases: `hcat` finds
 `append-cols` in `cx commands search`, but it is not a word of the language.
-The rest of the core vocabulary (`transpose`, the determinant, the stack
-words, ...) gets its names in step S4d.
+Every index is 1-based (D46): `1 pick` is level 1, the top of the stack, and
+`[[1 2] [3 4]] 1 delete-row` gives `[[3 4]]`. A word takes its counts and
+indices from the stack, above its operands.
 
 ## Semantics of `power` (D25)
 

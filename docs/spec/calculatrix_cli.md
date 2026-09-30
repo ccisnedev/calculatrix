@@ -1001,3 +1001,4 @@ records the ones that affect the whole stage (D25 to D45).
 | R28 | Defined words (2026-09-29) | An entry is primitive or an RPN program over other words; `inverse` is `-1 power`, `sqrt` is `0.5 power`; errors name the user's word; recursive definitions are rejected when the registry is built (runbook D43). |
 | R29 | One implementation per concept (2026-09-29) | `power` uses the exact algorithm for `-1` and `1/2`; a defined word and its definition are bitwise identical, checked by a core test (runbook D44). |
 | R30 | Display (2026-09-29) | CLI text output uses the core display formatter, 12 significant digits; JSON keeps the full double (runbook D45). |
+| R31 | Core vocabulary and index base (2026-09-30) | The rest of the core vocabulary is named in the runbook table "Command names"; `duplicate`, `over`, `swap` and `rotate` are defined words over `pick` and `roll`; every index (stack level, row, column) is 1-based (runbook D46). |
