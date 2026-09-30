@@ -83,6 +83,7 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D44 | One implementation per concept. `power` uses the exact algorithm of an exponent that has one: repeated multiplication for an integer, the inverse for `-1`, the matrix square root for `1/2`. A defined word and its definition give bitwise identical results, and a core test checks it for every defined word on its examples and on the rows of the D25 table that apply. A word whose definition is not yet identical stays primitive until it is. Found on 2026-09-29: `-4 √` gives `[[0 -2] [2 0]]` but `-4 0.5 ^` gives rounding noise. | User, 2026-09-29 |
 | D45 | The text output of the CLI uses the display formatter of core, the one the app uses: at most 12 significant digits (the STD display of the HP 50g), trailing zeros removed, so `[[1 2] [3 4]] -1 ^` prints `[[-2 1] [1.5 -0.5]]` instead of `-1.9999999999999996`. The stored value never changes, and `--json` keeps the full double. | User, 2026-09-29 |
 | D46 | The rest of the core vocabulary gets the names of the table "Command names" (step S4d): stack, construction, structure and linear algebra words, `exp` and `ln` (`log` stays free for base 10), `frobenius-norm` with alias `norm`, `duplicate` with alias `dup`, `rotate` with alias `rot` (a rotation matrix, if ever needed, is a product of matrices and is studied then). `duplicate`, `over`, `swap` and `rotate` are defined as `1 pick`, `2 pick`, `2 roll` and `3 roll`. Every index is 1-based: stack levels (level 1 is the top) and the rows and columns of a matrix, as in mathematical notation (a11 is the first entry) and in MATLAB, Julia and R; the conversion to the 0-based indices of the core happens once, in the words. Mathematical language comes first. | User, 2026-09-30 |
+| D47 | `eval rpn` prints the whole stack left by the program, not a single result: every level, with no limit, the highest level first and level 1 at the bottom (`2: 5`, `1: 7`), each value through the display formatter (D45). A program that leaves the stack empty (`1 drop`) prints nothing and exits 0. `--json` gives `{"stack": [{"level": n, "value": ...}, ...]}` with each level explicit, in the order it is printed. Infix still gives one value. Part of step S4f. | User, 2026-09-30 |
 
 ## Command catalog (proposal)
 
@@ -360,7 +361,7 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
 | S4c | calculatrix | `vector`, `rows`, `append-rows`, `append-cols` (B any matrix of matching size, not only a vector). | S4a |
 | S4d | calculatrix | The rest of the core vocabulary: one table of names, aliases and definitions, approved by the user before it is implemented. | S4b |
 | S4e | calculatrix | `cx commands` (`show`, `search`, `list`, `--json`) and "did you mean" for RPN words and routes. | S4d |
-| S4f | calculatrix | Text output through the core display formatter (D45). | S2 |
+| S4f | calculatrix | Text output through the core display formatter (D45); `eval rpn` prints the whole stack (D47). | S2 |
 | S5 | calculatrix | App: ENTER runs the command line, column 5 becomes delete, EVAL, ENTER, SPACE; `power` on the MATH page; `vector`, `append-rows` and `append-cols` keys on the MATRIX page. | S4 |
 
 S3 and S4 can run in parallel after S2.

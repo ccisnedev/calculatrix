@@ -246,7 +246,10 @@ class Calculatrix {
       return _compileDefinition(entry.definition!);
     }
 
-    throw UnknownWordError(token);
+    throw UnknownWordError(
+      token,
+      suggestions: CalculatrixCommandRegistry.standard.suggest(token),
+    );
   }
 
   // Compiles a defined word's definition program to commands, by

@@ -41,10 +41,18 @@ String resolveProgramSource({
 /// Maps a core [CalculatrixError] onto the CLI's own JSON error envelope
 /// (spec section 6, D36): kebab-case id, `exitCode` 65 (`dataError`), and
 /// the offending token/position when the evaluator knew them.
+///
+/// `error.suggestions` (spec section 7, "Did you mean"; issue #41, AC5),
+/// when not empty, rides along as `details.suggestions`: the core's own
+/// "did you mean" candidates for an unknown RPN word, already in
+/// `error.message` too. Kept apart from the route-level suggestion the
+/// `<program>` shortcut adds on top of this same exception (AC6, "RPN and
+/// route suggestions are listed apart").
 CommandException toCommandException(CalculatrixError error) {
   final details = <String, dynamic>{
     if (error.token != null) 'token': error.token,
     if (error.position != null) 'position': error.position,
+    if (error.suggestions.isNotEmpty) 'suggestions': error.suggestions,
   };
   return CommandException(
     id: error.errorId?.id ?? 'calculatrix-error',

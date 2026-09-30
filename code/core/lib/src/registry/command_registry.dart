@@ -275,6 +275,72 @@ final class CalculatrixCommandRegistry {
   /// (issue #32, AC4).
   CalculatrixCommandEntry? lookup(String word) => _byWord[word.toLowerCase()];
 
+  /// "Did you mean" candidates for `word` (spec section 7, "Did you
+  /// mean"): the names of entries whose name or alias is closest to
+  /// `word`, by restricted edit distance (Damerau-OSA: insertion,
+  /// deletion, substitution and adjacent transposition), within
+  /// `maxDistance`. An exact match on a search term is a candidate too,
+  /// ranked ahead of any distance-based match, because it names the entry
+  /// precisely even though it is never itself a word of the language
+  /// (`hcat` suggests `append-cols`).
+  ///
+  /// Independent of the CLI and of `modular_cli_sdk` on purpose (issue
+  /// #41): the app's own RPN evaluator needs the very same suggestions
+  /// without depending on a CLI package, so this cannot reuse
+  /// `CommandCatalog.suggest`, and is instead its own small
+  /// reimplementation of the same edit distance.
+  ///
+  /// Returns at most `limit` names, closest first, then in registration
+  /// order. Never suggests `word` itself: a word already in the registry
+  /// has nothing to suggest.
+  List<String> suggest(String word, {int maxDistance = 2, int limit = 3}) {
+    final String needle = word.toLowerCase();
+    if (_byWord.containsKey(needle)) {
+      return const <String>[];
+    }
+
+    final List<String> exactSearchTermMatches = <String>[];
+    final List<_CommandSuggestionCandidate> distanceMatches =
+        <_CommandSuggestionCandidate>[];
+
+    for (final CalculatrixCommandEntry entry in entries) {
+      if (entry.searchTerms.any((String term) => term.toLowerCase() == needle)) {
+        exactSearchTermMatches.add(entry.name);
+        continue;
+      }
+
+      int? best;
+      for (final String candidate in entry.words) {
+        final int distance = _restrictedEditDistance(
+          needle,
+          candidate.toLowerCase(),
+        );
+        if (best == null || distance < best) {
+          best = distance;
+        }
+      }
+      if (best != null && best <= maxDistance) {
+        distanceMatches.add(_CommandSuggestionCandidate(entry.name, best));
+      }
+    }
+
+    distanceMatches.sort((a, b) => a.distance.compareTo(b.distance));
+
+    final List<String> ranked = <String>[
+      ...exactSearchTermMatches,
+      for (final _CommandSuggestionCandidate candidate in distanceMatches)
+        candidate.name,
+    ];
+
+    final List<String> deduped = <String>[];
+    for (final String name in ranked) {
+      if (!deduped.contains(name)) {
+        deduped.add(name);
+      }
+    }
+    return deduped.length <= limit ? deduped : deduped.sublist(0, limit);
+  }
+
   /// The registry of every word `_compileWord` recognizes today (issue
   /// #32): the operators the RPN compiler used to resolve through its own
   /// hardcoded switch, with no new math. Names are words of the language
@@ -1321,4 +1387,68 @@ final class CalculatrixCommandRegistry {
       build: () => const QrDecompositionCommand(),
     ),
   ]);
+}
+
+/// A [CalculatrixCommandRegistry.suggest] candidate: an entry name paired
+/// with its edit distance to the word being looked up.
+class _CommandSuggestionCandidate {
+  _CommandSuggestionCandidate(this.name, this.distance);
+
+  final String name;
+  final int distance;
+}
+
+/// Restricted edit distance (Damerau-OSA) between `a` and `b`: the minimum
+/// number of insertions, deletions, substitutions and adjacent
+/// transpositions of a single pair of characters needed to turn one into
+/// the other. "Restricted" (optimal string alignment) because, unlike true
+/// Damerau-Levenshtein, no substring is transposed more than once; that
+/// difference never matters for the short, mostly-distinct command words
+/// this compares.
+///
+/// A local, dependency-free reimplementation (issue #41, spec section 7,
+/// "Did you mean"): core cannot depend on `modular_cli_sdk`, whose
+/// `CommandCatalog` has the same algorithm for route suggestions.
+int _restrictedEditDistance(String a, String b) {
+  final int lenA = a.length;
+  final int lenB = b.length;
+  if (lenA == 0) return lenB;
+  if (lenB == 0) return lenA;
+
+  final List<List<int>> distance = List<List<int>>.generate(
+    lenA + 1,
+    (int i) => List<int>.filled(lenB + 1, 0),
+  );
+
+  for (int i = 0; i <= lenA; i++) {
+    distance[i][0] = i;
+  }
+  for (int j = 0; j <= lenB; j++) {
+    distance[0][j] = j;
+  }
+
+  for (int i = 1; i <= lenA; i++) {
+    for (int j = 1; j <= lenB; j++) {
+      final int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+      int best = <int>[
+        distance[i - 1][j] + 1, // deletion
+        distance[i][j - 1] + 1, // insertion
+        distance[i - 1][j - 1] + cost, // substitution (or match)
+      ].reduce((int x, int y) => x < y ? x : y);
+
+      if (i > 1 &&
+          j > 1 &&
+          a[i - 1] == b[j - 2] &&
+          a[i - 2] == b[j - 1]) {
+        final int transposition = distance[i - 2][j - 2] + 1;
+        if (transposition < best) {
+          best = transposition;
+        }
+      }
+
+      distance[i][j] = best;
+    }
+  }
+
+  return distance[lenA][lenB];
 }

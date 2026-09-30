@@ -13,12 +13,12 @@ import 'package:test/test.dart';
 import '../support/memory_sink.dart';
 
 // The name column of a command row is 4 spaces of indent, then the command
-// name padded to 13 characters (see `_nameColumnWidth` in
+// name padded to 16 characters (see `_nameColumnWidth` in
 // `lib/src/banner/banner_render.dart`). Kept here, not imported, because
 // this test exercises the real CLI's printed text end to end, the same way
 // a person reading the terminal would.
 const _indent = '    ';
-const _nameColumnWidth = 13;
+const _nameColumnWidth = 16;
 
 void main() {
   group('banner quickstart (issue #26 scope 3)', () {

@@ -53,13 +53,13 @@ void main() {
         "  └─     ─┘\n"
         "\n"
         "  Commands:\n"
-        "    eval rpn     evaluate an RPN program     cx eval rpn '1 2 +'\n"
-        "    eval infix   evaluate an expression      cx eval infix "
+        "    eval rpn        evaluate an RPN program     cx eval rpn '1 2 +'\n"
+        "    eval infix      evaluate an expression      cx eval infix "
         '"2^0.5"\n'
-        "    doctor       verify local installation\n"
-        "    upgrade      update to latest version\n"
-        "    uninstall    remove cx\n"
-        "    version      print version\n"
+        "    doctor          verify local installation\n"
+        "    upgrade         update to latest version\n"
+        "    uninstall       remove cx\n"
+        "    version         print version\n"
         "\n"
         "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",
       );
@@ -82,8 +82,8 @@ void main() {
           "  └─     ─┘\n"
           "\n"
           "  Commands:\n"
-          "    eval rpn     evaluate an RPN program     cx eval rpn '1 2 +'\n"
-          "    eval infix   evaluate an expression      cx eval infix "
+          "    eval rpn        evaluate an RPN program     cx eval rpn '1 2 +'\n"
+          "    eval infix      evaluate an expression      cx eval infix "
           '"2^0.5"\n'
           "\n"
           "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",
