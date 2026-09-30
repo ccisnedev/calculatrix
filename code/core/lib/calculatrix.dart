@@ -16,5 +16,6 @@ export 'src/machine/macros.dart';
 export 'src/matrix/matrix.dart';
 export 'src/matrix/matrix_display_formatter.dart';
 export 'src/numeric/numeric_policy.dart';
+export 'src/registry/command_registry.dart';
 export 'src/rpn/rpn_engine.dart';
 export 'src/session/calculatrix_session.dart';

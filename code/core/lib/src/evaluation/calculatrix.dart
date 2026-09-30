@@ -6,6 +6,7 @@ import '../machine/calculatrix_machine.dart';
 import '../machine/calculatrix_program.dart';
 import '../machine/commands.dart';
 import '../matrix/matrix.dart';
+import '../registry/command_registry.dart';
 
 class Calculatrix {
   static CalculatrixProgram compileInfix(String expression) {
@@ -155,41 +156,35 @@ class Calculatrix {
     }
   }
 
+  // Every non-literal word is resolved through the core command registry
+  // (case-insensitive, by name or alias), not through a hardcoded switch
+  // (issue #32): a literal comes first, both because a numeric or matrix
+  // token can never collide with a registered word and because the
+  // registry has nothing to say about literals in the first place.
   static CalculatrixCommand _compileRpnToken(String token) {
-    switch (token) {
-      case '+':
-        return const AddCommand();
-      case '-':
-        return const SubtractCommand();
-      case '*':
-        return const MultiplyCommand();
-      case '/':
-        return const DivideCommand();
-      case '√':
-        return const SqrtCommand();
-      case '%':
-        return const PercentCommand();
-      case '^':
-        return const PowerCommand();
-      default:
-        if (_looksLikeMatrixLiteral(token)) {
-          return PushMatrixCommand(_parseSignedMatrixLiteral(token));
-        }
-
-        final double? value = double.tryParse(token);
-        if (value != null) {
-          if (!value.isFinite) {
-            throw MatrixDomainError(
-              'Numeric literal is not a finite number: $token',
-              errorId: CalculatrixErrorId.nonFinite,
-              token: token,
-            );
-          }
-          return PushScalarCommand(value);
-        }
-
-        throw UnknownWordError(token);
+    if (_looksLikeMatrixLiteral(token)) {
+      return PushMatrixCommand(_parseSignedMatrixLiteral(token));
     }
+
+    final double? value = double.tryParse(token);
+    if (value != null) {
+      if (!value.isFinite) {
+        throw MatrixDomainError(
+          'Numeric literal is not a finite number: $token',
+          errorId: CalculatrixErrorId.nonFinite,
+          token: token,
+        );
+      }
+      return PushScalarCommand(value);
+    }
+
+    final CalculatrixCommandEntry? entry = CalculatrixCommandRegistry.standard
+        .lookup(token);
+    if (entry != null) {
+      return entry.build();
+    }
+
+    throw UnknownWordError(token);
   }
 
   static Matrix _singleResult(

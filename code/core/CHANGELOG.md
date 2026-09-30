@@ -6,6 +6,23 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A core command registry (spec section 7): `CalculatrixCommandRegistry`
+  resolves an RPN word to a `CalculatrixCommandEntry` by name or alias,
+  case-insensitively, carrying the documentation fields spec section 7
+  requires (search terms, HP 50g equivalent, category, stack effect,
+  preconditions, description, executable examples, errors, see also) plus
+  how to build its `CalculatrixCommand`. `Calculatrix._compileRpnToken` now
+  resolves every non-literal RPN word through
+  `CalculatrixCommandRegistry.standard` instead of a hardcoded switch; a
+  word the registry does not know still raises `unknown-word` as before.
+  This PR registers the operators the compiler already knew (`+`, `-`,
+  `*`, `/`, `√`, `%`), with no new math, and adds `power`, with aliases
+  `pwr` and `^` (runbook D14, D18). `vector`, `rows`, `append-rows`,
+  `append-cols`, the `cx commands` route and "did you mean" are left to
+  follow-up PRs (issue #32).
+
 ### Fixed
 
 - `Matrix.sqrt()` no longer rejects singular matrices that do have a real
