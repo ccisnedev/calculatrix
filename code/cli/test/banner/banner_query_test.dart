@@ -47,8 +47,10 @@ void main() {
 
       expect(
         output.toText(),
-        "  ┌● ━┐   cx v0.8.0\n"
-        "  └┃ ●┘   Calculatrix: matrix-first RPN and infix calculator\n"
+        "  ┌─     ─┐\n"
+        "  │ ●   ━ │   cx v0.8.0\n"
+        "  │ ┃   ● │   Calculatrix: matrix-first RPN and infix calculator\n"
+        "  └─     ─┘\n"
         "\n"
         "  Commands:\n"
         "    eval rpn     evaluate an RPN program     cx eval rpn '1 2 +'\n"
@@ -74,8 +76,10 @@ void main() {
 
         expect(
           output.toText(),
-          "  ┌● ━┐   cx v0.8.0\n"
-          "  └┃ ●┘   Calculatrix: matrix-first RPN and infix calculator\n"
+          "  ┌─     ─┐\n"
+          "  │ ●   ━ │   cx v0.8.0\n"
+          "  │ ┃   ● │   Calculatrix: matrix-first RPN and infix calculator\n"
+          "  └─     ─┘\n"
           "\n"
           "  Commands:\n"
           "    eval rpn     evaluate an RPN program     cx eval rpn '1 2 +'\n"
@@ -93,19 +97,25 @@ void main() {
         final output = await buildQuery(
           registeredCommands: s2Commands,
         ).execute();
-        expect(output.toText(), startsWith('  ┌● ━┐   cx\n'));
+        expect(output.toText(), startsWith('  ┌─     ─┐\n  │ ●   ━ │   cx\n'));
         expect(output.toText(), isNot(contains(' v ')));
       },
     );
 
-    test('the logo is about as tall as it is wide: 5 columns by 2 rows, '
-        'since a terminal cell is roughly twice as tall as it is wide '
-        '(User, 2026-09-29)', () async {
+    test('the logo is about as tall as it is wide: 9 columns by 4 rows, '
+        'since a terminal cell is roughly twice as tall as it is wide, and '
+        'the brackets span the whole matrix (User, 2026-09-29)', () async {
       final output = await buildQuery(registeredCommands: s2Commands).execute();
-      final logoRows = output.toText()!.split('\n').take(2);
-      for (final row in logoRows) {
-        expect(row.substring(2, 7).runes.length, 5);
-        expect(row.substring(7, 10), '   ');
+      final rows = output.toText()!.split('\n').take(4).toList();
+      for (final row in rows) {
+        expect(row.substring(2, 11).runes.length, 9);
+      }
+      expect(rows[0], '  ┌─     ─┐');
+      expect(rows[3], '  └─     ─┘');
+      for (final row in rows.sublist(1, 3)) {
+        expect(row[2], '│');
+        expect(row[10], '│');
+        expect(row.substring(11, 14), '   ');
       }
     });
 
@@ -113,7 +123,7 @@ void main() {
         'console font has: no U+23A0..U+23BF bracket pieces, which the '
         'legacy Windows console cannot draw (User, 2026-09-29)', () async {
       final output = await buildQuery(registeredCommands: s2Commands).execute();
-      final logo = output.toText()!.split('\n').take(2).join();
+      final logo = output.toText()!.split('\n').take(4).join();
       expect(logo.runes.where((r) => r >= 0x23A0 && r <= 0x23BF), isEmpty);
     });
 
