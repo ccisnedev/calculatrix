@@ -77,6 +77,11 @@ stack. The app is that with a keypad; the REPL is that without one.
 | D38 | **Revoked 2026-09-28**: came from an automated Codex review round on PR #7, not a user need, and removed capability that main had; issue #5 is being rebuilt minimally in `feat/core-issue5-minimal`, keeping main's eigenvalues, `exp`, `sqrt` and `inverse`; PR #7 is closed unmerged. Kept below for history. From the Codex review of the core PR (calculatrix#7), rounds 7 and 8: `exp`, `log`, `sqrt` and a non-integer real power declare their precision range. Every nonzero entry of the matrix and every nonzero computed eigenvalue must have a magnitude between `1e-150` and `1e150`; zero entries are allowed. The same range applies to the result: every eigenvalue of the result that is not exactly zero, known before computing it (`exp(lambda)` for `exp`, `|lambda|^y` for a power), and every nonzero entry of the computed result must be inside it, so `exp(-1000)` and `exp(710)` are rejected instead of returning zero or overflowing. A matrix outside that range raises the new id `matrix-out-of-precision-range` (65), and the message names the offending entry or eigenvalue, of the argument or of the result. Inside the range the normwise relative error (Frobenius) is at most `1e4 * max(1, kappa) * u` (the `max` allows for rounding the result itself, as in `exp(1e-16)`, whose `kappa` is `1e-16`), where `u = 2^-53` is the unit roundoff, `kappa` is the relative condition number of the function at the matrix (Frobenius norm of the Frechet derivative times the norm of the matrix, divided by the norm of the result) and `1e4` is the named constant `matrixFunctionAccuracyFactor`. For a well conditioned matrix this is about `1e-12`; an ill conditioned one, such as `exp` of a rotation by an angle near `1e10`, gets a looser bound because no double precision algorithm can do better. A single entry that is tiny next to the norm of the result is not guaranteed componentwise. Two cases have no relative condition number and get an absolute bound instead: when the exact result is zero (`log` of the identity), `||X||_F <= 1e4 * u * ||L_f(A)||_F * ||A||_F`; when the function has no Frechet derivative at the matrix (`sqrt` of a singular matrix, such as `sqrt(0)`), `||X - f(A)||_F <= 1e4 * sqrt(u * ||A||_F)`. Integer powers are not affected. Three rules complete the range. First, it applies to the argument and to the final result only, never to an intermediate value of the computation: `2^(1e-150 I)` is valid although its intermediate `ln(2) * 1e-150` is below the range. Second, the stored binary64 entries are exact inputs, and every computed eigenvalue carries an absolute forward error bound `e` relative to them, set by the solver that computed it: for the cyclic Jacobi sweep, `e = 10 * n * u * ||B||_F`, with `B` the original block connected by the executed rotations and `n` its size (a forward bound by Weyl's theorem); for the real 2x2 closed form, a separate bound for each of the two eigenvalues, derived from a discriminant and a determinant computed with error-free transformations (on a block rescaled by a power of two when a product would underflow) and covering the rounding of the square root, the sum and the division; for scalar, diagonal and triangular matrices, whose eigenvalues are copied from entries, `e = 0`. If the solver cannot certify an eigenvalue, the operation is rejected: in the 2x2 closed form, when a product or the rounding error of an error-free transformation is subnormal or underflows even after rescaling, or a bound cannot be determined, it raises `matrix-out-of-precision-range` and the message names the reason, instead of returning an uncertified result. `10` is the named constant `jacobiEigenvalueBackwardErrorFactor`. Before the range check, an eigenvalue with `|lambda| <= e` is numerically zero, one above `e` is positive and one below `-e` is negative; no uncertainty of the entries themselves is assumed, so a small eigenvalue that the solver resolves accurately is a real eigenvalue and is range checked (the symmetric 2x2 `[[s, s], [s, s * (1 + 2^-50)]]` with `s = 1e-140` uses the closed form and has an eigenvalue of about `4.7e-156` and is rejected). A numerical zero is exempt from the range check: `sqrt` takes it as exactly zero, while `log` and a non-integer power raise `log-undefined` because a positive value cannot be certified. The scalar rows of D25 come first: a scalar zero raised to a non-integer power follows row 7 (`0^0.5` is `0`, `0^-0.5` is `non-finite`), so the `log-undefined` rule applies only to matrices that are not scalars. Third, when the exact result lies on a bound (`(1e-100)^1.5` is exactly `1e-150`) the computed one can land slightly past it, so the range of the result is widened in log space: `ln |x|` may exceed `ln(1e150)` in magnitude by `8 * 2^-52 * ln(1e150)`, which is a relative widening of the bounds of about `6.1e-13` (`8` is the named constant of units in the last place); the range of the argument stays strict. | User, 2026-09-25; accuracy made relative to the condition number, User, 2026-09-26; range of the result and the two absolute cases, Claude, 2026-09-26 (Codex review of #9); numerical zero, intermediate values and rounding at the bounds, Claude, 2026-09-26 (Codex rounds 11 to 13 of #7); forward error model of the numerical zero, Claude, 2026-09-26 (Codex rounds 16 to 18 of #7); uncertified eigenvalues rejected, User, 2026-09-26 (Codex rounds 19 and 20 of #7) |
 | D39 | An automated review (Codex) asks a closed, bounded question: whether the reviewed issue is met, and whether main regresses. A finding outside that question becomes a new issue, never a change to the PR under review. More than two or three rounds that keep raising new findings means stop and revisit the premise instead of continuing the rounds. A design decision never comes from a review finding; it comes from the user. | User, 2026-09-28 |
 | D40 | The executable is named `cx` (`cx.exe` on Windows). There is no `calculatrix` executable and no alias of any kind, so no shell layer sits between the user and the program. Replaces the `.cmd` shim rule for `calculatrix` (D1, D26, D31 amended). Reason: on Windows, any `.cmd`/`.bat` file is run through cmd.exe, which treats `^` as its own escape character while parsing the command line, before the file's own body ever runs, so it silently dropped `^` from `cx eval infix '2^0.5'` (`cx.cmd` calling `calculatrix.exe`) with no error and exit 0. Doubling the caret in the shim body does not help, since the mangling happens in cmd.exe's own command-line parse, before the shim script is even reached. `modular_cli_sdk` needs no change for this: its `InstallationPlugin` alias was already optional (issue #35). An independent review (one Codex pass) confirmed that `cx eval infix 2^0.5` typed unquoted in cmd.exe is cmd.exe's own syntax: the caret is consumed before any executable starts, so no alias or executable can fix that specific row; the achievable contract is that `cx` receives exactly the argv the calling shell produced (spec R25). `docs/spec/calculatrix_cli.md` and this repository's `README.md` use `cx` only; the README notes that in cmd.exe an expression with `^` must be quoted. | User, 2026-09-29 |
+| D41 | The name of every command is a lowercase word, or words joined by hyphens, spelled as in common mathematical usage: `add`, `subtract`, `multiply`, `divide`, `power`, `sqrt`, `percent`, `inverse`, `append-cols`. Symbols and short forms are aliases, never names: `+`, `-`, `*`, `/`, `^`, `√`, `%`, `pwr`, `inv`. The names of the rest of the core vocabulary are set in one table the user approves before it is implemented (step S4d). | User, 2026-09-29 |
+| D42 | The HP 50g is inspiration, not adoption. Parity means reaching the same level of reliability and usability, then surpassing it; it never means compatibility. HP names (`->ARRY`, `ROW->`) are neither names nor aliases, so `1 2 2 ->ARRY` is `unknown-word`. The entry keeps an informative "HP 50g reference" field, which `cx commands search` matches, as a bridge for users who come from the HP. Removes the HP ASCII aliases of "Command names" below. | User, 2026-09-29 |
+| D43 | A registry entry is either primitive (it builds a core command) or defined (an RPN program over other words of the registry, like a user program of the HP or a colon definition of Forth, but inside the registry). `inverse` is defined as `-1 power` and `sqrt` as `0.5 power`: in Calculatrix everything is a matrix, and `power` already covers both. `cx commands show` prints the definition. An error raised inside a defined word reports the word the user wrote and its position (`[[1 2] [2 4]] inverse` is `singular-matrix` with `token: inverse`). A definition that reaches itself, directly or through other words, is rejected when the registry is built. | User, 2026-09-29 |
+| D44 | One implementation per concept. `power` uses the exact algorithm of an exponent that has one: repeated multiplication for an integer, the inverse for `-1`, the matrix square root for `1/2`. A defined word and its definition give bitwise identical results, and a core test checks it for every defined word on its examples and on the rows of the D25 table that apply. A word whose definition is not yet identical stays primitive until it is. Found on 2026-09-29: `-4 √` gives `[[0 -2] [2 0]]` but `-4 0.5 ^` gives rounding noise. | User, 2026-09-29 |
+| D45 | The text output of the CLI uses the display formatter of core, the one the app uses: at most 12 significant digits (the STD display of the HP 50g), trailing zeros removed, so `[[1 2] [3 4]] -1 ^` prints `[[-2 1] [1.5 -0.5]]` instead of `-1.9999999999999996`. The stored value never changes, and `--json` keeps the full double. | User, 2026-09-29 |
 
 ## Command catalog (proposal)
 
@@ -127,22 +132,32 @@ The first PR maps `infix` and `rpn` to the new routes. `command` and `macro`
 registry lands. The CLI is not published yet, so this is not a break for
 anyone; it is still recorded in `CHANGELOG.md`.
 
-## Command names (proposal)
+## Command names
 
-| Calculatrix | HP 50g | Stack effect |
-|---|---|---|
-| `vector` | `→ARRY` (vector form) | `x1 ... xn n` gives the n x 1 column `[[x1] ... [xn]]` |
-| `append-cols` | none (closest: `COL+`) | `A B` gives `[A B]`; A and B need the same number of rows |
-| `append-rows` | none (closest: `ROW+`) | `A B` gives A over B; A and B need the same number of columns |
-| `rows` | `ROW→` | `[[...]]` gives `[row1] ... [rown] n` |
-| `power`, aliases `pwr`, `^` | `^` | `B Y` gives `B^Y` (D25) |
-| `exp` | `EXP` | `X` gives e^X |
+Names are words and symbols are aliases (D41); the HP 50g column is an
+informative reference, never a word of the language (D42).
 
-Matching is case-insensitive. ASCII spellings of the HP names (`->ARRY`,
-`ROW->`) are accepted as aliases for users coming from the HP. A row vector is
-`1 2 2 vector transpose`, or the literal `[[1 2]]`. Search terms (D29) are
-not aliases: `hcat` finds `append-cols` in `cx commands search`, but it is not
-a word of the language.
+| Name | Aliases | Definition | HP 50g reference | Stack effect |
+|---|---|---|---|---|
+| `add` | `+` | primitive | `+` | `A B` gives A + B |
+| `subtract` | `-` | primitive | `-` | `A B` gives A - B |
+| `multiply` | `*` | primitive | `*` | `A B` gives A B |
+| `divide` | `/` | primitive | `/` | `A B` gives A / B |
+| `percent` | `%` | primitive | `%` | as today's `%` |
+| `power` | `pwr`, `^` | primitive | `^` | `B Y` gives `B^Y` (D25, D44) |
+| `sqrt` | `√` | `0.5 power` (D43, D44) | `√` | `X` gives X^(1/2) |
+| `inverse` | `inv` | `-1 power` (D43) | `INV` | `A` gives A^-1 |
+| `vector` | none | primitive | `→ARRY` (vector form) | `x1 ... xn n` gives the n x 1 column `[[x1] ... [xn]]` |
+| `append-cols` | none (D29) | primitive | none (closest: `COL+`) | `A B` gives `[A B]`; A and B need the same number of rows |
+| `append-rows` | none (D29) | primitive | none (closest: `ROW+`) | `A B` gives A over B; A and B need the same number of columns |
+| `rows` | none | primitive | `ROW→` | `[[...]]` gives `[row1] ... [rown] n` |
+| `exp` | none | primitive | `EXP` | `X` gives e^X |
+
+Matching is case-insensitive. A row vector is `1 2 2 vector transpose`, or
+the literal `[[1 2]]`. Search terms (D29) are not aliases: `hcat` finds
+`append-cols` in `cx commands search`, but it is not a word of the language.
+The rest of the core vocabulary (`transpose`, the determinant, the stack
+words, ...) gets its names in step S4d.
 
 ## Semantics of `power` (D25)
 
@@ -304,7 +319,13 @@ them in `%LOCALAPPDATA%\calculatrix\bin`, and `cx upgrade` replaces them.
 | S2 | calculatrix | CLI on `modular_cli_sdk` 0.6.0: banner, `eval rpn`, `eval infix`, the shortcut, the grammar of spec section 4, `dev-install.ps1`. Tests: every row of spec section 13 whose behavior S2 delivers. The rows of `version`, `doctor`, `upgrade` and `uninstall` are tests of S3; the rows of `commands`, of domain error ids (`unknown-word`, `stack-underflow`, `syntax-error`) and of the suggestion `cx version` are tests of S4. | S1b |
 | S3a | modular_cli_sdk | Plugin system and standard plugins (D33): `VersionPlugin`, `DoctorPlugin` with `doctor.checks` and exit 78, `InstallationPlugin` with `upgrade` and `uninstall` as commands (D26) and the release lookup by tag prefix (D31). `macss` and `docmd` replace their own routes with them. Can ship inside 0.6.0 or as 0.6.x. | S1b |
 | S3 | calculatrix | Publishing: release workflow, app workflow guards, installers, ADR 0002 amendment, the standard plugins from S3a. | S2, S3a |
-| S4 | calculatrix | Core: command line parser and command registry with aliases and search terms (D29), `power` on matrices with a test per row of the D25 table, the domain error ids of spec section 6, `vector`, `append-rows`, `append-cols`, `rows`, space-separated matrix literals in RPN and infix, the core fixes of spec section 10. `eval rpn` and `commands` use it. | S2 |
+| S4 | calculatrix | Core, in the PRs S4a to S4f below. Already on main: `power` on matrices with a test per row of the D25 table, the domain error ids of spec section 6, the core fixes of spec section 10, space-separated and adjacent-row matrix literals in RPN and infix. `eval rpn` and `commands` use the registry. | S2 |
+| S4a | calculatrix | Command registry (D29, D41): entries with the fields of spec section 7, lookup by name or alias, the RPN compiler resolves every word through it; `add`, `subtract`, `multiply`, `divide`, `percent`, `power`, `sqrt` with their symbol aliases. | S2 |
+| S4b | calculatrix | Defined words (D43, D44): `power` uses the exact algorithm for `-1` and `1/2`; `inverse` and `sqrt` become defined words; errors report the user's word; the bitwise identity test. | S4a |
+| S4c | calculatrix | `vector`, `rows`, `append-rows`, `append-cols` (B any matrix of matching size, not only a vector). | S4a |
+| S4d | calculatrix | The rest of the core vocabulary: one table of names, aliases and definitions, approved by the user before it is implemented. | S4b |
+| S4e | calculatrix | `cx commands` (`show`, `search`, `list`, `--json`) and "did you mean" for RPN words and routes. | S4d |
+| S4f | calculatrix | Text output through the core display formatter (D45). | S2 |
 | S5 | calculatrix | App: ENTER runs the command line, column 5 becomes delete, EVAL, ENTER, SPACE; `power` on the MATH page; `vector`, `append-rows` and `append-cols` keys on the MATRIX page. | S4 |
 
 S3 and S4 can run in parallel after S2.
@@ -324,6 +345,7 @@ S3 and S4 can run in parallel after S2.
 | 2026-09-28 | D35, D37 and D38 revoked; D26 amended, `upgrade` and `uninstall` go through the normal approval prompt; D39, the review process rule. |
 | 2026-09-29 | D27 amended: GNU order by default through `cli_router` 0.2.1, strict POSIX with `POSIXLY_CORRECT` (spec G6). |
 | 2026-09-29 | D40, from issue ccisnedev/calculatrix#22: the executable is named `cx`, with no `calculatrix` executable and no alias of any kind, replacing the `.cmd` shim rule; D1, D26 and D31 amended. |
+| 2026-09-29 | D41 to D45: commands are words and symbols are aliases, the HP 50g is inspiration and not adoption, defined words, one implementation per concept, the core display formatter in the CLI. S4 split into S4a to S4f. |
 
 ## Progress log
 
