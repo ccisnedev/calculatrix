@@ -67,9 +67,17 @@ void main() {
       expect(power.build!(), isA<PowerCommand>());
     });
 
-    test('inverse and sqrt are defined words over power; every other entry '
-        'is still primitive (D43, issue #35, AC2)', () {
-      const Set<String> definedNames = <String>{'inverse', 'sqrt'};
+    test('inverse, sqrt, duplicate, over, swap and rotate are defined words '
+        'over power/pick/roll; every other entry is still primitive '
+        '(D43/D46, issues #35, #39, AC2)', () {
+      const Set<String> definedNames = <String>{
+        'inverse',
+        'sqrt',
+        'duplicate',
+        'over',
+        'swap',
+        'rotate',
+      };
       for (final CalculatrixCommandEntry entry
           in CalculatrixCommandRegistry.standard.entries) {
         if (definedNames.contains(entry.name)) {
@@ -125,6 +133,10 @@ void main() {
         containsAll(<CalculatrixCommandCategory>[
           CalculatrixCommandCategory.arithmetic,
           CalculatrixCommandCategory.matrix,
+          CalculatrixCommandCategory.stack,
+          CalculatrixCommandCategory.construction,
+          CalculatrixCommandCategory.structure,
+          CalculatrixCommandCategory.linearAlgebra,
         ]),
       );
     });

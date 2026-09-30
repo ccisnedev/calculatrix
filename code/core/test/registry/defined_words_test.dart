@@ -272,7 +272,14 @@ void main() {
       'definition (issue #35)', () {
     test('every defined entry, on its own registered examples, matches its '
         'expansion exactly', () {
-      const Set<String> definedNames = <String>{'inverse', 'sqrt'};
+      const Set<String> definedNames = <String>{
+        'inverse',
+        'sqrt',
+        'duplicate',
+        'over',
+        'swap',
+        'rotate',
+      };
       for (final CalculatrixCommandEntry entry
           in CalculatrixCommandRegistry.standard.entries) {
         if (!definedNames.contains(entry.name)) {
@@ -291,12 +298,17 @@ void main() {
             ...Calculatrix.tokenizeRpnLine(entry.definition!),
           ];
 
-          final Matrix viaWord = Calculatrix.evaluateRpn(tokens);
-          final Matrix viaDefinition = Calculatrix.evaluateRpn(expandedTokens);
+          // evaluateRpnStack (not evaluateRpn) because a stack word's own
+          // example, such as "over"'s, legitimately leaves more than one
+          // value on the stack (issue #39).
+          final List<Matrix> viaWord = Calculatrix.evaluateRpnStack(tokens);
+          final List<Matrix> viaDefinition = Calculatrix.evaluateRpnStack(
+            expandedTokens,
+          );
 
           expect(
             viaWord,
-            viaDefinition,
+            orderedEquals(viaDefinition),
             reason:
                 '"${example.program}" must be bitwise identical to '
                 'typing "${entry.definition}" by hand',
@@ -353,6 +365,54 @@ void main() {
         expect(outcome(viaWord), outcome(viaDefinition));
       });
     }
+  });
+
+  group('AC4 (issue #39): duplicate/over/swap/rotate agree with '
+      '1 pick/2 pick/2 roll/3 roll at stack depths 0 to 3', () {
+    // Correction to the issue text: a defined word is an RPN program with
+    // no implementation of its own (D44). duplicate/over/swap/rotate are
+    // pure definitions ("1 pick", "2 pick", "2 roll", "3 roll"), so this
+    // compares the word against the same tokens its own definition names,
+    // typed out by hand, rather than against any engine-level shortcut.
+    // Both sides go through the exact same evaluateRpnStack/registry
+    // compile path; the only difference is the token itself.
+    List<String> seedTokens(int depth) {
+      return List<String>.generate(depth, (int i) => '${i + 1}');
+    }
+
+    Object outcome(List<String> tokens) {
+      try {
+        return Calculatrix.evaluateRpnStack(tokens);
+      } on CalculatrixError catch (error) {
+        return '${error.runtimeType}: ${error.errorId}';
+      }
+    }
+
+    const Map<String, String> definitionByWord = <String, String>{
+      'duplicate': '1 pick',
+      'over': '2 pick',
+      'swap': '2 roll',
+      'rotate': '3 roll',
+    };
+
+    definitionByWord.forEach((String word, String definition) {
+      for (int depth = 0; depth <= 3; depth++) {
+        test('$word at depth $depth matches "$definition"', () {
+          final List<String> seed = seedTokens(depth);
+          final List<String> viaWord = <String>[...seed, word];
+          final List<String> viaDefinition = <String>[
+            ...seed,
+            ...definition.split(' '),
+          ];
+
+          expect(
+            outcome(viaWord),
+            outcome(viaDefinition),
+            reason: 'depth $depth',
+          );
+        });
+      }
+    });
   });
 
   group('AC4: an error raised inside a defined word\'s expansion carries the '

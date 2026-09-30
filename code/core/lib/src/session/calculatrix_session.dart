@@ -343,8 +343,12 @@ class CalculatrixSession {
     });
   }
 
+  // dup, swap, over and rot have no command class of their own: each runs
+  // as the registry word it names (duplicate, swap, over, rotate),
+  // compiled and executed through Calculatrix.executeWordOn exactly as
+  // typing that word in an RPN program would be (D44, issue #39).
   void dupRpn() {
-    _runRpnAction(() => _machine.execute(const DupCommand()));
+    _runRpnAction(() => Calculatrix.executeWordOn(_machine, 'duplicate'));
   }
 
   void dropRpn() {
@@ -352,15 +356,15 @@ class CalculatrixSession {
   }
 
   void swapRpn() {
-    _runRpnAction(() => _machine.execute(const SwapCommand()));
+    _runRpnAction(() => Calculatrix.executeWordOn(_machine, 'swap'));
   }
 
   void overRpn() {
-    _runRpnAction(() => _machine.execute(const OverCommand()));
+    _runRpnAction(() => Calculatrix.executeWordOn(_machine, 'over'));
   }
 
   void rotRpn() {
-    _runRpnAction(() => _machine.execute(const RotCommand()));
+    _runRpnAction(() => Calculatrix.executeWordOn(_machine, 'rotate'));
   }
 
   void executeCommand(CalculatrixCommand command) {
