@@ -18,6 +18,13 @@
 > and RPN stack semantics) lives in `package:calculatrix`. Flutter app and CLI
 > are UI/interaction layers over the same core API.
 
+> **Foundation: a calculator for agents**: calculatrix is the computation
+> tool an agent keeps in its pocket, where agents are humans and AI agents
+> alike. Every consumer is designed for both: a closed language, discovery
+> from the tool itself (`cx commands`), machine-readable output (`--json`)
+> and a stable error contract. A feature an AI agent cannot discover or
+> check through the CLI is not finished.
+
 > **Testing policy**:
 > 1. `code/core` must keep TDD and full unit/contract coverage for public semantics and new logic.
 > 2. `code/app` controller/view-model/editor state should target full unit coverage; widget tests protect only critical UI invariants.
@@ -1250,6 +1257,21 @@ One stage per HP 50g menu group, in the order fixed by the catalog.
 A pure Dart CAS inside `DartKernel`, MIT, verified against Giac as a black
 box under a clean-room policy. It runs in parallel from Stage 9 onward. Its
 order of difficulty and rules are in the runbook.
+
+## Agent track (continuous)
+
+Calculatrix as the computation tool for agents, human and non-human. It runs
+alongside the stages above; each item keeps one engine and one contract.
+
+- [ ] MCP server over calculatrix: `evaluate`, `search_commands`,
+  `show_command`, reusing the CLI's JSON and error contracts (issue #44)
+- [ ] Agent instructions (a skill) distributed with the CLI: when to use
+  `cx`, how to discover words, how to read errors
+- [ ] Unquoted programs on the root shortcut (`cx 5 7 power`), to be decided
+- [ ] Route "did you mean" on the root shortcut through the SDK instead of
+  `ProgramShortcutQuery` (ccisnedev/modular_cli_sdk#46)
+- [ ] Trial with real agents: tasks solved with and without `cx`, errors
+  and discovery paths recorded
 
 ---
 
