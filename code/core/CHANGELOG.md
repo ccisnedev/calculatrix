@@ -93,7 +93,10 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   `-4 0.5 power` is exactly `[[0 -2] [2 0]]` and `[[0 0] [0 4]] 0.5 power`
   is `[[0 0] [0 2]]` instead of `log-undefined`. The rounding noise of
   `[[1 2] [3 4]] -1 power` comes from the inverse itself and is left to
-  the display formatter (runbook D45). Every internal
+  the display formatter (runbook D45). `sqrt()` of a complex matrix
+  `[[a -b] [b a]]` (runbook D25) is its complex principal square root, as
+  for a negative scalar: `[[-1 0] [0 -1]] sqrt` and `0.5 power` give
+  exactly `i`, `[[0 -1] [1 0]]`, and `[[3 -4] [4 3]]` gives `[[2 -1] [1 2]]`. Every internal
   failure of `Matrix.sqrt()` now also carries `errorId:
   CalculatrixErrorId.logUndefined`, so `[[-1 0] [0 2]] sqrt` and
   `[[-1 0] [0 2]] 0.5 power` raise `log-undefined` instead of the CLI's

@@ -124,6 +124,52 @@ void main() {
         ),
       );
     });
+
+    // D25 row 7 comes before row 4 for a scalar: 0 -1 power is non-finite.
+    test('0 -1 power and 0 inverse raise non-finite (D25 row 7)', () {
+      for (final List<String> tokens in <List<String>>[
+        <String>['0', '-1', 'power'],
+        <String>['0', 'inverse'],
+      ]) {
+        expect(
+          () => Calculatrix.evaluateRpn(tokens),
+          throwsA(
+            isA<CalculatrixError>().having(
+              (CalculatrixError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.nonFinite,
+            ),
+          ),
+        );
+      }
+    });
+
+    // -I is the complex -1 (D25), whose principal square root is i, as
+    // for the scalar -1.
+    test('[[-1 0] [0 -1]] 0.5 power is exactly i, [[0 -1] [1 0]]', () {
+      final Matrix minusIdentity = Matrix(<List<double>>[
+        <double>[-1, 0],
+        <double>[0, -1],
+      ]);
+
+      expect(minusIdentity.power(Matrix.scalar(0.5)), Matrix.i);
+      expect(Matrix.scalar(-1).power(Matrix.scalar(0.5)), Matrix.i);
+    });
+
+    test('[[3 -4] [4 3]] 0.5 power is exactly 2+i, [[2 -1] [1 2]]', () {
+      final Matrix base = Matrix(<List<double>>[
+        <double>[3, -4],
+        <double>[4, 3],
+      ]);
+
+      expect(
+        base.power(Matrix.scalar(0.5)),
+        Matrix(<List<double>>[
+          <double>[2, -1],
+          <double>[1, 2],
+        ]),
+      );
+    });
   });
 
   group('AC7: D25 row 5, non-diagonalizable base at exponent 0.5', () {
@@ -259,47 +305,54 @@ void main() {
       }
     });
 
-    test('D25 row 1: -4 sqrt is bitwise identical to -4 0.5 power', () {
-      final Matrix viaPower = Matrix.scalar(-4).power(Matrix.scalar(0.5));
-      final Matrix viaSqrtWord = Calculatrix.evaluateRpn(<String>[
-        '-4',
-        'sqrt',
-      ]);
+    // Every row of the D25 table that applies to -1 or 0.5 (rows 1, 4, 5,
+    // 7, 8 and 9): the defined word and its definition give the same bits,
+    // or the same error id.
+    const List<(String, String, String)> d25Cases = <(String, String, String)>[
+      ('row 1', '-4', 'sqrt'),
+      ('row 1', '4', 'sqrt'),
+      ('row 1', '2', 'sqrt'),
+      ('row 1', '2', 'inverse'),
+      ('row 1', '-4', 'inverse'),
+      ('row 3', '[[-1 0] [0 -1]]', 'sqrt'),
+      ('row 3', '[[3 -4] [4 3]]', 'sqrt'),
+      ('row 3', '[[3 -4] [4 3]]', 'inverse'),
+      ('row 4', '[[1 1] [0 1]]', 'inverse'),
+      ('row 4', '[[1 2] [3 4]]', 'inverse'),
+      ('row 4', '[[1 2] [2 4]]', 'inverse'),
+      ('row 5', '[[2 0] [0 3]]', 'sqrt'),
+      ('row 5', '[[1 1] [0 1]]', 'sqrt'),
+      ('row 5', '[[0 0] [0 4]]', 'sqrt'),
+      ('row 5', '[[-1 0] [0 2]]', 'sqrt'),
+      ('row 7', '0', 'sqrt'),
+      ('row 7', '0', 'inverse'),
+      ('row 8', '[[0 0] [0 0]]', 'sqrt'),
+      ('row 8', '[[0 0] [0 0]]', 'inverse'),
+      ('row 9', '[[1 2]]', 'sqrt'),
+      ('row 9', '[[1 2]]', 'inverse'),
+    ];
+    for (final (String row, String base, String word) in d25Cases) {
+      test('D25 $row: $base $word is bitwise identical to its definition', () {
+        final String definition = CalculatrixCommandRegistry.standard
+            .lookup(word)!
+            .definition!;
+        final List<String> viaWord = <String>[base, word];
+        final List<String> viaDefinition = <String>[
+          base,
+          ...Calculatrix.tokenizeRpnLine(definition),
+        ];
 
-      expect(viaSqrtWord, viaPower);
-    });
+        Object outcome(List<String> tokens) {
+          try {
+            return Calculatrix.evaluateRpn(tokens);
+          } on CalculatrixError catch (error) {
+            return '${error.runtimeType}: ${error.errorId}';
+          }
+        }
 
-    test(
-      'D25 row 4: [[1 1] [0 1]] inverse is bitwise identical to -1 power',
-      () {
-        final Matrix base = Matrix(<List<double>>[
-          <double>[1, 1],
-          <double>[0, 1],
-        ]);
-        final Matrix viaPower = base.power(Matrix.scalar(-1));
-        final Matrix viaInverseWord = Calculatrix.evaluateRpn(<String>[
-          '[[1 1] [0 1]]',
-          'inverse',
-        ]);
-
-        expect(viaInverseWord, viaPower);
-      },
-    );
-
-    test('D25 row 5: [[1 1] [0 1]] sqrt (non-diagonalizable) is bitwise '
-        'identical to [[1 1] [0 1]] 0.5 power', () {
-      final Matrix base = Matrix(<List<double>>[
-        <double>[1, 1],
-        <double>[0, 1],
-      ]);
-      final Matrix viaPower = base.power(Matrix.scalar(0.5));
-      final Matrix viaSqrtWord = Calculatrix.evaluateRpn(<String>[
-        '[[1 1] [0 1]]',
-        'sqrt',
-      ]);
-
-      expect(viaSqrtWord, viaPower);
-    });
+        expect(outcome(viaWord), outcome(viaDefinition));
+      });
+    }
   });
 
   group('AC4: an error raised inside a defined word\'s expansion carries the '

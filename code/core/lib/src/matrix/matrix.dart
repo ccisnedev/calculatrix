@@ -1437,6 +1437,13 @@ class Matrix {
       );
     }
 
+    // A complex matrix [[a -b] [b a]] (a+bi, runbook D25) has the complex
+    // principal square root, the same value the scalar branch above gives
+    // for a negative scalar: [[-1 0] [0 -1]] is -1 and its root is i.
+    if (_isComplexForm) {
+      return _complexPrincipalSqrt(_rows[0][0], _rows[1][0]);
+    }
+
     // Every tolerance-based decision below (the structural-singularity
     // pre-check, and internally, Newton's own convergence check and the
     // range/null-space split's rank comparisons) is calibrated for a
@@ -2341,6 +2348,40 @@ class Matrix {
       return _powerByScalarExponent(exponent.scalarValue);
     }
     return _powerByMatrixExponent(exponent);
+  }
+
+  bool get _isComplexForm =>
+      rowCount == 2 &&
+      columnCount == 2 &&
+      _rows[0][0] == _rows[1][1] &&
+      _rows[0][1] == -_rows[1][0];
+
+  // Principal square root of a+bi as [[x -y] [y x]], with x >= 0 and, when
+  // x is 0, y >= 0. The larger of x and |y| comes from a square root, the
+  // other from b / 2, to avoid cancellation; the modulus is computed on
+  // the values scaled by max(|a|, |b|) so it cannot overflow.
+  static Matrix _complexPrincipalSqrt(double a, double b) {
+    final double scaleFactor = math.max(a.abs(), b.abs());
+    final double ratioA = a / scaleFactor;
+    final double ratioB = b / scaleFactor;
+    final double modulus =
+        scaleFactor * math.sqrt(ratioA * ratioA + ratioB * ratioB);
+    double x;
+    double y;
+    if (a >= 0) {
+      x = math.sqrt((modulus + a) / 2);
+      y = b / (2 * x);
+    } else {
+      y = math.sqrt((modulus - a) / 2);
+      if (b < 0) {
+        y = -y;
+      }
+      x = b / (2 * y);
+    }
+    return Matrix(<List<double>>[
+      <double>[x, -y],
+      <double>[y, x],
+    ]);
   }
 
   Matrix _powerByScalarExponent(double y) {
