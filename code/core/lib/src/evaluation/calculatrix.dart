@@ -319,9 +319,14 @@ class Calculatrix {
   // whitespace instead of commas (e.g. "[[1 2] [3 4]]"). jsonDecode only
   // understands comma-separated JSON, so this inserts the implied commas
   // before decoding. A comma already present is left untouched, so
-  // "[[1, 2], [3, 4]]" round-trips unchanged.
+  // "[[1, 2], [3, 4]]" round-trips unchanged. Rows may also touch with no
+  // whitespace at all, "[[0 -1][1 0]]" (the logo's form and the HP 50g's
+  // own notation, issue #29), so a comma is implied between a ']' and an
+  // immediately following '[' too.
   static String _normalizeMatrixLiteralSeparators(String token) {
-    final RegExp impliedSeparator = RegExp(r'(?<=[0-9.\]])\s+(?=[-0-9.\[])');
+    final RegExp impliedSeparator = RegExp(
+      r'(?<=[0-9.\]])\s+(?=[-0-9.\[])|(?<=\])(?=\[)',
+    );
     return token.replaceAll(impliedSeparator, ',');
   }
 

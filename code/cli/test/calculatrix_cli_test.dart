@@ -132,6 +132,12 @@ void main() {
       expect(out.output, contains('1: 1'));
     });
 
+    test("cx '[[0 -1][1 0]] 2 ^' accepts adjacent rows (issue #29)", () async {
+      final code = await run(['[[0 -1][1 0]] 2 ^']);
+      expect(code, ExitCode.ok);
+      expect(out.output, contains('1: [[-1 0] [0 -1]]'));
+    });
+
     test("cx '-1' evaluates and exits 0", () async {
       final code = await run(['-1']);
       expect(code, ExitCode.ok);

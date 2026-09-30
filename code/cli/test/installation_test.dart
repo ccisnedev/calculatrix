@@ -122,7 +122,7 @@ void main() {
         ['doctor', '--json'],
         pathLookup: (executable) => '/usr/local/bin/$executable',
         releaseSource: FakeReleaseSource(
-          releases: [_release('cli-v0.8.0', asset: _platformAsset)],
+          releases: [_release('cli-v$cxVersion', asset: _platformAsset)],
         ),
       );
 
@@ -164,7 +164,7 @@ void main() {
         ['doctor'],
         pathLookup: (executable) => null,
         releaseSource: FakeReleaseSource(
-          releases: [_release('cli-v0.8.0', asset: _platformAsset)],
+          releases: [_release('cli-v$cxVersion', asset: _platformAsset)],
         ),
       );
 
@@ -175,13 +175,13 @@ void main() {
     test('the release lookup ignores the app\'s vX.Y.Z tags and picks the '
         'newest cli-v* one', () async {
       // A repository with both an app release (v9.9.9, deliberately a
-      // "newer"-looking number) and this CLI's own cli-v0.8.1: only the
+      // "newer"-looking number) and this CLI's own cli-v1.0.0: only the
       // second is a candidate (runbook D31, "3. releases/latest is
       // ambiguous").
       final releaseSource = FakeReleaseSource(
         releases: [
           _release('v9.9.9', asset: 'Calculatrix-windows-x64.zip'),
-          _release('cli-v0.8.1', asset: _platformAsset),
+          _release('cli-v1.0.0', asset: _platformAsset),
         ],
       );
 
@@ -197,11 +197,11 @@ void main() {
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final checks = (decoded['checks'] as List).cast<Map<String, dynamic>>();
       final release = checks.singleWhere((c) => c['name'] == 'release');
-      // 0.8.1 is newer than cxVersion (0.8.0): a real newer cli-v release
+      // 1.0.0 is newer than cxVersion: a real newer cli-v release
       // was found and reported as a warning, not silently ignored as
       // "up to date" (which would mean v9.9.9 leaked into the comparison).
       expect(release['status'], 'warning');
-      expect(release['detail'], contains('0.8.1'));
+      expect(release['detail'], contains('1.0.0'));
       expect(release['detail'], isNot(contains('9.9.9')));
     });
   });
