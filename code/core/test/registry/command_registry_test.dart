@@ -64,14 +64,31 @@ void main() {
       expect(power.hp50gReference, '^');
       expect(power.definition, isNull);
       expect(power.isPrimitive, isTrue);
-      expect(power.build(), isA<PowerCommand>());
+      expect(power.build!(), isA<PowerCommand>());
     });
 
-    test('every entry registered so far is primitive (D43, step S4b)', () {
+    test('inverse and sqrt are defined words over power; every other entry '
+        'is still primitive (D43, issue #35, AC2)', () {
+      const Set<String> definedNames = <String>{'inverse', 'sqrt'};
       for (final CalculatrixCommandEntry entry
           in CalculatrixCommandRegistry.standard.entries) {
-        expect(entry.isPrimitive, isTrue, reason: entry.name);
+        if (definedNames.contains(entry.name)) {
+          expect(entry.isPrimitive, isFalse, reason: entry.name);
+          expect(entry.definition, isNotNull, reason: entry.name);
+          expect(entry.build, isNull, reason: entry.name);
+        } else {
+          expect(entry.isPrimitive, isTrue, reason: entry.name);
+          expect(entry.build, isNotNull, reason: entry.name);
+        }
       }
+
+      final CalculatrixCommandEntry inverse = CalculatrixCommandRegistry
+          .standard
+          .lookup('inverse')!;
+      final CalculatrixCommandEntry sqrt = CalculatrixCommandRegistry.standard
+          .lookup('sqrt')!;
+      expect(inverse.definition, '-1 power');
+      expect(sqrt.definition, '0.5 power');
     });
 
     test('no HP 50g reference is ever a name or alias (D42)', () {

@@ -108,24 +108,33 @@ class Calculatrix {
     return positioned;
   }
 
-  // Compiles each already-positioned token to a command, the one place
-  // (per notation) where a raw input token and the command it compiles to
-  // are both in hand at once. A compile-time failure (an unrecognized
-  // word, a non-finite literal, a malformed matrix literal, ...) is
-  // enriched with that token right here. The commands themselves are kept
-  // as their own concrete types (PushScalarCommand, MultiplyCommand, ...)
-  // rather than wrapped, so a CalculatrixProgram built from them stays a
-  // deterministic, typed program a caller can inspect; execution-time
-  // enrichment (stack underflow, a dimension mismatch, ...) is instead the
-  // job of _executePositioned, which dispatches each command with its
-  // token still in hand.
-  static List<CalculatrixCommand> _compileRpnCommands(
+  // Compiles each already-positioned token to its command(s), the one
+  // place (per notation) where a raw input token and the command(s) it
+  // compiles to are both in hand at once. A compile-time failure (an
+  // unrecognized word, a non-finite literal, a malformed matrix literal,
+  // an unresolved word inside a defined word's definition can never reach
+  // here: the registry itself validates that at construction, see
+  // CalculatrixCommandRegistry) is enriched with that token right here.
+  //
+  // A single input token compiles to more than one command exactly when
+  // it names a defined word (runbook D43): _compileWord then expands its
+  // definition through this very same compiler path, so a token such as
+  // "inverse" can compile down to the two commands "-1 power" would
+  // compile to. Every command produced this way is paired with the
+  // *original* input token (not the defined word's own inner tokens), so
+  // an error raised while executing one of them is still reported against
+  // the word the user actually wrote (issue #35, AC4).
+  static List<_PositionedCommand> _compilePositionedCommands(
     List<_PositionedToken> tokens,
   ) {
-    final List<CalculatrixCommand> commands = <CalculatrixCommand>[];
+    final List<_PositionedCommand> commands = <_PositionedCommand>[];
     for (final _PositionedToken positioned in tokens) {
       try {
-        commands.add(_compileRpnToken(positioned.value));
+        for (final CalculatrixCommand command in _compileWord(
+          positioned.value,
+        )) {
+          commands.add(_PositionedCommand(command, positioned));
+        }
       } on CalculatrixError catch (error) {
         error.enrichToken(positioned.value, positioned.position);
         rethrow;
@@ -134,23 +143,39 @@ class Calculatrix {
     return commands;
   }
 
+  // The command types a CalculatrixProgram is built from (compileInfix):
+  // callers that only need the typed program, not per-token error
+  // enrichment during execution, get the plain command list.
+  static List<CalculatrixCommand> _compileRpnCommands(
+    List<_PositionedToken> tokens,
+  ) {
+    return _compilePositionedCommands(
+      tokens,
+    ).map((_PositionedCommand positioned) => positioned.command).toList();
+  }
+
   // Compiles and runs positioned tokens one at a time against machine, the
   // choke point where an execution-time domain error (stack underflow, a
   // dimension mismatch, a singular matrix, ...) is enriched with the token
   // that produced the command that threw it: Matrix and RpnEngine methods
   // have no notion of "token" or "input position" themselves, so they
-  // cannot set these on the errors they raise.
+  // cannot set these on the errors they raise. A defined word's expanded
+  // commands all carry their original token (see
+  // _compilePositionedCommands), so this enriches with e.g. "inverse"
+  // even though the command that actually threw came from its "power"
+  // expansion.
   static void _executePositioned(
     CalculatrixMachine machine,
     List<_PositionedToken> tokens,
   ) {
-    final List<CalculatrixCommand> commands = _compileRpnCommands(tokens);
-    for (int index = 0; index < commands.length; index++) {
-      final _PositionedToken positioned = tokens[index];
+    final List<_PositionedCommand> commands = _compilePositionedCommands(
+      tokens,
+    );
+    for (final _PositionedCommand positioned in commands) {
       try {
-        machine.execute(commands[index]);
+        machine.execute(positioned.command);
       } on CalculatrixError catch (error) {
-        error.enrichToken(positioned.value, positioned.position);
+        error.enrichToken(positioned.token.value, positioned.token.position);
         rethrow;
       }
     }
@@ -160,10 +185,18 @@ class Calculatrix {
   // (case-insensitive, by name or alias), not through a hardcoded switch
   // (issue #32): a literal comes first, both because a numeric or matrix
   // token can never collide with a registered word and because the
-  // registry has nothing to say about literals in the first place.
-  static CalculatrixCommand _compileRpnToken(String token) {
+  // registry has nothing to say about literals in the first place. A
+  // defined entry (runbook D43) expands to the commands its own
+  // definition program compiles to, via _compileDefinition, which
+  // tokenizes the definition with the exact same tokenizeRpnLine used for
+  // any other RPN input and recurses back through this function -- so a
+  // defined word's compiled result is, command for command, identical to
+  // typing its definition out by hand (issue #35, AC3).
+  static List<CalculatrixCommand> _compileWord(String token) {
     if (_looksLikeMatrixLiteral(token)) {
-      return PushMatrixCommand(_parseSignedMatrixLiteral(token));
+      return <CalculatrixCommand>[
+        PushMatrixCommand(_parseSignedMatrixLiteral(token)),
+      ];
     }
 
     final double? value = double.tryParse(token);
@@ -175,16 +208,45 @@ class Calculatrix {
           token: token,
         );
       }
-      return PushScalarCommand(value);
+      return <CalculatrixCommand>[PushScalarCommand(value)];
     }
 
     final CalculatrixCommandEntry? entry = CalculatrixCommandRegistry.standard
         .lookup(token);
     if (entry != null) {
-      return entry.build();
+      if (entry.isPrimitive) {
+        return <CalculatrixCommand>[entry.build!()];
+      }
+      return _compileDefinition(entry.definition!);
     }
 
     throw UnknownWordError(token);
+  }
+
+  // Compiles a defined word's definition program to commands, by
+  // tokenizing it with tokenizeRpnLine (the same tokenizer any other RPN
+  // input goes through) and compiling each of its words through
+  // _compileWord, recursively. A definition can itself reference another
+  // defined word: CalculatrixCommandRegistry rejects a cyclic definition
+  // at construction time (issue #35, AC5), so this recursion is always
+  // finite.
+  static List<CalculatrixCommand> _compileDefinition(String definition) {
+    final List<CalculatrixCommand> commands = <CalculatrixCommand>[];
+    for (final String word in tokenizeRpnLine(definition)) {
+      commands.addAll(_compileWord(word));
+    }
+    return commands;
+  }
+
+  /// Whether `token` is a literal (a finite number or a matrix literal)
+  /// rather than a word the command registry must resolve. Exposed for
+  /// [CalculatrixCommandRegistry]'s definition validation (issue #35,
+  /// AC5): a defined word's definition may reference literals freely,
+  /// only its non-literal words must resolve in the registry. The same
+  /// classification _compileWord itself uses, so the registry's notion of
+  /// "literal" never drifts from the compiler's.
+  static bool isLiteralToken(String token) {
+    return _looksLikeMatrixLiteral(token) || double.tryParse(token) != null;
   }
 
   static Matrix _singleResult(
@@ -948,6 +1010,20 @@ class _PositionedToken {
 
   final String value;
   final int position;
+}
+
+// A compiled command paired with the original input token that produced
+// it. For a primitive word this is a 1:1 pairing exactly like before; for
+// a defined word (runbook D43) every command its definition expands to
+// shares the same originating token, so an execution-time error is
+// enriched with the word the user wrote (e.g. "inverse"), never with a
+// word from inside its definition (e.g. "power") -- see
+// Calculatrix._compilePositionedCommands.
+class _PositionedCommand {
+  const _PositionedCommand(this.command, this.token);
+
+  final CalculatrixCommand command;
+  final _PositionedToken token;
 }
 
 class _InfixValidationFrame {

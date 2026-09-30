@@ -1,4 +1,5 @@
 import '../errors/errors.dart';
+import '../evaluation/calculatrix.dart';
 import '../machine/calculatrix_command.dart';
 import '../machine/commands.dart';
 import '../matrix/matrix.dart';
@@ -46,8 +47,12 @@ final class CalculatrixCommandEntry {
     this.examples = const <CalculatrixCommandExample>[],
     this.errors = const <CalculatrixErrorId>[],
     this.seeAlso = const <String>[],
-    required this.build,
-  });
+    this.build,
+  }) : assert(
+         (definition == null) != (build == null),
+         'A command entry is either primitive (build, no definition) or '
+         'defined (definition, no build), never both or neither.',
+       );
 
   /// The word of the language that resolves to this entry, e.g. "power".
   /// Matched case-insensitively by [CalculatrixCommandRegistry.lookup].
@@ -73,9 +78,11 @@ final class CalculatrixCommandEntry {
 
   /// The RPN program over other words of the registry that defines this
   /// entry, or null when the entry is primitive (spec section 7,
-  /// "Definition"; runbook D43). Every entry registered so far is
-  /// primitive; defined words such as `inverse` (`-1 power`) arrive in
-  /// step S4b.
+  /// "Definition"; runbook D43), e.g. `inverse` is defined as `-1 power`.
+  /// [CalculatrixCommandRegistry] validates, at construction, that every
+  /// non-literal word a definition uses resolves in the registry and that
+  /// no definition reaches itself, directly or through other defined
+  /// words (issue #35, AC5).
   final String? definition;
 
   /// Whether this entry builds a core command directly rather than being
@@ -105,12 +112,14 @@ final class CalculatrixCommandEntry {
   final List<String> seeAlso;
 
   /// Builds the [CalculatrixCommand] the RPN compiler executes for this
-  /// entry. A factory function rather than a stored instance: every
+  /// entry, or null when the entry is defined rather than primitive
+  /// (exactly one of [build] and [definition] is set; see [isPrimitive]).
+  /// A factory function rather than a stored instance: every primitive
   /// command registered so far is itself a stateless `const`, so building
   /// one fresh per lookup costs nothing, and the shape already
   /// accommodates a future parameterized command without changing this
   /// field's type.
-  final CalculatrixCommand Function() build;
+  final CalculatrixCommand Function()? build;
 
   /// Every word this entry resolves from: its name plus its aliases. Used
   /// by [CalculatrixCommandRegistry] to build and validate its lookup
@@ -127,9 +136,14 @@ final class CalculatrixCommandEntry {
 final class CalculatrixCommandRegistry {
   /// Builds a registry from `entries`, rejecting at construction two
   /// entries that share a name or alias, case-insensitively (issue #32,
-  /// AC5). A silent shadowing here would make `_compileRpnToken`
+  /// AC5), and, once every word is known, rejecting a defined entry
+  /// (runbook D43) whose definition uses a word outside the registry, or
+  /// that reaches itself, directly or through other defined words (issue
+  /// #35, AC5). A silent shadowing here would make `_compileWord`
   /// non-deterministic about which entry's command actually runs for a
-  /// given word.
+  /// given word; an unresolved or cyclic definition would instead fail
+  /// only much later, the first time some RPN program happened to expand
+  /// it.
   factory CalculatrixCommandRegistry(
     Iterable<CalculatrixCommandEntry> entries,
   ) {
@@ -152,7 +166,76 @@ final class CalculatrixCommandRegistry {
       }
     }
 
+    // Definitions are validated only once every entry's words are known
+    // (above), so a definition may reference an entry registered later in
+    // `entries`: registration order never affects whether a definition
+    // resolves.
+    for (final CalculatrixCommandEntry entry in ordered) {
+      if (entry.definition != null) {
+        _requireResolvableDefinition(entry, byWord);
+      }
+    }
+    for (final CalculatrixCommandEntry entry in ordered) {
+      if (entry.definition != null) {
+        _requireAcyclicDefinition(entry, byWord, <CalculatrixCommandEntry>{});
+      }
+    }
+
     return CalculatrixCommandRegistry._(ordered, byWord);
+  }
+
+  static void _requireResolvableDefinition(
+    CalculatrixCommandEntry entry,
+    Map<String, CalculatrixCommandEntry> byWord,
+  ) {
+    for (final String word in Calculatrix.tokenizeRpnLine(entry.definition!)) {
+      if (Calculatrix.isLiteralToken(word)) {
+        continue;
+      }
+      if (!byWord.containsKey(word.toLowerCase())) {
+        throw ArgumentError(
+          'Command registry error: the definition of "${entry.name}" '
+          '("${entry.definition}") uses unknown word "$word".',
+        );
+      }
+    }
+  }
+
+  // Depth-first search over the definition graph, `path` holding every
+  // defined entry visited on the current chain from the original entry
+  // (inclusive of `entry` itself once we recurse below): a cycle is
+  // detected the moment a definition's own dependency chain revisits an
+  // entry already on that chain, whether that is `entry` reaching itself
+  // directly (a definition that names itself) or indirectly (through one
+  // or more other defined words).
+  static void _requireAcyclicDefinition(
+    CalculatrixCommandEntry entry,
+    Map<String, CalculatrixCommandEntry> byWord,
+    Set<CalculatrixCommandEntry> path,
+  ) {
+    if (path.contains(entry)) {
+      throw ArgumentError(
+        'Command registry error: cyclic definition detected at '
+        '"${entry.name}".',
+      );
+    }
+    if (entry.definition == null) {
+      return;
+    }
+
+    final Set<CalculatrixCommandEntry> nextPath = <CalculatrixCommandEntry>{
+      ...path,
+      entry,
+    };
+    for (final String word in Calculatrix.tokenizeRpnLine(entry.definition!)) {
+      if (Calculatrix.isLiteralToken(word)) {
+        continue;
+      }
+      final CalculatrixCommandEntry? dependency = byWord[word.toLowerCase()];
+      if (dependency != null) {
+        _requireAcyclicDefinition(dependency, byWord, nextPath);
+      }
+    }
   }
 
   CalculatrixCommandRegistry._(this.entries, this._byWord);
@@ -167,14 +250,14 @@ final class CalculatrixCommandRegistry {
   /// (issue #32, AC4).
   CalculatrixCommandEntry? lookup(String word) => _byWord[word.toLowerCase()];
 
-  /// The registry of every word `_compileRpnToken` recognizes today (issue
+  /// The registry of every word `_compileWord` recognizes today (issue
   /// #32): the operators the RPN compiler used to resolve through its own
   /// hardcoded switch, with no new math. Names are words of the language
-  /// and their historical symbols are aliases (runbook D41); `sqrt` stays
-  /// a primitive command here, its defined-word form (`0.5 power`, runbook
-  /// D43, D44) is step S4b of the runbook, not this PR. Follow-up PRs add
-  /// `vector`, `rows`, `append-rows`, `append-cols` and the rest of spec
-  /// section 7.
+  /// and their historical symbols are aliases (runbook D41); `inverse` and
+  /// `sqrt` are defined words (`-1 power` and `0.5 power`, runbook D43,
+  /// D44, issue #35), so `power` is the one implementation both of them
+  /// share for an exact exponent. Follow-up PRs add `vector`, `rows`,
+  /// `append-rows`, `append-cols` and the rest of spec section 7.
   static final CalculatrixCommandRegistry
   standard = CalculatrixCommandRegistry(<CalculatrixCommandEntry>[
     CalculatrixCommandEntry(
@@ -259,20 +342,56 @@ final class CalculatrixCommandRegistry {
       aliases: const <String>['√'],
       searchTerms: const <String>['root', 'square-root'],
       hp50gReference: '√',
+      definition: '0.5 power',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'X -> X^(1/2)',
       preconditions: 'X is square (a scalar is 1x1, and therefore square)',
       description:
-          'The principal square root of X; a negative scalar gives the '
-          'imaginary unit scaled accordingly. A primitive command in this '
-          'PR: its defined-word form (0.5 power) is runbook step S4b.',
+          'The principal square root of X (0.5 power, runbook D43, D44); '
+          'a negative scalar gives the imaginary unit scaled accordingly.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('9 sqrt', Matrix.scalar(3)),
         CalculatrixCommandExample('9 √', Matrix.scalar(3)),
       ],
-      errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
-      seeAlso: const <String>['power'],
-      build: () => const SqrtCommand(),
+      errors: const <CalculatrixErrorId>[
+        CalculatrixErrorId.dimensionMismatch,
+        CalculatrixErrorId.logUndefined,
+      ],
+      seeAlso: const <String>['power', 'inverse'],
+    ),
+    CalculatrixCommandEntry(
+      name: 'inverse',
+      aliases: const <String>['inv'],
+      searchTerms: const <String>['reciprocal'],
+      hp50gReference: 'INV',
+      definition: '-1 power',
+      category: CalculatrixCommandCategory.arithmetic,
+      stackEffect: 'A -> A^-1',
+      preconditions: 'A is square and not singular',
+      description:
+          'The inverse of A (-1 power, runbook D43, D44): A times its '
+          'inverse gives the identity.',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample(
+          '[[2 0] [0 4]] inverse',
+          Matrix(<List<double>>[
+            <double>[0.5, 0],
+            <double>[0, 0.25],
+          ]),
+        ),
+        CalculatrixCommandExample(
+          '[[2 0] [0 4]] inv',
+          Matrix(<List<double>>[
+            <double>[0.5, 0],
+            <double>[0, 0.25],
+          ]),
+        ),
+      ],
+      errors: const <CalculatrixErrorId>[
+        CalculatrixErrorId.singularMatrix,
+        CalculatrixErrorId.dimensionMismatch,
+      ],
+      seeAlso: const <String>['power', 'sqrt'],
     ),
     CalculatrixCommandEntry(
       name: 'percent',
@@ -300,7 +419,9 @@ final class CalculatrixCommandRegistry {
           'table)',
       description:
           'Raises B to the power Y (runbook D25): '
-          'B^Y = exp(Y . log B).',
+          'B^Y = exp(Y . log B). Exponent -1 and 0.5 use the exact '
+          'inverse and square-root algorithms instead (runbook D44); '
+          'inverse and sqrt are defined in terms of this word.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('2 3 pwr', Matrix.scalar(8)),
         CalculatrixCommandExample('2 3 POWER', Matrix.scalar(8)),
@@ -313,7 +434,7 @@ final class CalculatrixCommandRegistry {
         CalculatrixErrorId.nonFinite,
         CalculatrixErrorId.singularMatrix,
       ],
-      seeAlso: const <String>['sqrt'],
+      seeAlso: const <String>['sqrt', 'inverse'],
       build: () => const PowerCommand(),
     ),
   ]);

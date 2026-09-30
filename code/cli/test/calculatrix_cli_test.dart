@@ -547,13 +547,12 @@ void main() {
   //   matmul ([[1,2],[3,4]]*[[5,6],[7,8]]) -> [[19,22],[43,50]] (exact)
   //   neg    (1-2)                       -> -1.0000000000000000000 (exact)
   //
-  // core exposes no RPN/infix word for matrix inverse (InverseCommand in
-  // core/lib/src/machine/commands.dart is never wired to a token the RPN or
-  // infix compiler recognizes, and Matrix's own `/` operator only supports
-  // a scalar, i.e. 1x1, denominator -- matrix-by-matrix division throws
-  // typeMismatch), so a Giac-checked matrix inverse case cannot be built
-  // through `cx eval rpn`/`cx eval infix` in this stage; that vocabulary is
-  // reserved for the S4 commands catalog. Not tested here for that reason.
+  // Matrix's own `/` operator only supports a scalar, i.e. 1x1, denominator
+  // (matrix-by-matrix division throws typeMismatch), so a Giac-checked
+  // matrix inverse case built through `/` cannot be built here. `inverse`
+  // and `inv` are now registered RPN words (issue #35, defined as `-1
+  // power`), but that word and its Giac cross-check belong with the rest
+  // of the S4 commands catalog coverage, not this Giac fixture group.
   group('Giac-verified numeric results (non-trivial)', () {
     // Relative-tolerance comparison against a Giac-derived expected value,
     // matching the CLI's own JSON number (an int or a double per

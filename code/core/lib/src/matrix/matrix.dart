@@ -1437,6 +1437,13 @@ class Matrix {
       );
     }
 
+    // A complex matrix [[a -b] [b a]] (a+bi, runbook D25) has the complex
+    // principal square root, the same value the scalar branch above gives
+    // for a negative scalar: [[-1 0] [0 -1]] is -1 and its root is i.
+    if (_isComplexForm) {
+      return _complexPrincipalSqrt(_rows[0][0], _rows[1][0]);
+    }
+
     // Every tolerance-based decision below (the structural-singularity
     // pre-check, and internally, Newton's own convergence check and the
     // range/null-space split's rank comparisons) is calibrated for a
@@ -1563,6 +1570,7 @@ class Matrix {
       } on MatrixDomainError {
         throw MatrixDomainError(
           'Square root is undefined for this matrix in the real domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
 
@@ -1588,6 +1596,7 @@ class Matrix {
 
     throw MatrixDomainError(
       'Square root did not converge for this matrix in the real domain.',
+      errorId: CalculatrixErrorId.logUndefined,
     );
   }
 
@@ -1635,6 +1644,7 @@ class Matrix {
     if (rankA != rankASquared) {
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
+        errorId: CalculatrixErrorId.logUndefined,
       );
     }
 
@@ -1662,6 +1672,7 @@ class Matrix {
       // Matrix constructor below.
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
+        errorId: CalculatrixErrorId.logUndefined,
       );
     }
     if (rangeDimension != rankA || rangeDimension + nullBasis.length != n) {
@@ -1669,6 +1680,7 @@ class Matrix {
       // defensive guard against an unforeseen numerical edge case.
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
+        errorId: CalculatrixErrorId.logUndefined,
       );
     }
 
@@ -1699,6 +1711,7 @@ class Matrix {
     } on MatrixDomainError {
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
+        errorId: CalculatrixErrorId.logUndefined,
       );
     }
 
@@ -2337,7 +2350,57 @@ class Matrix {
     return _powerByMatrixExponent(exponent);
   }
 
+  bool get _isComplexForm =>
+      rowCount == 2 &&
+      columnCount == 2 &&
+      _rows[0][0] == _rows[1][1] &&
+      _rows[0][1] == -_rows[1][0];
+
+  // Principal square root of a+bi as [[x -y] [y x]], with x >= 0 and, when
+  // x is 0, y >= 0. The larger of x and |y| comes from a square root, the
+  // other from b / 2, to avoid cancellation; the modulus is computed on
+  // the values scaled by max(|a|, |b|) so it cannot overflow.
+  static Matrix _complexPrincipalSqrt(double a, double b) {
+    final double scaleFactor = math.max(a.abs(), b.abs());
+    final double ratioA = a / scaleFactor;
+    final double ratioB = b / scaleFactor;
+    final double modulus =
+        scaleFactor * math.sqrt(ratioA * ratioA + ratioB * ratioB);
+    double x;
+    double y;
+    if (a >= 0) {
+      x = math.sqrt((modulus + a) / 2);
+      y = b / (2 * x);
+    } else {
+      y = math.sqrt((modulus - a) / 2);
+      if (b < 0) {
+        y = -y;
+      }
+      x = b / (2 * y);
+    }
+    return Matrix(<List<double>>[
+      <double>[x, -y],
+      <double>[y, x],
+    ]);
+  }
+
   Matrix _powerByScalarExponent(double y) {
+    // Exponent exactly 0.5 uses the same principal-square-root algorithm
+    // as sqrt() itself, for both a scalar and a matrix base (runbook D44,
+    // issue #35, AC1, AC7): one implementation per concept, rather than a
+    // second, less exact route to the same value through exp(0.5 * log
+    // B). This also makes 0.5 power raise log-undefined exactly when
+    // sqrt() does (AC6), since it is now the very same call.
+    if (y == 0.5) {
+      return sqrt();
+    }
+    // Exponent exactly -1 is the matrix inverse itself (runbook D44): the
+    // same Gauss-Jordan elimination inverse() uses, not a product with the
+    // identity. A scalar base keeps math.pow below, which is exact for it.
+    if (y == -1 && !isScalar) {
+      return _inverse();
+    }
+
     final bool integerExponent = y == y.roundToDouble();
 
     if (isScalar) {
