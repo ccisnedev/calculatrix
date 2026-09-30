@@ -63,6 +63,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	`[[0 -1][1 0]]`, the logo's form and the HP 50g's own notation, in RPN
 	and infix. It means the same as `[[0 -1] [1 0]]` (issue #29). Shipped in
 	`cx` 0.8.1.
+- `cx doctor`, `cx upgrade` and `cx uninstall` exit as soon as they print
+	their result, instead of about 15 s later: `modular_cli_sdk` 0.8.3 closes
+	the HTTP client its release lookup opens (modular_cli_sdk issue #44).
+	Shipped in `cx` 0.8.2.
 
 ## [0.7.1] - 2026-05-30
 
