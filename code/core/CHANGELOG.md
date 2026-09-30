@@ -29,6 +29,25 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   a word (runbook D42, "the HP 50g is inspiration, not adoption"). The
   `definition` field is null for a primitive entry (`isPrimitive`); every
   entry registered here is primitive (runbook D43).
+- Defined words (runbook D43, D44; issue #35): a `CalculatrixCommandEntry`
+  is now either primitive (`build`, no `definition`) or defined (a
+  `definition` RPN program over other registry words, no `build`), never
+  both or neither. `Calculatrix._compileWord` expands a defined entry into
+  the compiled commands of its own definition, recursively, through the
+  exact same compiler path any other RPN input goes through, so a defined
+  word's result is bitwise identical to typing its definition by hand.
+  Every compiled command carries the original input token, so an error
+  raised while executing a defined word's expansion still reports the word
+  the user actually typed (e.g. `inverse`), not a word from inside its
+  definition (e.g. `power`). `CalculatrixCommandRegistry`'s construction
+  now also validates every definition: a non-literal word it uses must
+  resolve in the registry, and no definition may reach itself, directly or
+  through other defined words; either violation raises `ArgumentError` at
+  construction. `inverse` (alias `inv`, definition `-1 power`) is a new
+  registry entry; `sqrt` (alias `√`) is converted from primitive to
+  defined (`0.5 power`), both sharing `power`'s exact algorithm for those
+  exponents instead of a separate implementation (D44, one implementation
+  per concept).
 
 ### Fixed
 
@@ -68,6 +87,19 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   looser rank tolerance would have misrouted, and a uniformly tiny (or
   huge) but well-conditioned matrix that fixed absolute tolerances are not
   invariant to.
+- `power` at exponent `-1` (a matrix base) and `0.5` (a scalar or matrix
+  base) no longer goes through the general `exp(y * log B)` route, which
+  introduced floating-point rounding noise for well-conditioned inputs
+  that have an exact result (issue #35); `-1` now uses the same inverse
+  `power` already delegated to, and `0.5` now calls `sqrt()` directly.
+  `Matrix._inverse()` also gains a closed-form fast path for a 2x2 base,
+  since the general Gauss-Jordan elimination's partial pivoting was the
+  actual source of the rounding noise (e.g. `[[1 2] [3 4]] -1 power` used
+  to give `-1.9999999999999996` instead of exactly `-2`). Every internal
+  failure of `Matrix.sqrt()` now also carries `errorId:
+  CalculatrixErrorId.logUndefined`, so `[[-1 0] [0 2]] sqrt` and
+  `[[-1 0] [0 2]] 0.5 power` raise `log-undefined` instead of the CLI's
+  generic fallback error id.
 
 ## [0.7.0] - 2026-05-21
 

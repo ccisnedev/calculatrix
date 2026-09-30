@@ -336,6 +336,22 @@ class Matrix {
   }) {
     _requireSquare(operation: 'inverse');
 
+    // A closed-form fast path for the common 2x2 case (runbook D44, issue
+    // #35, AC1): the general Gauss-Jordan elimination below is exact in
+    // principle, but its partial pivoting can swap rows even when no swap
+    // is mathematically necessary, introducing floating-point rounding
+    // noise a human computing the same inverse by hand would never see
+    // (e.g. [[1,2],[3,4]] inverting to an entry of -1.9999999999999996
+    // instead of exactly -2). The closed form (1/det)*[[d,-b],[-c,a]] has
+    // no such choice to make, so it is exact whenever the true inverse's
+    // entries are themselves exactly representable. Left to the general
+    // algorithm for every other size: 3x3 and up have no comparably simple
+    // closed form, and the existing numerical-robustness tests (Hilbert,
+    // Pascal, Frank matrices) only exercise those larger sizes.
+    if (rowCount == 2) {
+      return _inverse2x2(absoluteTolerance: absoluteTolerance);
+    }
+
     final int size = rowCount;
     final List<List<double>> augmented = List<List<double>>.generate(
       size,
@@ -414,6 +430,32 @@ class Matrix {
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
   }) {
     return _inverse(absoluteTolerance: absoluteTolerance);
+  }
+
+  /// Closed-form inverse of a 2x2 matrix: (1/det)*[[d,-b],[-c,a]]. See
+  /// [_inverse]'s doc comment for why this exists alongside the general
+  /// Gauss-Jordan elimination.
+  Matrix _inverse2x2({
+    double absoluteTolerance =
+        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+  }) {
+    final double a = _rows[0][0];
+    final double b = _rows[0][1];
+    final double c = _rows[1][0];
+    final double d = _rows[1][1];
+    final double determinant = a * d - b * c;
+
+    if (determinant.abs() <= absoluteTolerance) {
+      throw MatrixDomainError(
+        'Matrix is singular and cannot be inverted.',
+        errorId: CalculatrixErrorId.singularMatrix,
+      );
+    }
+
+    return Matrix(<List<double>>[
+      <double>[d / determinant, -b / determinant],
+      <double>[-c / determinant, a / determinant],
+    ]);
   }
 
   Matrix determinant({
@@ -1563,6 +1605,7 @@ class Matrix {
       } on MatrixDomainError {
         throw MatrixDomainError(
           'Square root is undefined for this matrix in the real domain.',
+          errorId: CalculatrixErrorId.logUndefined,
         );
       }
 
@@ -1588,6 +1631,7 @@ class Matrix {
 
     throw MatrixDomainError(
       'Square root did not converge for this matrix in the real domain.',
+      errorId: CalculatrixErrorId.logUndefined,
     );
   }
 
@@ -1635,6 +1679,7 @@ class Matrix {
     if (rankA != rankASquared) {
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
+        errorId: CalculatrixErrorId.logUndefined,
       );
     }
 
@@ -1662,6 +1707,7 @@ class Matrix {
       // Matrix constructor below.
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
+        errorId: CalculatrixErrorId.logUndefined,
       );
     }
     if (rangeDimension != rankA || rangeDimension + nullBasis.length != n) {
@@ -1669,6 +1715,7 @@ class Matrix {
       // defensive guard against an unforeseen numerical edge case.
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
+        errorId: CalculatrixErrorId.logUndefined,
       );
     }
 
@@ -1699,6 +1746,7 @@ class Matrix {
     } on MatrixDomainError {
       throw MatrixDomainError(
         'Square root is undefined for this matrix in the real domain.',
+        errorId: CalculatrixErrorId.logUndefined,
       );
     }
 
@@ -2338,6 +2386,16 @@ class Matrix {
   }
 
   Matrix _powerByScalarExponent(double y) {
+    // Exponent exactly 0.5 uses the same principal-square-root algorithm
+    // as sqrt() itself, for both a scalar and a matrix base (runbook D44,
+    // issue #35, AC1, AC7): one implementation per concept, rather than a
+    // second, less exact route to the same value through exp(0.5 * log
+    // B). This also makes 0.5 power raise log-undefined exactly when
+    // sqrt() does (AC6), since it is now the very same call.
+    if (y == 0.5) {
+      return sqrt();
+    }
+
     final bool integerExponent = y == y.roundToDouble();
 
     if (isScalar) {
