@@ -150,7 +150,7 @@ class UnknownWordError extends CalculatrixError {
   UnknownWordError(String token, {int? position, List<String> suggestions = const <String>[]})
     : super(
         suggestions.isEmpty
-            ? 'Unknown word: $token'
+            ? 'Unknown word: $token.'
             : 'Unknown word: $token. Did you mean ${_didYouMean(suggestions)}?',
         errorId: CalculatrixErrorId.unknownWord,
         token: token,
