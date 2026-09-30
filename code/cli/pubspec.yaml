@@ -1,6 +1,6 @@
 name: calculatrix_cli
 description: Command-line interface for Calculatrix.
-version: 0.8.1
+version: 0.8.2
 publish_to: 'none'
 
 # The executable is `cx`, built from bin/cx.dart, with no alias of any kind
@@ -17,7 +17,7 @@ dependencies:
   calculatrix:
     path: ../core
   cli_router: ^0.2.1
-  modular_cli_sdk: ^0.8.2
+  modular_cli_sdk: ^0.8.3
   path: ^1.9.1
 
 dev_dependencies:
