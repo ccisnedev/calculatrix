@@ -336,22 +336,6 @@ class Matrix {
   }) {
     _requireSquare(operation: 'inverse');
 
-    // A closed-form fast path for the common 2x2 case (runbook D44, issue
-    // #35, AC1): the general Gauss-Jordan elimination below is exact in
-    // principle, but its partial pivoting can swap rows even when no swap
-    // is mathematically necessary, introducing floating-point rounding
-    // noise a human computing the same inverse by hand would never see
-    // (e.g. [[1,2],[3,4]] inverting to an entry of -1.9999999999999996
-    // instead of exactly -2). The closed form (1/det)*[[d,-b],[-c,a]] has
-    // no such choice to make, so it is exact whenever the true inverse's
-    // entries are themselves exactly representable. Left to the general
-    // algorithm for every other size: 3x3 and up have no comparably simple
-    // closed form, and the existing numerical-robustness tests (Hilbert,
-    // Pascal, Frank matrices) only exercise those larger sizes.
-    if (rowCount == 2) {
-      return _inverse2x2(absoluteTolerance: absoluteTolerance);
-    }
-
     final int size = rowCount;
     final List<List<double>> augmented = List<List<double>>.generate(
       size,
@@ -430,32 +414,6 @@ class Matrix {
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
   }) {
     return _inverse(absoluteTolerance: absoluteTolerance);
-  }
-
-  /// Closed-form inverse of a 2x2 matrix: (1/det)*[[d,-b],[-c,a]]. See
-  /// [_inverse]'s doc comment for why this exists alongside the general
-  /// Gauss-Jordan elimination.
-  Matrix _inverse2x2({
-    double absoluteTolerance =
-        CalculatrixNumericPolicy.defaultAbsoluteTolerance,
-  }) {
-    final double a = _rows[0][0];
-    final double b = _rows[0][1];
-    final double c = _rows[1][0];
-    final double d = _rows[1][1];
-    final double determinant = a * d - b * c;
-
-    if (determinant.abs() <= absoluteTolerance) {
-      throw MatrixDomainError(
-        'Matrix is singular and cannot be inverted.',
-        errorId: CalculatrixErrorId.singularMatrix,
-      );
-    }
-
-    return Matrix(<List<double>>[
-      <double>[d / determinant, -b / determinant],
-      <double>[-c / determinant, a / determinant],
-    ]);
   }
 
   Matrix determinant({
@@ -2394,6 +2352,12 @@ class Matrix {
     // sqrt() does (AC6), since it is now the very same call.
     if (y == 0.5) {
       return sqrt();
+    }
+    // Exponent exactly -1 is the matrix inverse itself (runbook D44): the
+    // same Gauss-Jordan elimination inverse() uses, not a product with the
+    // identity. A scalar base keeps math.pow below, which is exact for it.
+    if (y == -1 && !isScalar) {
+      return _inverse();
     }
 
     final bool integerExponent = y == y.roundToDouble();

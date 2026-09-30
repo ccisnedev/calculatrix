@@ -1,10 +1,9 @@
 // Tests for issue #35 (runbook D43, D44, step S4b): `inverse` and `sqrt`
 // as defined words over an exact `power`.
 //
-// AC1: `power` at exponent -1 (matrix case) and 0.5 (scalar and matrix
-// cases) is exact, not the general exp(y * log B) route, so it no longer
-// carries the floating-point rounding noise that route introduces for a
-// well-conditioned integer input.
+// AC1: `power` at exponent -1 is the matrix inverse and at 0.5 the
+// principal square root (scalar and matrix cases), not the general
+// exp(y * log B) route (D44).
 // AC3: a defined word's compiled result is bitwise identical to typing its
 // own definition, checked with exact `==` (never `almostEquals`), on the
 // entry's own registered examples and on the applicable rows of the D25
@@ -37,7 +36,7 @@ int _expectedRpnPosition(List<String> tokens, int index) {
 
 void main() {
   group('AC1: -1 and 0.5 power are exact (issue #35)', () {
-    test('[[1 2] [3 4]] -1 power is exactly [[-2 1] [1.5 -0.5]]', () {
+    test('[[1 2] [3 4]] -1 power is the inverse, bit for bit', () {
       final Matrix base = Matrix(<List<double>>[
         <double>[1, 2],
         <double>[3, 4],
@@ -45,13 +44,35 @@ void main() {
 
       final Matrix result = base.power(Matrix.scalar(-1));
 
+      expect(result, base.inverse());
       expect(
-        result,
-        Matrix(<List<double>>[
-          <double>[-2, 1],
-          <double>[1.5, -0.5],
-        ]),
+        result.almostEquals(
+          Matrix(<List<double>>[
+            <double>[-2, 1],
+            <double>[1.5, -0.5],
+          ]),
+        ),
+        isTrue,
       );
+    });
+
+    // A singularity test on the determinant alone, with the absolute
+    // tolerance of 1e-12, would call this matrix singular (det 1e-14) and
+    // overflow on a large scale; the inverse goes through the pivots.
+    test('-1 power inverts tiny and huge well-conditioned matrices', () {
+      final Matrix tiny = Matrix(<List<double>>[
+        <double>[1e-7, 0],
+        <double>[0, 1e-7],
+      ]);
+      final Matrix huge = Matrix(<List<double>>[
+        <double>[1e200, 0],
+        <double>[0, 1e200],
+      ]);
+
+      for (final Matrix base in <Matrix>[tiny, huge]) {
+        final Matrix product = base * base.power(Matrix.scalar(-1));
+        expect(product.almostEquals(Matrix.identity(2)), isTrue);
+      }
     });
 
     test('[[0 0] [0 4]] 0.5 power is exactly [[0 0] [0 2]]', () {
@@ -108,8 +129,7 @@ void main() {
   group('AC7: D25 row 5, non-diagonalizable base at exponent 0.5', () {
     // Newton's iteration for the principal square root of a non-diagonal,
     // non-diagonalizable Jordan block does not land on an exactly
-    // representable double the way the closed-form 2x2 inverse or a
-    // diagonal square root does, so this compares against the runbook's
+    // representable double the way a diagonal square root does, so this compares against the runbook's
     // expected value (docs/runbook-cli-stage-0.md, D25 row 5) within a
     // tight tolerance rather than with exact `==`. The "same bits" half of
     // issue #35 AC7 (below) is what is checked exactly: 0.5 power and sqrt

@@ -87,15 +87,13 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   looser rank tolerance would have misrouted, and a uniformly tiny (or
   huge) but well-conditioned matrix that fixed absolute tolerances are not
   invariant to.
-- `power` at exponent `-1` (a matrix base) and `0.5` (a scalar or matrix
-  base) no longer goes through the general `exp(y * log B)` route, which
-  introduced floating-point rounding noise for well-conditioned inputs
-  that have an exact result (issue #35); `-1` now uses the same inverse
-  `power` already delegated to, and `0.5` now calls `sqrt()` directly.
-  `Matrix._inverse()` also gains a closed-form fast path for a 2x2 base,
-  since the general Gauss-Jordan elimination's partial pivoting was the
-  actual source of the rounding noise (e.g. `[[1 2] [3 4]] -1 power` used
-  to give `-1.9999999999999996` instead of exactly `-2`). Every internal
+- `power` at exponent `-1` (a matrix base) calls the matrix inverse
+  directly, and at `0.5` (a scalar or matrix base) calls `sqrt()`, instead
+  of the general `exp(y * log B)` route (runbook D44, issue #35), so
+  `-4 0.5 power` is exactly `[[0 -2] [2 0]]` and `[[0 0] [0 4]] 0.5 power`
+  is `[[0 0] [0 2]]` instead of `log-undefined`. The rounding noise of
+  `[[1 2] [3 4]] -1 power` comes from the inverse itself and is left to
+  the display formatter (runbook D45). Every internal
   failure of `Matrix.sqrt()` now also carries `errorId:
   CalculatrixErrorId.logUndefined`, so `[[-1 0] [0 2]] sqrt` and
   `[[-1 0] [0 2]] 0.5 power` raise `log-undefined` instead of the CLI's

@@ -373,17 +373,17 @@ final class CalculatrixCommandRegistry {
           'inverse gives the identity.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
-          '[[1 2] [3 4]] inverse',
+          '[[2 0] [0 4]] inverse',
           Matrix(<List<double>>[
-            <double>[-2, 1],
-            <double>[1.5, -0.5],
+            <double>[0.5, 0],
+            <double>[0, 0.25],
           ]),
         ),
         CalculatrixCommandExample(
-          '[[1 2] [3 4]] inv',
+          '[[2 0] [0 4]] inv',
           Matrix(<List<double>>[
-            <double>[-2, 1],
-            <double>[1.5, -0.5],
+            <double>[0.5, 0],
+            <double>[0, 0.25],
           ]),
         ),
       ],
