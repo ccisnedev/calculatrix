@@ -38,6 +38,7 @@ final class CalculatrixCommandEntry {
     this.aliases = const <String>[],
     this.searchTerms = const <String>[],
     this.hp50gReference,
+    this.definition,
     required this.category,
     required this.stackEffect,
     this.preconditions,
@@ -69,6 +70,17 @@ final class CalculatrixCommandEntry {
   /// never resolved by [CalculatrixCommandRegistry.lookup], so an HP-only
   /// spelling such as "->ARRY" is never a name or alias of any entry.
   final String? hp50gReference;
+
+  /// The RPN program over other words of the registry that defines this
+  /// entry, or null when the entry is primitive (spec section 7,
+  /// "Definition"; runbook D43). Every entry registered so far is
+  /// primitive; defined words such as `inverse` (`-1 power`) arrive in
+  /// step S4b.
+  final String? definition;
+
+  /// Whether this entry builds a core command directly rather than being
+  /// defined by an RPN program (runbook D43).
+  bool get isPrimitive => definition == null;
 
   /// The registry category this entry belongs to (spec section 7).
   final CalculatrixCommandCategory category;

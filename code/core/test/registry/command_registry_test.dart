@@ -62,7 +62,16 @@ void main() {
       expect(power.examples, isNotEmpty);
       expect(power.errors, contains(CalculatrixErrorId.dimensionMismatch));
       expect(power.hp50gReference, '^');
+      expect(power.definition, isNull);
+      expect(power.isPrimitive, isTrue);
       expect(power.build(), isA<PowerCommand>());
+    });
+
+    test('every entry registered so far is primitive (D43, step S4b)', () {
+      for (final CalculatrixCommandEntry entry
+          in CalculatrixCommandRegistry.standard.entries) {
+        expect(entry.isPrimitive, isTrue, reason: entry.name);
+      }
     });
 
     test('no HP 50g reference is ever a name or alias (D42)', () {

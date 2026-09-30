@@ -11,7 +11,7 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 - A core command registry (spec section 7): `CalculatrixCommandRegistry`
   resolves an RPN word to a `CalculatrixCommandEntry` by name or alias,
   case-insensitively, carrying the documentation fields spec section 7
-  requires (search terms, HP 50g reference, category, stack effect,
+  requires (search terms, HP 50g reference, definition, category, stack effect,
   preconditions, description, executable examples, errors, see also) plus
   how to build its `CalculatrixCommand`. `Calculatrix._compileRpnToken` now
   resolves every non-literal RPN word through
@@ -26,7 +26,9 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   with `vector`, `rows`, `append-rows`, `append-cols`, the `cx commands`
   route and "did you mean" (issue #32). The entry field `hp50gEquivalent`
   is named `hp50gReference` instead: purely informative, never resolved as
-  a word (runbook D42, "the HP 50g is inspiration, not adoption").
+  a word (runbook D42, "the HP 50g is inspiration, not adoption"). The
+  `definition` field is null for a primitive entry (`isPrimitive`); every
+  entry registered here is primitive (runbook D43).
 
 ### Fixed
 
