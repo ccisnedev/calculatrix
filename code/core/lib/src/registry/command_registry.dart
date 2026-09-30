@@ -708,6 +708,7 @@ final class CalculatrixCommandRegistry {
         CalculatrixCommandExample.stack('1 2 drop', <Matrix>[Matrix.scalar(1)]),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
+      seeAlso: const <String>['duplicate', 'pick', 'roll'],
       build: () => const DropCommand(),
     ),
     CalculatrixCommandEntry(
@@ -871,6 +872,7 @@ final class CalculatrixCommandRegistry {
         ),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
+      seeAlso: const <String>['rows', 'append-cols', 'append-rows'],
       build: () => const TransposeCommand(),
     ),
     CalculatrixCommandEntry(
