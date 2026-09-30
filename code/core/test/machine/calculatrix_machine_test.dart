@@ -3,29 +3,25 @@ import 'package:test/test.dart';
 
 void main() {
   group('CalculatrixMachine', () {
-    test(
-      'executes a typed scalar addition program equivalent to RPN engine',
-      () {
-        final CalculatrixMachine machine = CalculatrixMachine();
-        final RpnEngine engine = RpnEngine();
-        final CalculatrixProgram program =
-            CalculatrixProgram(<CalculatrixCommand>[
-              const PushScalarCommand(2),
-              const PushScalarCommand(3),
-              const AddCommand(),
-            ]);
+    test('executes a typed scalar addition program equivalent to RPN engine', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final RpnEngine engine = RpnEngine();
+      final CalculatrixProgram program = CalculatrixProgram(<CalculatrixCommand>[
+        const PushScalarCommand(2),
+        const PushScalarCommand(3),
+        const AddCommand(),
+      ]);
 
-        machine.executeProgram(program);
+      machine.executeProgram(program);
 
-        engine.pushScalar(2);
-        engine.pushScalar(3);
-        final Matrix expected = engine.applyBinary(RpnBinaryOperator.add);
+      engine.pushScalar(2);
+      engine.pushScalar(3);
+      final Matrix expected = engine.applyBinary(RpnBinaryOperator.add);
 
-        expect(machine.depth, 1);
-        expect(machine.top, expected);
-        expect(machine.stackSnapshot, orderedEquals(<Matrix>[expected]));
-      },
-    );
+      expect(machine.depth, 1);
+      expect(machine.top, expected);
+      expect(machine.stackSnapshot, orderedEquals(<Matrix>[expected]));
+    });
 
     test('executeAll applies commands sequentially', () {
       final CalculatrixMachine machine = CalculatrixMachine();
@@ -167,37 +163,28 @@ void main() {
 
       machine.execute(const PushScalarCommand(1));
 
-      expect(
-        () => machine.execute(const PickCommand(0)),
-        throwsA(isA<RpnStackRangeError>()),
-      );
-      expect(
-        () => machine.execute(const RollCommand(2)),
-        throwsA(isA<RpnStackRangeError>()),
-      );
+      expect(() => machine.execute(const PickCommand(0)), throwsA(isA<RpnStackRangeError>()));
+      expect(() => machine.execute(const RollCommand(2)), throwsA(isA<RpnStackRangeError>()));
     });
 
-    test(
-      'pushes zeros, ones, and identity matrices through typed commands',
-      () {
-        final CalculatrixMachine machine = CalculatrixMachine();
+    test('pushes zeros, ones, and identity matrices through typed commands', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
 
-        machine.executeAll(<CalculatrixCommand>[
-          const PushZerosCommand(2, 2),
-          const PushOnesCommand(2, 2),
-          const PushIdentityCommand(2),
-        ]);
+      machine.executeAll(<CalculatrixCommand>[
+        const PushZerosCommand(2, 2),
+        const PushOnesCommand(2, 2),
+        const PushIdentityCommand(2),
+      ]);
 
-        expect(
-          machine.stackSnapshot,
-          orderedEquals(<Matrix>[
-            Matrix.zeros(2, 2),
-            Matrix.ones(2, 2),
-            Matrix.identity(2),
-          ]),
-        );
-      },
-    );
+      expect(
+        machine.stackSnapshot,
+        orderedEquals(<Matrix>[
+          Matrix.zeros(2, 2),
+          Matrix.ones(2, 2),
+          Matrix.identity(2),
+        ]),
+      );
+    });
 
     test('applies negate and transpose through typed matrix commands', () {
       final CalculatrixMachine machine = CalculatrixMachine();
@@ -325,29 +312,26 @@ void main() {
       expect((permutation * source).almostEquals(lower * upper), isTrue);
     });
 
-    test(
-      'expands LU decomposition for singular matrices without losing stack order',
-      () {
-        final CalculatrixMachine machine = CalculatrixMachine();
-        final Matrix source = Matrix(<List<double>>[
-          <double>[1, 2],
-          <double>[2, 4],
-        ]);
+    test('expands LU decomposition for singular matrices without losing stack order', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final Matrix source = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[2, 4],
+      ]);
 
-        machine.execute(PushMatrixCommand(source));
-        machine.execute(const LuDecompositionCommand());
+      machine.execute(PushMatrixCommand(source));
+      machine.execute(const LuDecompositionCommand());
 
-        expect(machine.depth, 3);
+      expect(machine.depth, 3);
 
-        final List<Matrix> stack = machine.stackSnapshot;
-        final Matrix permutation = stack[0];
-        final Matrix lower = stack[1];
-        final Matrix upper = stack[2];
+      final List<Matrix> stack = machine.stackSnapshot;
+      final Matrix permutation = stack[0];
+      final Matrix lower = stack[1];
+      final Matrix upper = stack[2];
 
-        expect((permutation * source).almostEquals(lower * upper), isTrue);
-        expect(upper.at(1, 1), 0);
-      },
-    );
+      expect((permutation * source).almostEquals(lower * upper), isTrue);
+      expect(upper.at(1, 1), 0);
+    });
 
     test('expands QR decomposition through a typed matrix command', () {
       final CalculatrixMachine machine = CalculatrixMachine();
@@ -393,70 +377,54 @@ void main() {
     test('surfaces typed shape errors for invalid construction commands', () {
       final CalculatrixMachine machine = CalculatrixMachine();
 
-      expect(
-        () => machine.execute(const PushZerosCommand(0, 2)),
-        throwsA(isA<MatrixShapeError>()),
-      );
-      expect(
-        () => machine.execute(const PushOnesCommand(2, 0)),
-        throwsA(isA<MatrixShapeError>()),
-      );
-      expect(
-        () => machine.execute(const PushIdentityCommand(0)),
-        throwsA(isA<MatrixShapeError>()),
-      );
+      expect(() => machine.execute(const PushZerosCommand(0, 2)), throwsA(isA<MatrixShapeError>()));
+      expect(() => machine.execute(const PushOnesCommand(2, 0)), throwsA(isA<MatrixShapeError>()));
+      expect(() => machine.execute(const PushIdentityCommand(0)), throwsA(isA<MatrixShapeError>()));
     });
 
-    test(
-      'appends compatible row and column operands through typed commands',
-      () {
-        final CalculatrixMachine machine = CalculatrixMachine();
+    test('appends compatible row and column operands through typed commands', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
 
-        machine.executeAll(<CalculatrixCommand>[
-          PushMatrixCommand(
-            Matrix(<List<double>>[
-              <double>[1, 2],
-              <double>[3, 4],
-            ]),
-          ),
-          PushMatrixCommand(
-            Matrix(<List<double>>[
-              <double>[5, 6],
-            ]),
-          ),
-          const AppendRowCommand(),
-        ]);
-
-        expect(
-          machine.top,
+      machine.executeAll(<CalculatrixCommand>[
+        PushMatrixCommand(
           Matrix(<List<double>>[
             <double>[1, 2],
             <double>[3, 4],
-            <double>[5, 6],
           ]),
-        );
+        ),
+        PushMatrixCommand(Matrix(<List<double>>[<double>[5, 6]])),
+        const AppendRowCommand(),
+      ]);
 
-        machine.executeAll(<CalculatrixCommand>[
-          PushMatrixCommand(
-            Matrix(<List<double>>[
-              <double>[7],
-              <double>[8],
-              <double>[9],
-            ]),
-          ),
-          const AppendColumnCommand(),
-        ]);
+      expect(
+        machine.top,
+        Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[3, 4],
+          <double>[5, 6],
+        ]),
+      );
 
-        expect(
-          machine.top,
+      machine.executeAll(<CalculatrixCommand>[
+        PushMatrixCommand(
           Matrix(<List<double>>[
-            <double>[1, 2, 7],
-            <double>[3, 4, 8],
-            <double>[5, 6, 9],
+            <double>[7],
+            <double>[8],
+            <double>[9],
           ]),
-        );
-      },
-    );
+        ),
+        const AppendColumnCommand(),
+      ]);
+
+      expect(
+        machine.top,
+        Matrix(<List<double>>[
+          <double>[1, 2, 7],
+          <double>[3, 4, 8],
+          <double>[5, 6, 9],
+        ]),
+      );
+    });
 
     test('applies structural row and column commands to the top matrix', () {
       final CalculatrixMachine machine = CalculatrixMachine();
@@ -487,149 +455,22 @@ void main() {
       );
     });
 
-    test(
-      'surfaces typed structural index and shape errors through commands',
-      () {
-        final CalculatrixMachine machine = CalculatrixMachine();
-
-        machine.execute(
-          PushMatrixCommand(
-            Matrix(<List<double>>[
-              <double>[1, 2],
-            ]),
-          ),
-        );
-        expect(
-          () => machine.execute(const DeleteRowCommand(1)),
-          throwsA(isA<MatrixIndexError>()),
-        );
-
-        machine.clear();
-        machine.execute(
-          PushMatrixCommand(
-            Matrix(<List<double>>[
-              <double>[1],
-              <double>[2],
-            ]),
-          ),
-        );
-        expect(
-          () => machine.execute(const DeleteColumnCommand(0)),
-          throwsA(isA<MatrixShapeError>()),
-        );
-      },
-    );
-
-    test('rows then append-rows round-trips a matrix through the engine '
-        '(issue #37, AC3)', () {
-      // "drop" is not a registered RPN word yet, so the round trip is
-      // driven through typed commands directly, exactly the pattern the
-      // issue calls for.
+    test('surfaces typed structural index and shape errors through commands', () {
       final CalculatrixMachine machine = CalculatrixMachine();
-      final Matrix original = Matrix(<List<double>>[
-        <double>[1, 2],
-        <double>[3, 4],
-      ]);
 
-      machine.execute(PushMatrixCommand(original));
-      machine.execute(const RowsCommand());
+      machine.execute(PushMatrixCommand(Matrix(<List<double>>[<double>[1, 2]])));
+      expect(() => machine.execute(const DeleteRowCommand(1)), throwsA(isA<MatrixIndexError>()));
 
-      expect(
-        machine.stackSnapshot,
-        orderedEquals(<Matrix>[
-          Matrix(<List<double>>[
-            <double>[1, 2],
-          ]),
-          Matrix(<List<double>>[
-            <double>[3, 4],
-          ]),
-          Matrix.scalar(2),
-        ]),
-      );
-
-      machine.execute(const DropCommand());
-      machine.execute(const AppendRowsCommand());
-
-      expect(machine.depth, 1);
-      expect(machine.top, original);
-    });
-
-    test(
-      'builds a column vector through a typed VectorCommand (issue #37, AC2)',
-      () {
-        final CalculatrixMachine machine = CalculatrixMachine();
-
-        machine.executeAll(<CalculatrixCommand>[
-          const PushScalarCommand(1),
-          const PushScalarCommand(2),
-          const PushScalarCommand(3),
-          const PushScalarCommand(3),
-          const VectorCommand(),
-        ]);
-
-        expect(
-          machine.top,
+      machine.clear();
+      machine.execute(
+        PushMatrixCommand(
           Matrix(<List<double>>[
             <double>[1],
             <double>[2],
-            <double>[3],
-          ]),
-        );
-      },
-    );
-
-    test('appends any matching matrix through AppendColsCommand and '
-        'AppendRowsCommand (issue #37, AC4, AC5)', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
-
-      machine.executeAll(<CalculatrixCommand>[
-        PushMatrixCommand(
-          Matrix(<List<double>>[
-            <double>[1, 2],
-            <double>[3, 4],
           ]),
         ),
-        PushMatrixCommand(
-          Matrix(<List<double>>[
-            <double>[5, 6, 7],
-            <double>[8, 9, 10],
-          ]),
-        ),
-        const AppendColsCommand(),
-      ]);
-
-      expect(
-        machine.top,
-        Matrix(<List<double>>[
-          <double>[1, 2, 5, 6, 7],
-          <double>[3, 4, 8, 9, 10],
-        ]),
       );
-
-      machine.clear();
-      machine.executeAll(<CalculatrixCommand>[
-        PushMatrixCommand(
-          Matrix(<List<double>>[
-            <double>[1, 2],
-          ]),
-        ),
-        PushMatrixCommand(
-          Matrix(<List<double>>[
-            <double>[3, 4],
-            <double>[5, 6],
-          ]),
-        ),
-        const AppendRowsCommand(),
-      ]);
-
-      expect(
-        machine.top,
-        Matrix(<List<double>>[
-          <double>[1, 2],
-          <double>[3, 4],
-          <double>[5, 6],
-        ]),
-      );
+      expect(() => machine.execute(const DeleteColumnCommand(0)), throwsA(isA<MatrixShapeError>()));
     });
   });
 
@@ -644,158 +485,115 @@ void main() {
       expect(machine.depth, 0);
     });
 
-    test('InverseCommand does not lose the popped operand when the inverse '
-        'computation fails', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
+    test(
+      'InverseCommand does not lose the popped operand when the inverse '
+      'computation fails',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
 
-      machine.execute(const PushScalarCommand(2));
-      machine.execute(const PushScalarCommand(0));
+        machine.execute(const PushScalarCommand(2));
+        machine.execute(const PushScalarCommand(0));
 
-      expect(
-        () => machine.execute(const InverseCommand()),
-        throwsA(isA<MatrixDomainError>()),
-      );
-      expect(
-        machine.stackSnapshot,
-        orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(0)]),
-      );
-    });
+        expect(
+          () => machine.execute(const InverseCommand()),
+          throwsA(isA<MatrixDomainError>()),
+        );
+        expect(
+          machine.stackSnapshot,
+          orderedEquals(<Matrix>[Matrix.scalar(2), Matrix.scalar(0)]),
+        );
+      },
+    );
 
-    test('AppendRowCommand restores a single operand lost to underflow', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
-      final Matrix target = Matrix(<List<double>>[
-        <double>[1, 2],
-      ]);
+    test(
+      'AppendRowCommand restores a single operand lost to underflow',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+        final Matrix target = Matrix(<List<double>>[
+          <double>[1, 2],
+        ]);
 
-      machine.execute(PushMatrixCommand(target));
+        machine.execute(PushMatrixCommand(target));
 
-      expect(
-        () => machine.execute(const AppendRowCommand()),
-        throwsA(isA<RpnStackUnderflowError>()),
-      );
-      expect(machine.stackSnapshot, orderedEquals(<Matrix>[target]));
-    });
+        expect(
+          () => machine.execute(const AppendRowCommand()),
+          throwsA(isA<RpnStackUnderflowError>()),
+        );
+        expect(machine.stackSnapshot, orderedEquals(<Matrix>[target]));
+      },
+    );
 
-    test('AppendRowCommand restores both operands when they are shape '
-        'incompatible', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
-      final Matrix target = Matrix(<List<double>>[
-        <double>[1, 2],
-        <double>[3, 4],
-      ]);
-      final Matrix incompatibleRow = Matrix(<List<double>>[
-        <double>[5, 6, 7],
-      ]);
+    test(
+      'AppendRowCommand restores both operands when they are shape '
+      'incompatible',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+        final Matrix target = Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[3, 4],
+        ]);
+        final Matrix incompatibleRow = Matrix(<List<double>>[
+          <double>[5, 6, 7],
+        ]);
 
-      machine.execute(PushMatrixCommand(target));
-      machine.execute(PushMatrixCommand(incompatibleRow));
+        machine.execute(PushMatrixCommand(target));
+        machine.execute(PushMatrixCommand(incompatibleRow));
 
-      expect(
-        () => machine.execute(const AppendRowCommand()),
-        throwsA(isA<MatrixShapeError>()),
-      );
-      expect(
-        machine.stackSnapshot,
-        orderedEquals(<Matrix>[target, incompatibleRow]),
-      );
-    });
+        expect(
+          () => machine.execute(const AppendRowCommand()),
+          throwsA(isA<MatrixShapeError>()),
+        );
+        expect(
+          machine.stackSnapshot,
+          orderedEquals(<Matrix>[target, incompatibleRow]),
+        );
+      },
+    );
 
-    test('DotProductCommand restores a single operand lost to underflow', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
-      final Matrix vector = Matrix(<List<double>>[
-        <double>[1],
-        <double>[2],
-      ]);
+    test(
+      'DotProductCommand restores a single operand lost to underflow',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+        final Matrix vector = Matrix(<List<double>>[
+          <double>[1],
+          <double>[2],
+        ]);
 
-      machine.execute(PushMatrixCommand(vector));
+        machine.execute(PushMatrixCommand(vector));
 
-      expect(
-        () => machine.execute(const DotProductCommand()),
-        throwsA(isA<RpnStackUnderflowError>()),
-      );
-      expect(machine.stackSnapshot, orderedEquals(<Matrix>[vector]));
-    });
+        expect(
+          () => machine.execute(const DotProductCommand()),
+          throwsA(isA<RpnStackUnderflowError>()),
+        );
+        expect(machine.stackSnapshot, orderedEquals(<Matrix>[vector]));
+      },
+    );
 
-    test('DotProductCommand restores both operands when the operands are not '
-        'column vectors', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
-      final Matrix rowVector = Matrix(<List<double>>[
-        <double>[1, 2],
-      ]);
-      final Matrix columnVector = Matrix(<List<double>>[
-        <double>[3],
-        <double>[4],
-      ]);
+    test(
+      'DotProductCommand restores both operands when the operands are not '
+      'column vectors',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+        final Matrix rowVector = Matrix(<List<double>>[
+          <double>[1, 2],
+        ]);
+        final Matrix columnVector = Matrix(<List<double>>[
+          <double>[3],
+          <double>[4],
+        ]);
 
-      machine.execute(PushMatrixCommand(rowVector));
-      machine.execute(PushMatrixCommand(columnVector));
+        machine.execute(PushMatrixCommand(rowVector));
+        machine.execute(PushMatrixCommand(columnVector));
 
-      expect(
-        () => machine.execute(const DotProductCommand()),
-        throwsA(isA<MatrixShapeError>()),
-      );
-      expect(
-        machine.stackSnapshot,
-        orderedEquals(<Matrix>[rowVector, columnVector]),
-      );
-    });
-
-    test('AppendRowsCommand restores both operands when column counts differ '
-        '(issue #37, AC5)', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
-      final Matrix a = Matrix(<List<double>>[
-        <double>[1, 2],
-      ]);
-      final Matrix b = Matrix(<List<double>>[
-        <double>[3, 4, 5],
-      ]);
-
-      machine.execute(PushMatrixCommand(a));
-      machine.execute(PushMatrixCommand(b));
-
-      expect(
-        () => machine.execute(const AppendRowsCommand()),
-        throwsA(isA<MatrixShapeError>()),
-      );
-      expect(machine.stackSnapshot, orderedEquals(<Matrix>[a, b]));
-    });
-
-    test('AppendColsCommand restores both operands when row counts differ '
-        '(issue #37, AC4)', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
-      final Matrix a = Matrix(<List<double>>[
-        <double>[1],
-        <double>[2],
-      ]);
-      final Matrix b = Matrix(<List<double>>[
-        <double>[3],
-      ]);
-
-      machine.execute(PushMatrixCommand(a));
-      machine.execute(PushMatrixCommand(b));
-
-      expect(
-        () => machine.execute(const AppendColsCommand()),
-        throwsA(isA<MatrixShapeError>()),
-      );
-      expect(machine.stackSnapshot, orderedEquals(<Matrix>[a, b]));
-    });
-
-    test('VectorCommand restores every popped operand when the count exceeds '
-        'the stack (issue #37, AC2)', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
-
-      machine.execute(const PushScalarCommand(1));
-      machine.execute(const PushScalarCommand(3));
-
-      expect(
-        () => machine.execute(const VectorCommand()),
-        throwsA(isA<RpnStackUnderflowError>()),
-      );
-      expect(
-        machine.stackSnapshot,
-        orderedEquals(<Matrix>[Matrix.scalar(1), Matrix.scalar(3)]),
-      );
-    });
+        expect(
+          () => machine.execute(const DotProductCommand()),
+          throwsA(isA<MatrixShapeError>()),
+        );
+        expect(
+          machine.stackSnapshot,
+          orderedEquals(<Matrix>[rowVector, columnVector]),
+        );
+      },
+    );
   });
 }

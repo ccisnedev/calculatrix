@@ -474,4 +474,171 @@ void main() {
       }
     });
   });
+
+  group('typed commands through the machine (issue #37)', () {
+    test('rows then append-rows round-trips a matrix through the engine '
+        '(issue #37, AC3)', () {
+      // "drop" is not a registered RPN word yet, so the round trip is
+      // driven through typed commands directly, exactly the pattern the
+      // issue calls for.
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final Matrix original = Matrix(<List<double>>[
+        <double>[1, 2],
+        <double>[3, 4],
+      ]);
+
+      machine.execute(PushMatrixCommand(original));
+      machine.execute(const RowsCommand());
+
+      expect(
+        machine.stackSnapshot,
+        orderedEquals(<Matrix>[
+          Matrix(<List<double>>[
+            <double>[1, 2],
+          ]),
+          Matrix(<List<double>>[
+            <double>[3, 4],
+          ]),
+          Matrix.scalar(2),
+        ]),
+      );
+
+      machine.execute(const DropCommand());
+      machine.execute(const AppendRowsCommand());
+
+      expect(machine.depth, 1);
+      expect(machine.top, original);
+    });
+    test(
+      'builds a column vector through a typed VectorCommand (issue #37, AC2)',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
+
+        machine.executeAll(<CalculatrixCommand>[
+          const PushScalarCommand(1),
+          const PushScalarCommand(2),
+          const PushScalarCommand(3),
+          const PushScalarCommand(3),
+          const VectorCommand(),
+        ]);
+
+        expect(
+          machine.top,
+          Matrix(<List<double>>[
+            <double>[1],
+            <double>[2],
+            <double>[3],
+          ]),
+        );
+      },
+    );
+    test('appends any matching matrix through AppendColsCommand and '
+        'AppendRowsCommand (issue #37, AC4, AC5)', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+
+      machine.executeAll(<CalculatrixCommand>[
+        PushMatrixCommand(
+          Matrix(<List<double>>[
+            <double>[1, 2],
+            <double>[3, 4],
+          ]),
+        ),
+        PushMatrixCommand(
+          Matrix(<List<double>>[
+            <double>[5, 6, 7],
+            <double>[8, 9, 10],
+          ]),
+        ),
+        const AppendColsCommand(),
+      ]);
+
+      expect(
+        machine.top,
+        Matrix(<List<double>>[
+          <double>[1, 2, 5, 6, 7],
+          <double>[3, 4, 8, 9, 10],
+        ]),
+      );
+
+      machine.clear();
+      machine.executeAll(<CalculatrixCommand>[
+        PushMatrixCommand(
+          Matrix(<List<double>>[
+            <double>[1, 2],
+          ]),
+        ),
+        PushMatrixCommand(
+          Matrix(<List<double>>[
+            <double>[3, 4],
+            <double>[5, 6],
+          ]),
+        ),
+        const AppendRowsCommand(),
+      ]);
+
+      expect(
+        machine.top,
+        Matrix(<List<double>>[
+          <double>[1, 2],
+          <double>[3, 4],
+          <double>[5, 6],
+        ]),
+      );
+    });
+    test('AppendRowsCommand restores both operands when column counts differ '
+        '(issue #37, AC5)', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final Matrix a = Matrix(<List<double>>[
+        <double>[1, 2],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[3, 4, 5],
+      ]);
+
+      machine.execute(PushMatrixCommand(a));
+      machine.execute(PushMatrixCommand(b));
+
+      expect(
+        () => machine.execute(const AppendRowsCommand()),
+        throwsA(isA<MatrixShapeError>()),
+      );
+      expect(machine.stackSnapshot, orderedEquals(<Matrix>[a, b]));
+    });
+    test('AppendColsCommand restores both operands when row counts differ '
+        '(issue #37, AC4)', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+      final Matrix a = Matrix(<List<double>>[
+        <double>[1],
+        <double>[2],
+      ]);
+      final Matrix b = Matrix(<List<double>>[
+        <double>[3],
+      ]);
+
+      machine.execute(PushMatrixCommand(a));
+      machine.execute(PushMatrixCommand(b));
+
+      expect(
+        () => machine.execute(const AppendColsCommand()),
+        throwsA(isA<MatrixShapeError>()),
+      );
+      expect(machine.stackSnapshot, orderedEquals(<Matrix>[a, b]));
+    });
+    test('VectorCommand restores every popped operand when the count exceeds '
+        'the stack (issue #37, AC2)', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
+
+      machine.execute(const PushScalarCommand(1));
+      machine.execute(const PushScalarCommand(3));
+
+      expect(
+        () => machine.execute(const VectorCommand()),
+        throwsA(isA<RpnStackUnderflowError>()),
+      );
+      expect(
+        machine.stackSnapshot,
+        orderedEquals(<Matrix>[Matrix.scalar(1), Matrix.scalar(3)]),
+      );
+    });
+  });
 }
