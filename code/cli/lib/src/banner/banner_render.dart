@@ -96,15 +96,19 @@ String renderBanner({
   final glow = trueColor ? _glowTrueColor : _glowFallback;
 
   final versionSuffix = version == null ? '' : ' v$version';
-  // 5 columns by 2 rows: a terminal cell is roughly twice as tall as it is
-  // wide, so this reads as square (User, 2026-09-29). The frame uses
-  // box-drawing corners, not the U+23A1..U+23A6 bracket pieces, because
-  // the legacy Windows console's fonts cannot draw those.
+  // 9 columns by 4 rows: a terminal cell is roughly twice as tall as it is
+  // wide, so this reads as square, and the brackets span the whole matrix
+  // (User, 2026-09-29). The frame is box-drawing (`┌─ │ └─`), not the
+  // U+23A1..U+23A6 bracket pieces, because the legacy Windows console's
+  // fonts cannot draw those; `│` joins `┌` and `└` where ASCII `|` does
+  // not.
   final logo =
-      '  ${c(_white, '┌')}${c(glow, '●')} ${c(_white, '━')}'
-      '${c(_white, '┐')}   ${c(_bold, 'cx')}$versionSuffix\n'
-      '  ${c(_white, '└')}${c(_white, '┃')} ${c(_white, '●')}'
-      '${c(_white, '┘')}   ${c(_dim, bannerTagline)}';
+      '  ${c(_white, '┌─     ─┐')}\n'
+      '  ${c(_white, '│')} ${c(glow, '●')}   ${c(_white, '━')} '
+      '${c(_white, '│')}   ${c(_bold, 'cx')}$versionSuffix\n'
+      '  ${c(_white, '│')} ${c(_white, '┃')}   ${c(_white, '●')} '
+      '${c(_white, '│')}   ${c(_dim, bannerTagline)}\n'
+      '  ${c(_white, '└─     ─┘')}';
 
   final rows = bannerCommands
       .where((cmd) => registeredCommands.contains(cmd.name))
