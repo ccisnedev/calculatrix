@@ -104,7 +104,7 @@ String renderBanner({
   // not.
   final logo =
       '  ${c(_white, '┌─     ─┐')}\n'
-      '  ${c(_white, '│')} ${c(glow, '●')}   ${c(_white, '━')} '
+      '  ${c(_white, '│')} ${c(glow, '●')}  ${c(_white, '━━')} '
       '${c(_white, '│')}   ${c(_bold, 'cx')}$versionSuffix\n'
       '  ${c(_white, '│')} ${c(_white, '┃')}   ${c(_white, '●')} '
       '${c(_white, '│')}   ${c(_dim, bannerTagline)}\n'

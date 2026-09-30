@@ -48,7 +48,7 @@ void main() {
       expect(
         output.toText(),
         "  ┌─     ─┐\n"
-        "  │ ●   ━ │   cx v0.8.0\n"
+        "  │ ●  ━━ │   cx v0.8.0\n"
         "  │ ┃   ● │   Calculatrix: matrix-first RPN and infix calculator\n"
         "  └─     ─┘\n"
         "\n"
@@ -77,7 +77,7 @@ void main() {
         expect(
           output.toText(),
           "  ┌─     ─┐\n"
-          "  │ ●   ━ │   cx v0.8.0\n"
+          "  │ ●  ━━ │   cx v0.8.0\n"
           "  │ ┃   ● │   Calculatrix: matrix-first RPN and infix calculator\n"
           "  └─     ─┘\n"
           "\n"
@@ -97,7 +97,7 @@ void main() {
         final output = await buildQuery(
           registeredCommands: s2Commands,
         ).execute();
-        expect(output.toText(), startsWith('  ┌─     ─┐\n  │ ●   ━ │   cx\n'));
+        expect(output.toText(), startsWith('  ┌─     ─┐\n  │ ●  ━━ │   cx\n'));
         expect(output.toText(), isNot(contains(' v ')));
       },
     );
