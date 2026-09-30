@@ -1,3 +1,4 @@
+import '../errors/errors.dart';
 import '../matrix/matrix.dart';
 import '../rpn/rpn_engine.dart';
 import 'calculatrix_command.dart';
@@ -126,6 +127,110 @@ final class AppendColumnCommand extends CalculatrixCommand {
     final Matrix target = engine.pop();
     engine.push(target.appendColumn(column));
   }
+}
+
+/// `x1 ... xn n` gives the n x 1 column `[[x1] ... [xn]]` (issue #37, S4c).
+///
+/// `n` needs the stack depth at run time (how many operands to gather is
+/// only known once `n` itself has been popped), so this cannot be a fixed
+/// literal-argument command like the ones above; it inspects the engine's
+/// stack directly, like [RowsCommand] below.
+final class VectorCommand extends CalculatrixCommand {
+  const VectorCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final int count = _requireNonNegativeIntegerCount(engine.pop(), 'vector');
+
+    final List<double> valuesTopToBottom = <double>[];
+    for (int i = 0; i < count; i++) {
+      valuesTopToBottom.add(_requireScalarValue(engine.pop(), 'vector'));
+    }
+
+    // A 0-item column is not representable: Matrix itself rejects an empty
+    // row list with dimension-mismatch, so "0 vector" raises the same error
+    // (the decision documented on the "vector" registry entry).
+    if (valuesTopToBottom.isEmpty) {
+      throw MatrixShapeError(
+        'vector cannot build an empty column: 0 vector has no matrix form.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+
+    engine.push(
+      Matrix(
+        valuesTopToBottom.reversed
+            .map((double value) => <double>[value])
+            .toList(growable: false),
+      ),
+    );
+  }
+}
+
+/// `[[...]]` gives `[row1] ... [rown] n`, each row a 1 x m matrix, followed
+/// by the row count (issue #37, S4c).
+final class RowsCommand extends CalculatrixCommand {
+  const RowsCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix value = engine.pop();
+    for (final List<double> row in value.rows) {
+      engine.push(Matrix(<List<double>>[List<double>.from(row)]));
+    }
+    engine.pushScalar(value.rowCount.toDouble());
+  }
+}
+
+/// `A B` gives `[A B]` (A and B side by side); a generalization of
+/// [AppendColumnCommand] to any operand B with a matching row count (issue
+/// #37, S4c). Both share the single `Matrix.appendColumns` implementation
+/// (D44).
+final class AppendColsCommand extends CalculatrixCommand {
+  const AppendColsCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix b = engine.pop();
+    final Matrix a = engine.pop();
+    engine.push(a.appendColumns(b));
+  }
+}
+
+/// `A B` gives A over B; a generalization of [AppendRowCommand] to any
+/// operand B with a matching column count (issue #37, S4c). Both share the
+/// single `Matrix.appendRows` implementation (D44).
+final class AppendRowsCommand extends CalculatrixCommand {
+  const AppendRowsCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    final Matrix b = engine.pop();
+    final Matrix a = engine.pop();
+    engine.push(a.appendRows(b));
+  }
+}
+
+double _requireScalarValue(Matrix value, String word) {
+  if (!value.isScalar) {
+    throw MatrixDomainError(
+      '$word requires a scalar operand, found a '
+      '${value.rowCount}x${value.columnCount} matrix.',
+      errorId: CalculatrixErrorId.typeMismatch,
+    );
+  }
+  return value.scalarValue;
+}
+
+int _requireNonNegativeIntegerCount(Matrix value, String word) {
+  final double raw = _requireScalarValue(value, word);
+  if (raw < 0 || raw != raw.truncateToDouble()) {
+    throw MatrixDomainError(
+      '$word requires a non-negative integer count, found $raw.',
+      errorId: CalculatrixErrorId.typeMismatch,
+    );
+  }
+  return raw.toInt();
 }
 
 final class SqrtCommand extends CalculatrixCommand {

@@ -122,7 +122,10 @@ void main() {
     test('categories are an enumeration', () {
       expect(
         CalculatrixCommandCategory.values,
-        contains(CalculatrixCommandCategory.arithmetic),
+        containsAll(<CalculatrixCommandCategory>[
+          CalculatrixCommandCategory.arithmetic,
+          CalculatrixCommandCategory.matrix,
+        ]),
       );
     });
 
@@ -228,10 +231,10 @@ void main() {
           final List<String> tokens = Calculatrix.tokenizeRpnLine(
             example.program,
           );
-          final Matrix result = Calculatrix.evaluateRpn(tokens);
+          final List<Matrix> result = Calculatrix.evaluateRpnStack(tokens);
           expect(
             result,
-            example.expected,
+            orderedEquals(example.expectedStack),
             reason:
                 'Example "${example.program}" of "${entry.name}" did not '
                 'match its documented result.',

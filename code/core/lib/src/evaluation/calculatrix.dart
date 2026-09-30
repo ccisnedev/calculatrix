@@ -70,6 +70,23 @@ class Calculatrix {
   }
 
   static Matrix evaluateRpn(List<String> tokens) {
+    final CalculatrixMachine machine = _runRpn(tokens);
+    return _singleResult(
+      machine,
+      expression: tokens.join(' '),
+      notation: 'RPN',
+    );
+  }
+
+  /// Runs `tokens` as an RPN program and returns the full stack it leaves,
+  /// bottom to top, instead of requiring a single result (unlike
+  /// [evaluateRpn]). Needed for words such as `rows` (issue #37, S4c) whose
+  /// documented, tested behavior leaves more than one value on the stack.
+  static List<Matrix> evaluateRpnStack(List<String> tokens) {
+    return _runRpn(tokens).stackSnapshot;
+  }
+
+  static CalculatrixMachine _runRpn(List<String> tokens) {
     if (tokens.isEmpty) {
       throw ExpressionSyntaxError(
         'RPN token list cannot be empty.',
@@ -79,11 +96,7 @@ class Calculatrix {
 
     final CalculatrixMachine machine = CalculatrixMachine();
     _executePositioned(machine, _positionRawRpnTokens(tokens));
-    return _singleResult(
-      machine,
-      expression: tokens.join(' '),
-      notation: 'RPN',
-    );
+    return machine;
   }
 
   // Assigns each raw RPN token its 1-based character position in the

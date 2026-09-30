@@ -2604,10 +2604,16 @@ class Matrix {
     return Matrix(result);
   }
 
-  Matrix appendRow(Matrix row) {
-    if (row.rowCount != 1 || row.columnCount != columnCount) {
+  /// Appends the rows of [rows] below this matrix's own rows. `rows` must
+  /// have the same number of columns as this matrix (issue #37, S4c).
+  ///
+  /// This is the single implementation behind [appendRow] (which further
+  /// requires a single-row operand) and the `append-rows` registry word
+  /// (D44: one implementation per concept).
+  Matrix appendRows(Matrix rows) {
+    if (rows.columnCount != columnCount) {
       throw MatrixShapeError(
-        'Cannot append ${row.rowCount}x${row.columnCount} row operand to '
+        'Cannot append ${rows.rowCount}x${rows.columnCount} rows to '
         '${rowCount}x${columnCount} matrix.',
         errorId: CalculatrixErrorId.dimensionMismatch,
       );
@@ -2615,15 +2621,22 @@ class Matrix {
 
     return Matrix(<List<double>>[
       ..._rows.map((List<double> source) => List<double>.from(source)),
-      List<double>.from(row._rows.first),
+      ...rows._rows.map((List<double> source) => List<double>.from(source)),
     ]);
   }
 
-  Matrix appendColumn(Matrix column) {
-    if (column.columnCount != 1 || column.rowCount != rowCount) {
+  /// Appends the columns of [columns] to the right of this matrix's own
+  /// columns. `columns` must have the same number of rows as this matrix
+  /// (issue #37, S4c).
+  ///
+  /// This is the single implementation behind [appendColumn] (which further
+  /// requires a single-column operand) and the `append-cols` registry word
+  /// (D44: one implementation per concept).
+  Matrix appendColumns(Matrix columns) {
+    if (columns.rowCount != rowCount) {
       throw MatrixShapeError(
-        'Cannot append ${column.rowCount}x${column.columnCount} column operand '
-        'to ${rowCount}x${columnCount} matrix.',
+        'Cannot append ${columns.rowCount}x${columns.columnCount} columns to '
+        '${rowCount}x${columnCount} matrix.',
         errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
@@ -2633,11 +2646,35 @@ class Matrix {
         rowCount,
         (int rowIndex) => <double>[
           ..._rows[rowIndex],
-          column._rows[rowIndex].first,
+          ...columns._rows[rowIndex],
         ],
         growable: false,
       ),
     );
+  }
+
+  Matrix appendRow(Matrix row) {
+    if (row.rowCount != 1) {
+      throw MatrixShapeError(
+        'Cannot append ${row.rowCount}x${row.columnCount} row operand to '
+        '${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+
+    return appendRows(row);
+  }
+
+  Matrix appendColumn(Matrix column) {
+    if (column.columnCount != 1) {
+      throw MatrixShapeError(
+        'Cannot append ${column.rowCount}x${column.columnCount} column operand '
+        'to ${rowCount}x${columnCount} matrix.',
+        errorId: CalculatrixErrorId.dimensionMismatch,
+      );
+    }
+
+    return appendColumns(column);
   }
 
   Matrix deleteRow(int rowIndex) {
