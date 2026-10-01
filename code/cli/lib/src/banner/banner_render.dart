@@ -56,11 +56,11 @@ const List<BannerCommand> bannerCommands = [
   ),
   BannerCommand('commands show', 'show one word of the registry', 'cx commands show dup'),
   BannerCommand('commands search', 'search the registry', 'cx commands search column'),
-  BannerCommand('commands list', 'list the registry by category'),
-  BannerCommand('doctor', 'verify local installation'),
-  BannerCommand('upgrade', 'update to latest version'),
-  BannerCommand('uninstall', 'remove cx'),
-  BannerCommand('version', 'print version'),
+  BannerCommand('commands list', 'list the registry by category', 'cx commands list'),
+  BannerCommand('doctor', 'verify local installation', 'cx doctor'),
+  BannerCommand('upgrade', 'update to latest version', 'cx upgrade'),
+  BannerCommand('uninstall', 'remove cx', 'cx uninstall'),
+  BannerCommand('version', 'print version', 'cx version'),
 ];
 
 // 17, not 13: wide enough for "commands search" (15 characters), the

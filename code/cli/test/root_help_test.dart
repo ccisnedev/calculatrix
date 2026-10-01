@@ -40,6 +40,22 @@ void main() {
     });
 
     test(
+      'every command the banner may list has its own example, none left '
+      'to fall back to a bare name/description row (issue #51 acceptance '
+      '1: commands list, doctor, upgrade, uninstall and version used to '
+      'have none)',
+      () {
+        for (final cmd in bannerCommands) {
+          expect(
+            cmd.example,
+            isNotNull,
+            reason: '"${cmd.name}" has no example',
+          );
+        }
+      },
+    );
+
+    test(
       'every command row keeps at least a 2-space gap between every '
       'column (name, description, example), the same as the banner '
       '(issue #51 acceptance 7)',
@@ -55,7 +71,12 @@ void main() {
             reason: 'no 2-space gap after the name column in: "$line"',
           );
 
-          final exampleStart = line.indexOf('cx ');
+          // The last "cx ", not the first: a description can itself contain
+          // "cx" followed by padding spaces ("remove cx", issue #51 AC1,
+          // once "uninstall" got its own example), and only the example
+          // column, always the final thing on the line, is what this gap
+          // check cares about.
+          final exampleStart = line.lastIndexOf('cx ');
           if (exampleStart <= 0) continue;
           sawRowWithExample = true;
           expect(

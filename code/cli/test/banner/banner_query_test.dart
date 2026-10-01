@@ -57,10 +57,10 @@ void main() {
         "'1 2 +'\n"
         "    eval infix       evaluate an expression         cx eval infix "
         '"2^0.5"\n'
-        "    doctor           verify local installation\n"
-        "    upgrade          update to latest version\n"
-        "    uninstall        remove cx\n"
-        "    version          print version\n"
+        "    doctor           verify local installation      cx doctor\n"
+        "    upgrade          update to latest version       cx upgrade\n"
+        "    uninstall        remove cx                      cx uninstall\n"
+        "    version          print version                  cx version\n"
         "\n"
         "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",
       );
@@ -101,7 +101,12 @@ void main() {
             reason: 'no 2-space gap after the name column in: "$line"',
           );
 
-          final exampleStart = line.indexOf('cx ');
+          // The last "cx ", not the first: a description can itself contain
+          // "cx" followed by padding spaces ("remove cx", issue #51 AC1,
+          // once "uninstall" got its own example), and only the example
+          // column, always the final thing on the line, is what this gap
+          // check cares about.
+          final exampleStart = line.lastIndexOf('cx ');
           if (exampleStart <= 0) continue;
           sawRowWithExample = true;
           expect(

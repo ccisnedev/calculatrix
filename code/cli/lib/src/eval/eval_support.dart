@@ -48,11 +48,18 @@ String resolveProgramSource({
 /// `error.message` too. Kept apart from the route-level suggestion the
 /// `<program>` shortcut adds on top of this same exception (AC6, "RPN and
 /// route suggestions are listed apart").
+///
+/// `error.name` (issue #51, AC2: the registry word an infix name error
+/// resolved to, e.g. "sqrt" for "sqrt(7)") rides along the same way, as
+/// `details.name`: a caller parsing the JSON envelope has no other way to
+/// recover it, since `error.message` is prose built for a human, not a
+/// field meant to be re-parsed.
 CommandException toCommandException(CalculatrixError error) {
   final details = <String, dynamic>{
     if (error.token != null) 'token': error.token,
     if (error.position != null) 'position': error.position,
     if (error.suggestions.isNotEmpty) 'suggestions': error.suggestions,
+    if (error.name != null) 'name': error.name,
   };
   return CommandException(
     id: error.errorId?.id ?? 'calculatrix-error',
