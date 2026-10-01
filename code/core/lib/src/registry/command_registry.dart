@@ -966,7 +966,12 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'CON',
       category: CalculatrixCommandCategory.construction,
       stackEffect: 'r c -> [r x c zero matrix]',
-      arity: 2,
+      // No declared arity (issue #51, AC8): ZerosCommand pops and validates
+      // c before it ever pops r, so with only one value on the stack a
+      // negative or non-integer c must still report its own type-mismatch,
+      // the way it did before the arity precheck existed. A fixed arity
+      // here would short-circuit that check with a stack-underflow instead,
+      // the one case the precheck must defer to the word itself on.
       preconditions: 'r and c are positive integer scalars',
       description:
           'Builds the r x c matrix of zeros (HP 50g CON with 0). "0 3 '
@@ -987,7 +992,8 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'CON',
       category: CalculatrixCommandCategory.construction,
       stackEffect: 'r c -> [r x c matrix of ones]',
-      arity: 2,
+      // No declared arity: see the same note on 'zeros' above (issue #51,
+      // AC8).
       preconditions: 'r and c are positive integer scalars',
       description:
           'Builds the r x c matrix of ones (HP 50g CON with 1). "0 3 '
@@ -1055,7 +1061,9 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'ROW-',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i -> A (row i removed)',
-      arity: 2,
+      // No declared arity: DeleteRowWordCommand pops and validates i
+      // before it ever pops A, so the same note on 'zeros' above applies
+      // (issue #51, AC8).
       preconditions: 'i is a 1-based row index of A',
       description: 'Removes row i of A (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1079,7 +1087,8 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'COL-',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j -> A (column j removed)',
-      arity: 2,
+      // No declared arity: see the note on 'delete-row' above (issue #51,
+      // AC8).
       preconditions: 'j is a 1-based column index of A',
       description: 'Removes column j of A (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1103,7 +1112,8 @@ final class CalculatrixCommandRegistry {
       name: 'duplicate-row',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i -> A (row i duplicated)',
-      arity: 2,
+      // No declared arity: see the note on 'delete-row' above (issue #51,
+      // AC8).
       preconditions: 'i is a 1-based row index of A',
       description: 'Inserts a copy of row i right after it (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1128,7 +1138,8 @@ final class CalculatrixCommandRegistry {
       name: 'duplicate-col',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j -> A (column j duplicated)',
-      arity: 2,
+      // No declared arity: see the note on 'delete-row' above (issue #51,
+      // AC8).
       preconditions: 'j is a 1-based column index of A',
       description:
           'Inserts a copy of column j right after it (1-based).',
@@ -1153,7 +1164,9 @@ final class CalculatrixCommandRegistry {
       name: 'move-row',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i k -> A (row i moved to position k)',
-      arity: 3,
+      // No declared arity: MoveRowWordCommand pops and validates k, then
+      // pops and validates i, before it ever pops A; same note on
+      // 'delete-row' above (issue #51, AC8).
       preconditions: 'i and k are 1-based row indices of A',
       description: 'Moves row i to position k (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1177,7 +1190,8 @@ final class CalculatrixCommandRegistry {
       name: 'move-col',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j k -> A (column j moved to position k)',
-      arity: 3,
+      // No declared arity: see the note on 'move-row' above (issue #51,
+      // AC8).
       preconditions: 'j and k are 1-based column indices of A',
       description: 'Moves column j to position k (1-based).',
       examples: <CalculatrixCommandExample>[

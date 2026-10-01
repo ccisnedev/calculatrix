@@ -322,8 +322,13 @@ class Calculatrix {
   // A plain negative literal such as "-5" never reaches this check at all
   // (it parses as a number before _compileWord gets here), so there is no
   // risk of this flagging it as infix-like.
+  //
+  // The right-hand operand may itself carry a sign ("3^-2") or lead with a
+  // bare decimal point ("1+.5"), issue #51 AC3: both are operand-shaped to
+  // a person reading the token, even though neither is a digit or "("
+  // itself, which the original character class alone required.
   static final RegExp _infixOperatorBetweenOperands = RegExp(
-    r'[0-9)][+\-*/^][0-9(]',
+    r'[0-9)][+\-*/^][+-]?[0-9.(]',
   );
 
   static bool _looksLikeInfixExpression(String token) {
@@ -1020,19 +1025,42 @@ class Calculatrix {
   // known to be a name start), rather than reporting just its first
   // character: the resulting name is both what the error message names
   // and what it looks up against the RPN registry.
+  //
+  // A "-" is also consumed, together with whatever further run of name
+  // characters follows it, when it is immediately followed by a name
+  // start: the registry has words of its own written with a hyphen
+  // ("frobenius-norm", "append-cols"), and the whole word, not just the
+  // run of letters up to its first hyphen, is what both the lookup below
+  // and the message need to name (issue #51, AC2). A "-" with nothing
+  // name-shaped after it (end of input, a digit, another "-") is left
+  // alone: infix has no bare names at all, so nothing here depends on
+  // telling an actual subtraction apart from one, only on not swallowing
+  // it into a name it is not part of.
   static String _scanName(String expression, int start) {
     int index = start;
-    while (index < expression.length && _isNameChar(expression[index])) {
-      index++;
+    while (index < expression.length) {
+      if (_isNameChar(expression[index])) {
+        index++;
+        continue;
+      }
+      if (expression[index] == '-' &&
+          index + 1 < expression.length &&
+          _isNameStart(expression[index + 1])) {
+        index++;
+        continue;
+      }
+      break;
     }
     return expression.substring(start, index);
   }
 
   // Finds the index just past the "(" at `openIndex`'s matching ")",
-  // accounting for nesting. Falls back to the end of the expression when
-  // the parenthesis is never closed, so a call-like name with an
-  // unbalanced opening paren still gets a best-effort example instead of
-  // crashing the error path itself.
+  // accounting for nesting, or -1 when the parenthesis is never closed:
+  // the caller then knows there is no real argument to read out, rather
+  // than reading one out of a substring range that was never a closed
+  // group in the first place (issue #51, AC1; this used to crash on a
+  // truncated call such as "sqrt(" by handing the caller a range past the
+  // end of the very "(" it opened).
   static int _matchingParenEnd(String expression, int openIndex) {
     int depth = 0;
     for (int index = openIndex; index < expression.length; index++) {
@@ -1045,16 +1073,39 @@ class Calculatrix {
         }
       }
     }
-    return expression.length;
+    return -1;
+  }
+
+  // The call-like argument text of a registered name's "(argument)", when
+  // one is both present (a closed parenthesis right after the name) and a
+  // plain number literal (issue #51, AC2): "sqrt(7)" qualifies, but
+  // "sqrt(1+2)" and "sqrt (7)" (space before the paren, so not call-like
+  // at all) do not, and neither does "sqrt(" (never closed). Read verbatim
+  // rather than parsed, since only the one argument slot RPN would occupy
+  // is needed here, not a full nested expression evaluation; restricted to
+  // a plain number because only a plain number is guaranteed to still mean
+  // the same thing once it is moved in front of the word instead of inside
+  // the call ("1+2 sqrt" is not "sqrt(1+2)", it is two RPN tokens, the
+  // second of which is unknown).
+  static String? _plainNumberCallArgument(String expression, int nameEnd) {
+    if (nameEnd >= expression.length || expression[nameEnd] != '(') {
+      return null;
+    }
+    final int closeIndex = _matchingParenEnd(expression, nameEnd);
+    if (closeIndex < 0) {
+      return null;
+    }
+    final String argument = expression.substring(nameEnd + 1, closeIndex - 1).trim();
+    return double.tryParse(argument) != null ? argument : null;
   }
 
   // Builds the actionable error for a name found where infix expects a
   // number, matrix literal, operator or parenthesis (AC2, issue #51).
   // When `name` is already a registered RPN word or alias, the message
-  // shows its RPN form; a call-like "name(argument)" carries its argument
-  // over into that form ("sqrt(7)" -> "7 sqrt"), read verbatim rather than
-  // parsed, since only the one argument slot RPN would occupy is needed
-  // here, not a full nested expression evaluation.
+  // shows its RPN form when a plain-number argument is available
+  // (_plainNumberCallArgument), or a generic, non-runnable description of
+  // where the argument goes otherwise, rather than composing an RPN
+  // command that would itself fail if the reader actually ran it.
   static ExpressionSyntaxError _buildInfixNameError(
     String expression,
     int start,
@@ -1069,17 +1120,12 @@ class Calculatrix {
 
     String message;
     if (isRegistered) {
-      String rpnForm = name;
-      if (nameEnd < expression.length && expression[nameEnd] == '(') {
-        final int closeIndex = _matchingParenEnd(expression, nameEnd);
-        final String argument = expression
-            .substring(nameEnd + 1, closeIndex > nameEnd ? closeIndex - 1 : closeIndex)
-            .trim();
-        if (argument.isNotEmpty) {
-          rpnForm = '$argument $name';
-        }
-      }
-      message = '$limitation; "$name" is an RPN word: cx eval rpn "$rpnForm"';
+      final String? argument = _plainNumberCallArgument(expression, nameEnd);
+      message = argument != null
+          ? '$limitation; "$name" is an RPN word: '
+                'cx eval rpn "$argument $name"'
+          : '$limitation; "$name" is an RPN word; in RPN the argument '
+                'comes first: x $name';
     } else {
       message = '$limitation; "$name" is a name, not a number.';
     }

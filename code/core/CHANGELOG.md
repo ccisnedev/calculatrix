@@ -165,6 +165,36 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   function `suggest()` itself uses) is now public, exported for
   `calculatrix_cli` to reuse rather than reimplement when it does the
   equivalent tightening for its own route suggestions.
+- A second round of review fixes on the compiled `cx` binary (issue #51):
+  a truncated infix call such as `sqrt(` no longer throws an unhandled
+  `RangeError`; an unclosed parenthesis is now detected and reported as
+  the normal syntax error instead. The declared `arity` that lets
+  `Calculatrix` pre-check a word's real stack depth (see the entry above)
+  is now `null` again for `zeros`, `ones`, `delete-row`, `delete-col`,
+  `duplicate-row`, `duplicate-col`, `move-row` and `move-col`: each of
+  these pops and validates one argument before it ever pops the next, so
+  with only one value on the stack a fixed arity would have masked that
+  argument's own type-mismatch (`"zeros requires a non-negative integer
+  count, found -1.0."`) behind a misleading stack-underflow. `vector` now
+  checks its own real need (the count against the values actually below
+  it) before popping any of them, rather than letting its last pop fail
+  with the generic "needs 1 value, found 0": `1 2 3 vector` now reports
+  `"vector needs 3 values on the stack, found 2."`, the count and the true
+  shortfall, not the inner pop's. A registry word written with a hyphen
+  (`frobenius-norm(7)`) is now recognized by its whole name in an infix
+  name error, not just the run of letters before the hyphen. The RPN form
+  an infix name error suggests is now shown only when the call's argument
+  is a plain number literal; a non-literal argument (`sqrt(1+2)`) or a
+  space before the call (`sqrt (7)`) instead gets a generic, non-runnable
+  description of where the argument goes, since neither `cx eval rpn "1+2
+  sqrt"` nor `cx eval rpn "sqrt"` is actually valid RPN. The infix-shaped
+  heuristic behind the unknown-word hint now also matches a signed
+  (`3^-2`) or leading-decimal (`1+.5`) right-hand operand.
+  `CalculatrixError.name`, set on an infix name error, now rides along in
+  the CLI's JSON error envelope as `details.name`. The root `--help`/`-h`
+  text now gives every listed command its own example, including
+  `commands list`, `doctor`, `upgrade`, `uninstall` and `version`, which
+  previously had none.
 
 ### Fixed
 

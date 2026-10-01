@@ -195,6 +195,24 @@ void main() {
       );
     });
 
+    test(
+      '1 2 3 vector names the real need, 3 values short by 1, not the '
+      'engine pop\'s own generic "needs 1 value, found 0" (issue #51, AC5 '
+      'regression: the count says 3, only 2 data values remain)',
+      () {
+        expect(
+          () => Calculatrix.evaluateRpn(<String>['1', '2', '3', 'vector']),
+          throwsA(
+            isA<CalculatrixError>().having(
+              (CalculatrixError error) => error.message,
+              'message',
+              'vector needs 3 values on the stack, found 2.',
+            ),
+          ),
+        );
+      },
+    );
+
     test('an operand that is not a scalar is type-mismatch', () {
       expect(
         () => Calculatrix.evaluateRpn(<String>['[[1 2]]', '5', '2', 'vector']),

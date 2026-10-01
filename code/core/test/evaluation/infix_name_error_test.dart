@@ -96,5 +96,77 @@ void main() {
         expect(error.position, 3);
       }
     });
+
+    test('a registry word with a hyphen is recognized as the whole word, '
+        'not just the run of letters before the hyphen (issue #51, AC2)', () {
+      try {
+        Calculatrix.evaluateInfix('frobenius-norm(7)');
+        fail('expected ExpressionSyntaxError');
+      } on ExpressionSyntaxError catch (error) {
+        expect(error.name, 'frobenius-norm');
+        expect(error.message, contains('"frobenius-norm" is an RPN word'));
+        expect(error.message, contains('cx eval rpn "7 frobenius-norm"'));
+      }
+    });
+
+    test('a call whose argument is not a plain number gives a generic, '
+        'non-runnable description instead of a failing command (issue #51, '
+        'AC2: "sqrt(1+2)" used to suggest "cx eval rpn \\"1+2 sqrt\\"", '
+        'which fails as unknown-word)', () {
+      try {
+        Calculatrix.evaluateInfix('sqrt(1+2)');
+        fail('expected ExpressionSyntaxError');
+      } on ExpressionSyntaxError catch (error) {
+        expect(error.name, 'sqrt');
+        expect(error.message, isNot(contains('cx eval rpn')));
+        expect(
+          error.message,
+          contains('in RPN the argument comes first: x sqrt'),
+        );
+      }
+    });
+
+    test('a space before the call parenthesis is not call-like, so it also '
+        'gets the generic form instead of a failing command (issue #51, AC2: '
+        '"sqrt (7)" used to suggest "cx eval rpn \\"sqrt\\"", which '
+        'underflows)', () {
+      try {
+        Calculatrix.evaluateInfix('sqrt (7)');
+        fail('expected ExpressionSyntaxError');
+      } on ExpressionSyntaxError catch (error) {
+        expect(error.name, 'sqrt');
+        expect(error.message, isNot(contains('cx eval rpn')));
+        expect(
+          error.message,
+          contains('in RPN the argument comes first: x sqrt'),
+        );
+      }
+    });
+
+    test(
+      'a truncated call never crashes, for a range of truncation points '
+      '(issue #51, AC1: "sqrt(" used to throw an unhandled RangeError '
+      'instead of a normal syntax error)',
+      () {
+        for (final expression in <String>[
+          'sqrt',
+          'sqrt(',
+          'sqrt( ',
+          '(',
+          'e(',
+        ]) {
+          try {
+            Calculatrix.evaluateInfix(expression);
+            fail('expected ExpressionSyntaxError for "$expression"');
+          } on ExpressionSyntaxError catch (error) {
+            expect(
+              error.errorId,
+              CalculatrixErrorId.syntaxError,
+              reason: 'for "$expression"',
+            );
+          }
+        }
+      },
+    );
   });
 }
