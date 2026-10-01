@@ -195,6 +195,28 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   text now gives every listed command its own example, including
   `commands list`, `doctor`, `upgrade`, `uninstall` and `version`, which
   previously had none.
+- Exact numbers (runbook-trust.md, step T2). `Rational` is an exact
+  rational over `BigInt`, always reduced, and a `Matrix` is either exact or
+  approximate as a whole (`isExact`, `exactRows`, `exactAt`; D49).
+  Literals in RPN, infix and matrix literals are exact (D50); `~` before a
+  literal makes it approximate (D56). `+ - * /`, `negate`, `percent`,
+  integer powers of scalars and non-negative integer powers of square
+  matrices are exact on exact operands (`ExactArithmetic`); one approximate
+  operand makes the result approximate (D51). Stack and structure words keep
+  exactness, and `zeros`, `ones`, `identity` and `rows` build exact values;
+  every other word converts its operands to approximate (D53). New words
+  `approx` (alias `num`) and `exact` (D52). `Rational.toDisplayString` gives
+  the text of D54. The new error id `limit-exceeded`
+  (`LimitExceededError`, with `limit` and `estimated`) is raised before an
+  exact result would exceed `maxDigits` digits (default
+  `ExactArithmetic.defaultMaxDigits`, 10000), a new parameter of
+  `evaluateRpn`, `evaluateRpnStack` and `evaluateInfix` (D55).
+  `evaluateInfix(approximate: true)` keeps the old approximate result for
+  callers that only take doubles, as the app does until step T5. A literal
+  out of the double range (`1e400`) is exact now, no longer `non-finite`;
+  `~1e400` still is. Differential tests against Giac
+  (`test/exact/giac_differential_test.dart`, tag `giac`) check every exact
+  word of this step, and run in CI (D57).
 
 ### Fixed
 

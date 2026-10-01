@@ -2910,7 +2910,10 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
   Matrix? _tryBuildMatrixOrNull() {
     try {
       _syncDraftFromControllers();
-      return Calculatrix.evaluateInfix(_draft.buildLiteral());
+      return Calculatrix.evaluateInfix(
+        _draft.buildLiteral(),
+        approximate: true,
+      );
     } on FormatException {
       return null;
     } on CalculatrixError {

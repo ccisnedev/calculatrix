@@ -1,12 +1,13 @@
-import 'dart:convert';
-
 import '../errors/errors.dart';
+import '../exact/exact_arithmetic.dart';
 import '../machine/calculatrix_command.dart';
 import '../machine/calculatrix_machine.dart';
 import '../machine/calculatrix_program.dart';
 import '../machine/commands.dart';
 import '../matrix/matrix.dart';
 import '../registry/command_registry.dart';
+import '../rpn/rpn_engine.dart';
+import 'literals.dart';
 
 class Calculatrix {
   static CalculatrixProgram compileInfix(String expression) {
@@ -54,11 +55,29 @@ class Calculatrix {
     ).map((_PositionedToken token) => token.value).toList();
   }
 
-  static Matrix evaluateInfix(String expression) {
+  /// Evaluates an infix expression. Exact literals give exact results
+  /// (runbook D50); [maxDigits] is the size limit of runbook D55. With
+  /// [approximate], the result is converted to an approximate value, for a
+  /// caller that only handles those (the app, until step T5 of the
+  /// runbook).
+  static Matrix evaluateInfix(
+    String expression, {
+    int maxDigits = ExactArithmetic.defaultMaxDigits,
+    bool approximate = false,
+  }) {
     try {
-      final CalculatrixMachine machine = CalculatrixMachine();
-      _executePositioned(machine, _compileInfixToRpnTokens(expression));
-      return _singleResult(machine, expression: expression, notation: 'infix');
+      final CalculatrixMachine machine = _newMachine(maxDigits);
+      _executePositioned(
+        machine,
+        _compileInfixToRpnTokens(expression),
+        maxDigits,
+      );
+      final Matrix result = _singleResult(
+        machine,
+        expression: expression,
+        notation: 'infix',
+      );
+      return approximate ? result.toApproximate() : result;
     } on RpnStackUnderflowError catch (error) {
       throw ExpressionSyntaxError(
         'Invalid infix expression: $expression',
@@ -69,8 +88,11 @@ class Calculatrix {
     }
   }
 
-  static Matrix evaluateRpn(List<String> tokens) {
-    final CalculatrixMachine machine = _runRpn(tokens);
+  static Matrix evaluateRpn(
+    List<String> tokens, {
+    int maxDigits = ExactArithmetic.defaultMaxDigits,
+  }) {
+    final CalculatrixMachine machine = _runRpn(tokens, maxDigits);
     return _singleResult(
       machine,
       expression: tokens.join(' '),
@@ -82,8 +104,11 @@ class Calculatrix {
   /// bottom to top, instead of requiring a single result (unlike
   /// [evaluateRpn]). Needed for words such as `rows` (issue #37, S4c) whose
   /// documented, tested behavior leaves more than one value on the stack.
-  static List<Matrix> evaluateRpnStack(List<String> tokens) {
-    return _runRpn(tokens).stackSnapshot;
+  static List<Matrix> evaluateRpnStack(
+    List<String> tokens, {
+    int maxDigits = ExactArithmetic.defaultMaxDigits,
+  }) {
+    return _runRpn(tokens, maxDigits).stackSnapshot;
   }
 
   /// Compiles `word` through the command registry, exactly as any RPN
@@ -96,10 +121,18 @@ class Calculatrix {
   /// (D44, issue #39): `over` on the session behaves exactly as typing
   /// "2 pick" does anywhere else.
   static void executeWordOn(CalculatrixMachine machine, String word) {
-    machine.executeAtomic(_compileWord(word));
+    machine.executeAtomic(
+      _compileWord(word, ExactArithmetic.defaultMaxDigits),
+    );
   }
 
-  static CalculatrixMachine _runRpn(List<String> tokens) {
+  static CalculatrixMachine _newMachine(int maxDigits) {
+    return CalculatrixMachine(
+      engine: RpnEngine(exact: ExactArithmetic(maxDigits: maxDigits)),
+    );
+  }
+
+  static CalculatrixMachine _runRpn(List<String> tokens, int maxDigits) {
     if (tokens.isEmpty) {
       throw ExpressionSyntaxError(
         'RPN token list cannot be empty.',
@@ -107,8 +140,8 @@ class Calculatrix {
       );
     }
 
-    final CalculatrixMachine machine = CalculatrixMachine();
-    _executePositioned(machine, _positionRawRpnTokens(tokens));
+    final CalculatrixMachine machine = _newMachine(maxDigits);
+    _executePositioned(machine, _positionRawRpnTokens(tokens), maxDigits);
     return machine;
   }
 
@@ -152,12 +185,14 @@ class Calculatrix {
   // the word the user actually wrote (issue #35, AC4).
   static List<_PositionedCommand> _compilePositionedCommands(
     List<_PositionedToken> tokens,
+    int maxDigits,
   ) {
     final List<_PositionedCommand> commands = <_PositionedCommand>[];
     for (final _PositionedToken positioned in tokens) {
       try {
         for (final CalculatrixCommand command in _compileWord(
           positioned.value,
+          maxDigits,
         )) {
           commands.add(_PositionedCommand(command, positioned));
         }
@@ -177,6 +212,7 @@ class Calculatrix {
   ) {
     return _compilePositionedCommands(
       tokens,
+      ExactArithmetic.defaultMaxDigits,
     ).map((_PositionedCommand positioned) => positioned.command).toList();
   }
 
@@ -193,9 +229,11 @@ class Calculatrix {
   static void _executePositioned(
     CalculatrixMachine machine,
     List<_PositionedToken> tokens,
+    int maxDigits,
   ) {
     final List<_PositionedCommand> commands = _compilePositionedCommands(
       tokens,
+      maxDigits,
     );
     int index = 0;
     while (index < commands.length) {
@@ -234,7 +272,8 @@ class Calculatrix {
   // as `^` already does on its own. Every level from the lowest one the
   // word changed up to level 1 is checked, since a word may push more than
   // one value (`diagonalize` pushes P, then D); the levels below it are the
-  // same objects as before the word ran, already checked.
+  // same objects as before the word ran, already checked. An exact value
+  // is always finite.
   static void _requireFiniteResults(
     List<Matrix> before,
     List<Matrix> after,
@@ -248,6 +287,9 @@ class Calculatrix {
     }
     for (int level = first; level < after.length; level++) {
       final Matrix value = after[level];
+      if (value.isExact) {
+        continue;
+      }
       for (int row = 0; row < value.rowCount; row++) {
         for (int column = 0; column < value.columnCount; column++) {
           if (!value.at(row, column).isFinite) {
@@ -315,23 +357,10 @@ class Calculatrix {
   // any other RPN input and recurses back through this function -- so a
   // defined word's compiled result is, command for command, identical to
   // typing its definition out by hand (issue #35, AC3).
-  static List<CalculatrixCommand> _compileWord(String token) {
-    if (_looksLikeMatrixLiteral(token)) {
-      return <CalculatrixCommand>[
-        PushMatrixCommand(_parseSignedMatrixLiteral(token)),
-      ];
-    }
-
-    final double? value = double.tryParse(token);
-    if (value != null) {
-      if (!value.isFinite) {
-        throw MatrixDomainError(
-          'Numeric literal is not a finite number: $token',
-          errorId: CalculatrixErrorId.nonFinite,
-          token: token,
-        );
-      }
-      return <CalculatrixCommand>[PushScalarCommand(value)];
+  static List<CalculatrixCommand> _compileWord(String token, int maxDigits) {
+    final Matrix? literal = Literals.parse(token, maxDigits: maxDigits);
+    if (literal != null) {
+      return <CalculatrixCommand>[PushMatrixCommand(literal)];
     }
 
     final CalculatrixCommandEntry? entry = CalculatrixCommandRegistry.standard
@@ -340,7 +369,7 @@ class Calculatrix {
       if (entry.isPrimitive) {
         return <CalculatrixCommand>[entry.build!()];
       }
-      return _compileDefinition(entry.definition!);
+      return _compileDefinition(entry.definition!, maxDigits);
     }
 
     throw UnknownWordError(
@@ -381,10 +410,13 @@ class Calculatrix {
   // defined word: CalculatrixCommandRegistry rejects a cyclic definition
   // at construction time (issue #35, AC5), so this recursion is always
   // finite.
-  static List<CalculatrixCommand> _compileDefinition(String definition) {
+  static List<CalculatrixCommand> _compileDefinition(
+    String definition,
+    int maxDigits,
+  ) {
     final List<CalculatrixCommand> commands = <CalculatrixCommand>[];
     for (final String word in tokenizeRpnLine(definition)) {
-      commands.addAll(_compileWord(word));
+      commands.addAll(_compileWord(word, maxDigits));
     }
     return commands;
   }
@@ -397,7 +429,7 @@ class Calculatrix {
   /// classification _compileWord itself uses, so the registry's notion of
   /// "literal" never drifts from the compiler's.
   static bool isLiteralToken(String token) {
-    return _looksLikeMatrixLiteral(token) || double.tryParse(token) != null;
+    return Literals.isLiteral(token);
   }
 
   static Matrix _singleResult(
@@ -414,128 +446,6 @@ class Calculatrix {
     }
 
     return top;
-  }
-
-  static bool _looksLikeMatrixLiteral(String token) {
-    final String unsigned = _stripLeadingMatrixSign(token);
-    return unsigned.startsWith('[') && unsigned.endsWith(']');
-  }
-
-  // A matrix literal token may carry a leading sign, e.g. "-[[1,2],[3,4]]",
-  // produced by toggling ± on a matrix operand in the rpn command line (see
-  // CalculatrixSession._toggleSignOfLastToken). The sign is handled here,
-  // as a scale(-1) applied after the ordinary, unsigned literal is decoded,
-  // rather than inside _parseMatrixLiteral, so the JSON-decode/normalization
-  // pipeline for the bracketed digits themselves never re-serializes or
-  // rounds anything: the sign toggle and the digits are two independent,
-  // lossless concerns.
-  static Matrix _parseSignedMatrixLiteral(String token) {
-    final bool negative = token.startsWith('-');
-    final Matrix matrix = _parseMatrixLiteral(_stripLeadingMatrixSign(token));
-    return negative ? matrix.scale(-1) : matrix;
-  }
-
-  static String _stripLeadingMatrixSign(String token) {
-    if (token.startsWith('-') || token.startsWith('+')) {
-      return token.substring(1);
-    }
-    return token;
-  }
-
-  static Matrix _parseMatrixLiteral(String token) {
-    dynamic decoded;
-    try {
-      decoded = jsonDecode(_normalizeMatrixLiteralSeparators(token));
-    } catch (_) {
-      throw ExpressionSyntaxError(
-        'Invalid matrix literal: $token',
-        errorId: CalculatrixErrorId.syntaxError,
-      );
-    }
-
-    if (decoded is num) {
-      return Matrix.scalar(_checkFiniteLiteralEntry(decoded, token));
-    }
-
-    if (decoded is! List) {
-      throw ExpressionSyntaxError(
-        'Matrix literal must decode to a list: $token',
-        errorId: CalculatrixErrorId.syntaxError,
-      );
-    }
-
-    if (decoded.isEmpty) {
-      // syntax-error is infix only (spec section 6): an empty matrix
-      // literal is well-formed syntax that names an impossible shape, in
-      // both RPN and infix, so this is dimension-mismatch, not
-      // syntax-error.
-      throw MatrixShapeError(
-        'Matrix literal cannot be empty.',
-        errorId: CalculatrixErrorId.dimensionMismatch,
-      );
-    }
-
-    if (decoded.every((dynamic item) => item is num)) {
-      return Matrix(<List<double>>[
-        decoded
-            .map((dynamic item) => _checkFiniteLiteralEntry(item as num, token))
-            .toList(),
-      ]);
-    }
-
-    final List<List<double>> rows = <List<double>>[];
-    for (final dynamic row in decoded) {
-      if (row is! List || row.isEmpty) {
-        throw ExpressionSyntaxError(
-          'Invalid matrix row in literal: $token',
-          errorId: CalculatrixErrorId.syntaxError,
-        );
-      }
-
-      final List<double> parsedRow = <double>[];
-      for (final dynamic item in row) {
-        if (item is! num) {
-          throw ExpressionSyntaxError(
-            'Matrix literal must contain only numbers.',
-            errorId: CalculatrixErrorId.syntaxError,
-          );
-        }
-        parsedRow.add(_checkFiniteLiteralEntry(item, token));
-      }
-      rows.add(parsedRow);
-    }
-
-    return Matrix(rows);
-  }
-
-  /// Guards a decoded matrix-literal entry against non-finite values
-  /// (`Infinity`, `-Infinity`, `NaN`) so a literal like `1e999` never
-  /// silently becomes an infinite matrix entry; it raises `non-finite`
-  /// instead.
-  static double _checkFiniteLiteralEntry(num item, String token) {
-    final double value = item.toDouble();
-    if (!value.isFinite) {
-      throw MatrixDomainError(
-        'Matrix literal contains a non-finite value: $token',
-        errorId: CalculatrixErrorId.nonFinite,
-      );
-    }
-    return value;
-  }
-
-  // HP-style matrix literals separate rows and entries with plain
-  // whitespace instead of commas (e.g. "[[1 2] [3 4]]"). jsonDecode only
-  // understands comma-separated JSON, so this inserts the implied commas
-  // before decoding. A comma already present is left untouched, so
-  // "[[1, 2], [3, 4]]" round-trips unchanged. Rows may also touch with no
-  // whitespace at all, "[[0 -1][1 0]]" (the logo's form and the HP 50g's
-  // own notation, issue #29), so a comma is implied between a ']' and an
-  // immediately following '[' too.
-  static String _normalizeMatrixLiteralSeparators(String token) {
-    final RegExp impliedSeparator = RegExp(
-      r'(?<=[0-9.\]])\s+(?=[-0-9.\[])|(?<=\])(?=\[)',
-    );
-    return token.replaceAll(impliedSeparator, ',');
   }
 
   /// One shared rule for the RPN command line and RPN programs: tokens are
@@ -639,6 +549,34 @@ class Calculatrix {
         continue;
       }
 
+      if (char == Literals.approximateMark) {
+        final int start = index;
+        index = _scanMarkedLiteral(expression, index);
+        tokens.add(
+          _PositionedToken(
+            _requireParseableNumberToken(
+              expression.substring(start, index),
+              start + 1,
+            ),
+            start + 1,
+          ),
+        );
+        continue;
+      }
+
+      if (_isMisplacedMark(expression, index, tokens)) {
+        final int literalEnd = _scanMarkedLiteral(expression, index + 1);
+        final String fixed =
+            '${Literals.approximateMark}$char'
+            '${expression.substring(index + 2, literalEnd)}';
+        throw ExpressionSyntaxError(
+          'The approximate mark goes before the sign: $fixed',
+          errorId: CalculatrixErrorId.syntaxError,
+          token: expression.substring(index, literalEnd),
+          position: index + 1,
+        );
+      }
+
       if (_isSignedNumberStart(expression, index, tokens)) {
         final int start = index;
         final _NumberScanResult scan = _scanNumber(expression, index);
@@ -737,7 +675,7 @@ class Calculatrix {
   /// syntax error it actually is; this check is infix-only. RPN's own
   /// token compiler already validates numeric literals independently.
   static String _requireParseableNumberToken(String token, int position) {
-    if (double.tryParse(token) == null) {
+    if (!Literals.isNumber(token) && !Literals.looksLikeMatrix(token)) {
       throw ExpressionSyntaxError(
         'Invalid numeric literal: $token',
         errorId: CalculatrixErrorId.syntaxError,
@@ -1175,6 +1113,50 @@ class Calculatrix {
     );
     error.name = name;
     return error;
+  }
+
+  // Scans a literal that starts with the approximate mark at `start`: a
+  // number or a matrix literal, either with an optional sign (runbook
+  // D56). Returns the index just past it.
+  static int _scanMarkedLiteral(String source, int start) {
+    int index = start + 1;
+    if (index < source.length && (source[index] == '-' || source[index] == '+')) {
+      index++;
+    }
+    if (index < source.length && source[index] == '[') {
+      return _scanBracketedLiteral(source, index);
+    }
+    if (index < source.length && _isNumberStart(source[index])) {
+      return _scanNumber(source, index).nextIndex;
+    }
+    throw ExpressionSyntaxError(
+      'The approximate mark must be followed by a number or a matrix '
+      'literal.',
+      errorId: CalculatrixErrorId.syntaxError,
+      token: source.substring(start, index),
+      position: start + 1,
+    );
+  }
+
+  // A sign followed by the approximate mark in unary position ("-~0.1"):
+  // the mark belongs to the literal, so it must come first ("~-0.1").
+  static bool _isMisplacedMark(
+    String source,
+    int index,
+    List<_PositionedToken> tokens,
+  ) {
+    final String sign = source[index];
+    if (sign != '-' && sign != '+') {
+      return false;
+    }
+    final bool unaryPosition =
+        tokens.isEmpty ||
+        _isOperator(tokens.last.value) ||
+        _isFunction(tokens.last.value) ||
+        tokens.last.value == '(';
+    return unaryPosition &&
+        index + 1 < source.length &&
+        source[index + 1] == Literals.approximateMark;
   }
 
   static bool _isSignedNumberStart(

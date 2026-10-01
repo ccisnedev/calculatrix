@@ -85,14 +85,15 @@ void main() {
     });
 
     test(
-      'non-finite: an overflowing literal carries itself and position 1',
+      'non-finite: an overflowing approximate literal carries itself and '
+      'position 1',
       () {
         try {
-          Calculatrix.evaluateRpn(<String>['1e999']);
+          Calculatrix.evaluateRpn(<String>['~1e999']);
           fail('expected MatrixDomainError');
         } on MatrixDomainError catch (error) {
           expect(error.errorId, CalculatrixErrorId.nonFinite);
-          expect(error.token, '1e999');
+          expect(error.token, '~1e999');
           expect(error.position, 1);
         }
       },
@@ -101,8 +102,8 @@ void main() {
     test('non-finite: an overflowing product carries the "*" token, and '
         'the whole stack is checked the same way', () {
       for (final List<String> tokens in <List<String>>[
-        <String>['1e300', '1e300', '*'],
-        <String>['[[1e300 1]]', '1e300', '*'],
+        <String>['~1e300', '1e300', '*'],
+        <String>['~[[1e300 1]]', '1e300', '*'],
       ]) {
         try {
           Calculatrix.evaluateRpnStack(tokens);
@@ -132,12 +133,12 @@ void main() {
 
     test('non-finite: an overflowing infix product carries "*"', () {
       try {
-        Calculatrix.evaluateInfix('1e300*1e300');
+        Calculatrix.evaluateInfix('~1e300*1e300');
         fail('expected MatrixDomainError');
       } on MatrixDomainError catch (error) {
         expect(error.errorId, CalculatrixErrorId.nonFinite);
         expect(error.token, '*');
-        expect(error.position, 6);
+        expect(error.position, 7);
       }
     });
 

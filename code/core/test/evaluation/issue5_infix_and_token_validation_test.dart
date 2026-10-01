@@ -120,10 +120,11 @@ void main() {
 
   group('Non-finite literals are rejected (issue #5 bug 4)', () {
     test(
-      'an infix numeric literal that overflows to infinity is non-finite',
+      'an approximate infix literal that overflows to infinity is '
+      'non-finite',
       () {
         expect(
-          () => Calculatrix.evaluateInfix('1e999'),
+          () => Calculatrix.evaluateInfix('~1e999'),
           throwsA(
             isA<MatrixDomainError>().having(
               (MatrixDomainError error) => error.errorId,
@@ -136,9 +137,8 @@ void main() {
     );
 
     test('an RPN NaN literal is non-finite', () {
-      // RPN's token compiler parses the whole token with double.tryParse,
-      // which recognizes "NaN", so this is where the non-finite guard for
-      // it applies.
+      // NaN and Infinity are literals that always fail, so this is where
+      // the non-finite guard applies.
       expect(
         () => Calculatrix.evaluateRpn(<String>['NaN']),
         throwsA(
@@ -169,9 +169,9 @@ void main() {
       );
     });
 
-    test('an RPN numeric literal that overflows to infinity is non-finite', () {
+    test('an approximate RPN literal that overflows to infinity is non-finite', () {
       expect(
-        () => Calculatrix.evaluateRpn(<String>['1e999']),
+        () => Calculatrix.evaluateRpn(<String>['~1e999']),
         throwsA(
           isA<MatrixDomainError>().having(
             (MatrixDomainError error) => error.errorId,
@@ -182,9 +182,9 @@ void main() {
       );
     });
 
-    test('a matrix literal containing a non-finite entry is non-finite', () {
+    test('an approximate matrix literal with a non-finite entry is non-finite', () {
       expect(
-        () => Calculatrix.evaluateInfix('[[1, 1e999]]'),
+        () => Calculatrix.evaluateInfix('[[1, ~1e999]]'),
         throwsA(
           isA<MatrixDomainError>().having(
             (MatrixDomainError error) => error.errorId,

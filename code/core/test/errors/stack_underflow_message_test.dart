@@ -143,21 +143,21 @@ void main() {
           }
           final String? message = switch (entry.name) {
             'zeros' => 'zeros requires a non-negative integer count, '
-                'found -1.0.',
+                'found -1.',
             'ones' => 'ones requires a non-negative integer count, '
-                'found -1.0.',
+                'found -1.',
             'delete-row' => 'delete-row requires a positive integer index, '
-                'found -1.0.',
+                'found -1.',
             'delete-col' => 'delete-col requires a positive integer index, '
-                'found -1.0.',
+                'found -1.',
             'duplicate-row' =>
-              'duplicate-row requires a positive integer index, found -1.0.',
+              'duplicate-row requires a positive integer index, found -1.',
             'duplicate-col' =>
-              'duplicate-col requires a positive integer index, found -1.0.',
+              'duplicate-col requires a positive integer index, found -1.',
             'move-row' => 'move-row requires a positive integer index, '
-                'found -1.0.',
+                'found -1.',
             'move-col' => 'move-col requires a positive integer index, '
-                'found -1.0.',
+                'found -1.',
             _ => null,
           };
           if (message == null) {

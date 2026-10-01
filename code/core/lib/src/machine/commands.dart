@@ -1,4 +1,5 @@
 import '../errors/errors.dart';
+import '../exact/rational.dart';
 import '../matrix/matrix.dart';
 import '../rpn/rpn_engine.dart';
 import 'calculatrix_command.dart';
@@ -101,9 +102,22 @@ final class PowerCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix exponent = engine.pop();
-    final Matrix base = engine.pop();
-    engine.push(base.power(exponent));
+    final Matrix exponent = engine.popAny();
+    final Matrix base = engine.popAny();
+    final BigInt? integerExponent = _exactIntegerScalar(exponent);
+    // An exact base takes an exact integer exponent exactly: any integer
+    // for a scalar, a non-negative one for a square matrix (a negative
+    // power of a matrix needs its inverse, exact from step T3 of the
+    // runbook). Everything else, fractional powers included, is
+    // approximate (runbook D53).
+    if (base.isExact &&
+        integerExponent != null &&
+        base.isSquare &&
+        (base.isScalar || !integerExponent.isNegative)) {
+      engine.push(engine.exact.power(base, integerExponent));
+      return;
+    }
+    engine.push(base.toApproximate().power(exponent.toApproximate()));
   }
 }
 
@@ -112,8 +126,8 @@ final class AppendRowCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix row = engine.pop();
-    final Matrix target = engine.pop();
+    final Matrix row = engine.popAny();
+    final Matrix target = engine.popAny();
     engine.push(target.appendRow(row));
   }
 }
@@ -123,8 +137,8 @@ final class AppendColumnCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix column = engine.pop();
-    final Matrix target = engine.pop();
+    final Matrix column = engine.popAny();
+    final Matrix target = engine.popAny();
     engine.push(target.appendColumn(column));
   }
 }
@@ -140,7 +154,10 @@ final class VectorCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int count = _requireNonNegativeIntegerCount(engine.pop(), 'vector');
+    final int count = _requireNonNegativeIntegerCount(
+      engine.popAny(),
+      'vector',
+    );
 
     // Checked once, up front, rather than letting the loop below run out
     // and have its very last pop raise the engine's own generic "needs 1
@@ -161,9 +178,11 @@ final class VectorCommand extends CalculatrixCommand {
       );
     }
 
-    final List<double> valuesTopToBottom = <double>[];
+    final List<Matrix> valuesTopToBottom = <Matrix>[];
     for (int i = 0; i < count; i++) {
-      valuesTopToBottom.add(_requireScalarValue(engine.pop(), 'vector'));
+      final Matrix value = engine.popAny();
+      _requireScalar(value, 'vector');
+      valuesTopToBottom.add(value);
     }
 
     // A 0-item column is not representable: Matrix itself rejects an empty
@@ -176,10 +195,22 @@ final class VectorCommand extends CalculatrixCommand {
       );
     }
 
+    // Exact only when every value is exact (runbook D49).
+    final Iterable<Matrix> values = valuesTopToBottom.reversed;
+    if (values.every((Matrix value) => value.isExact)) {
+      engine.push(
+        Matrix.exact(
+          values
+              .map((Matrix value) => <Rational>[value.exactAt(0, 0)])
+              .toList(growable: false),
+        ),
+      );
+      return;
+    }
     engine.push(
       Matrix(
-        valuesTopToBottom.reversed
-            .map((double value) => <double>[value])
+        values
+            .map((Matrix value) => <double>[value.toApproximate().scalarValue])
             .toList(growable: false),
       ),
     );
@@ -193,11 +224,15 @@ final class RowsCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    for (final List<double> row in value.rows) {
-      engine.push(Matrix(<List<double>>[List<double>.from(row)]));
+    final Matrix value = engine.popAny();
+    for (int r = 0; r < value.rowCount; r++) {
+      engine.push(
+        value.isExact
+            ? Matrix.exact(<List<Rational>>[value.exactRows[r]])
+            : Matrix(<List<double>>[List<double>.from(value.rows[r])]),
+      );
     }
-    engine.pushScalar(value.rowCount.toDouble());
+    engine.push(Matrix.exactScalar(Rational.fromInt(value.rowCount)));
   }
 }
 
@@ -210,8 +245,8 @@ final class AppendColsCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix b = engine.pop();
-    final Matrix a = engine.pop();
+    final Matrix b = engine.popAny();
+    final Matrix a = engine.popAny();
     engine.push(a.appendColumns(b));
   }
 }
@@ -224,13 +259,13 @@ final class AppendRowsCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix b = engine.pop();
-    final Matrix a = engine.pop();
+    final Matrix b = engine.popAny();
+    final Matrix a = engine.popAny();
     engine.push(a.appendRows(b));
   }
 }
 
-double _requireScalarValue(Matrix value, String word) {
+void _requireScalar(Matrix value, String word) {
   if (!value.isScalar) {
     throw MatrixDomainError(
       '$word requires a scalar operand, found a '
@@ -238,18 +273,61 @@ double _requireScalarValue(Matrix value, String word) {
       errorId: CalculatrixErrorId.typeMismatch,
     );
   }
-  return value.scalarValue;
 }
 
+/// The value of an exact scalar that is an integer, or null.
+BigInt? _exactIntegerScalar(Matrix value) {
+  if (!value.isExact || !value.isScalar) {
+    return null;
+  }
+  final Rational entry = value.exactAt(0, 0);
+  return entry.isInteger ? entry.numerator : null;
+}
+
+// Counts, sizes, stack levels and indexes are arguments, not values: they
+// take an exact or approximate whole number alike and never make a result
+// approximate (`~2 3 zeros` is exact zeros). Clamped to a bound no list
+// can reach, so the conversion to int is safe and the range checks of each
+// word still fail.
+const int _largestArgument = 0x7fffffff;
+
+int? _wholeArgument(Matrix value, String word) {
+  _requireScalar(value, word);
+  if (value.isExact) {
+    final Rational entry = value.exactAt(0, 0);
+    if (!entry.isInteger) {
+      return null;
+    }
+    final BigInt bound = BigInt.from(_largestArgument);
+    if (entry.numerator > bound) {
+      return _largestArgument;
+    }
+    if (entry.numerator < -bound) {
+      return -_largestArgument;
+    }
+    return entry.numerator.toInt();
+  }
+  final double raw = value.scalarValue;
+  if (!raw.isFinite || raw != raw.truncateToDouble()) {
+    return null;
+  }
+  return raw.clamp(-_largestArgument, _largestArgument).toInt();
+}
+
+String _argumentText(Matrix value) => value.isExact
+    ? value.exactAt(0, 0).toDisplayString()
+    : '~${value.scalarValue}';
+
 int _requireNonNegativeIntegerCount(Matrix value, String word) {
-  final double raw = _requireScalarValue(value, word);
-  if (raw < 0 || raw != raw.truncateToDouble()) {
+  final int? whole = _wholeArgument(value, word);
+  if (whole == null || whole < 0) {
     throw MatrixDomainError(
-      '$word requires a non-negative integer count, found $raw.',
+      '$word requires a non-negative integer count, found '
+      '${_argumentText(value)}.',
       errorId: CalculatrixErrorId.typeMismatch,
     );
   }
-  return raw.toInt();
+  return whole;
 }
 
 /// Pops a 1-based index or stack level, rejecting a non-integer, negative
@@ -258,14 +336,15 @@ int _requireNonNegativeIntegerCount(Matrix value, String word) {
 /// index (`delete-row`, `move-col`, ...), so the format check lives in one
 /// place.
 int _requirePositiveInteger(Matrix value, String word) {
-  final double raw = _requireScalarValue(value, word);
-  if (raw < 1 || raw != raw.truncateToDouble()) {
+  final int? whole = _wholeArgument(value, word);
+  if (whole == null || whole < 1) {
     throw MatrixDomainError(
-      '$word requires a positive integer index, found $raw.',
+      '$word requires a positive integer index, found '
+      '${_argumentText(value)}.',
       errorId: CalculatrixErrorId.typeMismatch,
     );
   }
-  return raw.toInt();
+  return whole;
 }
 
 /// Converts a 1-based row or column index to the 0-based index `Matrix`
@@ -315,8 +394,8 @@ final class NegateCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.scale(-1));
+    final Matrix value = engine.popAny();
+    engine.push(value.isExact ? engine.exact.negate(value) : value.scale(-1));
   }
 }
 
@@ -325,7 +404,7 @@ final class TransposeCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
+    final Matrix value = engine.popAny();
     engine.push(value.transpose());
   }
 }
@@ -527,7 +606,7 @@ final class DeleteRowCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
+    final Matrix value = engine.popAny();
     engine.push(value.deleteRow(rowIndex));
   }
 }
@@ -539,7 +618,7 @@ final class DeleteColumnCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
+    final Matrix value = engine.popAny();
     engine.push(value.deleteColumn(columnIndex));
   }
 }
@@ -551,7 +630,7 @@ final class DuplicateRowCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
+    final Matrix value = engine.popAny();
     engine.push(value.duplicateRow(rowIndex));
   }
 }
@@ -563,7 +642,7 @@ final class DuplicateColumnCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
+    final Matrix value = engine.popAny();
     engine.push(value.duplicateColumn(columnIndex));
   }
 }
@@ -576,7 +655,7 @@ final class MoveRowCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
+    final Matrix value = engine.popAny();
     engine.push(value.moveRow(fromIndex, toIndex));
   }
 }
@@ -589,7 +668,7 @@ final class MoveColumnCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
+    final Matrix value = engine.popAny();
     engine.push(value.moveColumn(fromIndex, toIndex));
   }
 }
@@ -623,7 +702,7 @@ final class PickWordCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int level = _requirePositiveInteger(engine.pop(), 'pick');
+    final int level = _requirePositiveInteger(engine.popAny(), 'pick');
     engine.pick(level);
   }
 }
@@ -635,7 +714,7 @@ final class RollWordCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int level = _requirePositiveInteger(engine.pop(), 'roll');
+    final int level = _requirePositiveInteger(engine.popAny(), 'roll');
     engine.roll(level);
   }
 }
@@ -650,11 +729,14 @@ final class ZerosCommand extends CalculatrixCommand {
   @override
   void executeOn(RpnEngine engine) {
     final int columnCount = _requireNonNegativeIntegerCount(
-      engine.pop(),
+      engine.popAny(),
       'zeros',
     );
-    final int rowCount = _requireNonNegativeIntegerCount(engine.pop(), 'zeros');
-    engine.push(Matrix.zeros(rowCount, columnCount));
+    final int rowCount = _requireNonNegativeIntegerCount(
+      engine.popAny(),
+      'zeros',
+    );
+    engine.push(Matrix.exactFilled(rowCount, columnCount, Rational.zero));
   }
 }
 
@@ -666,11 +748,14 @@ final class OnesCommand extends CalculatrixCommand {
   @override
   void executeOn(RpnEngine engine) {
     final int columnCount = _requireNonNegativeIntegerCount(
-      engine.pop(),
+      engine.popAny(),
       'ones',
     );
-    final int rowCount = _requireNonNegativeIntegerCount(engine.pop(), 'ones');
-    engine.push(Matrix.ones(rowCount, columnCount));
+    final int rowCount = _requireNonNegativeIntegerCount(
+      engine.popAny(),
+      'ones',
+    );
+    engine.push(Matrix.exactFilled(rowCount, columnCount, Rational.one));
   }
 }
 
@@ -686,14 +771,17 @@ final class IdentityCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int size = _requireNonNegativeIntegerCount(engine.pop(), 'identity');
+    final int size = _requireNonNegativeIntegerCount(
+      engine.popAny(),
+      'identity',
+    );
     if (size == 0) {
       throw MatrixShapeError(
         'identity requires a positive size, found 0.',
         errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
-    engine.push(Matrix.identity(size));
+    engine.push(Matrix.exactIdentity(size));
   }
 }
 
@@ -708,8 +796,8 @@ final class DeleteRowWordCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int index1 = _requirePositiveInteger(engine.pop(), 'delete-row');
-    final Matrix value = engine.pop();
+    final int index1 = _requirePositiveInteger(engine.popAny(), 'delete-row');
+    final Matrix value = engine.popAny();
     final int index0 = _requireIndexWithinCount(
       index1,
       value.rowCount,
@@ -727,8 +815,8 @@ final class DeleteColumnWordCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int index1 = _requirePositiveInteger(engine.pop(), 'delete-col');
-    final Matrix value = engine.pop();
+    final int index1 = _requirePositiveInteger(engine.popAny(), 'delete-col');
+    final Matrix value = engine.popAny();
     final int index0 = _requireIndexWithinCount(
       index1,
       value.columnCount,
@@ -746,8 +834,11 @@ final class DuplicateRowWordCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int index1 = _requirePositiveInteger(engine.pop(), 'duplicate-row');
-    final Matrix value = engine.pop();
+    final int index1 = _requirePositiveInteger(
+      engine.popAny(),
+      'duplicate-row',
+    );
+    final Matrix value = engine.popAny();
     final int index0 = _requireIndexWithinCount(
       index1,
       value.rowCount,
@@ -765,8 +856,11 @@ final class DuplicateColumnWordCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int index1 = _requirePositiveInteger(engine.pop(), 'duplicate-col');
-    final Matrix value = engine.pop();
+    final int index1 = _requirePositiveInteger(
+      engine.popAny(),
+      'duplicate-col',
+    );
+    final Matrix value = engine.popAny();
     final int index0 = _requireIndexWithinCount(
       index1,
       value.columnCount,
@@ -785,9 +879,9 @@ final class MoveRowWordCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int toIndex1 = _requirePositiveInteger(engine.pop(), 'move-row');
-    final int fromIndex1 = _requirePositiveInteger(engine.pop(), 'move-row');
-    final Matrix value = engine.pop();
+    final int toIndex1 = _requirePositiveInteger(engine.popAny(), 'move-row');
+    final int fromIndex1 = _requirePositiveInteger(engine.popAny(), 'move-row');
+    final Matrix value = engine.popAny();
     final int fromIndex0 = _requireIndexWithinCount(
       fromIndex1,
       value.rowCount,
@@ -811,9 +905,9 @@ final class MoveColumnWordCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final int toIndex1 = _requirePositiveInteger(engine.pop(), 'move-col');
-    final int fromIndex1 = _requirePositiveInteger(engine.pop(), 'move-col');
-    final Matrix value = engine.pop();
+    final int toIndex1 = _requirePositiveInteger(engine.popAny(), 'move-col');
+    final int fromIndex1 = _requirePositiveInteger(engine.popAny(), 'move-col');
+    final Matrix value = engine.popAny();
     final int fromIndex0 = _requireIndexWithinCount(
       fromIndex1,
       value.columnCount,
@@ -827,5 +921,28 @@ final class MoveColumnWordCommand extends CalculatrixCommand {
       label: 'column',
     );
     engine.push(value.moveColumn(fromIndex0, toIndex0));
+  }
+}
+
+/// `approx` (alias `num`): the value as an approximate one (runbook D52).
+/// An approximate value is left unchanged.
+final class ApproxCommand extends CalculatrixCommand {
+  const ApproxCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    engine.push(engine.popAny().toApproximate());
+  }
+}
+
+/// `exact`: the value as an exact one, each entry the simplest rational
+/// that rounds to the same `double` (runbook D52). An exact value is left
+/// unchanged.
+final class ExactCommand extends CalculatrixCommand {
+  const ExactCommand();
+
+  @override
+  void executeOn(RpnEngine engine) {
+    engine.push(engine.popAny().toExact());
   }
 }

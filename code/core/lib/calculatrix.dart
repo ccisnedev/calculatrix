@@ -7,6 +7,8 @@ library calculatrix;
 
 export 'src/errors/errors.dart';
 export 'src/evaluation/calculatrix.dart';
+export 'src/exact/exact_arithmetic.dart';
+export 'src/exact/rational.dart';
 export 'src/machine/calculatrix_command.dart';
 export 'src/machine/calculatrix_machine.dart';
 export 'src/machine/calculatrix_macro.dart';

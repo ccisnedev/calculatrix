@@ -9,9 +9,9 @@ void main() {
       expect(
         program.commands.map((CalculatrixCommand command) => command.runtimeType),
         orderedEquals(<Type>[
-          PushScalarCommand,
-          PushScalarCommand,
-          PushScalarCommand,
+          PushMatrixCommand,
+          PushMatrixCommand,
+          PushMatrixCommand,
           MultiplyCommand,
           AddCommand,
         ]),

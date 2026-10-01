@@ -115,7 +115,10 @@ class CalculatrixSession {
   }
 
   void insertMatrixLiteral(String literal) {
-    final Matrix matrix = Calculatrix.evaluateInfix(literal);
+    final Matrix matrix = Calculatrix.evaluateInfix(
+      literal,
+      approximate: true,
+    );
     _clearError();
 
     if (!isRpnMode) {
@@ -392,7 +395,7 @@ class CalculatrixSession {
         .replaceAll('×', '*')
         .replaceAll('÷', '/');
 
-    return Calculatrix.evaluateInfix(normalized);
+    return Calculatrix.evaluateInfix(normalized, approximate: true);
   }
 
   // Repeat-equals ("=" pressed again with an empty draft) replays
@@ -721,7 +724,7 @@ class CalculatrixSession {
         .replaceAll('×', '*')
         .replaceAll('÷', '/');
 
-    return Calculatrix.evaluateInfix(normalized);
+    return Calculatrix.evaluateInfix(normalized, approximate: true);
   }
 
   // Token boundaries in an rpn line are shared with rpn programs: splitting

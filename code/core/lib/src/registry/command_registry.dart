@@ -1,5 +1,6 @@
 import '../errors/errors.dart';
 import '../evaluation/calculatrix.dart';
+import '../exact/rational.dart';
 import '../machine/calculatrix_command.dart';
 import '../machine/commands.dart';
 import '../matrix/matrix.dart';
@@ -814,6 +815,57 @@ final class CalculatrixCommandRegistry {
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
       seeAlso: const <String>['subtract'],
       build: () => const NegateCommand(),
+    ),
+    CalculatrixCommandEntry(
+      name: 'approx',
+      aliases: const <String>['num'],
+      hp50gReference: '->NUM',
+      searchTerms: const <String>['decimal', 'float', 'numeric'],
+      category: CalculatrixCommandCategory.arithmetic,
+      stackEffect: 'A -> ~A',
+      arity: 1,
+      description:
+          'Makes A approximate: each entry becomes the nearest double. An '
+          'approximate value is left unchanged.',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample('1 3 / approx', Matrix.scalar(1 / 3)),
+        CalculatrixCommandExample('1 4 / num', Matrix.scalar(0.25)),
+      ],
+      errors: const <CalculatrixErrorId>[
+        CalculatrixErrorId.stackUnderflow,
+        CalculatrixErrorId.nonFinite,
+      ],
+      seeAlso: const <String>['exact'],
+      build: () => const ApproxCommand(),
+    ),
+    CalculatrixCommandEntry(
+      name: 'exact',
+      hp50gReference: '->Q',
+      searchTerms: const <String>['fraction', 'rational'],
+      category: CalculatrixCommandCategory.arithmetic,
+      stackEffect: '~A -> A',
+      arity: 1,
+      description:
+          'Makes A exact: each entry becomes the simplest rational (smallest '
+          'denominator) that rounds to the same double, so it never guesses '
+          'beyond the precision of the double. An exact value is left '
+          'unchanged.',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample(
+          '1 3 / approx exact',
+          Matrix.exactScalar(Rational(BigInt.one, BigInt.from(3))),
+        ),
+        CalculatrixCommandExample(
+          '0.1 approx exact',
+          Matrix.exactScalar(Rational(BigInt.one, BigInt.from(10))),
+        ),
+      ],
+      errors: const <CalculatrixErrorId>[
+        CalculatrixErrorId.stackUnderflow,
+        CalculatrixErrorId.nonFinite,
+      ],
+      seeAlso: const <String>['approx'],
+      build: () => const ExactCommand(),
     ),
     CalculatrixCommandEntry(
       name: 'pick',
