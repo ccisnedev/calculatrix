@@ -1514,6 +1514,20 @@ void main() {
       expect(_matrixEditableText(tester, 0, 0).controller.text, '0.');
     });
 
+    testWidgets('matrix editor ± keeps the sign after the mark (runbook D56)', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+      await _enterMatrixCell(tester, 0, 0, '~0.5');
+
+      await _tapFinderCenter(tester, _matrixCell(0, 0));
+      await _tapCalculatorButton(tester, '±');
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '~-0.5');
+
+      await _tapCalculatorButton(tester, '±');
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '~0.5');
+    });
+
     testWidgets('matrix editor keeps actions usable while editing a 4x4 draft', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());

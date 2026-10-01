@@ -49,7 +49,9 @@ class CalculatorController extends ChangeNotifier {
     }
 
     final String trimmed = expression.trim();
-    if (trimmed.isEmpty || !trimmed.startsWith('[[') || !trimmed.endsWith(']]')) {
+    final String literal =
+        trimmed.startsWith('~') ? trimmed.substring(1) : trimmed;
+    if (!literal.startsWith('[[') || !literal.endsWith(']]')) {
       return null;
     }
 

@@ -932,6 +932,17 @@ void main() {
       expect(controller.rpnStackTexts.single, '[[-2, 1], [1.5, -0.5]]');
     });
 
+    test('an approximate matrix draft seeds the matrix editor', () {
+      controller.openInfixEditor();
+      controller.insertMatrixLiteral('~[[0.5,1]]');
+
+      final Matrix? matrix = controller.matrixEditorSeedMatrix;
+
+      expect(matrix, isNotNull);
+      expect(matrix!.isExact, isFalse);
+      expect(matrix.at(0, 0), 0.5);
+    });
+
     test('spokenValue reads the mark as approximately', () {
       expect(spokenValue('~1.41421356237'), 'approximately 1.41421356237');
       expect(spokenValue('1/3'), '1/3');

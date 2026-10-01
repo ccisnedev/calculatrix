@@ -1634,10 +1634,11 @@ void main() {
     test('an approximate result is marked and keeps its mark', () {
       type('2');
       session.input('√');
-      expect(session.expression, '~1.41421356237');
+      // The seed keeps the whole double, so it reads back as the same value.
+      expect(session.expression, '~1.4142135623730951');
 
       session.toggleSign();
-      expect(session.expression, '~-1.41421356237');
+      expect(session.expression, '~-1.4142135623730951');
       session.evaluate();
       expect(session.currentValue!.isExact, isFalse);
       expect(text(session.currentValue), '~-1.41421356237');
@@ -1690,6 +1691,47 @@ void main() {
       expect(session.rpnDraft, '~-0.5');
       session.toggleSign();
       expect(session.rpnDraft, '~0.5');
+    });
+
+    test('an approximate seed with an exponent reads back as itself', () {
+      type('2 e 4 0');
+      session.input('√');
+      final double root = Calculatrix.evaluateRpn(<String>['~2e40', 'sqrt'])
+          .scalarValue;
+      expect(session.expression, startsWith('~'));
+
+      session.evaluate();
+      expect(session.hasError, isFalse);
+      expect(session.currentValue!.isExact, isFalse);
+      expect(session.currentValue!.scalarValue, root);
+    });
+
+    test('± on a fraction seed followed by an operator stays valid', () {
+      type('1 ÷ 3');
+      session.evaluate();
+      session.input('×');
+      type('3');
+      expect(session.expression, '(1/3)×3');
+
+      session.toggleSign();
+      expect(session.expression, '(-1/3)×3');
+      session.evaluate();
+      expect(session.hasError, isFalse);
+      expect(text(session.currentValue), '-1');
+    });
+
+    test('rpn: a draft token is read as rpn, as cx reads it (D59)', () {
+      session.setMode(CalculatrixMode.rpn);
+      type('1 . 5 / 2');
+      session.enter();
+      expect(session.hasError, isTrue);
+      expect(session.rpnStack, isEmpty);
+
+      session.clear();
+      type('- 5 / 3');
+      session.enter();
+      expect(session.hasError, isFalse);
+      expect(session.rpnTopLiteral, '[[-5/3]]');
     });
   });
 }

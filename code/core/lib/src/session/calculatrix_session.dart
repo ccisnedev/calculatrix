@@ -229,17 +229,18 @@ class CalculatrixSession {
   }
 
   // The sign goes after the approximate mark (`~-0.5`, runbook D56) and
-  // inside a parenthesized fraction (`(-1/3)`), since infix reads neither
-  // `-~0.5` nor `-(1/3)`.
+  // inside a leading parenthesized fraction (`(-1/3)×3`), since infix reads
+  // neither `-~0.5` nor `-(1/3)`.
   String _toggledInfixDraft(String draft) {
     if (draft.startsWith('~')) {
       return '~${_toggledInfixDraft(draft.substring(1))}';
     }
     final RegExpMatch? fraction = _parenthesizedFraction.firstMatch(draft);
     if (fraction != null) {
+      final String rest = draft.substring(fraction.end);
       return fraction.group(1)!.isEmpty
-          ? '(-${fraction.group(2)})'
-          : '(${fraction.group(2)})';
+          ? '(-${fraction.group(2)})$rest'
+          : '(${fraction.group(2)})$rest';
     }
     if (draft.startsWith('-')) {
       return draft.substring(1);
@@ -247,7 +248,7 @@ class CalculatrixSession {
     return '-$draft';
   }
 
-  static final RegExp _parenthesizedFraction = RegExp(r'^\((-?)(\d+/\d+)\)$');
+  static final RegExp _parenthesizedFraction = RegExp(r'^\((-?)(\d+/\d+)\)');
 
   void memoryClear() {
     if (isRpnMode) {
@@ -755,10 +756,14 @@ class CalculatrixSession {
   // on every literal space would tear a matrix literal such as
   // "[[1 2] [3 4]]" apart, so this delegates to the same bracket-aware
   // tokenizer the core uses for RPN programs rather than a second one.
+  //
+  // Each token is read as an RPN program of one token, as cx reads it, so
+  // `1/3` is a fraction literal and `1.5/2` an unknown word (runbook D59),
+  // never an infix expression.
   List<Matrix> _parseDraftTokens(String draft) {
-    return Calculatrix.tokenizeRpnLine(
-      draft,
-    ).map(_parseDraftOperand).toList(growable: false);
+    return Calculatrix.tokenizeRpnLine(draft)
+        .map((String token) => Calculatrix.evaluateRpn(<String>[token]))
+        .toList(growable: false);
   }
 
   /// Toggles the sign of the last token in a multi-operand rpn draft,
@@ -991,14 +996,15 @@ class CalculatrixSession {
 
   // An infix seed reads back as the same value: an exact scalar in full
   // (a fraction in parentheses, so `2÷(1/3)` stays one division), an
-  // approximate one marked (runbook D54, D56).
+  // approximate one marked, with its whole double, as a matrix seed has
+  // (runbook D54, D56).
   String _expressionSeedFromValue(Matrix value) {
     if (!value.isScalar) {
       return _serializeMatrix(value);
     }
 
     if (!value.isExact) {
-      return '~${_formatScalarLiteral(value.scalarValue)}';
+      return '~${_formatMatrixNumber(value.scalarValue)}';
     }
 
     final String text = value.exactAt(0, 0).toDisplayString();
@@ -1193,23 +1199,6 @@ class CalculatrixSession {
     }
 
     return value.toString();
-  }
-
-  String _formatScalarLiteral(double value) {
-    if (value == 0) {
-      return '0';
-    }
-
-    if (value == value.toInt().toDouble() && value.abs() < 1e12) {
-      return value.toInt().toString();
-    }
-
-    String text = value.toStringAsPrecision(12);
-    if (text.contains('.')) {
-      text = text.replaceAll(RegExp(r'0+$'), '');
-      text = text.replaceAll(RegExp(r'\.$'), '');
-    }
-    return text;
   }
 }
 

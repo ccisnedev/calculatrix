@@ -136,6 +136,8 @@ void main() {
       }
     });
 
+    // A marked fraction is exempt, like any marked literal: the limit's own
+    // hint suggests the mark (runbook D55, D56).
     test('each part is held to the digit limit', () {
       expect(
         () => _rpn('1/${'9' * 30}', maxDigits: 20),

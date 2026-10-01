@@ -3117,14 +3117,17 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       _editingColumn = _selectedColumn;
       final TextEditingController controller =
           _controllers[_selectedRow][_selectedColumn];
-      final String currentValue = controller.text;
+      // The sign goes after the approximate mark: `~0.5` becomes `~-0.5`,
+      // never `-~0.5` (runbook D56).
+      final String mark = controller.text.startsWith('~') ? '~' : '';
+      final String currentValue = controller.text.substring(mark.length);
       final String nextValue;
       if (currentValue.startsWith('-')) {
-        nextValue = currentValue.substring(1);
+        nextValue = mark + currentValue.substring(1);
       } else if (currentValue.isEmpty) {
-        nextValue = '-';
+        nextValue = '$mark-';
       } else {
-        nextValue = '-$currentValue';
+        nextValue = '$mark-$currentValue';
       }
       controller.text = nextValue;
       controller.selection = TextSelection.collapsed(offset: nextValue.length);

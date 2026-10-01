@@ -248,7 +248,8 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   that irrational results stay approximate.
 - Fraction literals and exact sessions (runbook-trust.md, step T5). An
   integer fraction `p/q` is one exact numeric literal in RPN and inside a
-  matrix literal (D59), each part held to `maxDigits`; infix is unchanged.
+  matrix literal (D59), each part of an exact fraction held to `maxDigits`
+  (`~p/q` is exempt, like any marked literal); infix is unchanged.
   `MatrixDisplayFormatter` prints exact values in full and marks
   approximate ones with `~` in `compact`, `expanded` and `complex`, and the
   new `text`, `mark` and `entry` give the `cx` stack-line form (D54).
