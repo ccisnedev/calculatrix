@@ -1,7 +1,7 @@
-// Exact numbers through `cx` (runbook-trust.md, steps T2 to T4): the
-// output of D54, the approximate mark as input (D56), contagion (D51), the
-// exact linear algebra words, roots and eigenvalues (D53) and the size
-// limit with --max-digits (D55).
+// Exact numbers through `cx` (runbook-trust.md, steps T2 to T5): the
+// output of D54, the approximate mark as input (D56), fraction literals
+// (D59), contagion (D51), the exact linear algebra words, roots and
+// eigenvalues (D53) and the size limit with --max-digits (D55).
 import 'dart:convert';
 
 import 'package:calculatrix_cli/calculatrix_cli.dart';
@@ -139,6 +139,54 @@ void main() {
       final error = errorOf();
       expect(error['id'], 'syntax-error');
       expect(error['message'], contains('~-0.1'));
+    });
+  });
+
+  group('fraction literals (D59)', () {
+    for (final (String program, String expected) in [
+      ('1/3 3 *', '1: 1\n'),
+      ('-5/3 1/3 +', '1: -4/3\n'),
+      ('[[1/3 2] [3 4]] inverse', '1: [[-6/7 3/7] [9/14 -1/14]]\n'),
+      ('~1/3', '1: ~0.333333333333\n'),
+    ]) {
+      test("cx '$program'", () async {
+        final code = await run([program]);
+        expect(code, ExitCode.ok, reason: err.output);
+        expect(out.output, expected);
+      });
+    }
+
+    test('every exact output types back to the same value', () async {
+      for (final String program in <String>[
+        '1 3 /',
+        '[[1 2] [3 4]] 3 / inverse',
+        '10 30 ^ 7 /',
+      ]) {
+        out = MemorySink();
+        expect(await run([program]), ExitCode.ok);
+        final String printed = out.output.substring('1: '.length).trim();
+        out = MemorySink();
+        expect(await run([printed]), ExitCode.ok, reason: printed);
+        expect(out.output, '1: $printed\n', reason: program);
+      }
+    });
+
+    test("cx '1/0' is non-finite", () async {
+      final code = await run(['eval', 'rpn', '--json', '1/0']);
+      expect(code, ExitCode.dataError);
+      expect(errorOf()['id'], 'non-finite');
+    });
+
+    test("cx '1.5/2' is no literal, so an unknown word", () async {
+      final code = await run(['eval', 'rpn', '--json', '1.5/2']);
+      expect(code, ExitCode.dataError);
+      expect(errorOf()['id'], 'unknown-word');
+    });
+
+    test("cx '[[1 1.5/2]]' is syntax-error", () async {
+      final code = await run(['eval', 'rpn', '--json', '[[1 1.5/2]]']);
+      expect(code, ExitCode.dataError);
+      expect(errorOf()['id'], 'syntax-error');
     });
   });
 

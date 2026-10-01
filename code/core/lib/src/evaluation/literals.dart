@@ -7,7 +7,10 @@ import '../matrix/matrix.dart';
 /// A literal is exact (runbook D50): `0.1` is 1/10 and `1e400` is 10^400.
 /// A `~` in front of a literal, its sign included, makes it approximate
 /// (runbook D56): `~0.1`, `~-0.1`, `~[[1 2]]`. A `~` on one entry of a
-/// matrix literal makes the whole matrix approximate (runbook D49).
+/// matrix literal makes the whole matrix approximate (runbook D49). A
+/// fraction of two integers, `1/3` or `-5/3`, is a literal too (runbook
+/// D59), so every exact value `cx` prints can be typed back, alone or as a
+/// matrix entry.
 abstract final class Literals {
   /// The approximate mark of runbook D54 and D56.
   static const String approximateMark = '~';
@@ -16,12 +19,16 @@ abstract final class Literals {
     r'^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$',
   );
 
-  /// Whether [text] is a numeric literal (exact or with `~`), `NaN` or
-  /// `Infinity` included: they are literals that always fail as
-  /// `non-finite`.
+  static final RegExp _fraction = RegExp(r'^([+-]?\d+)/(\d+)$');
+
+  /// Whether [text] is a numeric literal (exact or with `~`), a fraction
+  /// included, and `NaN` or `Infinity` too: they are literals that always
+  /// fail as `non-finite`.
   static bool isNumber(String text) {
     final String unmarked = _unmark(text);
-    return _number.hasMatch(unmarked) || _isNonFiniteWord(unmarked);
+    return _number.hasMatch(unmarked) ||
+        _fraction.hasMatch(unmarked) ||
+        _isNonFiniteWord(unmarked);
   }
 
   /// Whether [text] has the shape of a matrix literal: brackets, with an
@@ -109,6 +116,10 @@ abstract final class Literals {
         token: token,
       );
     }
+    final RegExpMatch? fraction = _fraction.firstMatch(unmarked);
+    if (fraction != null) {
+      return _parseFraction(fraction, token, maxDigits, marked: marked);
+    }
     if (marked) {
       final double value = double.parse(unmarked);
       if (!value.isFinite) {
@@ -132,6 +143,51 @@ abstract final class Literals {
       ),
     );
     return _Entry.exact(value!);
+  }
+
+  // A fraction `p/q` of two integers (runbook D59): exact, or the double
+  // nearest to it when [marked], with no digit limit then, as for a marked
+  // decimal. A zero denominator is `non-finite`, as the division `p q /`
+  // is.
+  static _Entry _parseFraction(
+    RegExpMatch fraction,
+    String token,
+    int maxDigits, {
+    required bool marked,
+  }) {
+    Rational part(String text) => Rational.tryParseDecimal(
+      text,
+      maxDigits: marked ? Rational.maxEstimate : maxDigits,
+      onTooLarge: (int estimated) => LimitExceededError(
+        'The literal ${fraction.group(0)} has about $estimated digits, over '
+        'the limit of $maxDigits.',
+        limit: maxDigits,
+        estimated: estimated,
+        token: token,
+      ),
+    )!;
+    final Rational numerator = part(fraction.group(1)!);
+    final Rational denominator = part(fraction.group(2)!);
+    if (denominator.isZero) {
+      throw MatrixDomainError(
+        'The literal ${fraction.group(0)} divides by zero: $token',
+        errorId: CalculatrixErrorId.nonFinite,
+        token: token,
+      );
+    }
+    final Rational value = numerator / denominator;
+    if (!marked) {
+      return _Entry.exact(value);
+    }
+    final double approximate = value.toDouble();
+    if (!approximate.isFinite) {
+      throw MatrixDomainError(
+        'Numeric literal is not a finite number: $token',
+        errorId: CalculatrixErrorId.nonFinite,
+        token: token,
+      );
+    }
+    return _Entry.approximate(approximate);
   }
 
   static Matrix _parseMatrix(String token, int maxDigits) {

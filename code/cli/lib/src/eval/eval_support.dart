@@ -159,23 +159,12 @@ Object matrixToJsonValue(Matrix matrix) {
 }
 
 /// One stack value as an HP 50g-style stack line wants it (spec section 6,
-/// runbook D54): `1: 3`, `1: [[0 -1] [1 0]]`, `1: 1/3`. An exact number
-/// prints in full; an approximate value goes through the display
-/// formatter of core, the one the app uses (runbook D45), and carries the
-/// mark `~` once, in front of the whole value: `1: ~0.333333333333`,
+/// runbook D54): `1: 3`, `1: [[0 -1] [1 0]]`, `1: 1/3`. The text comes from
+/// the display formatter of core, the one the app uses (runbook D45): an
+/// exact number prints in full, and an approximate value carries the mark
+/// `~` once, in front of the whole value: `1: ~0.333333333333`,
 /// `1: ~[[1 1.41421356237]]`.
-String matrixToText(Matrix matrix) {
-  String entry(int row, int column) => matrix.isExact
-      ? matrix.exactAt(row, column).toDisplayString()
-      : _numberText(matrix.at(row, column));
-  final String mark = matrix.isExact ? '' : '~';
-  if (matrix.isScalar) return '$mark${entry(0, 0)}';
-  final rows = [
-    for (var row = 0; row < matrix.rowCount; row++)
-      '[${[for (var column = 0; column < matrix.columnCount; column++) entry(row, column)].join(' ')}]',
-  ];
-  return '$mark[${rows.join(' ')}]';
-}
+String matrixToText(Matrix matrix) => MatrixDisplayFormatter.text(matrix);
 
 Object _jsonNumber(double value) {
   if (value.isFinite && value == value.roundToDouble() && value.abs() < 1e15) {
@@ -183,5 +172,3 @@ Object _jsonNumber(double value) {
   }
   return value;
 }
-
-String _numberText(double value) => MatrixDisplayFormatter.number(value);

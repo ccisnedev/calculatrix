@@ -54,4 +54,43 @@ void main() {
       expect(draft.cellValue(3, 3), '8');
     });
   });
+
+  group('MatrixEditorDraft cells (runbook D56, D59)', () {
+    MatrixEditorDraft draftWith(String a, String b) => MatrixEditorDraft(
+      order: null,
+      rowCount: 1,
+      columnCount: 2,
+    )..setCell(0, 0, a)..setCell(0, 1, b);
+
+    test('a fraction or a marked value is a number, kept as typed', () {
+      final MatrixEditorDraft draft = draftWith('1/3', '~0.1');
+
+      expect(draft.validationError(), isNull);
+      expect(draft.buildLiteral(), '[[1/3,~0.1]]');
+    });
+
+    test('a negative fraction and an exponent are numbers', () {
+      final MatrixEditorDraft draft = draftWith('-5/3', '1e3');
+
+      expect(draft.validationError(), isNull);
+      expect(draft.buildLiteral(), '[[-5/3,1e3]]');
+    });
+
+    test('text that is no literal gets the example message', () {
+      for (final String cell in <String>['oops', '1/2/3', '[[1]]', '1.5/2']) {
+        expect(
+          draftWith('1', cell).validationError(),
+          'r1 c2 must be a number, like -2, 3.5 or 1/3',
+          reason: cell,
+        );
+      }
+    });
+
+    test('a zero denominator gets the core message', () {
+      expect(
+        draftWith('1/0', '2').validationError(),
+        startsWith('r1 c1 is not a valid number: '),
+      );
+    });
+  });
 }

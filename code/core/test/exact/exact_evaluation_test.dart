@@ -77,6 +77,80 @@ void main() {
     });
   });
 
+  group('fraction literals (D59)', () {
+    test('p/q is the exact rational, in RPN and in matrix literals', () {
+      expect(_rpn('1/3'), _exactScalar(_q(1, 3)));
+      expect(_rpn('-5/3'), _exactScalar(_q(-5, 3)));
+      expect(_rpn('+4/6'), _exactScalar(_q(2, 3)));
+      expect(_rpn('6/3'), _exactScalar(_q(2)));
+      expect(_rpn('1/3 3 *'), _exactScalar(_q(1)));
+      expect(
+        _rpn('[[1/3 2/3] [1 -5/3]]'),
+        _exactRows([
+          [_q(1, 3), _q(2, 3)],
+          [_q(1), _q(-5, 3)],
+        ]),
+      );
+      expect(
+        _rpn('[[1/3,2],[3,4]]'),
+        _exactRows([
+          [_q(1, 3), _q(2)],
+          [_q(3), _q(4)],
+        ]),
+      );
+    });
+
+    test('every exact output reads back as the same value', () {
+      for (final String program in [
+        '1 3 /',
+        '[[1 2] [3 4]] inv',
+        '2 3 / 5 7 / +',
+        '1 1024 /',
+        '10 30 ^ 7 /',
+      ]) {
+        final Matrix value = _rpn(program);
+        final String text = MatrixDisplayFormatter.text(value);
+        expect(_rpn(text), _exactRows(value.exactRows), reason: text);
+      }
+    });
+
+    test('the mark makes a fraction approximate', () {
+      expect(_rpn('~1/3'), _approximateScalar(1 / 3));
+      expect(_rpn('~-1/3'), _approximateScalar(-1 / 3));
+      expect(_rpn('[[~1/3 1]]').isExact, isFalse);
+    });
+
+    test('a zero denominator is non-finite', () {
+      expect(() => _rpn('1/0'), _errorId(CalculatrixErrorId.nonFinite));
+      expect(() => _rpn('[[1 2/0]]'), _errorId(CalculatrixErrorId.nonFinite));
+      expect(() => _rpn('~1/0'), _errorId(CalculatrixErrorId.nonFinite));
+    });
+
+    test('only integers on each side: other forms are not literals', () {
+      for (final String program in ['1.5/2', '1/2/3', '1/-2', '1e2/3', '/3']) {
+        expect(
+          () => _rpn(program),
+          throwsA(isA<CalculatrixError>()),
+          reason: program,
+        );
+      }
+    });
+
+    test('each part is held to the digit limit', () {
+      expect(
+        () => _rpn('1/${'9' * 30}', maxDigits: 20),
+        _errorId(CalculatrixErrorId.limitExceeded),
+      );
+      expect(_rpn('~1/${'9' * 30}', maxDigits: 20).isExact, isFalse);
+    });
+
+    test('infix is unchanged: / is still division', () {
+      expect(Calculatrix.evaluateInfix('1/3'), _exactScalar(_q(1, 3)));
+      expect(Calculatrix.evaluateInfix('2^1/3'), _exactScalar(_q(2, 3)));
+      expect(Calculatrix.evaluateInfix('12/3/2'), _exactScalar(_q(2)));
+    });
+  });
+
   group('the approximate mark (D56)', () {
     test('~ before a literal makes it approximate, sign included', () {
       expect(_rpn('~0.1'), _approximateScalar(0.1));

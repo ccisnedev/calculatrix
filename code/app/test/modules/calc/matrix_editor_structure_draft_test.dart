@@ -83,7 +83,7 @@ void main() {
       expect(draft.cellValue(1, 1), 'oops');
       expect(
         draft.validationError(),
-        'r1 c2 must be a number, like -2 or 3.5',
+        'r1 c2 must be a number, like -2, 3.5 or 1/3',
       );
     });
 

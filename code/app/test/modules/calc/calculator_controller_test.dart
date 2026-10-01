@@ -609,12 +609,24 @@ void main() {
       openInfixEditor();
     });
 
-    test('1÷3 has reasonable precision', () {
+    test('1÷3 is exact and ×3 gives back 1 (runbook D54)', () {
       controller.input('1');
       controller.input('÷');
       controller.input('3');
       controller.evaluate();
-      expect(controller.result, startsWith('0.3333333'));
+      expect(controller.result, '1/3');
+
+      controller.input('×');
+      controller.input('3');
+      controller.evaluate();
+      expect(controller.result, '1');
+    });
+
+    test('an approximate result has 12 digits and the mark', () {
+      controller.input('2');
+      controller.input('√');
+      controller.evaluate();
+      expect(controller.result, '~1.41421356237');
     });
 
     test('large numbers display correctly', () {
@@ -893,6 +905,36 @@ void main() {
           <double>[6, 8],
         ]),
       );
+    });
+  });
+
+  group('CalculatorController - exact values (runbook T5, D54)', () {
+    test('the rpn stack shows each value through the core formatter', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.insertMatrixLiteral('[[1/3,2]]');
+      controller.insertMatrixLiteral('~[[0.5]]');
+      controller.insertMatrixLiteral('[[7]]');
+
+      expect(controller.rpnStackTexts, <String>[
+        '7',
+        '~0.5',
+        '[[1/3, 2]]',
+      ]);
+      expect(controller.committedRpnDisplay, '7');
+    });
+
+    test('an exact matrix result prints its entries in full', () {
+      controller.setMode(CalculatorMode.rpn);
+      controller.insertMatrixLiteral('[[1,2],[3,4]]');
+
+      controller.executeRpnCommand(const InverseCommand());
+
+      expect(controller.rpnStackTexts.single, '[[-2, 1], [1.5, -0.5]]');
+    });
+
+    test('spokenValue reads the mark as approximately', () {
+      expect(spokenValue('~1.41421356237'), 'approximately 1.41421356237');
+      expect(spokenValue('1/3'), '1/3');
     });
   });
 }

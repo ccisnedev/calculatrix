@@ -632,16 +632,16 @@ class _CalculatorViewState extends State<CalculatorView> {
     if (_controller.hasDraftDisplay) {
       return <_RpnStackSlot>[
         for (int register = 0;
-            register < _controller.rpnStackLiterals.length;
+            register < _controller.rpnStackTexts.length;
             register++)
           _RpnStackSlot(
             register: register,
-            literal: _controller.rpnStackLiterals[register],
+            literal: _controller.rpnStackTexts[register],
           ),
       ];
     }
 
-    final Iterable<String> stackedLiterals = _controller.rpnStackLiterals.skip(1);
+    final Iterable<String> stackedLiterals = _controller.rpnStackTexts.skip(1);
     final List<_RpnStackSlot> slots = <_RpnStackSlot>[
       const _RpnStackSlot(register: 0),
     ];
@@ -784,7 +784,7 @@ class _CalculatorViewState extends State<CalculatorView> {
         alignment: Alignment.centerRight,
         child: Semantics(
           liveRegion: true,
-          label: 'Display: ${_controller.committedRpnDisplay}',
+          label: 'Display: ${spokenValue(_controller.committedRpnDisplay)}',
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             reverse: true,
@@ -820,7 +820,7 @@ class _CalculatorViewState extends State<CalculatorView> {
           child: Semantics(
             liveRegion: true,
             label:
-                'Display: $semanticValue. Matrix ${matrix.rowCount} by ${matrix.columnCount}',
+                'Display: ${spokenValue(semanticValue)}. Matrix ${matrix.rowCount} by ${matrix.columnCount}',
             child: SingleChildScrollView(
               scrollDirection: Axis.vertical,
               child: SingleChildScrollView(
@@ -852,7 +852,7 @@ class _CalculatorViewState extends State<CalculatorView> {
 
     return Semantics(
       container: true,
-      label: 'Stack item ${slot.register}: $literal',
+      label: 'Stack item ${slot.register}: ${spokenValue(literal)}',
       child: ExcludeSemantics(
         child: Row(
           children: [
@@ -896,7 +896,7 @@ class _CalculatorViewState extends State<CalculatorView> {
         alignment: Alignment.centerRight,
         child: Semantics(
           liveRegion: true,
-          label: 'Display: ${_controller.display}',
+          label: 'Display: ${spokenValue(_controller.display)}',
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             reverse: true,
@@ -932,7 +932,7 @@ class _CalculatorViewState extends State<CalculatorView> {
           child: Semantics(
             liveRegion: true,
             label:
-                'Display: $semanticValue. Matrix ${matrix.rowCount} by ${matrix.columnCount}',
+                'Display: ${spokenValue(semanticValue)}. Matrix ${matrix.rowCount} by ${matrix.columnCount}',
             child: SingleChildScrollView(
               scrollDirection: Axis.vertical,
               child: SingleChildScrollView(
@@ -1310,9 +1310,9 @@ class _CalculatorViewState extends State<CalculatorView> {
         case '4x4':
           editor._selectOrder(4);
         case 'I':
-          editor._fillSpecialMatrix(Matrix.identity(2));
+          editor._fillSpecialMatrix(Matrix.exactIdentity(2));
         case 'J':
-          editor._fillSpecialMatrix(Matrix.i);
+          editor._fillSpecialMatrix(Matrix.i.toExact());
         case 'ZEROS':
           editor._fillZerosThroughCore();
         case 'ONES':
@@ -2804,7 +2804,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
           const FillZerosLikeTopMacro(),
           seed:
               _tryBuildMatrixOrNull() ??
-              Matrix.zeros(_draft.rowCount, _draft.columnCount),
+              Matrix.zeros(_draft.rowCount, _draft.columnCount).toExact(),
         ),
       );
     });
@@ -2819,7 +2819,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
           const FillOnesLikeTopMacro(),
           seed:
               _tryBuildMatrixOrNull() ??
-              Matrix.zeros(_draft.rowCount, _draft.columnCount),
+              Matrix.zeros(_draft.rowCount, _draft.columnCount).toExact(),
         ),
       );
     });
@@ -2910,10 +2910,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
   Matrix? _tryBuildMatrixOrNull() {
     try {
       _syncDraftFromControllers();
-      return Calculatrix.evaluateInfix(
-        _draft.buildLiteral(),
-        approximate: true,
-      );
+      return Calculatrix.evaluateInfix(_draft.buildLiteral());
     } on FormatException {
       return null;
     } on CalculatrixError {
@@ -2947,7 +2944,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     _draft.resize(rowCount: matrix.rowCount, columnCount: matrix.columnCount);
     for (int row = 0; row < matrix.rowCount; row++) {
       for (int column = 0; column < matrix.columnCount; column++) {
-        _draft.setCell(row, column, _formatMatrixCellValue(matrix.at(row, column)));
+        _draft.setCell(row, column, _formatMatrixCellValue(matrix, row, column));
       }
     }
 
@@ -2988,12 +2985,20 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
     widget.onStackExpandingCommand!(literal!, command);
   }
 
-  String _formatMatrixCellValue(double value) {
-    if (value == value.toInt().toDouble()) {
-      return value.toInt().toString();
+  // A cell reads back as the same entry: an exact one in full (`1/3`), an
+  // approximate one as its whole double with the mark (`~0.1`), which marks
+  // the matrix built from the cells (runbook D56).
+  String _formatMatrixCellValue(Matrix matrix, int row, int column) {
+    if (matrix.isExact) {
+      return matrix.exactAt(row, column).toDisplayString();
     }
 
-    return value.toString();
+    final double value = matrix.at(row, column);
+    if (value == value.toInt().toDouble()) {
+      return '~${value.toInt()}';
+    }
+
+    return '~$value';
   }
 
   String _buildPreviewText() {

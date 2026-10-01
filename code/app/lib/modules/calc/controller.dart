@@ -54,10 +54,7 @@ class CalculatorController extends ChangeNotifier {
     }
 
     try {
-      final Matrix matrix = Calculatrix.evaluateInfix(
-        trimmed,
-        approximate: true,
-      );
+      final Matrix matrix = Calculatrix.evaluateInfix(trimmed);
       if (matrix.rowCount > 4 || matrix.columnCount > 4) {
         return null;
       }
@@ -115,6 +112,13 @@ class CalculatorController extends ChangeNotifier {
 
   String get rpnTopLiteral => _session.rpnTopLiteral;
 
+  /// The stack as the display shows it, top first: each value through the
+  /// core formatter, exact in full or approximate with the mark `~`
+  /// (runbook D54).
+  List<String> get rpnStackTexts => _session.rpnStack.reversed
+      .map(_formatHonestValue)
+      .toList(growable: false);
+
   bool get hasDraftDisplay => _error.isNotEmpty || expression.isNotEmpty;
 
   bool get deleteWouldEditDraft =>
@@ -128,7 +132,7 @@ class CalculatorController extends ChangeNotifier {
       return '0';
     }
 
-    return _session.rpnTopLiteral;
+    return _formatHonestValue(currentValue);
   }
 
   Matrix? get committedRpnDisplayMatrix {
@@ -379,29 +383,15 @@ class CalculatorController extends ChangeNotifier {
     _mutate(() => _session.executeMacro(macro));
   }
 
-  String _formatResult(double value) {
-    if (value.isInfinite) return 'Error';
-    if (value.isNaN) return 'Error';
-    if (value == 0) return '0';
-    if (value == value.toInt().toDouble() && value.abs() < 1e12) {
-      return value.toInt().toString();
-    }
-    // Use 12 significant digits, remove trailing zeros
-    var str = value.toStringAsPrecision(12);
-    if (str.contains('.')) {
-      str = str.replaceAll(RegExp(r'0+$'), '');
-      str = str.replaceAll(RegExp(r'\.$'), '');
-    }
-    return str;
-  }
-
   String _formatMemoryPreview(Matrix memory) {
     return _formatHonestValue(memory);
   }
 
+  // The same formatter as cx (runbook D54): an exact value in full
+  // (`1/3`), an approximate one with 12 digits and the mark (`~0.333...`).
   String _formatHonestValue(Matrix value) {
     if (value.isScalar) {
-      return _formatResult(value.scalarValue);
+      return MatrixDisplayFormatter.text(value);
     }
 
     return MatrixDisplayFormatter.compact(value);
@@ -426,7 +416,9 @@ class CalculatorController extends ChangeNotifier {
 
     return _MemoryStatusPreview(
       text: 'MEM: $leftOperand $operatorSymbol $rightOperand',
-      semanticsText: 'Memory status: $leftOperand $operatorWord $rightOperand',
+      semanticsText:
+          'Memory status: ${spokenValue(leftOperand)} $operatorWord '
+          '${spokenValue(rightOperand)}',
     );
   }
 
@@ -434,10 +426,7 @@ class CalculatorController extends ChangeNotifier {
     final String currentExpression = expression;
     if (currentExpression.isNotEmpty) {
       try {
-        return Calculatrix.evaluateInfix(
-          currentExpression,
-          approximate: true,
-        );
+        return Calculatrix.evaluateInfix(currentExpression);
       } on FormatException {
         return null;
       } on CalculatrixError {
@@ -515,18 +504,8 @@ class CalculatorController extends ChangeNotifier {
       return;
     }
 
-    if (_session.mode == CalculatrixMode.rpn) {
-      _displayMatrix = currentValue.isScalar ? null : currentValue;
-      _result = currentValue.isScalar
-        ? _formatResult(currentValue.scalarValue)
-        : _session.rpnTopLiteral;
-      return;
-    }
-
     _displayMatrix = currentValue.isScalar ? null : currentValue;
-    _result = currentValue.isScalar
-        ? _formatResult(currentValue.scalarValue)
-      : _formatHonestValue(currentValue);
+    _result = _formatHonestValue(currentValue);
   }
 }
 
@@ -539,3 +518,8 @@ class _MemoryStatusPreview {
   final String text;
   final String semanticsText;
 }
+
+/// [text] as a screen reader should say it: a leading approximate mark
+/// `~` (runbook D54) is read as "approximately".
+String spokenValue(String text) =>
+    text.startsWith('~') ? 'approximately ${text.substring(1)}' : text;

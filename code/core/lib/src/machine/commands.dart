@@ -28,6 +28,10 @@ final class PushScalarCommand extends CalculatrixCommand {
   }
 }
 
+/// The app's fixed-shape structure commands (and the macros built on them)
+/// push exact values, like the `zeros`, `ones` and `identity` words (runbook
+/// D53), so editing an exact matrix keeps it exact. The approximate factory
+/// still validates the shape.
 final class PushZerosCommand extends CalculatrixCommand {
   const PushZerosCommand(this.rowCount, this.columnCount);
 
@@ -36,7 +40,7 @@ final class PushZerosCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    engine.push(Matrix.zeros(rowCount, columnCount));
+    engine.push(Matrix.zeros(rowCount, columnCount).toExact());
   }
 }
 
@@ -48,7 +52,7 @@ final class PushOnesCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    engine.push(Matrix.ones(rowCount, columnCount));
+    engine.push(Matrix.ones(rowCount, columnCount).toExact());
   }
 }
 
@@ -59,7 +63,7 @@ final class PushIdentityCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    engine.push(Matrix.identity(size));
+    engine.push(Matrix.identity(size).toExact());
   }
 }
 
@@ -753,8 +757,8 @@ final class RollWordCommand extends CalculatrixCommand {
 
 /// `r c zeros` (issue #39, S4d): the RPN word for `zeros`, taking its shape
 /// from the stack rather than a fixed int argument like [PushZerosCommand],
-/// which `macros.dart`'s app-facing macros still use. Both share the very
-/// same [Matrix.zeros] (D44).
+/// which `macros.dart`'s app-facing macros still use. Both push the same
+/// exact zeros (D44, D53).
 final class ZerosCommand extends CalculatrixCommand {
   const ZerosCommand();
 

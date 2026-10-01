@@ -133,6 +133,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	and raises `limit-exceeded` over the limit (D55). Complex eigenvalues are
 	deferred: `[[0 -1] [1 0]] eigenvalues` is still an error. Shipped in
 	`cx` 0.12.0.
+- Fraction literals (runbook-trust.md, step T5, D59). In RPN and inside a
+	matrix literal, `p/q` with integer parts is one exact literal: `1/3`,
+	`-5/3`, `[[1/3 2]]`. Every exact output can now be typed back, `1/3`
+	included. `~1/3` is approximate, `1/0` is `non-finite`, and `1.5/2`,
+	`1/2/3` or `1/-2` are not literals (`unknown-word` in RPN,
+	`syntax-error` inside a matrix literal). Infix keeps `/` as division.
+	Shipped in `cx` 0.13.0.
+
+### App
+
+- Exact values in the app (runbook-trust.md, step T5). The display, the
+	RPN stack and the memory status go through the core formatter, the one
+	`cx` uses: `1 ÷ 3` shows `1/3`, `× 3` gives back `1`, `0.1 + 0.2` shows
+	`0.3`, and `2 √` shows `~1.41421356237` (D54). Screen readers read the
+	mark as "approximately". Infix, RPN, memory, ± and the matrix editor keep
+	exact values instead of turning every literal approximate; the editor
+	accepts `1/3` and `~0.1` in a cell, and its zeros, identity and `i`
+	fills are exact.
 
 ## [0.7.1] - 2026-05-30
 
