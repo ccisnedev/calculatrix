@@ -144,6 +144,27 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   pulls in unrelated one-character aliases (`+`, `-`, `*`, `/`) as "did you
   mean" suggestions, while longer typos (`pow`, `dupp`, `transpos`) keep
   suggesting the word they were obviously reaching for.
+- Review fixes on the compiled `cx` binary (issue #51): `power` (and every
+  other registry word with a declared arity) now reports the arity of the
+  word actually typed, not whatever an inner primitive its definition
+  expands to happens to pop. `CalculatrixCommandEntry` gained a new
+  `arity` field, set on every word whose stack need is fixed and known
+  ahead of time (`null` for the handful, such as `vector`, `pick` and
+  `roll`, whose need is only known at run time and which already report
+  their own accurate `needed`/`found`); `Calculatrix` now checks the real
+  stack depth against that arity before expanding a word's definition,
+  instead of letting the first primitive inside it raise its own, possibly
+  different, underflow. A new test iterates every registry word with an
+  arity, both on an empty stack and one value short, asserting the message
+  always states the real arity and the actual depth. `suggest()` also
+  tightens its candidates to the single closest edit-distance tier (and,
+  within a tie in that tier, to a prefix match when one exists), so `pow`
+  suggests only `power`, not also `rows` or `rotate` merely because they
+  happen to sit at the same raw distance, and `dupp` suggests only
+  `duplicate`, not also `drop`. `restrictedEditDistance` (the distance
+  function `suggest()` itself uses) is now public, exported for
+  `calculatrix_cli` to reuse rather than reimplement when it does the
+  equivalent tightening for its own route suggestions.
 
 ### Fixed
 

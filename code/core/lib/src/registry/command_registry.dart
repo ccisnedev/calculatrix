@@ -67,6 +67,7 @@ final class CalculatrixCommandEntry {
     this.definition,
     required this.category,
     required this.stackEffect,
+    this.arity,
     this.preconditions,
     required this.description,
     this.examples = const <CalculatrixCommandExample>[],
@@ -119,6 +120,18 @@ final class CalculatrixCommandEntry {
 
   /// How the entry reads and leaves the stack, HP style, e.g. "B Y -> B^Y".
   final String stackEffect;
+
+  /// How many values this word takes from the stack, counted on the
+  /// user-facing word itself rather than on whatever primitives its
+  /// expansion happens to call. Null for a word whose arity is only known
+  /// at run time (e.g. `vector`, `pick`, `roll`), which already report
+  /// their own accurate `needed`/`found` and need no pre-check here. Set
+  /// for every other word so the evaluator can check the real stack depth
+  /// against it before expanding a defined word's program, instead of
+  /// letting an inner primitive's own (possibly inflated, for a defined
+  /// word that pushes a literal before calling it) pop count leak into the
+  /// user-facing error (issue #51, AC5).
+  final int? arity;
 
   /// What must hold of the operands for the command to succeed, beyond
   /// having enough of them on the stack, or null when there is none.
@@ -290,6 +303,18 @@ final class CalculatrixCommandRegistry {
   /// `CommandCatalog.suggest`, and is instead its own small
   /// reimplementation of the same edit distance.
   ///
+  /// Two entries equally close by raw edit distance are not necessarily
+  /// equally good guesses: "pow" sits exactly 2 edits from "power" (insert
+  /// "e" and "r"), but also from "rows" and from "rotate"'s alias "rot",
+  /// which share almost none of its letters (issue #51, AC6). Once every
+  /// candidate within `maxDistance` is found, only the closest tier (the
+  /// minimum distance actually reached) is kept, and, within that tier, a
+  /// candidate reached through a word that shares a prefix with the
+  /// needle, either way around ("pow" is a prefix of "power"; "dup" is a
+  /// prefix of "dupp"), is kept over one that is merely as close by raw
+  /// distance alone, whenever at least one such prefix match exists in
+  /// the tier.
+  ///
   /// Returns at most `limit` names, closest first, then in registration
   /// order. Never suggests `word` itself: a word already in the registry
   /// has nothing to suggest.
@@ -310,13 +335,18 @@ final class CalculatrixCommandRegistry {
       }
 
       int? best;
+      bool bestIsPrefixMatch = false;
       for (final String candidate in entry.words) {
-        final int distance = _restrictedEditDistance(
-          needle,
-          candidate.toLowerCase(),
-        );
+        final String candidateLower = candidate.toLowerCase();
+        final int distance = restrictedEditDistance(needle, candidateLower);
+        final bool isPrefixMatch =
+            needle.startsWith(candidateLower) ||
+            candidateLower.startsWith(needle);
         if (best == null || distance < best) {
           best = distance;
+          bestIsPrefixMatch = isPrefixMatch;
+        } else if (distance == best && isPrefixMatch) {
+          bestIsPrefixMatch = true;
         }
       }
       // Scaled down for a short needle: a bare maxDistance of 2 puts every
@@ -331,15 +361,20 @@ final class CalculatrixCommandRegistry {
         maxDistance,
       );
       if (best != null && best <= effectiveMaxDistance) {
-        distanceMatches.add(_CommandSuggestionCandidate(entry.name, best));
+        distanceMatches.add(
+          _CommandSuggestionCandidate(entry.name, best, bestIsPrefixMatch),
+        );
       }
     }
 
-    distanceMatches.sort((a, b) => a.distance.compareTo(b.distance));
+    final List<_CommandSuggestionCandidate> tightened = _tightenToClosestTier(
+      distanceMatches,
+    );
+    tightened.sort((a, b) => a.distance.compareTo(b.distance));
 
     final List<String> ranked = <String>[
       ...exactSearchTermMatches,
-      for (final _CommandSuggestionCandidate candidate in distanceMatches)
+      for (final _CommandSuggestionCandidate candidate in tightened)
         candidate.name,
     ];
 
@@ -350,6 +385,40 @@ final class CalculatrixCommandRegistry {
       }
     }
     return deduped.length <= limit ? deduped : deduped.sublist(0, limit);
+  }
+
+  // Keeps only the minimum-distance tier of `candidates`, then, within that
+  // tier, only the prefix-related candidates when at least one of them is
+  // prefix-related (see suggest's own doc comment for why: raw edit
+  // distance alone cannot tell "power" apart from "rows" or "rot" for the
+  // needle "pow", all three being exactly 2 edits away).
+  static List<_CommandSuggestionCandidate> _tightenToClosestTier(
+    List<_CommandSuggestionCandidate> candidates,
+  ) {
+    if (candidates.isEmpty) {
+      return candidates;
+    }
+
+    int minDistance = candidates.first.distance;
+    for (final _CommandSuggestionCandidate candidate in candidates) {
+      if (candidate.distance < minDistance) {
+        minDistance = candidate.distance;
+      }
+    }
+
+    final List<_CommandSuggestionCandidate> closestTier = candidates
+        .where((_CommandSuggestionCandidate c) => c.distance == minDistance)
+        .toList();
+
+    final bool anyPrefixMatch = closestTier.any(
+      (_CommandSuggestionCandidate c) => c.isPrefixMatch,
+    );
+    if (!anyPrefixMatch) {
+      return closestTier;
+    }
+    return closestTier
+        .where((_CommandSuggestionCandidate c) => c.isPrefixMatch)
+        .toList();
   }
 
   /// The registry of every word `_compileWord` recognizes today (issue
@@ -369,6 +438,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: '+',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A B -> A+B',
+      arity: 2,
       preconditions:
           'A and B have the same shape, or either is a scalar '
           '(1x1)',
@@ -388,6 +458,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: '-',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A B -> A-B',
+      arity: 2,
       preconditions:
           'A and B have the same shape, or either is a scalar '
           '(1x1)',
@@ -407,6 +478,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: '*',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A B -> A*B',
+      arity: 2,
       preconditions: "A's columns equal B's rows, or either is a scalar (1x1)",
       description:
           'Multiplies A by B: matrix product, or scaling when either is '
@@ -426,6 +498,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: '/',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A B -> A/B',
+      arity: 2,
       preconditions: 'B is a scalar (1x1) and not zero',
       description: 'Divides A by the scalar B.',
       examples: <CalculatrixCommandExample>[
@@ -447,6 +520,7 @@ final class CalculatrixCommandRegistry {
       definition: '0.5 power',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'X -> X^(1/2)',
+      arity: 1,
       preconditions: 'X is square (a scalar is 1x1, and therefore square)',
       description:
           'The principal square root of X (0.5 power); '
@@ -470,6 +544,7 @@ final class CalculatrixCommandRegistry {
       definition: '-1 power',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A -> A^-1',
+      arity: 1,
       preconditions: 'A is square and not singular',
       description:
           'The inverse of A (-1 power): A times its '
@@ -503,6 +578,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: '%',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'X -> X/100',
+      arity: 1,
       description: 'X as a fraction of 100, e.g. "50 %" gives 0.5.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('50 %', Matrix.scalar(0.5)),
@@ -517,6 +593,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: '^',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'B Y -> B^Y',
+      arity: 2,
       // The full case table for squareness and size matching lives in
       // runbook D25.
       preconditions:
@@ -596,6 +673,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'ROW→',
       category: CalculatrixCommandCategory.matrix,
       stackEffect: '[[...]] -> [row1] ... [rown] n',
+      arity: 1,
       description:
           'Splits a matrix into its rows, each a 1 x m matrix, followed by '
           'the row count n at level 1. A scalar has a '
@@ -624,6 +702,7 @@ final class CalculatrixCommandRegistry {
       searchTerms: const <String>['hcat', 'horzcat', 'concatenate', 'column'],
       category: CalculatrixCommandCategory.matrix,
       stackEffect: 'A B -> [A B]',
+      arity: 2,
       preconditions: 'A and B have the same number of rows',
       description:
           'Places the columns of B to the right of A: a '
@@ -656,6 +735,7 @@ final class CalculatrixCommandRegistry {
       searchTerms: const <String>['vcat', 'vertcat', 'concatenate', 'row'],
       category: CalculatrixCommandCategory.matrix,
       stackEffect: 'A B -> A over B',
+      arity: 2,
       preconditions: 'A and B have the same number of columns',
       description:
           'Places the rows of B below A: a generalization '
@@ -685,6 +765,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'EXP',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'X -> e^X',
+      arity: 1,
       preconditions: 'X is square (a scalar is 1x1, and therefore square)',
       description: 'The matrix exponential of X (Matrix.exp).',
       examples: <CalculatrixCommandExample>[
@@ -702,6 +783,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'LN',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'X -> log(X)',
+      arity: 1,
       preconditions: 'X is square (a scalar is 1x1, and therefore square)',
       description:
           'The principal matrix logarithm of X (Matrix.log); "log" stays '
@@ -723,6 +805,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'NEG',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A -> -A',
+      arity: 1,
       description: 'Negates A element-wise.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('5 negate', Matrix.scalar(-5)),
@@ -788,6 +871,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'DROP',
       category: CalculatrixCommandCategory.stack,
       stackEffect: 'A -> (removes level 1)',
+      arity: 1,
       description: 'Removes the top of the stack.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 drop', <Matrix>[Matrix.scalar(1)]),
@@ -803,6 +887,7 @@ final class CalculatrixCommandRegistry {
       definition: '1 pick',
       category: CalculatrixCommandCategory.stack,
       stackEffect: 'A -> A A',
+      arity: 1,
       description: 'Duplicates the top of the stack (1 pick).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('5 duplicate', <Matrix>[
@@ -823,6 +908,7 @@ final class CalculatrixCommandRegistry {
       definition: '2 pick',
       category: CalculatrixCommandCategory.stack,
       stackEffect: 'A B -> A B A',
+      arity: 2,
       description: 'Copies the second value from the top to the top (2 pick).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 over', <Matrix>[
@@ -840,6 +926,7 @@ final class CalculatrixCommandRegistry {
       definition: '2 roll',
       category: CalculatrixCommandCategory.stack,
       stackEffect: 'A B -> B A',
+      arity: 2,
       description: 'Swaps the top two values (2 roll).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 swap', <Matrix>[
@@ -857,6 +944,7 @@ final class CalculatrixCommandRegistry {
       definition: '3 roll',
       category: CalculatrixCommandCategory.stack,
       stackEffect: 'A B C -> B C A',
+      arity: 3,
       description: 'Rotates the top three values (3 roll).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 3 rotate', <Matrix>[
@@ -878,6 +966,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'CON',
       category: CalculatrixCommandCategory.construction,
       stackEffect: 'r c -> [r x c zero matrix]',
+      arity: 2,
       preconditions: 'r and c are positive integer scalars',
       description:
           'Builds the r x c matrix of zeros (HP 50g CON with 0). "0 3 '
@@ -898,6 +987,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'CON',
       category: CalculatrixCommandCategory.construction,
       stackEffect: 'r c -> [r x c matrix of ones]',
+      arity: 2,
       preconditions: 'r and c are positive integer scalars',
       description:
           'Builds the r x c matrix of ones (HP 50g CON with 1). "0 3 '
@@ -924,6 +1014,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'IDN',
       category: CalculatrixCommandCategory.construction,
       stackEffect: 'n -> [n x n identity]',
+      arity: 1,
       preconditions: 'n is a positive integer scalar',
       description:
           'Builds the n x n identity matrix. "0 identity" raises '
@@ -944,6 +1035,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'TRN',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A -> A^T',
+      arity: 1,
       description: 'Transposes A.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
@@ -963,6 +1055,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'ROW-',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i -> A (row i removed)',
+      arity: 2,
       preconditions: 'i is a 1-based row index of A',
       description: 'Removes row i of A (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -986,6 +1079,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'COL-',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j -> A (column j removed)',
+      arity: 2,
       preconditions: 'j is a 1-based column index of A',
       description: 'Removes column j of A (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1009,6 +1103,7 @@ final class CalculatrixCommandRegistry {
       name: 'duplicate-row',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i -> A (row i duplicated)',
+      arity: 2,
       preconditions: 'i is a 1-based row index of A',
       description: 'Inserts a copy of row i right after it (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1033,6 +1128,7 @@ final class CalculatrixCommandRegistry {
       name: 'duplicate-col',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j -> A (column j duplicated)',
+      arity: 2,
       preconditions: 'j is a 1-based column index of A',
       description:
           'Inserts a copy of column j right after it (1-based).',
@@ -1057,6 +1153,7 @@ final class CalculatrixCommandRegistry {
       name: 'move-row',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i k -> A (row i moved to position k)',
+      arity: 3,
       preconditions: 'i and k are 1-based row indices of A',
       description: 'Moves row i to position k (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1080,6 +1177,7 @@ final class CalculatrixCommandRegistry {
       name: 'move-col',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j k -> A (column j moved to position k)',
+      arity: 3,
       preconditions: 'j and k are 1-based column indices of A',
       description: 'Moves column j to position k (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1105,6 +1203,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'DET',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> det(A)',
+      arity: 1,
       preconditions: 'A is square',
       description: 'The determinant of A.',
       examples: <CalculatrixCommandExample>[
@@ -1126,6 +1225,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'TRACE',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> trace(A)',
+      arity: 1,
       preconditions: 'A is square',
       description: 'The sum of the diagonal of A.',
       examples: <CalculatrixCommandExample>[
@@ -1143,6 +1243,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'RANK',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> rank(A)',
+      arity: 1,
       description: 'The rank of A.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('[[1 2] [2 4]] rank', Matrix.scalar(1)),
@@ -1157,6 +1258,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'FNORM',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> ||A||_F',
+      arity: 1,
       description: 'The Frobenius norm of A.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('[[3 4]] frobenius-norm', Matrix.scalar(5)),
@@ -1171,6 +1273,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'SNRM',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> ||A||_2',
+      arity: 1,
       description: 'The spectral (2-)norm of A: its largest singular value.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
@@ -1188,6 +1291,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'EGVL',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> [eigenvalues of A]',
+      arity: 1,
       preconditions: 'A is square',
       description: 'The eigenvalues of A, as a column, descending.',
       examples: <CalculatrixCommandExample>[
@@ -1217,6 +1321,7 @@ final class CalculatrixCommandRegistry {
       name: 'diagonalize',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> P D (A = P D P^-1, D on level 1)',
+      arity: 1,
       preconditions: 'A is square, with a real spectrum',
       description:
           'Diagonalizes A: leaves the eigenvector matrix P and the '
@@ -1244,6 +1349,7 @@ final class CalculatrixCommandRegistry {
       name: 'cofactors',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> [cofactor matrix of A]',
+      arity: 1,
       preconditions: 'A is square',
       description: 'The cofactor matrix of A.',
       examples: <CalculatrixCommandExample>[
@@ -1267,6 +1373,7 @@ final class CalculatrixCommandRegistry {
       aliases: const <String>['adj'],
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> adj(A)',
+      arity: 1,
       preconditions: 'A is square',
       description: 'The adjugate of A: the transpose of its cofactor matrix.',
       examples: <CalculatrixCommandExample>[
@@ -1297,6 +1404,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'DOT',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A B -> A . B',
+      arity: 2,
       preconditions: 'A and B are column vectors of the same dimension',
       description: 'The dot product of A and B.',
       examples: <CalculatrixCommandExample>[
@@ -1317,6 +1425,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'CROSS',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A B -> A x B',
+      arity: 2,
       preconditions: 'A and B are 3x1 column vectors',
       description: 'The cross product of A and B.',
       examples: <CalculatrixCommandExample>[
@@ -1341,6 +1450,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'RREF',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> rref(A)',
+      arity: 1,
       description: 'The reduced row echelon form of A.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
@@ -1360,6 +1470,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'LU',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> P L U (P A = L U, U on level 1)',
+      arity: 1,
       preconditions: 'A is square',
       description:
           'The PLU decomposition of A: leaves the permutation P, the unit '
@@ -1383,6 +1494,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'QR',
       category: CalculatrixCommandCategory.linearAlgebra,
       stackEffect: 'A -> Q R (A = Q R, R on level 1)',
+      arity: 1,
       preconditions: 'A has at least as many rows as columns',
       description:
           'The QR decomposition of A: leaves the orthogonal Q and the '
@@ -1404,12 +1516,15 @@ final class CalculatrixCommandRegistry {
 }
 
 /// A [CalculatrixCommandRegistry.suggest] candidate: an entry name paired
-/// with its edit distance to the word being looked up.
+/// with its edit distance to the word being looked up, and whether that
+/// distance was reached through a word (the entry's name or one of its
+/// aliases) that shares a prefix with the needle, either way around.
 class _CommandSuggestionCandidate {
-  _CommandSuggestionCandidate(this.name, this.distance);
+  _CommandSuggestionCandidate(this.name, this.distance, this.isPrefixMatch);
 
   final String name;
   final int distance;
+  final bool isPrefixMatch;
 }
 
 /// Restricted edit distance (Damerau-OSA) between `a` and `b`: the minimum
@@ -1423,7 +1538,14 @@ class _CommandSuggestionCandidate {
 /// A local, dependency-free reimplementation (issue #41, spec section 7,
 /// "Did you mean"): core cannot depend on `modular_cli_sdk`, whose
 /// `CommandCatalog` has the same algorithm for route suggestions.
-int _restrictedEditDistance(String a, String b) {
+///
+/// Public (not `_`-prefixed) so `calculatrix_cli` can reuse this one
+/// implementation instead of writing its own copy when it needs to score
+/// whether a whole route name, not just one word of it, is genuinely close
+/// to a typo (issue #51, AC6): the dependency runs the other way from the
+/// one the comment above rules out, since the CLI package already depends
+/// on this one.
+int restrictedEditDistance(String a, String b) {
   final int lenA = a.length;
   final int lenB = b.length;
   if (lenA == 0) return lenB;

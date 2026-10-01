@@ -197,13 +197,73 @@ class Calculatrix {
     final List<_PositionedCommand> commands = _compilePositionedCommands(
       tokens,
     );
-    for (final _PositionedCommand positioned in commands) {
-      try {
-        machine.execute(positioned.command);
-      } on CalculatrixError catch (error) {
-        error.enrichToken(positioned.token.value, positioned.token.position);
-        rethrow;
+    int index = 0;
+    while (index < commands.length) {
+      // Every command a single original token expands to (one, for a
+      // primitive word; more than one, for a defined word's whole program)
+      // carries that same token object (see _compilePositionedCommands), so
+      // grouping consecutive commands by identity on it recovers exactly
+      // the original, pre-expansion tokens, one group per token.
+      final _PositionedToken token = commands[index].token;
+      int end = index + 1;
+      while (end < commands.length && identical(commands[end].token, token)) {
+        end++;
       }
+      _requireSufficientDepth(machine, token);
+      for (int i = index; i < end; i++) {
+        final _PositionedCommand positioned = commands[i];
+        try {
+          machine.execute(positioned.command);
+        } on CalculatrixError catch (error) {
+          error.enrichToken(
+            positioned.token.value,
+            positioned.token.position,
+          );
+          rethrow;
+        }
+      }
+      index = end;
+    }
+  }
+
+  // Checks the real, pre-expansion stack depth against the arity of the
+  // user-facing word `token` names, before any of the commands its own
+  // expansion produced run (issue #51, AC5). Needed because a defined
+  // word's expansion can inflate the depth an inner primitive sees: "sqrt"
+  // is defined as "0.5 power", so by the time PowerCommand itself runs,
+  // the stack already holds the literal 0.5 it just pushed, and
+  // PowerCommand's own sequential pops would (each on its own) only ever
+  // report "needs 1, found 0", never the true arity and depth of the word
+  // the user actually wrote. Skipped for a literal token (nothing to look
+  // up) and for a word whose arity is only known at run time (entry.arity
+  // is null), which already reports its own accurate needed/found, e.g.
+  // pick, roll, vector.
+  static void _requireSufficientDepth(
+    CalculatrixMachine machine,
+    _PositionedToken token,
+  ) {
+    if (isLiteralToken(token.value)) {
+      return;
+    }
+
+    final int? arity = CalculatrixCommandRegistry.standard
+        .lookup(token.value)
+        ?.arity;
+    if (arity == null) {
+      return;
+    }
+
+    final int depth = machine.depth;
+    if (depth < arity) {
+      final String valueWord = arity == 1 ? 'value' : 'values';
+      throw RpnStackUnderflowError(
+        '${token.value} needs $arity $valueWord on the stack, found $depth.',
+        errorId: CalculatrixErrorId.stackUnderflow,
+        token: token.value,
+        position: token.position,
+        needed: arity,
+        found: depth,
+      );
     }
   }
 

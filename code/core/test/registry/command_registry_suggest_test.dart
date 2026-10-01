@@ -76,6 +76,29 @@ void main() {
         contains('transpose'),
       );
     });
+
+    // "pow" used to also suggest "rows" and "rotate" (via its alias "rot"),
+    // both exactly as far from "pow" by raw edit distance as "power" is,
+    // but sharing almost none of its letters. Tightening to the closest
+    // tier, then to a prefix match within it when one exists, narrows this
+    // to "power" alone (issue #51, AC6).
+    test('a typo this close to its target names only that target, not '
+        'other words that happen to share the same raw edit distance', () {
+      expect(CalculatrixCommandRegistry.standard.suggest('pow'), [
+        'power',
+      ]);
+    });
+
+    // "dupp" used to also suggest "drop", one edit further from "dupp"
+    // than "duplicate" (via its alias "dup") already is. Tightening to
+    // the closest tier alone removes it, with no need for the prefix
+    // tie-break (issue #51, AC6).
+    test('a typo one tier closer to its target drops a same-maxDistance '
+        'word from a different tier entirely', () {
+      expect(CalculatrixCommandRegistry.standard.suggest('dupp'), [
+        'duplicate',
+      ]);
+    });
   });
 
   group('UnknownWordError carries suggestions (issue #41)', () {

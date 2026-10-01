@@ -62,5 +62,63 @@ void main() {
 
       expect(error.message, 'Stack index 2 exceeds current depth 1.');
     });
+
+    // A word such as "power" (arity 2) used to report "needs 1 value,
+    // found 0" on an empty stack: PowerCommand popped its two operands one
+    // at a time, so the first pop to fail only ever knew about itself, not
+    // the word's real, user-facing arity. Worse, a defined word whose
+    // program pushes a literal before calling such a primitive (e.g.
+    // "sqrt" is "0.5 power") inflated the depth the primitive saw, so even
+    // remapping the inner failure's own needed/found could not have fixed
+    // every case. The fix checks the real, pre-expansion depth against the
+    // word's own declared arity before any of its commands run (issue #51,
+    // AC5), so this walks every word the registry declares an arity for
+    // and checks both an empty stack and a stack one value short of it.
+    test('every registry word with a declared arity reports that arity '
+        'and the actual depth, both empty and one value short', () {
+      for (final entry in CalculatrixCommandRegistry.standard.entries) {
+        final int? arity = entry.arity;
+        if (arity == null) {
+          continue;
+        }
+        final String valueWord = arity == 1 ? 'value' : 'values';
+
+        try {
+          Calculatrix.evaluateRpn(<String>[entry.name]);
+          fail(
+            'expected RpnStackUnderflowError for "${entry.name}" on an '
+            'empty stack',
+          );
+        } on RpnStackUnderflowError catch (error) {
+          expect(
+            error.message,
+            '${entry.name} needs $arity $valueWord on the stack, found 0.',
+            reason: 'word: ${entry.name}',
+          );
+        }
+
+        if (arity <= 1) {
+          continue;
+        }
+        final List<String> oneShort = <String>[
+          for (int i = 0; i < arity - 1; i++) '1',
+          entry.name,
+        ];
+        try {
+          Calculatrix.evaluateRpn(oneShort);
+          fail(
+            'expected RpnStackUnderflowError for "${entry.name}" one '
+            'value short of its arity',
+          );
+        } on RpnStackUnderflowError catch (error) {
+          expect(
+            error.message,
+            '${entry.name} needs $arity $valueWord on the stack, '
+            'found ${arity - 1}.',
+            reason: 'word: ${entry.name}',
+          );
+        }
+      }
+    });
   });
 }
