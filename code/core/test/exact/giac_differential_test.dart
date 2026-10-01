@@ -247,19 +247,21 @@ Future<Map<int, String>?> _runGiac(List<String> expressions) async {
   } on ProcessException {
     return null;
   }
-  final StringBuffer input = StringBuffer();
-  for (int i = 0; i < expressions.length; i++) {
-    input.writeln('print("R$i "+string(${expressions[i]}));');
-  }
-  process.stdin.write(input.toString());
-  await process.stdin.close();
-  // Giac's print writes to stderr; read both streams.
+  // Giac's print writes to stderr; read both streams. Reading starts
+  // before the input is written: with a large input, Giac fills the output
+  // pipe while it still reads, and both sides would block.
   final Future<String> output = process.stdout
       .transform(const Utf8Decoder(allowMalformed: true))
       .join();
   final Future<String> errors = process.stderr
       .transform(const Utf8Decoder(allowMalformed: true))
       .join();
+  final StringBuffer input = StringBuffer();
+  for (int i = 0; i < expressions.length; i++) {
+    input.writeln('print("R$i "+string(${expressions[i]}));');
+  }
+  process.stdin.write(input.toString());
+  await process.stdin.close();
   final String text = '${await errors}\n${await output}'.replaceAll(
     '\u0000',
     '',
