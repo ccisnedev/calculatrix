@@ -296,7 +296,8 @@ Targets distributed with Giac in this phase: CLI and Windows only.
       adapter, release messages or serialized values for workers and web
 - [ ] Parser: exponentiation `^` with precedence and right associativity
 - [ ] Parser: exact numeric literals (large integers, rationals) kept exact
-      instead of `double.tryParse` / `toDouble()`
+      instead of `double.tryParse` / `toDouble()`; brought forward to the
+      Trust stage, see `docs/runbook-trust.md` (D50)
 - [ ] Parser: identifiers and named functions in the infix tokenizer
 - [ ] Symbolic matrix literals (`[[3*y, 3*x], [2, x^2-3]]`)
 - [ ] Round-trip tests through CLI and app for large integers, rationals,
