@@ -1,5 +1,7 @@
 import '../errors/errors.dart';
 import '../exact/exact_arithmetic.dart';
+import '../exact/exact_roots.dart';
+import '../exact/rational.dart';
 import '../matrix/matrix.dart';
 
 enum RpnBinaryOperator { add, subtract, multiply, divide }
@@ -171,8 +173,8 @@ class RpnEngine {
     return result;
   }
 
-  /// `percent` keeps exactness; `sqrt` is approximate until step T4 of
-  /// the runbook.
+  /// Both keep exactness: `sqrt` is exact when the root is rational, as
+  /// `0.5 power` is (runbook D53).
   Matrix applyUnary(RpnUnaryOperator operatorType) {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError(
@@ -190,7 +192,9 @@ class RpnEngine {
     late final Matrix result;
     switch (operatorType) {
       case RpnUnaryOperator.sqrt:
-        result = value.toApproximate().sqrt();
+        result = value.isExact
+            ? exact.fractionalPower(value, Rational(BigInt.one, BigInt.two))
+            : value.sqrt();
       case RpnUnaryOperator.percent:
         result = value.isExact ? exact.percent(value) : value.scale(0.01);
     }

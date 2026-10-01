@@ -92,6 +92,59 @@ final class Rational implements Comparable<Rational> {
     return Rational._(numerator.pow(exponent), denominator.pow(exponent));
   }
 
+  /// The non-negative [index]-th root of this non-negative value when it
+  /// is rational, else null: a reduced fraction has a rational root only
+  /// when its numerator and denominator are both perfect powers.
+  Rational? root(BigInt index) {
+    assert(!isNegative && index >= BigInt.one);
+    final BigInt? n = integerRoot(numerator, index);
+    if (n == null) {
+      return null;
+    }
+    final BigInt? d = integerRoot(denominator, index);
+    return d == null ? null : Rational._(n, d);
+  }
+
+  /// The [index]-th root of the integer [value] >= 0 when it is an
+  /// integer, else null.
+  static BigInt? integerRoot(BigInt value, BigInt index) {
+    if (value <= BigInt.one || index == BigInt.one) {
+      return value;
+    }
+    // Past this index the floor of the root is 1, whose powers are 1.
+    if (index >= BigInt.from(value.bitLength)) {
+      return null;
+    }
+    final BigInt root = floorRoot(value, index);
+    return root.pow(index.toInt()) == value ? root : null;
+  }
+
+  /// The largest integer whose [index]-th power is at most [value] >= 0.
+  static BigInt floorRoot(BigInt value, BigInt index) {
+    assert(!value.isNegative && index >= BigInt.one);
+    if (value <= BigInt.one || index == BigInt.one) {
+      return value;
+    }
+    final int bits = value.bitLength;
+    // value < 2^bits, so a root of 2 or more needs index < bits.
+    if (index >= BigInt.from(bits)) {
+      return BigInt.one;
+    }
+    final int k = index.toInt();
+    // Integer Newton iteration from a start above the root; it decreases
+    // to the floor of the root and stops there.
+    BigInt x = BigInt.one << ((bits + k - 1) ~/ k);
+    final BigInt previousIndex = BigInt.from(k - 1);
+    while (true) {
+      final BigInt next = (previousIndex * x + value ~/ x.pow(k - 1)) ~/ index;
+      if (next >= x) {
+        break;
+      }
+      x = next;
+    }
+    return x;
+  }
+
   @override
   int compareTo(Rational other) =>
       (numerator * other.denominator).compareTo(other.numerator * denominator);
@@ -284,6 +337,21 @@ final class Rational implements Comparable<Rational> {
     final Rational found = _simplestBetween(low, high);
     final Rational result = negative ? -found : found;
     return result.toDouble() == value ? result : exact;
+  }
+
+  /// The simplest rational strictly within [tolerance] > 0 of the finite
+  /// [value]: a guess for a rational that a rounded computation missed by
+  /// more than one unit in the last place. Unlike [Rational.simplestForDouble]
+  /// it may not round back to [value]; callers check it exactly.
+  factory Rational.simplestWithin(double value, double tolerance) {
+    final Rational center = Rational.fromDouble(value.abs());
+    final Rational radius = Rational.fromDouble(tolerance);
+    final Rational low = center - radius;
+    if (!(Rational.zero < low)) {
+      return Rational.zero;
+    }
+    final Rational found = _simplestBetween(low, center + radius);
+    return value < 0 ? -found : found;
   }
 
   // The simplest rational strictly between 0 <= low < high, by the

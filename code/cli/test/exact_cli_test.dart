@@ -1,7 +1,7 @@
-// Exact numbers through `cx` (runbook-trust.md, steps T2 and T3): the
+// Exact numbers through `cx` (runbook-trust.md, steps T2 to T4): the
 // output of D54, the approximate mark as input (D56), contagion (D51), the
-// exact linear algebra words (D53) and the size limit with --max-digits
-// (D55).
+// exact linear algebra words, roots and eigenvalues (D53) and the size
+// limit with --max-digits (D55).
 import 'dart:convert';
 
 import 'package:calculatrix_cli/calculatrix_cli.dart';
@@ -53,6 +53,20 @@ void main() {
       ('0.1 approx exact', '1: 0.1\n'),
       ('1 3 / approx exact', '1: 1/3\n'),
       ('5 1 3 /', '2: 5\n1: 1/3\n'),
+      ('4 sqrt', '1: 2\n'),
+      ('2 sqrt', '1: ~1.41421356237\n'),
+      ('-4 sqrt', '1: [[0 -2] [2 0]]\n'),
+      ('27 8 / 2 3 / ^', '1: 2.25\n'),
+      ('[[5 4] [4 5]] sqrt', '1: [[2 1] [1 2]]\n'),
+      ('[[3 -4] [4 3]] sqrt', '1: [[2 -1] [1 2]]\n'),
+      ('[[2 1] [1 2]] eigenvalues', '1: [[3] [1]]\n'),
+      (
+        '[[1 2] [3 4]] eigenvalues',
+        '1: ~[[5.37228132327] [-0.372281323269]]\n',
+      ),
+      ('[[3 4]] frobenius-norm', '1: 5\n'),
+      ('[[0 0] [0 0]] exp', '1: [[1 0] [0 1]]\n'),
+      ('1 exp', '1: ~2.71828182846\n'),
     ]) {
       test("cx '$program'", () async {
         final code = await run([program]);
@@ -196,6 +210,42 @@ void main() {
         ExitCode.ok,
       );
       expect(out.output, startsWith('1: ~'));
+    });
+
+    test('exact eigenvalues over the limit suggest approx', () async {
+      final code = await run([
+        'eval',
+        'rpn',
+        '--json',
+        '--max-digits',
+        '50',
+        '[[1e30 1] [1 1e30]] eigenvalues',
+      ]);
+      expect(code, ExitCode.dataError);
+      final error = errorOf();
+      expect(error['id'], 'limit-exceeded');
+      expect(error['details']['estimated'], 62);
+      expect(
+        error['message'],
+        'The exact characteristic polynomial could have up to 62 digits '
+        '(norm bound), over the limit of 50; for an approximate result: '
+        "cx '[[1e30 1] [1 1e30]] approx eigenvalues', or raise the limit "
+        'with --max-digits.',
+      );
+    });
+
+    test('complex eigenvalues stay an error', () async {
+      final code = await run([
+        'eval',
+        'rpn',
+        '--json',
+        '[[0 -1] [1 0]] eigenvalues',
+      ]);
+      expect(code, isNot(ExitCode.ok));
+      expect(
+        errorOf()['message'],
+        'Eigenvalues are undefined in the real domain for this matrix.',
+      );
     });
 
     test('a literal over the limit suggests the mark ~', () async {

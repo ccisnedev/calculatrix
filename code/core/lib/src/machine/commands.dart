@@ -1,5 +1,6 @@
 import '../errors/errors.dart';
 import '../exact/exact_linear_algebra.dart';
+import '../exact/exact_roots.dart';
 import '../exact/rational.dart';
 import '../matrix/matrix.dart';
 import '../rpn/rpn_engine.dart';
@@ -108,8 +109,16 @@ final class PowerCommand extends CalculatrixCommand {
     final BigInt? integerExponent = _exactIntegerScalar(exponent);
     // An exact base takes an exact integer exponent exactly: any integer
     // for a scalar; for a square matrix, a negative power is a power of
-    // its exact inverse. Everything else, fractional powers included, is
-    // approximate (runbook D53).
+    // its exact inverse. An exact fractional exponent gives an exact
+    // result when it is rational, and the approximate one otherwise
+    // (runbook D53).
+    if (base.isExact &&
+        integerExponent == null &&
+        exponent.isExact &&
+        exponent.isScalar) {
+      engine.push(engine.exact.fractionalPower(base, exponent.exactAt(0, 0)));
+      return;
+    }
     if (base.isExact && integerExponent != null && base.isSquare) {
       if (integerExponent.isNegative && !base.isScalar) {
         engine.push(
@@ -439,8 +448,10 @@ final class EigenvaluesCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.eigenvalues());
+    final Matrix value = engine.popAny();
+    engine.push(
+      value.isExact ? engine.exact.eigenvalues(value) : value.eigenvalues(),
+    );
   }
 }
 
@@ -471,8 +482,10 @@ final class NormCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.frobeniusNorm());
+    final Matrix value = engine.popAny();
+    engine.push(
+      value.isExact ? engine.exact.frobeniusNorm(value) : value.frobeniusNorm(),
+    );
   }
 }
 
@@ -697,8 +710,8 @@ final class ExpCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.exp());
+    final Matrix value = engine.popAny();
+    engine.push(value.isExact ? engine.exact.exp(value) : value.exp());
   }
 }
 
@@ -707,8 +720,8 @@ final class LnCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.log());
+    final Matrix value = engine.popAny();
+    engine.push(value.isExact ? engine.exact.ln(value) : value.log());
   }
 }
 

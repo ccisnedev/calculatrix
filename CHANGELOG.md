@@ -123,6 +123,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	the program to run for an approximate result (D55). `lu` picks the same
 	pivots as the approximate decomposition, so P is the same. Shipped in
 	`cx` 0.11.0.
+- Exact roots and eigenvalues (runbook-trust.md, step T4). `sqrt`,
+	fractional powers, `frobenius-norm`, `eigenvalues`, `exp` and `ln` are
+	exact on exact values when the result is rational: `9 4 / sqrt` prints
+	`1.5`, `-4 sqrt` prints `[[0 -2] [2 0]]`, `[[5 4] [4 5]] sqrt` prints
+	`[[2 1] [1 2]]` and `[[2 1] [1 2]] eigenvalues` prints `[[3] [1]]`, all
+	without the mark; `2 sqrt` stays approximate, with the mark (D53).
+	`eigenvalues` estimates the size of its characteristic polynomial first
+	and raises `limit-exceeded` over the limit (D55). Complex eigenvalues are
+	deferred: `[[0 -1] [1 0]] eigenvalues` is still an error. Shipped in
+	`cx` 0.12.0.
 
 ## [0.7.1] - 2026-05-30
 
