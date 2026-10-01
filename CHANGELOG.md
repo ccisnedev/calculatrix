@@ -91,6 +91,28 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	6 requires; before, `cx` printed `1: Infinity` (or `NaN`) and exited 0,
 	and `--json` crashed. The app shows the same error for an overflowing
 	infix expression. Shipped in `cx` 0.9.0.
+- Exact numbers (runbook-trust.md, step T2). A literal is the exact
+	rational it spells, so `0.1 0.2 +` prints `0.3`, `1 3 /` prints `1/3`
+	and `3 40 ^` prints all 20 digits (D50). `+ - * /`, `negate`, `percent`,
+	integer powers and the stack and structure words keep exactness; any
+	other word converts to approximate (D53). An exact value prints in full:
+	an integer, a decimal with at most 20 places, or a fraction (D54).
+- An approximate value carries the mark `~` once, in front (`~0.333333333333`,
+	`~[[-2 1] [1.5 -0.5]]`), and `~` before a literal makes it approximate,
+	so every text output can be typed back (D56). Approximation is
+	contagious: one approximate operand makes the result approximate (D51).
+	`approx` (alias `num`) and `exact` convert between the two (D52).
+- Breaking: each JSON stack level gains `"exact"`, and exact numbers are
+	strings (`{"level": 1, "exact": true, "value": "1/3"}`), because a JSON
+	number cannot hold them; approximate numbers stay JSON numbers with the
+	full double (D54). The `result` of each example in `cx commands show
+	--json` takes the same shape.
+- A result with more digits than the limit is the new error
+	`limit-exceeded`, exit 65, raised before computing, with `limit` and
+	`estimated` in `details` and the program to run for an approximate
+	result: `cx '3 1000000 approx ^'`. `--max-digits <n>` on `eval rpn`,
+	`eval infix` and the shortcut sets the limit; the default is 10000 (D55).
+	Shipped in `cx` 0.10.0.
 
 ## [0.7.1] - 2026-05-30
 

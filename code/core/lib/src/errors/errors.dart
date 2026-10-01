@@ -14,7 +14,8 @@ enum CalculatrixErrorId {
   nonFinite('non-finite'),
   logUndefined('log-undefined'),
   ambiguousPower('ambiguous-power'),
-  syntaxError('syntax-error');
+  syntaxError('syntax-error'),
+  limitExceeded('limit-exceeded');
 
   const CalculatrixErrorId(this.id);
 
@@ -231,4 +232,24 @@ class UnknownWordError extends CalculatrixError {
 /// than racing an uncommitted line. See CalculatrixSession.memoryRecall.
 class EmptyMemoryError extends CalculatrixError {
   EmptyMemoryError(super.message);
+}
+
+/// An exact result that would be larger than the size limit (runbook D55):
+/// raised before the computation, never replaced by an approximate result.
+/// [limit] and [estimated] count decimal digits of a numerator or
+/// denominator.
+class LimitExceededError extends CalculatrixError {
+  LimitExceededError(
+    super.message, {
+    required this.limit,
+    required this.estimated,
+    super.token,
+    super.position,
+  }) : super(errorId: CalculatrixErrorId.limitExceeded);
+
+  /// The digit limit in force.
+  final int limit;
+
+  /// The estimated digits of the result.
+  final int estimated;
 }

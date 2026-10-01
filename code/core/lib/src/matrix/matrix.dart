@@ -1,4 +1,5 @@
 import '../errors/errors.dart';
+import '../exact/rational.dart';
 import '../numeric/numeric_policy.dart';
 import 'dart:math' as math;
 
@@ -37,8 +38,61 @@ final class SvdDecomposition {
 }
 
 class Matrix {
-  Matrix(List<List<double>> rows) : _rows = _normalize(rows) {
+  /// An approximate matrix (runbook D49): entries are `double`.
+  Matrix(List<List<double>> rows) : _rows = _normalize(rows), _exact = null {
     _validateRectangular(_rows);
+  }
+
+  Matrix._withExact(this._rows, this._exact);
+
+  /// An exact matrix (runbook D49): entries are reduced rationals. Its
+  /// `double` view ([at], [rows], [scalarValue]) holds the nearest `double`
+  /// of each entry, which is an infinity for an entry beyond the `double`
+  /// range; [toApproximate] is the checked way to leave the exact domain.
+  factory Matrix.exact(List<List<Rational>> rows) {
+    _validateRectangular(rows);
+    final List<List<Rational>> exact = rows
+        .map((List<Rational> row) => List<Rational>.unmodifiable(row))
+        .toList(growable: false);
+    final List<List<double>> view = exact
+        .map(
+          (List<Rational> row) => List<double>.unmodifiable(
+            row.map((Rational value) => value.toDouble()),
+          ),
+        )
+        .toList(growable: false);
+    return Matrix._withExact(view, exact);
+  }
+
+  /// The exact 1x1 matrix of [value].
+  factory Matrix.exactScalar(Rational value) {
+    return Matrix.exact(<List<Rational>>[
+      <Rational>[value],
+    ]);
+  }
+
+  /// The exact [rowCount] x [columnCount] matrix whose every entry is
+  /// [value].
+  factory Matrix.exactFilled(int rowCount, int columnCount, Rational value) {
+    return Matrix.exact(
+      List<List<Rational>>.generate(
+        rowCount,
+        (_) => List<Rational>.filled(columnCount, value),
+      ),
+    );
+  }
+
+  /// The exact identity matrix of [size].
+  factory Matrix.exactIdentity(int size) {
+    return Matrix.exact(
+      List<List<Rational>>.generate(
+        size,
+        (int r) => List<Rational>.generate(
+          size,
+          (int c) => r == c ? Rational.one : Rational.zero,
+        ),
+      ),
+    );
   }
 
   factory Matrix.scalar(double value) {
@@ -171,6 +225,96 @@ class Matrix {
   }
 
   final List<List<double>> _rows;
+
+  // The exact entries, or null for an approximate matrix.
+  final List<List<Rational>>? _exact;
+
+  /// Whether this value is exact (runbook D49). An exact value has exact
+  /// entries; an approximate one has `double` entries only.
+  bool get isExact => _exact != null;
+
+  /// The exact entry at ([row], [column]). Only for an exact matrix.
+  Rational exactAt(int row, int column) => _exact![row][column];
+
+  /// The exact entries, row by row. Only for an exact matrix.
+  List<List<Rational>> get exactRows => _exact!;
+
+  /// This value as an approximate matrix (runbook D52, `approx`): itself
+  /// when already approximate, else each entry rounded to its nearest
+  /// `double`. An entry too large for a finite `double` raises
+  /// `non-finite`; an entry too small for one becomes 0.
+  Matrix toApproximate() {
+    if (_exact == null) {
+      return this;
+    }
+    for (final List<double> row in _rows) {
+      for (final double value in row) {
+        if (!value.isFinite) {
+          throw MatrixDomainError(
+            'An exact value is too large for an approximate number.',
+            errorId: CalculatrixErrorId.nonFinite,
+          );
+        }
+      }
+    }
+    return Matrix(_rows);
+  }
+
+  /// This value as an exact matrix (runbook D52, `exact`): itself when
+  /// already exact, else each entry replaced by the simplest rational that
+  /// rounds to the same `double`. A non-finite entry raises `non-finite`.
+  Matrix toExact() {
+    if (_exact != null) {
+      return this;
+    }
+    for (final List<double> row in _rows) {
+      for (final double value in row) {
+        if (!value.isFinite) {
+          throw MatrixDomainError(
+            'A value that is not a finite number has no exact form.',
+            errorId: CalculatrixErrorId.nonFinite,
+          );
+        }
+      }
+    }
+    return Matrix.exact(
+      _rows
+          .map(
+            (List<double> row) => row
+                .map((double value) => Rational.simplestForDouble(value))
+                .toList(growable: false),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  // Rebuilds this matrix with the same kind of entries through [reshape],
+  // which only moves entries around (transpose, delete, duplicate, move):
+  // an exact matrix stays exact (runbook D53), an approximate one stays
+  // approximate.
+  Matrix _restructure(List<List<E>> Function<E>(List<List<E>> rows) reshape) {
+    final List<List<Rational>>? exact = _exact;
+    if (exact != null) {
+      return Matrix.exact(reshape<Rational>(exact));
+    }
+    return Matrix(reshape<double>(_rows));
+  }
+
+  // Joins this matrix with [other] through [join]: exact when both are
+  // exact, approximate otherwise (runbook D51).
+  Matrix _combine(
+    Matrix other,
+    List<List<E>> Function<E>(List<List<E>> a, List<List<E>> b) join,
+  ) {
+    final List<List<Rational>>? exactA = _exact;
+    final List<List<Rational>>? exactB = other._exact;
+    if (exactA != null && exactB != null) {
+      return Matrix.exact(join<Rational>(exactA, exactB));
+    }
+    return Matrix(
+      join<double>(toApproximate()._rows, other.toApproximate()._rows),
+    );
+  }
 
   int get rowCount => _rows.length;
 
@@ -2590,22 +2734,24 @@ class Matrix {
     return SvdDecomposition(u: Matrix(uRows), s: Matrix(sRows), vT: vT);
   }
 
+  /// The transpose. Keeps exactness (runbook D53).
   Matrix transpose() {
-    final List<List<double>> result = List<List<double>>.generate(
-      columnCount,
-      (int c) => List<double>.generate(
-        rowCount,
-        (int r) => _rows[r][c],
+    return _restructure(<E>(List<List<E>> rows) {
+      return List<List<E>>.generate(
+        rows.first.length,
+        (int c) => List<E>.generate(
+          rows.length,
+          (int r) => rows[r][c],
+          growable: false,
+        ),
         growable: false,
-      ),
-      growable: false,
-    );
-
-    return Matrix(result);
+      );
+    });
   }
 
   /// Appends the rows of [rows] below this matrix's own rows. `rows` must
   /// have the same number of columns as this matrix (issue #37, S4c).
+  /// Exact when both operands are exact (runbook D53).
   ///
   /// This is the single implementation behind [appendRow] (which further
   /// requires a single-row operand) and the `append-rows` registry word
@@ -2619,15 +2765,17 @@ class Matrix {
       );
     }
 
-    return Matrix(<List<double>>[
-      ..._rows.map((List<double> source) => List<double>.from(source)),
-      ...rows._rows.map((List<double> source) => List<double>.from(source)),
-    ]);
+    return _combine(rows, <E>(List<List<E>> a, List<List<E>> b) {
+      return <List<E>>[
+        ...a.map((List<E> source) => List<E>.from(source)),
+        ...b.map((List<E> source) => List<E>.from(source)),
+      ];
+    });
   }
 
   /// Appends the columns of [columns] to the right of this matrix's own
   /// columns. `columns` must have the same number of rows as this matrix
-  /// (issue #37, S4c).
+  /// (issue #37, S4c). Exact when both operands are exact (runbook D53).
   ///
   /// This is the single implementation behind [appendColumn] (which further
   /// requires a single-column operand) and the `append-cols` registry word
@@ -2641,16 +2789,13 @@ class Matrix {
       );
     }
 
-    return Matrix(
-      List<List<double>>.generate(
-        rowCount,
-        (int rowIndex) => <double>[
-          ..._rows[rowIndex],
-          ...columns._rows[rowIndex],
-        ],
+    return _combine(columns, <E>(List<List<E>> a, List<List<E>> b) {
+      return List<List<E>>.generate(
+        a.length,
+        (int rowIndex) => <E>[...a[rowIndex], ...b[rowIndex]],
         growable: false,
-      ),
-    );
+      );
+    });
   }
 
   Matrix appendRow(Matrix row) {
@@ -2686,14 +2831,14 @@ class Matrix {
       );
     }
 
-    return Matrix(
-      List<List<double>>.generate(rowCount - 1, (int targetIndex) {
+    return _restructure(<E>(List<List<E>> rows) {
+      return List<List<E>>.generate(rows.length - 1, (int targetIndex) {
         final int sourceIndex = targetIndex < rowIndex
             ? targetIndex
             : targetIndex + 1;
-        return List<double>.from(_rows[sourceIndex]);
-      }, growable: false),
-    );
+        return List<E>.from(rows[sourceIndex]);
+      }, growable: false);
+    });
   }
 
   Matrix deleteColumn(int columnIndex) {
@@ -2705,41 +2850,43 @@ class Matrix {
       );
     }
 
-    return Matrix(
-      List<List<double>>.generate(
-        rowCount,
+    return _restructure(<E>(List<List<E>> rows) {
+      return List<List<E>>.generate(
+        rows.length,
         (int rowIndex) =>
-            List<double>.generate(columnCount - 1, (int targetIndex) {
+            List<E>.generate(rows[rowIndex].length - 1, (int targetIndex) {
               final int sourceIndex = targetIndex < columnIndex
                   ? targetIndex
                   : targetIndex + 1;
-              return _rows[rowIndex][sourceIndex];
+              return rows[rowIndex][sourceIndex];
             }, growable: false),
         growable: false,
-      ),
-    );
+      );
+    });
   }
 
   Matrix duplicateRow(int rowIndex) {
     _requireRowIndex(rowIndex);
 
-    final List<List<double>> rows = _rows
-        .map((List<double> row) => List<double>.from(row))
-        .toList(growable: true);
-    rows.insert(rowIndex + 1, List<double>.from(_rows[rowIndex]));
-    return Matrix(rows);
+    return _restructure(<E>(List<List<E>> rows) {
+      final List<List<E>> result = rows
+          .map((List<E> row) => List<E>.from(row))
+          .toList(growable: true);
+      result.insert(rowIndex + 1, List<E>.from(rows[rowIndex]));
+      return result;
+    });
   }
 
   Matrix duplicateColumn(int columnIndex) {
     _requireColumnIndex(columnIndex);
 
-    return Matrix(
-      List<List<double>>.generate(rowCount, (int rowIndex) {
-        final List<double> row = List<double>.from(_rows[rowIndex]);
-        row.insert(columnIndex + 1, _rows[rowIndex][columnIndex]);
+    return _restructure(<E>(List<List<E>> rows) {
+      return List<List<E>>.generate(rows.length, (int rowIndex) {
+        final List<E> row = List<E>.from(rows[rowIndex]);
+        row.insert(columnIndex + 1, rows[rowIndex][columnIndex]);
         return row;
-      }, growable: false),
-    );
+      }, growable: false);
+    });
   }
 
   Matrix moveRow(int fromIndex, int toIndex) {
@@ -2749,12 +2896,14 @@ class Matrix {
       return this;
     }
 
-    final List<List<double>> rows = _rows
-        .map((List<double> row) => List<double>.from(row))
-        .toList(growable: true);
-    final List<double> moved = rows.removeAt(fromIndex);
-    rows.insert(toIndex, moved);
-    return Matrix(rows);
+    return _restructure(<E>(List<List<E>> rows) {
+      final List<List<E>> result = rows
+          .map((List<E> row) => List<E>.from(row))
+          .toList(growable: true);
+      final List<E> moved = result.removeAt(fromIndex);
+      result.insert(toIndex, moved);
+      return result;
+    });
   }
 
   Matrix moveColumn(int fromIndex, int toIndex) {
@@ -2764,14 +2913,14 @@ class Matrix {
       return this;
     }
 
-    return Matrix(
-      List<List<double>>.generate(rowCount, (int rowIndex) {
-        final List<double> row = List<double>.from(_rows[rowIndex]);
-        final double moved = row.removeAt(fromIndex);
+    return _restructure(<E>(List<List<E>> rows) {
+      return List<List<E>>.generate(rows.length, (int rowIndex) {
+        final List<E> row = List<E>.from(rows[rowIndex]);
+        final E moved = row.removeAt(fromIndex);
         row.insert(toIndex, moved);
         return row;
-      }, growable: false),
-    );
+      }, growable: false);
+    });
   }
 
   bool almostEquals(
@@ -2810,7 +2959,7 @@ class Matrix {
         .toList(growable: false);
   }
 
-  static void _validateRectangular(List<List<double>> rows) {
+  static void _validateRectangular<E>(List<List<E>> rows) {
     if (rows.isEmpty) {
       throw MatrixShapeError(
         'Matrix cannot be empty.',
@@ -2826,7 +2975,7 @@ class Matrix {
     }
 
     final int width = rows.first.length;
-    for (final List<double> row in rows) {
+    for (final List<E> row in rows) {
       if (row.length != width) {
         throw MatrixShapeError(
           'All rows must have the same number of columns.',
@@ -2915,12 +3064,23 @@ class Matrix {
     return maxRowSum;
   }
 
+  /// Two exact matrices are equal when their rationals are; any other pair
+  /// compares its `double` entries, so an exact value equals the
+  /// approximate value it rounds to. Exactness itself is [isExact].
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
       return true;
     }
-    return other is Matrix && _rowsEqual(_rows, other._rows);
+    if (other is! Matrix) {
+      return false;
+    }
+    final List<List<Rational>>? exactA = _exact;
+    final List<List<Rational>>? exactB = other._exact;
+    if (exactA != null && exactB != null) {
+      return _exactRowsEqual(exactA, exactB);
+    }
+    return _rowsEqual(_rows, other._rows);
   }
 
   @override
@@ -2930,7 +3090,7 @@ class Matrix {
 
   @override
   String toString() {
-    return 'Matrix($_rows)';
+    return _exact == null ? 'Matrix($_rows)' : 'Matrix.exact($_exact)';
   }
 
   static bool _rowsEqual(List<List<double>> a, List<List<double>> b) {
@@ -2949,6 +3109,23 @@ class Matrix {
       }
     }
 
+    return true;
+  }
+
+  static bool _exactRowsEqual(List<List<Rational>> a, List<List<Rational>> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (int r = 0; r < a.length; r++) {
+      if (a[r].length != b[r].length) {
+        return false;
+      }
+      for (int c = 0; c < a[r].length; c++) {
+        if (a[r][c] != b[r][c]) {
+          return false;
+        }
+      }
+    }
     return true;
   }
 }

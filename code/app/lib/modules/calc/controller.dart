@@ -54,7 +54,10 @@ class CalculatorController extends ChangeNotifier {
     }
 
     try {
-      final Matrix matrix = Calculatrix.evaluateInfix(trimmed);
+      final Matrix matrix = Calculatrix.evaluateInfix(
+        trimmed,
+        approximate: true,
+      );
       if (matrix.rowCount > 4 || matrix.columnCount > 4) {
         return null;
       }
@@ -431,7 +434,10 @@ class CalculatorController extends ChangeNotifier {
     final String currentExpression = expression;
     if (currentExpression.isNotEmpty) {
       try {
-        return Calculatrix.evaluateInfix(currentExpression);
+        return Calculatrix.evaluateInfix(
+          currentExpression,
+          approximate: true,
+        );
       } on FormatException {
         return null;
       } on CalculatrixError {

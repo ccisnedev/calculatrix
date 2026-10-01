@@ -218,9 +218,9 @@ Global options, declared by the SDK on every route except the shortcut:
 | Route | Kind | Contract | What it does |
 |---|---|---|---|
 | `cx` | query | globals only | Logo, version, the list of routes. Never reads stdin. **Amended 2026-09-29 (User, issue #26):** the logo is the branded mark (glow dot `#2EF2C3`, square box-drawing brackets, 9 columns by 4 rows), colored only when stdout is a terminal that supports ANSI escapes and `NO_COLOR` is unset; the route list shows only routes the CLI actually registers, so `doctor`, `upgrade`, `uninstall` and `version` appear once `InstallationPlugin`/`DoctorPlugin`/`VersionPlugin` register them (8.7), not before. |
-| `cx <program>` | query | one operand; no options, no globals | Same as `cx eval rpn <program>`. |
-| `cx eval rpn [<program>]` | query | `--file`, `--stdin`; `ExactlyOne(program, file, stdin)` | Runs an RPN program on an empty stack and prints the stack. |
-| `cx eval infix [<expression>]` | query | `--file`, `--stdin`; `ExactlyOne(expression, file, stdin)` | Evaluates an infix expression and prints the result. |
+| `cx <program>` | query | one operand; `--max-digits`; no globals | Same as `cx eval rpn <program>`. |
+| `cx eval rpn [<program>]` | query | `--file`, `--stdin`, `--max-digits`; `ExactlyOne(program, file, stdin)` | Runs an RPN program on an empty stack and prints the stack. |
+| `cx eval infix [<expression>]` | query | `--file`, `--stdin`, `--max-digits`; `ExactlyOne(expression, file, stdin)` | Evaluates an infix expression and prints the result. |
 | `cx commands list` | query | `--category <name>` (value: enumeration from the registry, optional) | Lists the commands by category. |
 | `cx commands show <name>` | query | one operand | The entry of one command, by name or alias. |
 | `cx commands search <text>` | query | one operand | Finds commands by name, alias, HP reference, search terms or description. |
@@ -264,11 +264,17 @@ the id `doctor-check-failed`, exit code `78` and every check result under
 ## 6. Output and errors
 
 **Text (default).** HP 50g style: one line per level, level 1 at the bottom,
-spaces inside matrices (runbook D12, D13). Numbers go through the display
-formatter of core, the same one the app uses: at most 12 significant digits,
-trailing zeros removed (runbook D45). `[[1 2] [3 4]] -1 ^` prints
-`[[-2 1] [1.5 -0.5]]`. The stored value is unchanged, and JSON keeps the full
-double.
+spaces inside matrices (runbook D12, D13). A value is exact or approximate as
+a whole (runbook-trust.md D49). An exact value prints in full, never rounded:
+an integer as an integer, a rational with a finite decimal expansion of at
+most 20 digits after the point as a decimal, any other rational as a
+fraction (`0.1 0.2 +` prints `0.3`, `1 3 /` prints `1/3`; D54). An
+approximate value goes through the display formatter of core, the same one
+the app uses: at most 12 significant digits, trailing zeros removed (runbook
+D45), with the mark `~` once in front of the value: `[[1 2] [3 4]] -1 ^`
+prints `~[[-2 1] [1.5 -0.5]]`. The stored value is unchanged, and JSON keeps
+the full double. `~` before a literal makes it approximate, so every text
+output can be typed back (D56).
 
 `eval rpn` and the shortcut print the whole stack the program leaves, every
 level, with no limit (runbook D47). A program that leaves the stack empty
@@ -285,16 +291,21 @@ $ cx '5 [[0 -1] [1 0]]'
 `Output.toJson()`. For `eval`:
 
 ```json
-{"stack": [{"level": 2, "value": 5}, {"level": 1, "value": [[0, -1], [1, 0]]}]}
+{"stack": [{"level": 2, "exact": true, "value": "5"},
+           {"level": 1, "exact": false, "value": [[0.5, -1], [1, 0]]}]}
 ```
 
 - The stack is an array with one object per level, each naming its level,
   in the order the text prints it: the highest level first, level 1 last.
   An empty stack is `{"stack": []}`. `eval infix` gives one object, level 1.
-- A 1x1 matrix is a JSON number. Any other matrix is an array of rows, never
-  flattened: the column vector `0 1 2 vector` is `[[0], [1]]`.
-- Numbers are JSON numbers. `Infinity` and `NaN` never appear: a non-finite
-  value is the error `non-finite`.
+- Each level says whether its value is exact (`"exact": true`) or
+  approximate (runbook-trust.md D54).
+- A 1x1 matrix is a single number. Any other matrix is an array of rows,
+  never flattened: the column vector `0 1 2 vector` is `[["0"], ["1"]]`.
+- An exact number is a string in the text form above (`"3/5"`,
+  `"12157665459056928801"`), because a JSON number cannot hold it. An
+  approximate number is a JSON number with the full double. `Infinity` and
+  `NaN` never appear: a non-finite value is the error `non-finite`.
 
 **Exit codes.** Eight values, never mixed:
 
@@ -345,11 +356,30 @@ offset of the token in the program.
 
 Ids: `unknown-word`, `stack-underflow`, `type-mismatch`, `dimension-mismatch`,
 `singular-matrix`, `non-finite`, `log-undefined`, `ambiguous-power`,
-`syntax-error` (infix only). `no-convergence`, `unsupported-matrix-function`
+`syntax-error` (infix, and a sign before the mark `~` in RPN: `-~0.1`),
+`limit-exceeded`. `no-convergence`, `unsupported-matrix-function`
 and `matrix-out-of-precision-range` are revoked (runbook D35, D37, D38,
 2026-09-28); see spec section 14, R22 to R24. The ids belong to the core; the CLI only renders
 them. The semantics of `power`, the source of `log-undefined` and
 `ambiguous-power`, are in the runbook (D25).
+
+**Size limit.** An exact result with more digits than the limit (counted on
+each numerator or denominator) is `limit-exceeded`, raised before the
+computation starts when the size can be estimated (`a^n`), never an
+approximate result instead (runbook-trust.md D55). `details` carry `limit`
+and `estimated`, and the message gives the next step: the same program with
+`approx` before the failing word, or `~` before a failing literal, and
+`--max-digits`. The default limit is 10000 digits; `--max-digits <n>` on
+`eval rpn`, `eval infix` and the shortcut sets it, and must be at least 1.
+
+```text
+$ cx '3 1000000 ^'
+Error: 3^1000000 has about 477122 digits, over the limit of 10000; for an approximate result: cx '3 1000000 approx ^', or raise the limit with --max-digits. [limit-exceeded]
+  token: ^
+  position: 11
+  limit: 10000
+  estimated: 477122
+```
 
 ## 7. The encyclopedia: `cx commands`
 
@@ -911,8 +941,8 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx version junk` † | `extraArgument`, 64; today `junk` is ignored |
 | `cx verison` | program `verison`, `unknown-word`, 65, suggests `cx version` |
 | `cx eval rpn '1 2 +'` | prints `1: 3`, 0 |
-| `cx eval rpn --json '1 2 +'` | `{"stack": [{"level": 1, "value": 3}]}`, 0 (D47) |
-| `cx eval rpn '1 2 +' --json` | `{"stack": [{"level": 1, "value": 3}]}`, 0 (GNU order, G6 amended 2026-09-29); `misplacedOption`, 7 with `POSIXLY_CORRECT` |
+| `cx eval rpn --json '1 2 +'` | `{"stack": [{"level": 1, "exact": true, "value": "3"}]}`, 0 (D47, trust D54) |
+| `cx eval rpn '1 2 +' --json` | `{"stack": [{"level": 1, "exact": true, "value": "3"}]}`, 0 (GNU order, G6 amended 2026-09-29); `misplacedOption`, 7 with `POSIXLY_CORRECT` |
 | `cx eval rpn -f prog.rpn` | program from the file, 0 |
 | `cx eval rpn -f prog.rpn --json` | program from the file, JSON, 0 |
 | `cx eval rpn -f nope.rpn` | 7, file not found |
@@ -936,10 +966,20 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx eval rpn --trace '1 2 +'` | `unknownOption`, 7 (not in this stage) |
 | `cx eval rpn '1 +'` | `stack-underflow`, 65 |
 | `cx '5 [[0 -1] [1 0]]'` | prints `2: 5` then `1: [[0 -1] [1 0]]`, 0 (D47) |
-| `cx eval rpn --json '5 7 9'` | `{"stack": [{"level": 3, "value": 5}, {"level": 2, "value": 7}, {"level": 1, "value": 9}]}`, 0 (D47) |
+| `cx eval rpn --json '5 7 9'` | `{"stack": [{"level": 3, "exact": true, "value": "5"}, {"level": 2, "exact": true, "value": "7"}, {"level": 1, "exact": true, "value": "9"}]}`, 0 (D47, trust D54) |
 | `cx eval rpn '1 drop'` | prints an empty line, 0; with `--json`, `{"stack": []}` (D47) |
-| `cx eval rpn '2 3 /'` | prints `1: 0.666666666667`, 0; `--json` keeps `0.6666666666666666` (D45) |
-| `cx '1e300 1e300 *'` | `non-finite`, 65, `token: *`, `position: 13` (section 6) |
+| `cx eval rpn '2 3 /'` | prints `1: 2/3`, 0; `--json` gives `"2/3"` (trust D50, D54) |
+| `cx eval rpn '~2 3 /'` | prints `1: ~0.666666666667`, 0; `--json` keeps `0.6666666666666666` (D45, trust D54) |
+| `cx '0.1 0.2 +'` | prints `1: 0.3`, 0 (trust D50, D54) |
+| `cx '3 40 ^'` | prints `1: 12157665459056928801`, 0 (trust D54) |
+| `cx '1 1073741824 /'` | prints `1: 1/1073741824`, 0: more than 20 decimal places (trust D54) |
+| `cx '~0.1 0.2 +'` | prints `1: ~0.3`, 0: approximation is contagious (trust D51, D56) |
+| `cx '1 3 / approx exact'` | prints `1: 1/3`, 0 (trust D52) |
+| `cx '-~0.1'` | `syntax-error`, 65; the message shows `~-0.1` (trust D56) |
+| `cx '3 1000000 ^'` | `limit-exceeded`, 65, `limit: 10000`, `estimated: 477122`; suggests `cx '3 1000000 approx ^'` (trust D55) |
+| `cx --max-digits 20000 '3 30000 ^'` | prints all 14314 digits, 0; over the default limit without the option (trust D55) |
+| `cx eval rpn --max-digits 0 '1'` | `validation-failed`, 7 |
+| `cx '~1e300 1e300 *'` | `non-finite`, 65, `token: *`, `position: 14` (section 6) |
 | `cx '9 sqrt'`, `cx '9 √'`, `cx '9 SQRT'` | prints `1: 3`, 0 (D41) |
 | `cx '2 3 pwr'`, `cx '2 3 power'` | prints `1: 8`, 0 |
 | `cx '2 3 add'` | prints `1: 5`, 0: `add` is a name, `+` its alias (D41) |

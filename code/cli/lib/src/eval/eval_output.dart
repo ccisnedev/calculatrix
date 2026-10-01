@@ -5,7 +5,8 @@ import 'eval_support.dart';
 
 /// The result of `eval rpn` or `eval infix`: the stack the program leaves,
 /// bottom to top (spec section 6, runbook D47). `eval rpn` keeps every
-/// level; `eval infix` always leaves exactly one.
+/// level; `eval infix` always leaves exactly one. Each level says whether
+/// its value is exact (runbook D54).
 class EvalOutput extends Output {
   EvalOutput(this.stack);
 
@@ -22,7 +23,11 @@ class EvalOutput extends Output {
   Map<String, dynamic> toJson() => {
     'stack': [
       for (final entry in _levels)
-        {'level': entry.level, 'value': matrixToJsonValue(entry.value)},
+        {
+          'level': entry.level,
+          'exact': entry.value.isExact,
+          'value': matrixToJsonValue(entry.value),
+        },
     ],
   };
 

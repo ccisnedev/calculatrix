@@ -51,11 +51,13 @@ String get _rootHelpDescription {
 }
 
 /// `cx <program>`'s own contract (spec section 4, G4): one required
-/// positional, no options, not even the global ones (`globals: false`
-/// where this is registered). Not [EvalContracts.rpn], which declares
-/// `--file`/`--stdin` and an optional `program`: those belong to the full
-/// `eval rpn` route, never to this shorter, options-free spelling of it.
+/// positional and `--max-digits` (runbook D55), not even the global options
+/// (`globals: false` where this is registered). Not [EvalContracts.rpn],
+/// which declares `--file`/`--stdin` and an optional `program`: those
+/// belong to the full `eval rpn` route, never to this shorter spelling of
+/// it.
 final CliContract _programShortcutContract = CliContract(
+  options: [EvalContracts.maxDigits],
   positionals: [CliPositional.string('program', required: true)],
 );
 
@@ -63,7 +65,7 @@ final CliContract _programShortcutContract = CliContract(
 /// `cx upgrade` (spec section 8.7: `VersionPlugin` and `ModularCli` are
 /// required to agree). ADR 0002 section 2 lets a shell version
 /// independently of the core package; this is not the core's version.
-const cxVersion = '0.9.0';
+const cxVersion = '0.10.0';
 
 /// `owner/repo` on GitHub `cx upgrade`, `cx uninstall` and `cx doctor` look
 /// releases up in (runbook D26, D31; spec 8.3, 8.7). The same repository

@@ -1,15 +1,30 @@
 import '../errors/errors.dart';
+import '../exact/exact_arithmetic.dart';
 import '../matrix/matrix.dart';
 
 enum RpnBinaryOperator { add, subtract, multiply, divide }
 
 enum RpnUnaryOperator { sqrt, percent }
 
+/// The RPN stack (runbook D49): every value on it is either exact or
+/// approximate, as a whole.
+///
+/// [pop] and [peek] hand out approximate values, so a command written for
+/// `double` matrices sees approximate operands whatever the stack holds and
+/// its result is approximate (runbook D53: until a word becomes exact, it
+/// converts its exact operands, marked, never silently). A command that
+/// keeps exactness reads its operands with [popAny] instead.
 class RpnEngine {
+  RpnEngine({this.exact = const ExactArithmetic()});
+
+  /// The exact operations, with the digit limit of runbook D55.
+  final ExactArithmetic exact;
+
   final List<Matrix> _stack = <Matrix>[];
 
   int get depth => _stack.length;
 
+  /// The values as they are, exact or approximate, bottom to top.
   List<Matrix> get stack {
     return List<Matrix>.unmodifiable(_stack);
   }
@@ -42,6 +57,7 @@ class RpnEngine {
   // compile down to these same primitives, so there is exactly one
   // implementation of "read/move the nth value from the top" (D44) and a
   // defined word never duplicates engine logic of its own (issue #39).
+  // They move values as they are, so exactness is kept (runbook D53).
   Matrix drop() {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError(
@@ -72,6 +88,7 @@ class RpnEngine {
     return value;
   }
 
+  /// The top value, approximate (see the class comment).
   Matrix peek() {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError(
@@ -82,10 +99,15 @@ class RpnEngine {
       );
     }
 
-    return _stack.last;
+    return _stack.last.toApproximate();
   }
 
-  Matrix pop() {
+  /// Removes the top value and returns it approximate (see the class
+  /// comment).
+  Matrix pop() => popAny().toApproximate();
+
+  /// Removes the top value and returns it as it is, exact or approximate.
+  Matrix popAny() {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError(
         'Cannot pop from an empty RPN stack.',
@@ -98,6 +120,8 @@ class RpnEngine {
     return _stack.removeLast();
   }
 
+  /// Exact when both operands are exact, approximate otherwise (runbook
+  /// D51).
   Matrix applyBinary(RpnBinaryOperator operatorType) {
     if (_stack.length < 2) {
       throw RpnStackUnderflowError(
@@ -115,15 +139,30 @@ class RpnEngine {
     final Matrix left = _stack[_stack.length - 2];
 
     late final Matrix result;
-    switch (operatorType) {
-      case RpnBinaryOperator.add:
-        result = left + right;
-      case RpnBinaryOperator.subtract:
-        result = left - right;
-      case RpnBinaryOperator.multiply:
-        result = left * right;
-      case RpnBinaryOperator.divide:
-        result = _divide(left, right);
+    if (left.isExact && right.isExact) {
+      switch (operatorType) {
+        case RpnBinaryOperator.add:
+          result = exact.add(left, right);
+        case RpnBinaryOperator.subtract:
+          result = exact.subtract(left, right);
+        case RpnBinaryOperator.multiply:
+          result = exact.multiply(left, right);
+        case RpnBinaryOperator.divide:
+          result = exact.divide(left, right);
+      }
+    } else {
+      final Matrix a = left.toApproximate();
+      final Matrix b = right.toApproximate();
+      switch (operatorType) {
+        case RpnBinaryOperator.add:
+          result = a + b;
+        case RpnBinaryOperator.subtract:
+          result = a - b;
+        case RpnBinaryOperator.multiply:
+          result = a * b;
+        case RpnBinaryOperator.divide:
+          result = a / b;
+      }
     }
 
     _stack.removeLast();
@@ -132,6 +171,8 @@ class RpnEngine {
     return result;
   }
 
+  /// `percent` keeps exactness; `sqrt` is approximate until step T4 of
+  /// the runbook.
   Matrix applyUnary(RpnUnaryOperator operatorType) {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError(
@@ -149,27 +190,15 @@ class RpnEngine {
     late final Matrix result;
     switch (operatorType) {
       case RpnUnaryOperator.sqrt:
-        result = _sqrt(value);
+        result = value.toApproximate().sqrt();
       case RpnUnaryOperator.percent:
-        result = _percent(value);
+        result = value.isExact ? exact.percent(value) : value.scale(0.01);
     }
 
     _stack.removeLast();
 
     _stack.add(result);
     return result;
-  }
-
-  Matrix _divide(Matrix left, Matrix right) {
-    return left / right;
-  }
-
-  Matrix _sqrt(Matrix value) {
-    return value.sqrt();
-  }
-
-  Matrix _percent(Matrix value) {
-    return value.scale(0.01);
   }
 
   // A malformed index (less than 1) is a range error: it can never be valid,

@@ -93,3 +93,4 @@ anything else made one error.
 
 - 2026-10-01: runbook created (T0).
 - 2026-10-01: T1 (S4f) in PR #58: text through the core display formatter, `eval rpn` prints the whole stack, one `{"level", "value"}` object per level in JSON, `cx` 0.9.0. An empty stack prints an empty line, not nothing: the SDK always ends a text output with a newline. An overflowing word is now `non-finite` (spec section 6) instead of printing `Infinity`.
+- 2026-10-01: T2 in PR #59: exact numbers in core and `cx` 0.10.0 (D49 to D57 for `+ - * /`, `negate`, `percent`, integer powers, stack and structure words, `approx`, `num`, `exact`); every other word converts to approximate. The Giac differential tests run in the new `core` CI job, which also runs the whole core suite for the first time. The details added during implementation are listed in the PR for approval (D39).
