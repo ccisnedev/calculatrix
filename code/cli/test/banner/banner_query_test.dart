@@ -53,17 +53,71 @@ void main() {
         "  └─     ─┘\n"
         "\n"
         "  Commands:\n"
-        "    eval rpn        evaluate an RPN program     cx eval rpn '1 2 +'\n"
-        "    eval infix      evaluate an expression      cx eval infix "
+        "    eval rpn         evaluate an RPN program        cx eval rpn "
+        "'1 2 +'\n"
+        "    eval infix       evaluate an expression         cx eval infix "
         '"2^0.5"\n'
-        "    doctor          verify local installation\n"
-        "    upgrade         update to latest version\n"
-        "    uninstall       remove cx\n"
-        "    version         print version\n"
+        "    doctor           verify local installation      cx doctor\n"
+        "    upgrade          update to latest version       cx upgrade\n"
+        "    uninstall        remove cx                      cx uninstall\n"
+        "    version          print version                  cx version\n"
         "\n"
         "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",
       );
     });
+
+    test(
+      'every row keeps at least a 2-space gap between every column (name, '
+      'description, example), even for the longest description the banner '
+      'has ("show one word of the registry", 30 characters, which a '
+      'single separating space used to swallow whole; issue #51 '
+      'acceptance 7)',
+      () async {
+        final output = await buildQuery(
+          version: '0.8.0',
+          registeredCommands: const {
+            'eval rpn',
+            'eval infix',
+            'commands show',
+            'commands search',
+            'commands list',
+            'doctor',
+            'upgrade',
+            'uninstall',
+            'version',
+          },
+        ).execute();
+        final commandLines = output
+            .toText()!
+            .split('\n')
+            .where((line) => line.startsWith('    ') && line.trim().isNotEmpty)
+            .toList();
+        var sawRowWithExample = false;
+        for (final line in commandLines) {
+          final nameEnd = line.indexOf(RegExp(r'  '), 4);
+          expect(
+            nameEnd,
+            greaterThan(4),
+            reason: 'no 2-space gap after the name column in: "$line"',
+          );
+
+          // The last "cx ", not the first: a description can itself contain
+          // "cx" followed by padding spaces ("remove cx", issue #51 AC1,
+          // once "uninstall" got its own example), and only the example
+          // column, always the final thing on the line, is what this gap
+          // check cares about.
+          final exampleStart = line.lastIndexOf('cx ');
+          if (exampleStart <= 0) continue;
+          sawRowWithExample = true;
+          expect(
+            line.substring(exampleStart - 2, exampleStart),
+            '  ',
+            reason: 'no 2-space gap before the example in: "$line"',
+          );
+        }
+        expect(sawRowWithExample, isTrue);
+      },
+    );
 
     test(
       'with only the S2 routes registered, the optional commands are '
@@ -82,8 +136,9 @@ void main() {
           "  └─     ─┘\n"
           "\n"
           "  Commands:\n"
-          "    eval rpn        evaluate an RPN program     cx eval rpn '1 2 +'\n"
-          "    eval infix      evaluate an expression      cx eval infix "
+          "    eval rpn         evaluate an RPN program        cx eval rpn "
+          "'1 2 +'\n"
+          "    eval infix       evaluate an expression         cx eval infix "
           '"2^0.5"\n'
           "\n"
           "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",

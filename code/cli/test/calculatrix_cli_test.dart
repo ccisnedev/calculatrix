@@ -510,6 +510,86 @@ void main() {
     });
   });
 
+  group('infix name errors in JSON (issue #51, AC2)', () {
+    // The error envelope goes to stderr, never stdout
+    // (`_renderRecordedError` in modular_cli_sdk writes only to `err`; see
+    // the equivalent assertion in commands_cli_test.dart).
+    test('cx eval infix "sqrt(7)" --json carries details.name, which '
+        'error.message alone does not let a caller recover', () async {
+      final code = await run(['eval', 'infix', '--json', 'sqrt(7)']);
+      expect(code, ExitCode.dataError);
+      final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+      final error = decoded['error'] as Map<String, dynamic>;
+      final details = error['details'] as Map<String, dynamic>;
+      expect(details['name'], 'sqrt');
+      expect(error['message'], contains('cx eval rpn "7 sqrt"'));
+    });
+
+    test(
+      'cx eval infix "sqrt(1+2)" never suggests a command that would '
+      'itself fail (issue #51, AC2): "cx eval rpn \\"1+2 sqrt\\"" is two '
+      'tokens, the second of which is unknown-word',
+      () async {
+        final code = await run(['eval', 'infix', '--json', 'sqrt(1+2)']);
+        expect(code, ExitCode.dataError);
+        final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+        final error = decoded['error'] as Map<String, dynamic>;
+        expect(error['message'], isNot(contains('cx eval rpn')));
+      },
+    );
+
+    test(
+      'cx eval infix "sqrt (7)" (space before the call) never suggests a '
+      'command that would itself underflow (issue #51, AC2)',
+      () async {
+        final code = await run(['eval', 'infix', '--json', 'sqrt (7)']);
+        expect(code, ExitCode.dataError);
+        final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+        final error = decoded['error'] as Map<String, dynamic>;
+        expect(error['message'], isNot(contains('cx eval rpn')));
+      },
+    );
+
+    test(
+      'cx eval infix "frobenius-norm(7)" names the whole hyphenated word, '
+      'not just "frobenius" (issue #51, AC2)',
+      () async {
+        final code = await run([
+          'eval',
+          'infix',
+          '--json',
+          'frobenius-norm(7)',
+        ]);
+        expect(code, ExitCode.dataError);
+        final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+        final error = decoded['error'] as Map<String, dynamic>;
+        final details = error['details'] as Map<String, dynamic>;
+        expect(details['name'], 'frobenius-norm');
+        expect(error['message'], contains('cx eval rpn "7 frobenius-norm"'));
+      },
+    );
+
+    test('cx "3^-2" (shortcut) hints at eval infix instead of a plain '
+        'unknown-word (issue #51, AC3)', () async {
+      final code = await run(['3^-2']);
+      expect(code, ExitCode.dataError);
+      expect(
+        err.output,
+        contains('this looks like an infix expression'),
+      );
+    });
+
+    test('cx eval rpn "1+.5" hints at eval infix instead of a plain '
+        'unknown-word (issue #51, AC3)', () async {
+      final code = await run(['eval', 'rpn', '1+.5']);
+      expect(code, ExitCode.dataError);
+      expect(
+        err.output,
+        contains('this looks like an infix expression'),
+      );
+    });
+  });
+
   group('eval module and help precedence (8.6)', () {
     test('cx eval alone is incomplete, 64', () async {
       final code = await run(['eval']);

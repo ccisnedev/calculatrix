@@ -1,6 +1,10 @@
+import 'dart:io' as io;
+
 import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 
 import 'banner/banner_query.dart';
+import 'banner/banner_render.dart';
+import 'buffering_sink.dart';
 import 'commands/commands_contracts.dart';
 import 'commands/commands_list_query.dart';
 import 'commands/commands_search_query.dart';
@@ -11,7 +15,42 @@ import 'eval/eval_infix_query.dart';
 import 'eval/eval_output.dart';
 import 'eval/eval_rpn_query.dart';
 import 'shortcut/program_shortcut_query.dart';
+import 'shortcut/route_suggestion.dart';
+import 'shortcut/unquoted_program_error.dart';
 import 'stdin_reader.dart';
+
+/// What `cx --help`, `cx -h` and `cx help` all show for the root route (the
+/// bare `cx`, with nothing else typed): what the program is, every command
+/// it has with a one-line description and, where there is one, the exact
+/// invocation that runs it, and how to run a program directly without
+/// naming a command at all. Built once, from [bannerCommands], the same
+/// list the banner itself renders, through [bannerCommandRow] (colorless:
+/// help text is not a terminal banner), so the two can never say different
+/// things about what `cx` can do.
+///
+/// `modular_cli_sdk`'s `HelpRenderer` reads this single string for both a
+/// focused `Usage: ...` block (`--help`/`-h`) and this route's own row in
+/// the full catalog (`cx help`), with no way for calculatrix to give it two
+/// different texts for those two places, or a program name to put on the
+/// `Usage:` line: that line stays empty (a known limitation of the SDK this
+/// package does not patch, vendor or work around). Deliberately not headed
+/// "Commands:" the way the banner heads its own copy of these same rows:
+/// `cx help` already prints a real "Commands:"/"Queries:" heading of its
+/// own right after this text, and a second, identical-looking heading one
+/// line above it would read as a mistake rather than as the list it is.
+String get _rootHelpDescription {
+  final String commandRows = bannerCommands.map(bannerCommandRow).join('\n');
+  return <String>[
+    bannerTagline,
+    '',
+    'What each command does, with an example where one helps:',
+    commandRows,
+    '',
+    'Run a calculation directly by quoting it as one argument, without '
+        "naming a command at all, e.g.: cx '5 7 power'.",
+    'Each command also takes its own --help, e.g.: cx eval rpn --help.',
+  ].join('\n');
+}
 
 /// `cx <program>`'s own contract (spec section 4, G4): one required
 /// positional, no options, not even the global ones (`globals: false`
@@ -49,6 +88,13 @@ const cxAssets = {
   'linux': 'cx-linux-x64.tar.gz',
 };
 
+/// How tolerant a "did you mean" suggestion is, for both `ModularCli`'s own
+/// route vocabulary and [tightenRouteSuggestion]'s re-check of the whole
+/// route it points to (issue #51, AC6): the two must agree, or tightening
+/// could reject at a stricter distance than the SDK used to find the word
+/// in the first place.
+const _suggestionDistance = 2;
+
 /// Builds the `cx` CLI (spec section 4; runbook stages S2 and S3): the bare
 /// banner, `eval rpn`, `eval infix`, the `cx <program>` RPN shortcut (G3),
 /// and the standard plugins `version`, `doctor`, `upgrade` and `uninstall`
@@ -76,7 +122,11 @@ ModularCli buildCalculatrixCli({
   PlatformOps? platformOps,
   PathLookup? pathLookup,
 }) {
-  final cli = ModularCli(name: 'cx', version: cxVersion, suggestionDistance: 2);
+  final cli = ModularCli(
+    name: 'cx',
+    version: cxVersion,
+    suggestionDistance: _suggestionDistance,
+  );
 
   cli.query<BannerInput, BannerOutput>(
     '',
@@ -91,7 +141,7 @@ ModularCli buildCalculatrixCli({
     ),
     globals: true,
     contract: CliContract.none,
-    description: 'Print a short banner.',
+    description: _rootHelpDescription,
   );
 
   cli.plugin(VersionPlugin(version: cxVersion));
@@ -165,11 +215,21 @@ ModularCli buildCalculatrixCli({
   // add a route suggestion to this path alone (issue #41, AC6; see
   // ProgramShortcutQuery). `eval rpn` above stays the one and only
   // registration of its own body.
+  //
+  // `cli.suggest(word)` alone can name a bare fragment of a multi-word
+  // route (`show`, from `commands show`) as if it were a command by
+  // itself; `tightenRouteSuggestion` re-checks the whole route it came
+  // from before trusting it (issue #51, AC6).
   cli.query<EvalRpnInput, EvalOutput>(
     '<program>',
     (req) => ProgramShortcutQuery(
       EvalRpnQuery(EvalRpnInput.fromCliRequest(req), readStdin: readStdin),
-      routeSuggest: (String word) => cli.suggest(word),
+      routeSuggest: (String word) => tightenRouteSuggestion(
+        word,
+        cli.suggest(word),
+        cli.catalog.commands,
+        maxDistance: _suggestionDistance,
+      ),
     ),
     globals: false,
     contract: _programShortcutContract,
@@ -177,4 +237,47 @@ ModularCli buildCalculatrixCli({
   );
 
   return cli;
+}
+
+/// Runs the `cx` CLI exactly as [buildCalculatrixCli] plus [ModularCli.run]
+/// would, except for one case: an unquoted program typed as several shell
+/// words (`cx 5 7 power`, issue #51 acceptance 4), where `modular_cli_sdk`
+/// itself can only report `extra-argument` with a generic, SDK-worded
+/// message. That one message is rewritten into something actionable
+/// ("quote the program as one argument") before it ever reaches [stderr];
+/// its id and the process exit code are both left exactly as
+/// `modular_cli_sdk` decided them.
+///
+/// This is the one call `bin/cx.dart` makes, instead of building the CLI
+/// and calling [ModularCli.run] itself, so the rewrite applies the same
+/// way in production as it does under test.
+Future<int> runCalculatrixCli(
+  List<String> args, {
+  io.IOSink? stdout,
+  io.IOSink? stderr,
+  StdinReader readStdin = readAllStdin,
+  CliReleaseSource? releaseSource,
+  PlatformOps? platformOps,
+  PathLookup? pathLookup,
+}) async {
+  final cli = buildCalculatrixCli(
+    readStdin: readStdin,
+    releaseSource: releaseSource,
+    platformOps: platformOps,
+    pathLookup: pathLookup,
+  );
+  final io.IOSink realOut = stdout ?? io.stdout;
+  final io.IOSink realErr = stderr ?? io.stderr;
+
+  // Only an invocation that could possibly be an unquoted program is worth
+  // the extra buffering at all: everything else is written straight to
+  // the real stream, exactly as a plain `cli.run` call would.
+  if (!looksLikeUnquotedProgram(args)) {
+    return cli.run(args, stdout: realOut, stderr: realErr);
+  }
+
+  final BufferingSink bufferedErr = BufferingSink();
+  final int exitCode = await cli.run(args, stdout: realOut, stderr: bufferedErr);
+  realErr.write(rewriteUnquotedProgramError(bufferedErr.text, args));
+  return exitCode;
 }

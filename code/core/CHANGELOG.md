@@ -120,6 +120,82 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   candidates in a new `suggestions` field (`CalculatrixError.suggestions`,
   empty by default), and appends them to its own message when not empty.
 
+- Actionable agent-facing errors (issue #51): `RpnStackUnderflowError.message`
+  now names the word that underflowed and how far short the stack fell
+  (`"power needs 1 value on the stack, found 0."`), built lazily from a new
+  `needed`/`found` pair every `RpnEngine` throw site now records, once the
+  evaluator's dispatch loop has enriched the error with its word
+  (`CalculatrixError.enrichToken`); an error built with no token, or no
+  `needed`/`found`, keeps its original message exactly as before. A name
+  written into an infix expression (`sqrt(7)`, `e`, `ln(10)`) now raises
+  `ExpressionSyntaxError` (still `syntax-error`, same `details.position`)
+  explaining that infix only accepts numbers, matrix literals, the four
+  arithmetic operators, `^` and parentheses; when the name is a registered
+  RPN word or alias, the message also shows its RPN form (`cx eval rpn "7
+  sqrt"`), via `CalculatrixError.name`, newly set on the error. A
+  non-literal RPN word whose text looks like an infix expression (contains
+  `(`/`)`, or an operator sandwiched between operand-shaped characters,
+  such as `3.7^2.5`) now appends a hint to its `unknown-word` message
+  pointing at `cx eval infix`, both from `cx eval rpn` and from the root
+  `<program>` shortcut; the id, exit code and suggestions are unchanged.
+  `CalculatrixCommandRegistry.suggest()` now scales its distance threshold
+  to the needle's own length (`(needle.length - 1).clamp(0, maxDistance)`)
+  instead of a flat threshold, so a short token such as `e` no longer
+  pulls in unrelated one-character aliases (`+`, `-`, `*`, `/`) as "did you
+  mean" suggestions, while longer typos (`pow`, `dupp`, `transpos`) keep
+  suggesting the word they were obviously reaching for.
+- Review fixes on the compiled `cx` binary (issue #51): `power` (and every
+  other registry word with a declared arity) now reports the arity of the
+  word actually typed, not whatever an inner primitive its definition
+  expands to happens to pop. `CalculatrixCommandEntry` gained a new
+  `arity` field, set on every word whose stack need is fixed and known
+  ahead of time (`null` for the handful, such as `vector`, `pick` and
+  `roll`, whose need is only known at run time and which already report
+  their own accurate `needed`/`found`); `Calculatrix` now checks the real
+  stack depth against that arity before expanding a word's definition,
+  instead of letting the first primitive inside it raise its own, possibly
+  different, underflow. A new test iterates every registry word with an
+  arity, both on an empty stack and one value short, asserting the message
+  always states the real arity and the actual depth. `suggest()` also
+  tightens its candidates to the single closest edit-distance tier (and,
+  within a tie in that tier, to a prefix match when one exists), so `pow`
+  suggests only `power`, not also `rows` or `rotate` merely because they
+  happen to sit at the same raw distance, and `dupp` suggests only
+  `duplicate`, not also `drop`. `restrictedEditDistance` (the distance
+  function `suggest()` itself uses) is now public, exported for
+  `calculatrix_cli` to reuse rather than reimplement when it does the
+  equivalent tightening for its own route suggestions.
+- A second round of review fixes on the compiled `cx` binary (issue #51):
+  a truncated infix call such as `sqrt(` no longer throws an unhandled
+  `RangeError`; an unclosed parenthesis is now detected and reported as
+  the normal syntax error instead. The declared `arity` that lets
+  `Calculatrix` pre-check a word's real stack depth (see the entry above)
+  is now `null` again for `zeros`, `ones`, `delete-row`, `delete-col`,
+  `duplicate-row`, `duplicate-col`, `move-row` and `move-col`: each of
+  these pops and validates one argument before it ever pops the next, so
+  with only one value on the stack a fixed arity would have masked that
+  argument's own type-mismatch (`"zeros requires a non-negative integer
+  count, found -1.0."`) behind a misleading stack-underflow. `vector` now
+  checks its own real need (the count against the values actually below
+  it) before popping any of them, rather than letting its last pop fail
+  with the generic "needs 1 value, found 0": `1 2 3 vector` now reports
+  `"vector needs 3 values on the stack, found 2."`, the count and the true
+  shortfall, not the inner pop's. A registry word written with a hyphen
+  (`frobenius-norm(7)`) is now recognized by its whole name in an infix
+  name error, not just the run of letters before the hyphen. The RPN form
+  an infix name error suggests is now shown only when the call's argument
+  is a plain number literal; a non-literal argument (`sqrt(1+2)`) or a
+  space before the call (`sqrt (7)`) instead gets a generic, non-runnable
+  description of where the argument goes, since neither `cx eval rpn "1+2
+  sqrt"` nor `cx eval rpn "sqrt"` is actually valid RPN. The infix-shaped
+  heuristic behind the unknown-word hint now also matches a signed
+  (`3^-2`) or leading-decimal (`1+.5`) right-hand operand.
+  `CalculatrixError.name`, set on an infix name error, now rides along in
+  the CLI's JSON error envelope as `details.name`. The root `--help`/`-h`
+  text now gives every listed command its own example, including
+  `commands list`, `doctor`, `upgrade`, `uninstall` and `version`, which
+  previously had none.
+
 ### Fixed
 
 - `Matrix.sqrt()` no longer rejects singular matrices that do have a real

@@ -197,13 +197,73 @@ class Calculatrix {
     final List<_PositionedCommand> commands = _compilePositionedCommands(
       tokens,
     );
-    for (final _PositionedCommand positioned in commands) {
-      try {
-        machine.execute(positioned.command);
-      } on CalculatrixError catch (error) {
-        error.enrichToken(positioned.token.value, positioned.token.position);
-        rethrow;
+    int index = 0;
+    while (index < commands.length) {
+      // Every command a single original token expands to (one, for a
+      // primitive word; more than one, for a defined word's whole program)
+      // carries that same token object (see _compilePositionedCommands), so
+      // grouping consecutive commands by identity on it recovers exactly
+      // the original, pre-expansion tokens, one group per token.
+      final _PositionedToken token = commands[index].token;
+      int end = index + 1;
+      while (end < commands.length && identical(commands[end].token, token)) {
+        end++;
       }
+      _requireSufficientDepth(machine, token);
+      for (int i = index; i < end; i++) {
+        final _PositionedCommand positioned = commands[i];
+        try {
+          machine.execute(positioned.command);
+        } on CalculatrixError catch (error) {
+          error.enrichToken(
+            positioned.token.value,
+            positioned.token.position,
+          );
+          rethrow;
+        }
+      }
+      index = end;
+    }
+  }
+
+  // Checks the real, pre-expansion stack depth against the arity of the
+  // user-facing word `token` names, before any of the commands its own
+  // expansion produced run (issue #51, AC5). Needed because a defined
+  // word's expansion can inflate the depth an inner primitive sees: "sqrt"
+  // is defined as "0.5 power", so by the time PowerCommand itself runs,
+  // the stack already holds the literal 0.5 it just pushed, and
+  // PowerCommand's own sequential pops would (each on its own) only ever
+  // report "needs 1, found 0", never the true arity and depth of the word
+  // the user actually wrote. Skipped for a literal token (nothing to look
+  // up) and for a word whose arity is only known at run time (entry.arity
+  // is null), which already reports its own accurate needed/found, e.g.
+  // pick, roll, vector.
+  static void _requireSufficientDepth(
+    CalculatrixMachine machine,
+    _PositionedToken token,
+  ) {
+    if (isLiteralToken(token.value)) {
+      return;
+    }
+
+    final int? arity = CalculatrixCommandRegistry.standard
+        .lookup(token.value)
+        ?.arity;
+    if (arity == null) {
+      return;
+    }
+
+    final int depth = machine.depth;
+    if (depth < arity) {
+      final String valueWord = arity == 1 ? 'value' : 'values';
+      throw RpnStackUnderflowError(
+        '${token.value} needs $arity $valueWord on the stack, found $depth.',
+        errorId: CalculatrixErrorId.stackUnderflow,
+        token: token.value,
+        position: token.position,
+        needed: arity,
+        found: depth,
+      );
     }
   }
 
@@ -249,7 +309,32 @@ class Calculatrix {
     throw UnknownWordError(
       token,
       suggestions: CalculatrixCommandRegistry.standard.suggest(token),
+      infixHint: _looksLikeInfixExpression(token)
+          ? 'this looks like an infix expression: cx eval infix "$token"'
+          : null,
     );
+  }
+
+  // A non-word RPN token is flagged as "looks like infix" when it carries
+  // parentheses, or an operator sandwiched between two operand-shaped
+  // characters ("3.7^2.5"): neither can ever be a valid RPN word, but both
+  // are exactly what someone who meant to write an infix expression types.
+  // A plain negative literal such as "-5" never reaches this check at all
+  // (it parses as a number before _compileWord gets here), so there is no
+  // risk of this flagging it as infix-like.
+  //
+  // The right-hand operand may itself carry a sign ("3^-2") or lead with a
+  // bare decimal point ("1+.5"), issue #51 AC3: both are operand-shaped to
+  // a person reading the token, even though neither is a digit or "("
+  // itself, which the original character class alone required.
+  static final RegExp _infixOperatorBetweenOperands = RegExp(
+    r'[0-9)][+\-*/^][+-]?[0-9.(]',
+  );
+
+  static bool _looksLikeInfixExpression(String token) {
+    return token.contains('(') ||
+        token.contains(')') ||
+        _infixOperatorBetweenOperands.hasMatch(token);
   }
 
   // Compiles a defined word's definition program to commands, by
@@ -584,6 +669,18 @@ class Calculatrix {
         continue;
       }
 
+      // Infix has no notion of a function call or a bare name at all: a
+      // letter-led run of characters here is never a valid infix token,
+      // whether it is a call-like "sqrt(7)" or a lone "e". Scanning the
+      // whole name (rather than letting the generic fallthrough below
+      // report only its first character) is what lets the error explain
+      // the limitation and, when the name is already a known RPN word or
+      // alias, show its RPN form (AC2, issue #51).
+      if (_isNameStart(char)) {
+        final int start = index;
+        throw _buildInfixNameError(expression, start);
+      }
+
       throw ExpressionSyntaxError(
         'Unexpected token near "$char".',
         errorId: CalculatrixErrorId.syntaxError,
@@ -913,6 +1010,136 @@ class Calculatrix {
     return _isAsciiDigit(code) || code == _dotCode;
   }
 
+  static bool _isNameStart(String char) {
+    final int code = char.codeUnitAt(0);
+    return (code >= _lowerACode && code <= _lowerZCode) ||
+        (code >= _upperACode && code <= _upperZCode) ||
+        char == '_';
+  }
+
+  static bool _isNameChar(String char) {
+    return _isNameStart(char) || _isAsciiDigit(char.codeUnitAt(0));
+  }
+
+  // Scans the full run of name characters starting at `start` (already
+  // known to be a name start), rather than reporting just its first
+  // character: the resulting name is both what the error message names
+  // and what it looks up against the RPN registry.
+  //
+  // A "-" is also consumed, together with whatever further run of name
+  // characters follows it, when it is immediately followed by a name
+  // start: the registry has words of its own written with a hyphen
+  // ("frobenius-norm", "append-cols"), and the whole word, not just the
+  // run of letters up to its first hyphen, is what both the lookup below
+  // and the message need to name (issue #51, AC2). A "-" with nothing
+  // name-shaped after it (end of input, a digit, another "-") is left
+  // alone: infix has no bare names at all, so nothing here depends on
+  // telling an actual subtraction apart from one, only on not swallowing
+  // it into a name it is not part of.
+  static String _scanName(String expression, int start) {
+    int index = start;
+    while (index < expression.length) {
+      if (_isNameChar(expression[index])) {
+        index++;
+        continue;
+      }
+      if (expression[index] == '-' &&
+          index + 1 < expression.length &&
+          _isNameStart(expression[index + 1])) {
+        index++;
+        continue;
+      }
+      break;
+    }
+    return expression.substring(start, index);
+  }
+
+  // Finds the index just past the "(" at `openIndex`'s matching ")",
+  // accounting for nesting, or -1 when the parenthesis is never closed:
+  // the caller then knows there is no real argument to read out, rather
+  // than reading one out of a substring range that was never a closed
+  // group in the first place (issue #51, AC1; this used to crash on a
+  // truncated call such as "sqrt(" by handing the caller a range past the
+  // end of the very "(" it opened).
+  static int _matchingParenEnd(String expression, int openIndex) {
+    int depth = 0;
+    for (int index = openIndex; index < expression.length; index++) {
+      if (expression[index] == '(') {
+        depth++;
+      } else if (expression[index] == ')') {
+        depth--;
+        if (depth == 0) {
+          return index + 1;
+        }
+      }
+    }
+    return -1;
+  }
+
+  // The call-like argument text of a registered name's "(argument)", when
+  // one is both present (a closed parenthesis right after the name) and a
+  // plain number literal (issue #51, AC2): "sqrt(7)" qualifies, but
+  // "sqrt(1+2)" and "sqrt (7)" (space before the paren, so not call-like
+  // at all) do not, and neither does "sqrt(" (never closed). Read verbatim
+  // rather than parsed, since only the one argument slot RPN would occupy
+  // is needed here, not a full nested expression evaluation; restricted to
+  // a plain number because only a plain number is guaranteed to still mean
+  // the same thing once it is moved in front of the word instead of inside
+  // the call ("1+2 sqrt" is not "sqrt(1+2)", it is two RPN tokens, the
+  // second of which is unknown).
+  static String? _plainNumberCallArgument(String expression, int nameEnd) {
+    if (nameEnd >= expression.length || expression[nameEnd] != '(') {
+      return null;
+    }
+    final int closeIndex = _matchingParenEnd(expression, nameEnd);
+    if (closeIndex < 0) {
+      return null;
+    }
+    final String argument = expression.substring(nameEnd + 1, closeIndex - 1).trim();
+    return double.tryParse(argument) != null ? argument : null;
+  }
+
+  // Builds the actionable error for a name found where infix expects a
+  // number, matrix literal, operator or parenthesis (AC2, issue #51).
+  // When `name` is already a registered RPN word or alias, the message
+  // shows its RPN form when a plain-number argument is available
+  // (_plainNumberCallArgument), or a generic, non-runnable description of
+  // where the argument goes otherwise, rather than composing an RPN
+  // command that would itself fail if the reader actually ran it.
+  static ExpressionSyntaxError _buildInfixNameError(
+    String expression,
+    int start,
+  ) {
+    final String name = _scanName(expression, start);
+    final int nameEnd = start + name.length;
+    const String limitation =
+        'infix accepts numbers, matrix literals, + - * / ^ and parentheses';
+
+    final bool isRegistered =
+        CalculatrixCommandRegistry.standard.lookup(name) != null;
+
+    String message;
+    if (isRegistered) {
+      final String? argument = _plainNumberCallArgument(expression, nameEnd);
+      message = argument != null
+          ? '$limitation; "$name" is an RPN word: '
+                'cx eval rpn "$argument $name"'
+          : '$limitation; "$name" is an RPN word; in RPN the argument '
+                'comes first: x $name';
+    } else {
+      message = '$limitation; "$name" is a name, not a number.';
+    }
+
+    final ExpressionSyntaxError error = ExpressionSyntaxError(
+      message,
+      errorId: CalculatrixErrorId.syntaxError,
+      token: name,
+      position: start + 1,
+    );
+    error.name = name;
+    return error;
+  }
+
   static bool _isSignedNumberStart(
     String source,
     int index,
@@ -1019,6 +1246,10 @@ class Calculatrix {
   static const int _dotCode = 46;
   static const int _lowerECode = 101;
   static const int _upperECode = 69;
+  static const int _lowerACode = 97;
+  static const int _lowerZCode = 122;
+  static const int _upperACode = 65;
+  static const int _upperZCode = 90;
 }
 
 class _NumberScanResult {

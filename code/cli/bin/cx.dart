@@ -22,6 +22,5 @@ import 'package:calculatrix_cli/calculatrix_cli.dart';
 /// reading, which forced `POSIXLY_CORRECT` unconditionally; see G6 in
 /// docs/spec/calculatrix_cli.md and D27 in docs/runbook-cli-stage-0.md.
 Future<void> main(List<String> args) async {
-  final cli = buildCalculatrixCli();
-  exitCode = await cli.run(args);
+  exitCode = await runCalculatrixCli(args);
 }

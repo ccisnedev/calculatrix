@@ -49,6 +49,56 @@ void main() {
 
       expect(suggestions.length, lessThanOrEqualTo(2));
     });
+
+    test('a single-character word suggests nothing: every symbolic alias '
+        '(+, -, *, /) is only one edit away, which would otherwise swamp '
+        'it with unrelated words', () {
+      expect(CalculatrixCommandRegistry.standard.suggest('e'), isEmpty);
+    });
+
+    test('a short but multi-character typo still suggests its target', () {
+      expect(
+        CalculatrixCommandRegistry.standard.suggest('pow'),
+        contains('power'),
+      );
+    });
+
+    test('a longer typo still suggests its target', () {
+      expect(
+        CalculatrixCommandRegistry.standard.suggest('dupp'),
+        contains('duplicate'),
+      );
+    });
+
+    test('a longer typo on a hyphenated name still suggests its target', () {
+      expect(
+        CalculatrixCommandRegistry.standard.suggest('transpos'),
+        contains('transpose'),
+      );
+    });
+
+    // "pow" used to also suggest "rows" and "rotate" (via its alias "rot"),
+    // both exactly as far from "pow" by raw edit distance as "power" is,
+    // but sharing almost none of its letters. Tightening to the closest
+    // tier, then to a prefix match within it when one exists, narrows this
+    // to "power" alone (issue #51, AC6).
+    test('a typo this close to its target names only that target, not '
+        'other words that happen to share the same raw edit distance', () {
+      expect(CalculatrixCommandRegistry.standard.suggest('pow'), [
+        'power',
+      ]);
+    });
+
+    // "dupp" used to also suggest "drop", one edit further from "dupp"
+    // than "duplicate" (via its alias "dup") already is. Tightening to
+    // the closest tier alone removes it, with no need for the prefix
+    // tie-break (issue #51, AC6).
+    test('a typo one tier closer to its target drops a same-maxDistance '
+        'word from a different tier entirely', () {
+      expect(CalculatrixCommandRegistry.standard.suggest('dupp'), [
+        'duplicate',
+      ]);
+    });
   });
 
   group('UnknownWordError carries suggestions (issue #41)', () {

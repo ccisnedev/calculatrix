@@ -142,6 +142,25 @@ final class VectorCommand extends CalculatrixCommand {
   void executeOn(RpnEngine engine) {
     final int count = _requireNonNegativeIntegerCount(engine.pop(), 'vector');
 
+    // Checked once, up front, rather than letting the loop below run out
+    // and have its very last pop raise the engine's own generic "needs 1
+    // value" (issue #51, AC5 regression): that message names the wrong
+    // need entirely, since what actually falls short is not one value but
+    // however many of the n values below the count are still missing.
+    // `needed`/`found` here, not the fallback message text (which
+    // RpnStackUnderflowError.message only falls back to when either is
+    // null; see that getter), are what the real, rendered message is
+    // built from once `token` is also set.
+    if (engine.depth < count) {
+      throw RpnStackUnderflowError(
+        'vector needs $count values below the count, found ${engine.depth}.',
+        errorId: CalculatrixErrorId.stackUnderflow,
+        token: 'vector',
+        needed: count,
+        found: engine.depth,
+      );
+    }
+
     final List<double> valuesTopToBottom = <double>[];
     for (int i = 0; i < count; i++) {
       valuesTopToBottom.add(_requireScalarValue(engine.pop(), 'vector'));

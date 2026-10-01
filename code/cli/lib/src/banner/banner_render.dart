@@ -56,18 +56,37 @@ const List<BannerCommand> bannerCommands = [
   ),
   BannerCommand('commands show', 'show one word of the registry', 'cx commands show dup'),
   BannerCommand('commands search', 'search the registry', 'cx commands search column'),
-  BannerCommand('commands list', 'list the registry by category'),
-  BannerCommand('doctor', 'verify local installation'),
-  BannerCommand('upgrade', 'update to latest version'),
-  BannerCommand('uninstall', 'remove cx'),
-  BannerCommand('version', 'print version'),
+  BannerCommand('commands list', 'list the registry by category', 'cx commands list'),
+  BannerCommand('doctor', 'verify local installation', 'cx doctor'),
+  BannerCommand('upgrade', 'update to latest version', 'cx upgrade'),
+  BannerCommand('uninstall', 'remove cx', 'cx uninstall'),
+  BannerCommand('version', 'print version', 'cx version'),
 ];
 
-// 16, not 13: wide enough for "commands search" (15 characters), the
+// 17, not 13: wide enough for "commands search" (15 characters), the
 // longest name the banner lists since issue #41 added the `commands`
-// module's rows.
-const int _nameColumnWidth = 16;
-const int _descriptionColumnWidth = 28;
+// module's rows, plus a 2-character gap before the description column so
+// a name never runs into its own description with only a single
+// separating space (issue #51, AC7).
+const int _nameColumnWidth = 17;
+
+// Wide enough for the longest description that is ever paired with an
+// example, plus a 2-character gap, so an example always starts at least
+// two columns after the longest description instead of running straight
+// into it with only one separating space (a fixed width shorter than
+// that longest description, as this used to be, silently dropped that
+// gap entirely for just that one row; issue #51, AC7).
+final int _descriptionColumnWidth = _widestDescriptionWithExample() + 2;
+
+int _widestDescriptionWithExample() {
+  int widest = 0;
+  for (final BannerCommand cmd in bannerCommands) {
+    if (cmd.example != null && cmd.description.length > widest) {
+      widest = cmd.description.length;
+    }
+  }
+  return widest;
+}
 
 const String _reset = '\x1B[0m';
 const String _bold = '\x1B[1m';
@@ -150,3 +169,11 @@ String _commandRow(BannerCommand cmd, String Function(String, String) c) {
   final description = cmd.description.padRight(_descriptionColumnWidth);
   return '    $name$description${cmd.example}';
 }
+
+/// [cmd]'s row exactly as the banner lists it, but with no color: the same
+/// name, description and example columns the banner computes, so any other
+/// text that wants to list `cx`'s commands (the root route's own help text,
+/// issue #51 acceptance 1) can share this instead of drifting into its own,
+/// separately maintained copy.
+String bannerCommandRow(BannerCommand cmd) =>
+    _commandRow(cmd, (String code, String text) => text);
