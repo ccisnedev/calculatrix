@@ -1,8 +1,10 @@
-// Differential tests of the exact words of step T2 against Giac (runbook
-// D57): `+ - * /`, `negate`, `percent` and integer powers, on generated
-// exact inputs with fixed seeds, from trivial sizes to results near the
-// limit of 10000 digits. Each case runs through the RPN evaluator and
-// through Giac, and the two results must agree entry by entry as exact
+// Differential tests of the exact words against Giac (runbook D57): step
+// T2's `+ - * /`, `negate`, `percent` and integer powers, and step T3's
+// `inverse`, `determinant`, `rref`, `rank`, `trace`, `adjugate`,
+// `cofactors`, `lu`, `dot`, `cross` and negative matrix powers, on
+// generated exact inputs with fixed seeds, from trivial sizes to results
+// near the limit of 10000 digits. Each case runs through the RPN evaluator
+// and through Giac, and the two results must agree entry by entry as exact
 // rationals.
 //
 // Giac is the judge only, never a dependency: in CI a Linux job installs
@@ -51,6 +53,60 @@ final class _Operand {
   String get giac => isScalar
       ? '(${rows.first.first}/$denominator)'
       : '(${_matrix(',', ',')}/$denominator)';
+
+  /// Always a Giac matrix, even for a 1x1, which the matrix words need.
+  String get giacMatrix => '(${_matrix(',', ',')}/$denominator)';
+
+  /// A column vector as a Giac list, which `dot` and `cross` take.
+  String get giacVector =>
+      '([${rows.map((List<BigInt> row) => row.first).join(',')}]/$denominator)';
+
+  /// Whether the square matrix is singular, by plain rational elimination
+  /// (independent of the fraction-free code under test).
+  bool get isSingular {
+    final List<List<Rational>> work = rows
+        .map((List<BigInt> row) => row.map((BigInt v) => Rational(v)).toList())
+        .toList();
+    final int n = work.length;
+    for (int c = 0; c < n; c++) {
+      final int pivot = work.indexWhere(
+        (List<Rational> row) => !row[c].isZero,
+        c,
+      );
+      if (pivot < 0) {
+        return true;
+      }
+      final List<Rational> held = work[c];
+      work[c] = work[pivot];
+      work[pivot] = held;
+      for (int r = c + 1; r < n; r++) {
+        final Rational factor = work[r][c] / work[c][c];
+        for (int j = c; j < n; j++) {
+          work[r][j] = work[r][j] - factor * work[c][j];
+        }
+      }
+    }
+    return false;
+  }
+
+  /// The same matrix with its last [dependent] rows replaced by sums of
+  /// the rows it keeps, so its rank is at most n - [dependent].
+  _Operand withDependentRows(int dependent) {
+    final int kept = rows.length - dependent;
+    return _Operand(<List<BigInt>>[
+      ...rows.sublist(0, kept),
+      for (int j = 0; j < dependent; j++)
+        List<BigInt>.generate(
+          rows.first.length,
+          (int c) => rows
+              .take(math.min(j + 1, kept))
+              .fold(
+                BigInt.zero,
+                (BigInt sum, List<BigInt> row) => sum + row[c],
+              ),
+        ),
+    ], denominator);
+  }
 }
 
 final class _Generator {
@@ -230,7 +286,184 @@ List<_Case> _cases() {
       ),
     );
   }
+
+  _linearAlgebraCases(g, cases);
   return cases;
+}
+
+// Giac has no cofactor word; this builds the matrix from minors.
+String _giacCofactors(String a, int n) =>
+    '(B->makemat((j,k)->(-1)^(j+k)*det(delcols(delrows(B,j),k)),$n,$n))($a)';
+
+// Giac's lu pivots on the entry of smallest magnitude and cx's on the
+// largest, so their P differ. Given cx's P, the L U of M = P A without
+// pivoting is unique; these build it in Giac from minors of M:
+// U[i][j] = det(M[0..i][0..i-1, j]) / det(M[0..i-1][0..i-1]) and
+// L[i][j] = det(M[0..j-1, i][0..j]) / det(M[0..j][0..j]).
+String _giacUpper(String m, int n) =>
+    '(M->makemat((i,j)->when(j<i,0,'
+    'det(makemat((r,c)->M[r][when(c<i,c,j)],i+1,i+1))'
+    '/when(i==0,1,det(makemat((r,c)->M[r][c],i,i)))),$n,$n))($m)';
+
+String _giacLower(String m, int n) =>
+    '(M->makemat((i,j)->when(i<j,0,when(i==j,1,'
+    'det(makemat((r,c)->M[when(r<j,r,i)][c],j+1,j+1))'
+    '/det(makemat((r,c)->M[r][c],j+1,j+1)))),$n,$n))($m)';
+
+/// [a] with its rows in the order of cx's P from `lu`.
+_Operand _permutedByLu(_Operand a) {
+  final Matrix p = Calculatrix.evaluateRpnStack(
+    Calculatrix.tokenizeRpnLine('${a.rpn} lu'),
+  ).first;
+  return _Operand(<List<BigInt>>[
+    for (int r = 0; r < a.size; r++)
+      a.rows[List<int>.generate(
+        a.size,
+        (int c) => c,
+      ).firstWhere((int c) => p.exactAt(r, c) == Rational.one)],
+  ], a.denominator);
+}
+
+void _squareCases(String tag, _Operand a, List<_Case> cases, _Generator g) {
+  final int n = a.size;
+  cases
+    ..add(
+      _Case('$tag determinant', '${a.rpn} determinant', 'det(${a.giacMatrix})'),
+    )
+    ..add(_Case('$tag trace', '${a.rpn} trace', 'trace(${a.giacMatrix})'))
+    ..add(_Case('$tag rank', '${a.rpn} rank', 'rank(${a.giacMatrix})'))
+    ..add(_Case('$tag rref', '${a.rpn} rref', 'rref(${a.giacMatrix})'));
+  if (n > 1) {
+    cases
+      ..add(
+        _Case(
+          '$tag cofactors',
+          '${a.rpn} cofactors',
+          _giacCofactors(a.giacMatrix, n),
+        ),
+      )
+      ..add(
+        _Case(
+          '$tag adjugate',
+          '${a.rpn} adjugate',
+          'tran(${_giacCofactors(a.giacMatrix, n)})',
+        ),
+      );
+  }
+  if (a.isSingular) {
+    return;
+  }
+  cases.add(_Case('$tag inverse', '${a.rpn} inverse', 'inv(${a.giacMatrix})'));
+  if (n > 1) {
+    final int exponent = -(g.nextInt(3) + 1);
+    // Compared on nonsingular matrices, where L and U are unique;
+    // exact_linear_algebra_test checks P A = L U on singular ones.
+    final _Operand m = _permutedByLu(a);
+    cases
+      ..add(
+        _Case(
+          '$tag ^$exponent',
+          '${a.rpn} $exponent ^',
+          '${a.giacMatrix}^($exponent)',
+        ),
+      )
+      ..add(
+        _Case(
+          '$tag lu L',
+          '${a.rpn} lu drop swap drop',
+          _giacLower(m.giacMatrix, n),
+        ),
+      )
+      ..add(
+        _Case(
+          '$tag lu U',
+          '${a.rpn} lu swap drop swap drop',
+          _giacUpper(m.giacMatrix, n),
+        ),
+      );
+  }
+}
+
+void _linearAlgebraCases(_Generator g, List<_Case> cases) {
+  // Square matrices: random (almost always nonsingular) and made singular.
+  for (final int size in <int>[1, 2, 3, 4, 5]) {
+    for (final int digits in <int>[1, 4, 15]) {
+      for (int i = 0; i < 3; i++) {
+        final _Operand a = g.operand(size, size, digits);
+        final String tag = 'T3 ${size}x$size d$digits';
+        _squareCases('$tag #$i', a, cases, g);
+        if (size > 1 && i == 0) {
+          _squareCases('$tag rank n-1', a.withDependentRows(1), cases, g);
+        }
+        if (size > 2 && i == 1) {
+          _squareCases('$tag rank n-2', a.withDependentRows(2), cases, g);
+        }
+      }
+    }
+  }
+
+  // Rectangular rref and rank.
+  for (int i = 0; i < 12; i++) {
+    final int rows = g.nextInt(4) + 1;
+    final int columns = g.nextInt(5) + 1;
+    final _Operand a = g.operand(rows, columns, 5);
+    if (a.isScalar) {
+      continue;
+    }
+    final String tag = 'T3 ${rows}x$columns #$i';
+    cases
+      ..add(_Case('$tag rref', '${a.rpn} rref', 'rref(${a.giac})'))
+      ..add(_Case('$tag rank', '${a.rpn} rank', 'rank(${a.giac})'));
+  }
+
+  // Dot and cross products.
+  for (final int digits in <int>[1, 8, 60]) {
+    for (int i = 0; i < 4; i++) {
+      final int length = g.nextInt(5) + 1;
+      final _Operand u = g.operand(length, 1, digits);
+      final _Operand v = g.operand(length, 1, digits);
+      final _Operand x = g.operand(3, 1, digits);
+      final _Operand y = g.operand(3, 1, digits);
+      cases
+        ..add(
+          _Case(
+            'T3 dot $length d$digits #$i',
+            '${u.rpn} ${v.rpn} dot',
+            'dot(${u.giacVector},${v.giacVector})',
+          ),
+        )
+        ..add(
+          _Case(
+            'T3 cross d$digits #$i',
+            '${x.rpn} ${y.rpn} cross',
+            'cross(${x.giacVector},${y.giacVector})',
+          ),
+        );
+    }
+  }
+
+  // Near the default limit of 10000 digits: a determinant of about 8800
+  // digits and an inverse whose denominators have about 4200.
+  for (final (String word, String giacWord, int size, int digits)
+      in <(String, String, int, int)>[
+        ('determinant', 'det', 4, 2190),
+        ('inverse', 'inv', 3, 1400),
+      ]) {
+    final _Operand a = _Operand(
+      List<List<BigInt>>.generate(
+        size,
+        (_) => List<BigInt>.generate(size, (_) => g.integer(digits)),
+      ),
+      BigInt.one,
+    );
+    cases.add(
+      _Case(
+        'T3 near the limit $word',
+        '${a.rpn} $word',
+        '$giacWord(${a.giac})',
+      ),
+    );
+  }
 }
 
 List<String> _giacCommand() => Platform.isWindows
@@ -316,7 +549,7 @@ void main() {
     giac = await _runGiac(cases.map((_Case c) => c.giac).toList());
   });
 
-  test('Giac agrees with every exact result of step T2', () {
+  test('Giac agrees with every exact result of steps T2 and T3', () {
     if (giac == null) {
       // The CI job sets this, so a broken Giac install fails there instead
       // of passing silently.
@@ -329,7 +562,7 @@ void main() {
       );
       return;
     }
-    expect(cases.length, greaterThan(250));
+    expect(cases.length, greaterThan(1000));
     int largest = 0;
     for (int i = 0; i < cases.length; i++) {
       final _Case c = cases[i];

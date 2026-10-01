@@ -365,8 +365,10 @@ them. The semantics of `power`, the source of `log-undefined` and
 
 **Size limit.** An exact result with more digits than the limit (counted on
 each numerator or denominator) is `limit-exceeded`, raised before the
-computation starts when the size can be estimated (`a^n`), never an
-approximate result instead (runbook-trust.md D55). `details` carry `limit`
+computation starts when the size can be estimated (`a^n`, and the
+Hadamard bound for `inverse`, `determinant`, `rref`, `rank`, `cofactors`,
+`adjugate` and `lu`), never an approximate result instead
+(runbook-trust.md D55). `details` carry `limit`
 and `estimated`, and the message gives the next step: the same program with
 `approx` before the failing word, or `~` before a failing literal, and
 `--max-digits`. The default limit is 10000 digits; `--max-digits <n>` on
@@ -983,7 +985,10 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx '9 sqrt'`, `cx '9 √'`, `cx '9 SQRT'` | prints `1: 3`, 0 (D41) |
 | `cx '2 3 pwr'`, `cx '2 3 power'` | prints `1: 8`, 0 |
 | `cx '2 3 add'` | prints `1: 5`, 0: `add` is a name, `+` its alias (D41) |
-| `cx '[[1 2] [3 4]] inverse'` | prints `1: [[-2 1] [1.5 -0.5]]`, 0 (D43, D45) |
+| `cx '[[1 2] [3 4]] inverse'` | prints `1: [[-2 1] [1.5 -0.5]]`, 0: exact (D43, D45, trust D53) |
+| `cx '~[[1 2] [3 4]] inverse'` | prints `1: ~[[-2 1] [1.5 -0.5]]`, 0 (trust D51) |
+| `cx '[[1 2 3] [4 5 6] [7 8 10]] 3 / determinant'` | prints `1: -1/9`, 0 (trust D53) |
+| `cx --max-digits 50 '[[1e30 1] [1 1e30]] determinant'` | `limit-exceeded`, 65, `estimated: 61` from the Hadamard bound; suggests `cx '[[1e30 1] [1 1e30]] approx determinant'` (trust D55) |
 | `cx '[[1 2] [2 4]] inverse'` | `singular-matrix`, 65, `token: inverse` (D43) |
 | `cx '-4 sqrt'` | the same result as `cx '-4 0.5 ^'`, bit for bit (D44) |
 | `cx '1 2 2 ->ARRY'` | `unknown-word`, 65 (D42) |

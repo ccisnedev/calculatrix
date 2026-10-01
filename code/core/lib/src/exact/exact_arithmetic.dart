@@ -86,9 +86,9 @@ final class ExactArithmetic {
       _map(a, (Rational x) => _checked(x * factor));
 
   /// [base] raised to the integer [exponent]. A scalar base takes any
-  /// integer; a square matrix takes a non-negative one (a negative power
-  /// of a matrix needs its inverse, exact from step T3). The caller has
-  /// already checked that [base] is square.
+  /// integer; a square matrix takes a non-negative one (the caller raises
+  /// its inverse for a negative power). The caller has already checked
+  /// that [base] is square.
   Matrix power(Matrix base, BigInt exponent) {
     if (base.isScalar) {
       return Matrix.exactScalar(_scalarPower(base.exactAt(0, 0), exponent));

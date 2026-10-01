@@ -1,4 +1,5 @@
 import '../errors/errors.dart';
+import '../exact/exact_linear_algebra.dart';
 import '../exact/rational.dart';
 import '../matrix/matrix.dart';
 import '../rpn/rpn_engine.dart';
@@ -106,15 +107,17 @@ final class PowerCommand extends CalculatrixCommand {
     final Matrix base = engine.popAny();
     final BigInt? integerExponent = _exactIntegerScalar(exponent);
     // An exact base takes an exact integer exponent exactly: any integer
-    // for a scalar, a non-negative one for a square matrix (a negative
-    // power of a matrix needs its inverse, exact from step T3 of the
-    // runbook). Everything else, fractional powers included, is
+    // for a scalar; for a square matrix, a negative power is a power of
+    // its exact inverse. Everything else, fractional powers included, is
     // approximate (runbook D53).
-    if (base.isExact &&
-        integerExponent != null &&
-        base.isSquare &&
-        (base.isScalar || !integerExponent.isNegative)) {
-      engine.push(engine.exact.power(base, integerExponent));
+    if (base.isExact && integerExponent != null && base.isSquare) {
+      if (integerExponent.isNegative && !base.isScalar) {
+        engine.push(
+          engine.exact.power(engine.exact.inverse(base), -integerExponent),
+        );
+      } else {
+        engine.push(engine.exact.power(base, integerExponent));
+      }
       return;
     }
     engine.push(base.toApproximate().power(exponent.toApproximate()));
@@ -414,8 +417,8 @@ final class InverseCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.inverse());
+    final Matrix value = engine.popAny();
+    engine.push(value.isExact ? engine.exact.inverse(value) : value.inverse());
   }
 }
 
@@ -424,8 +427,10 @@ final class DeterminantCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.determinant());
+    final Matrix value = engine.popAny();
+    engine.push(
+      value.isExact ? engine.exact.determinant(value) : value.determinant(),
+    );
   }
 }
 
@@ -456,8 +461,8 @@ final class TraceCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.trace());
+    final Matrix value = engine.popAny();
+    engine.push(value.isExact ? engine.exact.trace(value) : value.trace());
   }
 }
 
@@ -476,8 +481,8 @@ final class RankCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.rank());
+    final Matrix value = engine.popAny();
+    engine.push(value.isExact ? engine.exact.rank(value) : value.rank());
   }
 }
 
@@ -486,8 +491,10 @@ final class CofactorMatrixCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.cofactorMatrix());
+    final Matrix value = engine.popAny();
+    engine.push(
+      value.isExact ? engine.exact.cofactors(value) : value.cofactorMatrix(),
+    );
   }
 }
 
@@ -496,8 +503,10 @@ final class AdjugateCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.adjugate());
+    final Matrix value = engine.popAny();
+    engine.push(
+      value.isExact ? engine.exact.adjugate(value) : value.adjugate(),
+    );
   }
 }
 
@@ -506,9 +515,13 @@ final class DotProductCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix b = engine.pop();
-    final Matrix a = engine.pop();
-    engine.push(a.dot(b));
+    final Matrix b = engine.popAny();
+    final Matrix a = engine.popAny();
+    engine.push(
+      a.isExact && b.isExact
+          ? engine.exact.dot(a, b)
+          : a.toApproximate().dot(b.toApproximate()),
+    );
   }
 }
 
@@ -517,9 +530,13 @@ final class CrossProductCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix b = engine.pop();
-    final Matrix a = engine.pop();
-    engine.push(a.cross(b));
+    final Matrix b = engine.popAny();
+    final Matrix a = engine.popAny();
+    engine.push(
+      a.isExact && b.isExact
+          ? engine.exact.cross(a, b)
+          : a.toApproximate().cross(b.toApproximate()),
+    );
   }
 }
 
@@ -528,8 +545,8 @@ final class RrefCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    engine.push(value.rref());
+    final Matrix value = engine.popAny();
+    engine.push(value.isExact ? engine.exact.rref(value) : value.rref());
   }
 }
 
@@ -548,8 +565,10 @@ final class LuDecompositionCommand extends CalculatrixCommand {
 
   @override
   void executeOn(RpnEngine engine) {
-    final Matrix value = engine.pop();
-    final LuDecomposition decomposition = value.luDecomposition();
+    final Matrix value = engine.popAny();
+    final LuDecomposition decomposition = value.isExact
+        ? engine.exact.lu(value)
+        : value.luDecomposition();
     engine.push(decomposition.permutation);
     engine.push(decomposition.lower);
     engine.push(decomposition.upper);
