@@ -53,8 +53,9 @@ void main() {
         "  └─     ─┘\n"
         "\n"
         "  Commands:\n"
-        "    eval rpn        evaluate an RPN program     cx eval rpn '1 2 +'\n"
-        "    eval infix      evaluate an expression      cx eval infix "
+        "    eval rpn        evaluate an RPN program       cx eval rpn "
+        "'1 2 +'\n"
+        "    eval infix      evaluate an expression        cx eval infix "
         '"2^0.5"\n'
         "    doctor          verify local installation\n"
         "    upgrade         update to latest version\n"
@@ -64,6 +65,46 @@ void main() {
         "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",
       );
     });
+
+    test(
+      'every row with an example keeps a separating space before it, so '
+      'the example never runs into the description, even for the longest '
+      'description the banner has ("show one word of the registry", 29 '
+      'characters, which a fixed 28-wide column used to swallow whole '
+      '(issue #51 acceptance 7)',
+      () async {
+        final output = await buildQuery(
+          version: '0.8.0',
+          registeredCommands: const {
+            'eval rpn',
+            'eval infix',
+            'commands show',
+            'commands search',
+            'commands list',
+            'doctor',
+            'upgrade',
+            'uninstall',
+            'version',
+          },
+        ).execute();
+        final commandLines = output
+            .toText()!
+            .split('\n')
+            .where((line) => line.startsWith('    ') && line.trim().isNotEmpty);
+        var sawRowWithExample = false;
+        for (final line in commandLines) {
+          final exampleStart = line.indexOf('cx ');
+          if (exampleStart <= 0) continue;
+          sawRowWithExample = true;
+          expect(
+            line[exampleStart - 1],
+            ' ',
+            reason: 'no separating space before the example in: "$line"',
+          );
+        }
+        expect(sawRowWithExample, isTrue);
+      },
+    );
 
     test(
       'with only the S2 routes registered, the optional commands are '
@@ -82,8 +123,9 @@ void main() {
           "  └─     ─┘\n"
           "\n"
           "  Commands:\n"
-          "    eval rpn        evaluate an RPN program     cx eval rpn '1 2 +'\n"
-          "    eval infix      evaluate an expression      cx eval infix "
+          "    eval rpn        evaluate an RPN program       cx eval rpn "
+          "'1 2 +'\n"
+          "    eval infix      evaluate an expression        cx eval infix "
           '"2^0.5"\n'
           "\n"
           "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",

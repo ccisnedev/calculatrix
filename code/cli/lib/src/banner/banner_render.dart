@@ -67,7 +67,23 @@ const List<BannerCommand> bannerCommands = [
 // longest name the banner lists since issue #41 added the `commands`
 // module's rows.
 const int _nameColumnWidth = 16;
-const int _descriptionColumnWidth = 28;
+
+// Wide enough for the longest description that is ever paired with an
+// example, plus one separating space, so an example never runs straight
+// into its own description's last character (a fixed width shorter than
+// that longest description, as this used to be, silently dropped that
+// separating space for just that one row).
+final int _descriptionColumnWidth = _widestDescriptionWithExample() + 1;
+
+int _widestDescriptionWithExample() {
+  int widest = 0;
+  for (final BannerCommand cmd in bannerCommands) {
+    if (cmd.example != null && cmd.description.length > widest) {
+      widest = cmd.description.length;
+    }
+  }
+  return widest;
+}
 
 const String _reset = '\x1B[0m';
 const String _bold = '\x1B[1m';
@@ -150,3 +166,11 @@ String _commandRow(BannerCommand cmd, String Function(String, String) c) {
   final description = cmd.description.padRight(_descriptionColumnWidth);
   return '    $name$description${cmd.example}';
 }
+
+/// [cmd]'s row exactly as the banner lists it, but with no color: the same
+/// name, description and example columns the banner computes, so any other
+/// text that wants to list `cx`'s commands (the root route's own help text,
+/// issue #51 acceptance 1) can share this instead of drifting into its own,
+/// separately maintained copy.
+String bannerCommandRow(BannerCommand cmd) =>
+    _commandRow(cmd, (String code, String text) => text);
