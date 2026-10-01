@@ -63,17 +63,20 @@ const List<BannerCommand> bannerCommands = [
   BannerCommand('version', 'print version'),
 ];
 
-// 16, not 13: wide enough for "commands search" (15 characters), the
+// 17, not 13: wide enough for "commands search" (15 characters), the
 // longest name the banner lists since issue #41 added the `commands`
-// module's rows.
-const int _nameColumnWidth = 16;
+// module's rows, plus a 2-character gap before the description column so
+// a name never runs into its own description with only a single
+// separating space (issue #51, AC7).
+const int _nameColumnWidth = 17;
 
 // Wide enough for the longest description that is ever paired with an
-// example, plus one separating space, so an example never runs straight
-// into its own description's last character (a fixed width shorter than
+// example, plus a 2-character gap, so an example always starts at least
+// two columns after the longest description instead of running straight
+// into it with only one separating space (a fixed width shorter than
 // that longest description, as this used to be, silently dropped that
-// separating space for just that one row).
-final int _descriptionColumnWidth = _widestDescriptionWithExample() + 1;
+// gap entirely for just that one row; issue #51, AC7).
+final int _descriptionColumnWidth = _widestDescriptionWithExample() + 2;
 
 int _widestDescriptionWithExample() {
   int widest = 0;

@@ -39,6 +39,35 @@ void main() {
       expect(out.output, contains("cx '5 7 power'"));
     });
 
+    test(
+      'every command row keeps at least a 2-space gap between every '
+      'column (name, description, example), the same as the banner '
+      '(issue #51 acceptance 7)',
+      () async {
+        var sawRowWithExample = false;
+        for (final cmd in bannerCommands) {
+          final line = bannerCommandRow(cmd);
+
+          final nameEnd = line.indexOf(RegExp(r'  '), 4);
+          expect(
+            nameEnd,
+            greaterThan(4),
+            reason: 'no 2-space gap after the name column in: "$line"',
+          );
+
+          final exampleStart = line.indexOf('cx ');
+          if (exampleStart <= 0) continue;
+          sawRowWithExample = true;
+          expect(
+            line.substring(exampleStart - 2, exampleStart),
+            '  ',
+            reason: 'no 2-space gap before the example in: "$line"',
+          );
+        }
+        expect(sawRowWithExample, isTrue);
+      },
+    );
+
     test('cx -h gives the exact same text as cx --help', () async {
       final outLong = MemorySink();
       final outShort = MemorySink();

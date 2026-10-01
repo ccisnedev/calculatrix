@@ -15,6 +15,7 @@ import 'eval/eval_infix_query.dart';
 import 'eval/eval_output.dart';
 import 'eval/eval_rpn_query.dart';
 import 'shortcut/program_shortcut_query.dart';
+import 'shortcut/route_suggestion.dart';
 import 'shortcut/unquoted_program_error.dart';
 import 'stdin_reader.dart';
 
@@ -87,6 +88,13 @@ const cxAssets = {
   'linux': 'cx-linux-x64.tar.gz',
 };
 
+/// How tolerant a "did you mean" suggestion is, for both `ModularCli`'s own
+/// route vocabulary and [tightenRouteSuggestion]'s re-check of the whole
+/// route it points to (issue #51, AC6): the two must agree, or tightening
+/// could reject at a stricter distance than the SDK used to find the word
+/// in the first place.
+const _suggestionDistance = 2;
+
 /// Builds the `cx` CLI (spec section 4; runbook stages S2 and S3): the bare
 /// banner, `eval rpn`, `eval infix`, the `cx <program>` RPN shortcut (G3),
 /// and the standard plugins `version`, `doctor`, `upgrade` and `uninstall`
@@ -114,7 +122,11 @@ ModularCli buildCalculatrixCli({
   PlatformOps? platformOps,
   PathLookup? pathLookup,
 }) {
-  final cli = ModularCli(name: 'cx', version: cxVersion, suggestionDistance: 2);
+  final cli = ModularCli(
+    name: 'cx',
+    version: cxVersion,
+    suggestionDistance: _suggestionDistance,
+  );
 
   cli.query<BannerInput, BannerOutput>(
     '',
@@ -203,11 +215,21 @@ ModularCli buildCalculatrixCli({
   // add a route suggestion to this path alone (issue #41, AC6; see
   // ProgramShortcutQuery). `eval rpn` above stays the one and only
   // registration of its own body.
+  //
+  // `cli.suggest(word)` alone can name a bare fragment of a multi-word
+  // route (`show`, from `commands show`) as if it were a command by
+  // itself; `tightenRouteSuggestion` re-checks the whole route it came
+  // from before trusting it (issue #51, AC6).
   cli.query<EvalRpnInput, EvalOutput>(
     '<program>',
     (req) => ProgramShortcutQuery(
       EvalRpnQuery(EvalRpnInput.fromCliRequest(req), readStdin: readStdin),
-      routeSuggest: (String word) => cli.suggest(word),
+      routeSuggest: (String word) => tightenRouteSuggestion(
+        word,
+        cli.suggest(word),
+        cli.catalog.commands,
+        maxDistance: _suggestionDistance,
+      ),
     ),
     globals: false,
     contract: _programShortcutContract,

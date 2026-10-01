@@ -63,4 +63,19 @@ void main() {
     final combined = out.output + err.output;
     expect(combined, contains('show'));
   });
+
+  test(
+    'cx pow is unknown-word and suggests only the word "power"; it does '
+    'not also suggest the invalid command "cx show", a bare fragment of '
+    'the real route "commands show" that ModularCli.suggest used to '
+    'return for this typo (issue #51, AC6)',
+    () async {
+      final code = await run(['pow']);
+      expect(code, ExitCode.dataError);
+      expect(err.output, contains('unknown-word'));
+      expect(err.output, contains('power'));
+      expect(err.output, isNot(contains('routeSuggestion')));
+      expect(err.output, isNot(contains('cx show')));
+    },
+  );
 }

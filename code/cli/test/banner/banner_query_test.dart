@@ -53,25 +53,25 @@ void main() {
         "  └─     ─┘\n"
         "\n"
         "  Commands:\n"
-        "    eval rpn        evaluate an RPN program       cx eval rpn "
+        "    eval rpn         evaluate an RPN program        cx eval rpn "
         "'1 2 +'\n"
-        "    eval infix      evaluate an expression        cx eval infix "
+        "    eval infix       evaluate an expression         cx eval infix "
         '"2^0.5"\n'
-        "    doctor          verify local installation\n"
-        "    upgrade         update to latest version\n"
-        "    uninstall       remove cx\n"
-        "    version         print version\n"
+        "    doctor           verify local installation\n"
+        "    upgrade          update to latest version\n"
+        "    uninstall        remove cx\n"
+        "    version          print version\n"
         "\n"
         "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",
       );
     });
 
     test(
-      'every row with an example keeps a separating space before it, so '
-      'the example never runs into the description, even for the longest '
-      'description the banner has ("show one word of the registry", 29 '
-      'characters, which a fixed 28-wide column used to swallow whole '
-      '(issue #51 acceptance 7)',
+      'every row keeps at least a 2-space gap between every column (name, '
+      'description, example), even for the longest description the banner '
+      'has ("show one word of the registry", 30 characters, which a '
+      'single separating space used to swallow whole; issue #51 '
+      'acceptance 7)',
       () async {
         final output = await buildQuery(
           version: '0.8.0',
@@ -90,16 +90,24 @@ void main() {
         final commandLines = output
             .toText()!
             .split('\n')
-            .where((line) => line.startsWith('    ') && line.trim().isNotEmpty);
+            .where((line) => line.startsWith('    ') && line.trim().isNotEmpty)
+            .toList();
         var sawRowWithExample = false;
         for (final line in commandLines) {
+          final nameEnd = line.indexOf(RegExp(r'  '), 4);
+          expect(
+            nameEnd,
+            greaterThan(4),
+            reason: 'no 2-space gap after the name column in: "$line"',
+          );
+
           final exampleStart = line.indexOf('cx ');
           if (exampleStart <= 0) continue;
           sawRowWithExample = true;
           expect(
-            line[exampleStart - 1],
-            ' ',
-            reason: 'no separating space before the example in: "$line"',
+            line.substring(exampleStart - 2, exampleStart),
+            '  ',
+            reason: 'no 2-space gap before the example in: "$line"',
           );
         }
         expect(sawRowWithExample, isTrue);
@@ -123,9 +131,9 @@ void main() {
           "  └─     ─┘\n"
           "\n"
           "  Commands:\n"
-          "    eval rpn        evaluate an RPN program       cx eval rpn "
+          "    eval rpn         evaluate an RPN program        cx eval rpn "
           "'1 2 +'\n"
-          "    eval infix      evaluate an expression        cx eval infix "
+          "    eval infix       evaluate an expression         cx eval infix "
           '"2^0.5"\n'
           "\n"
           "  Quickstart:  cx '[[0,-1],[1,0]] 2 ^'",
