@@ -234,8 +234,8 @@ void main() {
 
     test('a word not yet exact converts to approximate (D53)', () {
       expect(_rpn('4 sqrt').isExact, isFalse);
-      expect(_rpn('[[1 2] [3 4]] inverse').isExact, isFalse);
-      expect(_rpn('[[1 2] [3 4]] determinant').isExact, isFalse);
+      expect(_rpn('[[1 2] [3 4]] eigenvalues').isExact, isFalse);
+      expect(_rpn('[[1 2] [3 4]] frobenius-norm').isExact, isFalse);
     });
   });
 
@@ -272,8 +272,7 @@ void main() {
       );
     });
 
-    test('negative matrix powers and fractional powers are approximate', () {
-      expect(_rpn('[[1 2] [3 4]] -1 ^').isExact, isFalse);
+    test('fractional powers are approximate', () {
       expect(_rpn('4 1 2 / ^').isExact, isFalse);
       expect(_rpn('2 ~3 ^'), _approximateScalar(8));
     });

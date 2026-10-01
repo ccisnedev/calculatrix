@@ -113,6 +113,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	result: `cx '3 1000000 approx ^'`. `--max-digits <n>` on `eval rpn`,
 	`eval infix` and the shortcut sets the limit; the default is 10000 (D55).
 	Shipped in `cx` 0.10.0.
+- Exact linear algebra (runbook-trust.md, step T3). `inverse`,
+	`determinant`, `rref`, `rank`, `trace`, `adjugate`, `cofactors`, `lu`,
+	`dot`, `cross` and negative matrix powers are exact on exact values:
+	`[[1 2] [3 4]] inverse` prints `[[-2 1] [1.5 -0.5]]` without the mark,
+	and the inverse of a Hilbert matrix is its exact integer matrix (D53).
+	Before computing, the elimination words estimate the size of the result
+	with the Hadamard bound and raise `limit-exceeded` over the limit, with
+	the program to run for an approximate result (D55). `lu` picks the same
+	pivots as the approximate decomposition, so P is the same. Shipped in
+	`cx` 0.11.0.
 
 ## [0.7.1] - 2026-05-30
 

@@ -1,6 +1,7 @@
-// Exact numbers through `cx` (runbook-trust.md, step T2): the output of
-// D54, the approximate mark as input (D56), contagion (D51), and the size
-// limit with --max-digits (D55).
+// Exact numbers through `cx` (runbook-trust.md, steps T2 and T3): the
+// output of D54, the approximate mark as input (D56), contagion (D51), the
+// exact linear algebra words (D53) and the size limit with --max-digits
+// (D55).
 import 'dart:convert';
 
 import 'package:calculatrix_cli/calculatrix_cli.dart';
@@ -36,6 +37,15 @@ void main() {
       ('3 40 ^', '1: 12157665459056928801\n'),
       ('2 -1 ^', '1: 0.5\n'),
       ('[[1 2] [3 4]] 2 ^', '1: [[7 10] [15 22]]\n'),
+      ('[[1 2] [3 4]] inverse', '1: [[-2 1] [1.5 -0.5]]\n'),
+      ('[[1 2] [3 4]] -1 ^', '1: [[-2 1] [1.5 -0.5]]\n'),
+      ('[[2 1] [1 3]] 3 / inverse', '1: [[1.8 -0.6] [-0.6 1.2]]\n'),
+      ('[[1 2] [3 4]] determinant', '1: -2\n'),
+      ('[[1 2 3] [4 5 6] [7 8 10]] 3 / determinant', '1: -1/9\n'),
+      ('[[1 2] [2 4]] rank', '1: 1\n'),
+      ('[[2 4 6] [1 3 5]] rref', '1: [[1 0 -1] [0 1 2]]\n'),
+      ('[[1] [2] [3]] 7 / [[4] [5] [6]] dot', '1: 32/7\n'),
+      ('[[1 2] [3 4]] ~1 * inverse', '1: ~[[-2 1] [1.5 -0.5]]\n'),
       ('1 3 / approx', '1: ~0.333333333333\n'),
       ('~0.1 0.2 +', '1: ~0.3\n'),
       ('~-0.1 0.1 +', '1: ~0\n'),
@@ -157,6 +167,35 @@ void main() {
       final rerun = await run(['10 6 approx ^']);
       expect(rerun, ExitCode.ok);
       expect(out.output, '1: ~1000000\n');
+    });
+
+    test('an exact determinant over the limit suggests approx', () async {
+      final code = await run([
+        'eval',
+        'rpn',
+        '--json',
+        '--max-digits',
+        '50',
+        '[[1e30 1] [1 1e30]] determinant',
+      ]);
+      expect(code, ExitCode.dataError);
+      final error = errorOf();
+      expect(error['id'], 'limit-exceeded');
+      expect(error['details']['estimated'], 61);
+      expect(
+        error['message'],
+        'The exact determinant could have up to 61 digits (Hadamard bound), '
+        'over the limit of 50; for an approximate result: '
+        "cx '[[1e30 1] [1 1e30]] approx determinant', or raise the limit with "
+        '--max-digits.',
+      );
+      out = MemorySink();
+      err = MemorySink();
+      expect(
+        await run(['[[1e30 1] [1 1e30]] approx determinant']),
+        ExitCode.ok,
+      );
+      expect(out.output, startsWith('1: ~'));
     });
 
     test('a literal over the limit suggests the mark ~', () async {

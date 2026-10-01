@@ -88,25 +88,22 @@ void main() {
     });
   });
 
-  group(
-    'usage lines name cx (issue #22 acceptance item 3, PR #23 review)',
-    () {
-      test('cx --help prints a Usage: line naming cx', () async {
-        final code = await run(['--help']);
-        expect(code, ExitCode.ok);
-        expect(out.output, contains('Usage: cx'));
-      });
+  group('usage lines name cx (issue #22 acceptance item 3, PR #23 review)', () {
+    test('cx --help prints a Usage: line naming cx', () async {
+      final code = await run(['--help']);
+      expect(code, ExitCode.ok);
+      expect(out.output, contains('Usage: cx'));
+    });
 
-      test(
-        'an option error under eval infix prints a Usage: line naming cx',
-        () async {
-          final code = await run(['eval', 'infix', '--bogus']);
-          expect(code, ExitCode.validationFailed);
-          expect(err.output, contains('Usage: cx eval infix'));
-        },
-      );
-    },
-  );
+    test(
+      'an option error under eval infix prints a Usage: line naming cx',
+      () async {
+        final code = await run(['eval', 'infix', '--bogus']);
+        expect(code, ExitCode.validationFailed);
+        expect(err.output, contains('Usage: cx eval infix'));
+      },
+    );
+  });
 
   group('cx <program> shortcut', () {
     test("cx '-1 2 +' evaluates and exits 0", () async {
@@ -500,13 +497,15 @@ void main() {
   });
 
   group('eval output: display formatter and whole stack (D45, D47)', () {
-    test("cx '[[1 2] [3 4]] inverse' prints 1: ~[[-2 1] [1.5 -0.5]]", () async {
-      // inverse is approximate until step T3 of the runbook (D53), and an
-      // approximate value carries the mark once, in front (D54).
-      final code = await run(['[[1 2] [3 4]] inverse']);
-      expect(code, ExitCode.ok);
-      expect(out.output, '1: ~[[-2 1] [1.5 -0.5]]\n');
-    });
+    test(
+      "cx '~[[1 2] [3 4]] inverse' prints 1: ~[[-2 1] [1.5 -0.5]]",
+      () async {
+        // An approximate value carries the mark once, in front (D54).
+        final code = await run(['~[[1 2] [3 4]] inverse']);
+        expect(code, ExitCode.ok);
+        expect(out.output, '1: ~[[-2 1] [1.5 -0.5]]\n');
+      },
+    );
 
     test('--json keeps the full double the text rounds', () async {
       final code = await run(['eval', 'rpn', '--json', '[[1 2] [3 4]] -1 ^']);
@@ -529,17 +528,20 @@ void main() {
       expect(out.output, '2: 5\n1: [[0 -1] [1 0]]\n');
     });
 
-    test('cx eval rpn --json gives each level explicitly, in print order', () async {
-      final code = await run(['eval', 'rpn', '--json', '5 7 9']);
-      expect(code, ExitCode.ok);
-      expect(jsonDecode(out.output), {
-        'stack': [
-          {'level': 3, 'exact': true, 'value': '5'},
-          {'level': 2, 'exact': true, 'value': '7'},
-          {'level': 1, 'exact': true, 'value': '9'},
-        ],
-      });
-    });
+    test(
+      'cx eval rpn --json gives each level explicitly, in print order',
+      () async {
+        final code = await run(['eval', 'rpn', '--json', '5 7 9']);
+        expect(code, ExitCode.ok);
+        expect(jsonDecode(out.output), {
+          'stack': [
+            {'level': 3, 'exact': true, 'value': '5'},
+            {'level': 2, 'exact': true, 'value': '7'},
+            {'level': 1, 'exact': true, 'value': '9'},
+          ],
+        });
+      },
+    );
 
     test("cx eval rpn '1 drop' leaves an empty stack: no level, 0", () async {
       final code = await run(['eval', 'rpn', '1 drop']);
@@ -589,68 +591,48 @@ void main() {
       expect(error['message'], contains('cx eval rpn "7 sqrt"'));
     });
 
-    test(
-      'cx eval infix "sqrt(1+2)" never suggests a command that would '
-      'itself fail (issue #51, AC2): "cx eval rpn \\"1+2 sqrt\\"" is two '
-      'tokens, the second of which is unknown-word',
-      () async {
-        final code = await run(['eval', 'infix', '--json', 'sqrt(1+2)']);
-        expect(code, ExitCode.dataError);
-        final decoded = jsonDecode(err.output) as Map<String, dynamic>;
-        final error = decoded['error'] as Map<String, dynamic>;
-        expect(error['message'], isNot(contains('cx eval rpn')));
-      },
-    );
+    test('cx eval infix "sqrt(1+2)" never suggests a command that would '
+        'itself fail (issue #51, AC2): "cx eval rpn \\"1+2 sqrt\\"" is two '
+        'tokens, the second of which is unknown-word', () async {
+      final code = await run(['eval', 'infix', '--json', 'sqrt(1+2)']);
+      expect(code, ExitCode.dataError);
+      final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+      final error = decoded['error'] as Map<String, dynamic>;
+      expect(error['message'], isNot(contains('cx eval rpn')));
+    });
 
-    test(
-      'cx eval infix "sqrt (7)" (space before the call) never suggests a '
-      'command that would itself underflow (issue #51, AC2)',
-      () async {
-        final code = await run(['eval', 'infix', '--json', 'sqrt (7)']);
-        expect(code, ExitCode.dataError);
-        final decoded = jsonDecode(err.output) as Map<String, dynamic>;
-        final error = decoded['error'] as Map<String, dynamic>;
-        expect(error['message'], isNot(contains('cx eval rpn')));
-      },
-    );
+    test('cx eval infix "sqrt (7)" (space before the call) never suggests a '
+        'command that would itself underflow (issue #51, AC2)', () async {
+      final code = await run(['eval', 'infix', '--json', 'sqrt (7)']);
+      expect(code, ExitCode.dataError);
+      final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+      final error = decoded['error'] as Map<String, dynamic>;
+      expect(error['message'], isNot(contains('cx eval rpn')));
+    });
 
-    test(
-      'cx eval infix "frobenius-norm(7)" names the whole hyphenated word, '
-      'not just "frobenius" (issue #51, AC2)',
-      () async {
-        final code = await run([
-          'eval',
-          'infix',
-          '--json',
-          'frobenius-norm(7)',
-        ]);
-        expect(code, ExitCode.dataError);
-        final decoded = jsonDecode(err.output) as Map<String, dynamic>;
-        final error = decoded['error'] as Map<String, dynamic>;
-        final details = error['details'] as Map<String, dynamic>;
-        expect(details['name'], 'frobenius-norm');
-        expect(error['message'], contains('cx eval rpn "7 frobenius-norm"'));
-      },
-    );
+    test('cx eval infix "frobenius-norm(7)" names the whole hyphenated word, '
+        'not just "frobenius" (issue #51, AC2)', () async {
+      final code = await run(['eval', 'infix', '--json', 'frobenius-norm(7)']);
+      expect(code, ExitCode.dataError);
+      final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+      final error = decoded['error'] as Map<String, dynamic>;
+      final details = error['details'] as Map<String, dynamic>;
+      expect(details['name'], 'frobenius-norm');
+      expect(error['message'], contains('cx eval rpn "7 frobenius-norm"'));
+    });
 
     test('cx "3^-2" (shortcut) hints at eval infix instead of a plain '
         'unknown-word (issue #51, AC3)', () async {
       final code = await run(['3^-2']);
       expect(code, ExitCode.dataError);
-      expect(
-        err.output,
-        contains('this looks like an infix expression'),
-      );
+      expect(err.output, contains('this looks like an infix expression'));
     });
 
     test('cx eval rpn "1+.5" hints at eval infix instead of a plain '
         'unknown-word (issue #51, AC3)', () async {
       final code = await run(['eval', 'rpn', '1+.5']);
       expect(code, ExitCode.dataError);
-      expect(
-        err.output,
-        contains('this looks like an infix expression'),
-      );
+      expect(err.output, contains('this looks like an infix expression'));
     });
   });
 
@@ -729,7 +711,10 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac((stack.single as Map)['value'] as num, 0.66666666666666666666);
+      expectNearGiac(
+        (stack.single as Map)['value'] as num,
+        0.66666666666666666666,
+      );
     });
 
     test("cx eval infix '~2/3' matches Giac's 2/3 within 1e-12", () async {
@@ -737,7 +722,10 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac((stack.single as Map)['value'] as num, 0.66666666666666666666);
+      expectNearGiac(
+        (stack.single as Map)['value'] as num,
+        0.66666666666666666666,
+      );
     });
 
     // sqrt(2). Giac: evalf(sqrt(2)) = 1.4142135623730950488.
@@ -746,7 +734,10 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac((stack.single as Map)['value'] as num, 1.4142135623730950488);
+      expectNearGiac(
+        (stack.single as Map)['value'] as num,
+        1.4142135623730950488,
+      );
     });
 
     test("cx eval infix '√2' matches Giac's sqrt(2) within 1e-12", () async {
@@ -754,7 +745,10 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac((stack.single as Map)['value'] as num, 1.4142135623730950488);
+      expectNearGiac(
+        (stack.single as Map)['value'] as num,
+        1.4142135623730950488,
+      );
     });
 
     // 2^0.5: non-integer power, same value as sqrt(2) by construction.
@@ -764,7 +758,10 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac((stack.single as Map)['value'] as num, 1.4142135623730950488);
+      expectNearGiac(
+        (stack.single as Map)['value'] as num,
+        1.4142135623730950488,
+      );
     });
 
     test("cx eval infix '2^0.5' matches Giac's 2^0.5 within 1e-12", () async {
@@ -772,7 +769,10 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac((stack.single as Map)['value'] as num, 1.4142135623730950488);
+      expectNearGiac(
+        (stack.single as Map)['value'] as num,
+        1.4142135623730950488,
+      );
     });
 
     // Matrix product [[1,2],[3,4]] * [[5,6],[7,8]]. Giac:

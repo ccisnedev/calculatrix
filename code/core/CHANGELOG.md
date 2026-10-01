@@ -217,6 +217,18 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   `~1e400` still is. Differential tests against Giac
   (`test/exact/giac_differential_test.dart`, tag `giac`) check every exact
   word of this step, and run in CI (D57).
+- Exact linear algebra (runbook-trust.md, step T3). `ExactLinearAlgebra`
+  extends `ExactArithmetic` with `inverse`, `determinant`, `rref`, `rank`,
+  `trace`, `cofactors`, `adjugate`, `lu`, `dot` and `cross` on exact
+  matrices, and the matching RPN words use them on exact operands (D53);
+  a negative integer power of an exact square matrix is the exact power of
+  its inverse. Elimination is fraction-free (Bareiss) on the integer matrix
+  over one common denominator. Before computing, the Hadamard bound
+  estimates the size of the result and raises `limit-exceeded` over
+  `maxDigits` (D55). Shapes and error messages are those of the
+  approximate methods, and `lu` picks the pivot of largest magnitude, as
+  `luDecomposition` does. The Giac differential tests cover every new word,
+  with more than 1100 cases.
 
 ### Fixed
 
