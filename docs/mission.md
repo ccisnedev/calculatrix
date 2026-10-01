@@ -49,6 +49,8 @@ free to use whatever they normally use.
   `0.1 + 0.2 - 0.3` or the inverse of a Hilbert matrix. Answer keys are
   verified with Giac.
 
+The task sets, answer keys and scripts live in `benchmark/`.
+
 The metric that matters most: **with `cx` installed and mentioned in the
 agent's instructions, but not requested for the task, does the agent
 choose `cx` on its own?**

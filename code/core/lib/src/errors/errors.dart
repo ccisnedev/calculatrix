@@ -15,7 +15,8 @@ enum CalculatrixErrorId {
   logUndefined('log-undefined'),
   ambiguousPower('ambiguous-power'),
   syntaxError('syntax-error'),
-  limitExceeded('limit-exceeded');
+  limitExceeded('limit-exceeded'),
+  complexResult('complex-result');
 
   const CalculatrixErrorId(this.id);
 

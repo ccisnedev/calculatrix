@@ -359,7 +359,7 @@ offset of the token in the program.
 Ids: `unknown-word`, `stack-underflow`, `type-mismatch`, `dimension-mismatch`,
 `singular-matrix`, `non-finite`, `log-undefined`, `ambiguous-power`,
 `syntax-error` (infix, and a sign before the mark `~` in RPN: `-~0.1`),
-`limit-exceeded`. `no-convergence`, `unsupported-matrix-function`
+`limit-exceeded`, `complex-result`. `no-convergence`, `unsupported-matrix-function`
 and `matrix-out-of-precision-range` are revoked (runbook D35, D37, D38,
 2026-09-28); see spec section 14, R22 to R24. The ids belong to the core; the CLI only renders
 them. The semantics of `power`, the source of `log-undefined` and
@@ -384,6 +384,19 @@ Error: 3^1000000 has about 477122 digits, over the limit of 10000; for an approx
   position: 11
   limit: 10000
   estimated: 477122
+```
+
+**Complex results.** A real matrix whose eigenvalues include a complex
+pair has no column of eigenvalues to print yet, so `eigenvalues` and
+`diagonalize` raise `complex-result` instead of a wrong or partial value,
+exact or approximate input alike (runbook-trust.md D60; complex vectors
+are issue #64).
+
+```text
+$ cx '[[0 -1] [1 0]] eigenvalues'
+Error: The eigenvalues of this matrix are complex, and cx has no complex columns yet. [complex-result]
+  token: eigenvalues
+  position: 16
 ```
 
 ## 7. The encyclopedia: `cx commands`
@@ -999,7 +1012,7 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx '[[5 4] [4 5]] sqrt'` | prints `1: [[2 1] [1 2]]`, 0: exact (trust D53) |
 | `cx '[[2 1] [1 2]] eigenvalues'` | prints `1: [[3] [1]]`, 0: exact (trust D53) |
 | `cx '[[1 2] [3 4]] eigenvalues'` | prints `1: ~[[5.37228132327] [-0.372281323269]]`, 0: irrational, so approximate (trust D53) |
-| `cx '[[0 -1] [1 0]] eigenvalues'` | `calculatrix-error`, 65: complex eigenvalues are deferred (trust D53) |
+| `cx '[[0 -1] [1 0]] eigenvalues'` | `complex-result`, 65, `token: eigenvalues`: complex eigenvalues are deferred (trust D53, D60) |
 | `cx '[[3 4]] frobenius-norm'` | prints `1: 5`, 0: exact (trust D53) |
 | `cx --max-digits 50 '[[1e30 1] [1 1e30]] eigenvalues'` | `limit-exceeded`, 65, `estimated: 62` from the norm bound; suggests `cx '[[1e30 1] [1 1e30]] approx eigenvalues'` (trust D55) |
 | `cx '-4 sqrt'` | the same result as `cx '-4 0.5 ^'`, bit for bit (D44) |

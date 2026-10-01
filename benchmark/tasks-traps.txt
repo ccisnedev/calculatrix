@@ -1,0 +1,8 @@
+1. 3^40 (all its digits)
+2. The determinant of the matrix [[1 2 3] [4 5 6] [7 8 9]]
+3. The inverse of the matrix [[1 2 3] [4 5 6] [7 8 9]]
+4. The inverse of the 4x4 Hilbert matrix, H(i,j) = 1/(i+j-1)
+5. (10^16 + 1) - 10^16
+6. 0.1 + 0.2 - 0.3
+7. The product of A = [[1 2] [3 4]] and B = [[5 6] [7 8]]
+8. The eigenvalues of [[0 -1] [1 0]]

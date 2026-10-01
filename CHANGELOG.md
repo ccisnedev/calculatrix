@@ -146,6 +146,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	at once, and the test failed writing to it instead of skipping. It now
 	skips, as it does when Giac is missing. No change to `cx` itself since
 	0.13.0.
+- Complex results (runbook-trust.md, step T6, D60). A real matrix with a
+	complex pair of eigenvalues makes `eigenvalues` and `diagonalize` raise
+	the new error id `complex-result`, exit 65, instead of the generic
+	`calculatrix-error`: `[[0 -1] [1 0]] eigenvalues` has no column of
+	complex values to print yet (issue #64). Shipped in `cx` 0.14.0.
+
+### Benchmark
+
+- The agent benchmark of `docs/mission.md` moves into `benchmark/`: the
+	basic and trap task sets, their answer keys verified with Giac,
+	`run-trial.ps1` and `summarize.ps1`. `benchmark/trap-set.json` writes
+	each trap as a `cx` program with its expected output, and
+	`code/cli/test/trap_set_test.dart` runs it in RPN and infix with the CLI
+	tests, which the CLI release workflow runs before every release: the
+	trap set passes 8 of 8 through `cx` (acceptance 2 of #54).
 
 ### App
 

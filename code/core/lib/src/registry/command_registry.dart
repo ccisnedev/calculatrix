@@ -1379,6 +1379,7 @@ final class CalculatrixCommandRegistry {
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
         CalculatrixErrorId.dimensionMismatch,
+        CalculatrixErrorId.complexResult,
       ],
       seeAlso: const <String>['diagonalize'],
       build: () => const EigenvaluesCommand(),
@@ -1407,6 +1408,7 @@ final class CalculatrixCommandRegistry {
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
         CalculatrixErrorId.dimensionMismatch,
+        CalculatrixErrorId.complexResult,
       ],
       seeAlso: const <String>['eigenvalues'],
       build: () => const DiagonalizationCommand(),
