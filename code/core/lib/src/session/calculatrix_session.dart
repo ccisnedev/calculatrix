@@ -5,6 +5,7 @@ import '../machine/calculatrix_machine.dart';
 import '../machine/calculatrix_macro.dart';
 import '../machine/commands.dart';
 import '../matrix/matrix.dart';
+import '../matrix/matrix_display_formatter.dart';
 import '../rpn/rpn_engine.dart';
 
 enum CalculatrixMode { infix, rpn }
@@ -47,8 +48,7 @@ class CalculatrixSession {
   Matrix? get rpnTopValue => _machine.top;
 
   List<String> get rpnStackLiterals {
-    return _machine.stackSnapshot
-        .reversed
+    return _machine.stackSnapshot.reversed
         .map(_serializeMatrix)
         .toList(growable: false);
   }
@@ -115,10 +115,7 @@ class CalculatrixSession {
   }
 
   void insertMatrixLiteral(String literal) {
-    final Matrix matrix = Calculatrix.evaluateInfix(
-      literal,
-      approximate: true,
-    );
+    final Matrix matrix = Calculatrix.evaluateInfix(literal);
     _clearError();
 
     if (!isRpnMode) {
@@ -141,7 +138,9 @@ class CalculatrixSession {
       return;
     }
 
-    if (_infixDraft.isEmpty && _currentValue != null && _lastOperator.isNotEmpty) {
+    if (_infixDraft.isEmpty &&
+        _currentValue != null &&
+        _lastOperator.isNotEmpty) {
       _infixDraft =
           '${_expressionSeedFromCurrentValue()}$_lastOperator$_lastOperand';
     }
@@ -224,14 +223,32 @@ class CalculatrixSession {
     }
 
     if (_infixDraft.isNotEmpty) {
-      if (_infixDraft.startsWith('-')) {
-        _infixDraft = _infixDraft.substring(1);
-      } else {
-        _infixDraft = '-$_infixDraft';
-      }
+      _infixDraft = _toggledInfixDraft(_infixDraft);
       _clearError();
     }
   }
+
+  // The sign goes after the approximate mark (`~-0.5`, runbook D56) and
+  // inside a leading parenthesized fraction (`(-1/3)×3`), since infix reads
+  // neither `-~0.5` nor `-(1/3)`.
+  String _toggledInfixDraft(String draft) {
+    if (draft.startsWith('~')) {
+      return '~${_toggledInfixDraft(draft.substring(1))}';
+    }
+    final RegExpMatch? fraction = _parenthesizedFraction.firstMatch(draft);
+    if (fraction != null) {
+      final String rest = draft.substring(fraction.end);
+      return fraction.group(1)!.isEmpty
+          ? '(-${fraction.group(2)})$rest'
+          : '(${fraction.group(2)})$rest';
+    }
+    if (draft.startsWith('-')) {
+      return draft.substring(1);
+    }
+    return '-$draft';
+  }
+
+  static final RegExp _parenthesizedFraction = RegExp(r'^\((-?)(\d+/\d+)\)');
 
   void memoryClear() {
     if (isRpnMode) {
@@ -286,7 +303,9 @@ class CalculatrixSession {
     }
 
     try {
-      _memoryValue = _memoryValue == null ? operand : _memoryValue! + operand;
+      _memoryValue = _memoryValue == null
+          ? operand
+          : _applyCommand(const AddCommand(), _memoryValue!, operand);
       _clearError();
     } on CalculatrixError catch (error) {
       _lastError = error;
@@ -300,7 +319,9 @@ class CalculatrixSession {
     }
 
     try {
-      _memoryValue = _memoryValue == null ? operand.scale(-1) : _memoryValue! - operand;
+      _memoryValue = _memoryValue == null
+          ? _negatedValue(operand)
+          : _applyCommand(const SubtractCommand(), _memoryValue!, operand);
       _clearError();
     } on CalculatrixError catch (error) {
       _lastError = error;
@@ -391,11 +412,11 @@ class CalculatrixSession {
   }
 
   Matrix _evaluateExpression(String expression) {
-    final String normalized = _normalizeSessionPercentExpression(expression)
-        .replaceAll('×', '*')
-        .replaceAll('÷', '/');
+    final String normalized = _normalizeSessionPercentExpression(
+      expression,
+    ).replaceAll('×', '*').replaceAll('÷', '/');
 
-    return Calculatrix.evaluateInfix(normalized, approximate: true);
+    return Calculatrix.evaluateInfix(normalized);
   }
 
   // Repeat-equals ("=" pressed again with an empty draft) replays
@@ -410,7 +431,9 @@ class CalculatrixSession {
   // all; a raw scan that does not even track bracket depth would find it
   // first).
   void _saveLastOperation(String expression) {
-    final String normalized = expression.replaceAll('×', '*').replaceAll('÷', '/');
+    final String normalized = expression
+        .replaceAll('×', '*')
+        .replaceAll('÷', '/');
 
     List<String> tokens;
     try {
@@ -653,7 +676,9 @@ class CalculatrixSession {
   }
 
   String _currentInfixOperandExpression(String expression) {
-    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(expression);
+    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(
+      expression,
+    );
     return context?.rightExpression ?? expression;
   }
 
@@ -716,7 +741,7 @@ class CalculatrixSession {
       return true;
     }
 
-    return _isOperator(previous) || previous == '(';
+    return _isOperator(previous) || previous == '(' || previous == '~';
   }
 
   Matrix _parseDraftOperand(String expression) {
@@ -724,16 +749,20 @@ class CalculatrixSession {
         .replaceAll('×', '*')
         .replaceAll('÷', '/');
 
-    return Calculatrix.evaluateInfix(normalized, approximate: true);
+    return Calculatrix.evaluateInfix(normalized);
   }
 
   // Token boundaries in an rpn line are shared with rpn programs: splitting
   // on every literal space would tear a matrix literal such as
   // "[[1 2] [3 4]]" apart, so this delegates to the same bracket-aware
   // tokenizer the core uses for RPN programs rather than a second one.
+  //
+  // Each token is read as an RPN program of one token, as cx reads it, so
+  // `1/3` is a fraction literal and `1.5/2` an unknown word (runbook D59),
+  // never an infix expression.
   List<Matrix> _parseDraftTokens(String draft) {
     return Calculatrix.tokenizeRpnLine(draft)
-        .map(_parseDraftOperand)
+        .map((String token) => Calculatrix.evaluateRpn(<String>[token]))
         .toList(growable: false);
   }
 
@@ -773,8 +802,9 @@ class CalculatrixSession {
   // since both are toggled by this same textual prefix rule.
   String _toggleSignOfLastToken(String draft) {
     final int lastTokenStart = Calculatrix.lastRpnTokenBoundary(draft);
-    final String prefix = draft.substring(0, lastTokenStart);
-    final String lastToken = draft.substring(lastTokenStart);
+    final String mark = draft.startsWith('~', lastTokenStart) ? '~' : '';
+    final String prefix = draft.substring(0, lastTokenStart) + mark;
+    final String lastToken = draft.substring(lastTokenStart + mark.length);
 
     final String toggledToken;
     if (lastToken.startsWith('-')) {
@@ -848,7 +878,8 @@ class CalculatrixSession {
       // action only clears memory, so "MC" with no pending draft must
       // leave repeat-equals intact, matching the empty-draft case there).
       _syncCommittedValueFromRpnStack(
-        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
+        invalidateRepeatEquals:
+            _machine.mutationCount != mutationCountBeforeAction,
       );
     } on FormatException catch (error) {
       _lastError = error;
@@ -865,12 +896,14 @@ class CalculatrixSession {
       // content in place without changing how many elements are on the
       // stack (e.g. negating the top), which depth alone cannot detect.
       _syncCommittedValueFromRpnStack(
-        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
+        invalidateRepeatEquals:
+            _machine.mutationCount != mutationCountBeforeAction,
       );
     } on CalculatrixError catch (error) {
       _lastError = error;
       _syncCommittedValueFromRpnStack(
-        invalidateRepeatEquals: _machine.mutationCount != mutationCountBeforeAction,
+        invalidateRepeatEquals:
+            _machine.mutationCount != mutationCountBeforeAction,
       );
     }
   }
@@ -886,9 +919,7 @@ class CalculatrixSession {
     }
   }
 
-  void _syncCommittedValueFromRpnStack({
-    bool invalidateRepeatEquals = false,
-  }) {
+  void _syncCommittedValueFromRpnStack({bool invalidateRepeatEquals = false}) {
     _currentValue = _machine.top;
     if (invalidateRepeatEquals) {
       _clearRepeatState();
@@ -963,24 +994,49 @@ class CalculatrixSession {
     return _expressionSeedFromValue(value);
   }
 
+  // An infix seed reads back as the same value: an exact scalar in full
+  // (a fraction in parentheses, so `2÷(1/3)` stays one division), an
+  // approximate one marked, with its whole double, as a matrix seed has
+  // (runbook D54, D56).
   String _expressionSeedFromValue(Matrix value) {
     if (!value.isScalar) {
       return _serializeMatrix(value);
     }
 
-    return _formatScalarLiteral(value.scalarValue);
+    if (!value.isExact) {
+      return '~${_formatMatrixNumber(value.scalarValue)}';
+    }
+
+    final String text = value.exactAt(0, 0).toDisplayString();
+    return text.contains('/') ? '($text)' : text;
+  }
+
+  // The session's own unary and memory operations run the same commands
+  // as the RPN words, so they keep exactness the same way (runbook D51).
+  Matrix _applyCommand(
+    CalculatrixCommand command,
+    Matrix value, [
+    Matrix? other,
+  ]) {
+    final CalculatrixMachine scratch = CalculatrixMachine()
+      ..execute(PushMatrixCommand(value));
+    if (other != null) {
+      scratch.execute(PushMatrixCommand(other));
+    }
+    scratch.execute(command);
+    return scratch.top!;
   }
 
   Matrix _negatedValue(Matrix value) {
-    return value.scale(-1);
+    return _applyCommand(const NegateCommand(), value);
   }
 
   Matrix _sqrtValue(Matrix value) {
-    return value.sqrt();
+    return _applyCommand(const SqrtCommand(), value);
   }
 
   Matrix _invertValue(Matrix value) {
-    return value.inverse();
+    return _applyCommand(const InverseCommand(), value);
   }
 
   Matrix _transposeValue(Matrix value) {
@@ -988,7 +1044,9 @@ class CalculatrixSession {
   }
 
   String _normalizeSessionPercentExpression(String expression) {
-    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(expression);
+    final _InfixBinaryContext? context = _tryParseInfixBinaryContext(
+      expression,
+    );
     if (context != null) {
       final String normalizedLeft = _normalizeSessionPercentExpression(
         context.leftExpression,
@@ -1009,8 +1067,9 @@ class CalculatrixSession {
     required String normalizedLeftExpression,
     required String rightExpression,
   }) {
-    final _InfixPercentContext? percentContext =
-        _tryParseInfixPercentContext(rightExpression);
+    final _InfixPercentContext? percentContext = _tryParseInfixPercentContext(
+      rightExpression,
+    );
     if (percentContext == null) {
       return _normalizeStandalonePercentExpression(rightExpression);
     }
@@ -1038,8 +1097,9 @@ class CalculatrixSession {
   }
 
   String _normalizeStandalonePercentExpression(String expression) {
-    final _InfixPercentContext? percentContext =
-        _tryParseInfixPercentContext(expression);
+    final _InfixPercentContext? percentContext = _tryParseInfixPercentContext(
+      expression,
+    );
     if (percentContext == null) {
       return expression;
     }
@@ -1098,8 +1158,12 @@ class CalculatrixSession {
     return -1;
   }
 
+  // A matrix literal that reads back as the same value: exact entries in
+  // full, an approximate matrix marked once with its entries as doubles.
   String _serializeMatrix(Matrix matrix) {
-    final StringBuffer buffer = StringBuffer('[');
+    final StringBuffer buffer = StringBuffer(
+      MatrixDisplayFormatter.mark(matrix),
+    )..write('[');
 
     for (int rowIndex = 0; rowIndex < matrix.rowCount; rowIndex++) {
       if (rowIndex > 0) {
@@ -1107,12 +1171,20 @@ class CalculatrixSession {
       }
 
       buffer.write('[');
-      for (int columnIndex = 0; columnIndex < matrix.columnCount; columnIndex++) {
+      for (
+        int columnIndex = 0;
+        columnIndex < matrix.columnCount;
+        columnIndex++
+      ) {
         if (columnIndex > 0) {
           buffer.write(',');
         }
 
-        buffer.write(_formatMatrixNumber(matrix.at(rowIndex, columnIndex)));
+        buffer.write(
+          matrix.isExact
+              ? matrix.exactAt(rowIndex, columnIndex).toDisplayString()
+              : _formatMatrixNumber(matrix.at(rowIndex, columnIndex)),
+        );
       }
       buffer.write(']');
     }
@@ -1127,23 +1199,6 @@ class CalculatrixSession {
     }
 
     return value.toString();
-  }
-
-  String _formatScalarLiteral(double value) {
-    if (value == 0) {
-      return '0';
-    }
-
-    if (value == value.toInt().toDouble() && value.abs() < 1e12) {
-      return value.toInt().toString();
-    }
-
-    String text = value.toStringAsPrecision(12);
-    if (text.contains('.')) {
-      text = text.replaceAll(RegExp(r'0+$'), '');
-      text = text.replaceAll(RegExp(r'\.$'), '');
-    }
-    return text;
   }
 }
 

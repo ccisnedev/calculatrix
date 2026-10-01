@@ -184,6 +184,8 @@ void main() {
           Matrix.identity(2),
         ]),
       );
+      // Exact, so an exact matrix built on them stays exact (runbook T5).
+      expect(machine.stackSnapshot.every((Matrix m) => m.isExact), isTrue);
     });
 
     test('applies negate and transpose through typed matrix commands', () {

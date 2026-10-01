@@ -1583,6 +1583,157 @@ void main() {
       }
     });
   });
+
+  group('CalculatrixSession - exact values (runbook T5, D54, D59)', () {
+    void type(String keys) {
+      for (final String key in keys.split(' ')) {
+        session.input(key);
+      }
+    }
+
+    String text(Matrix? value) => MatrixDisplayFormatter.text(value!);
+
+    test('infix results are exact: 1 ÷ 3 × 3 = 1 and 0.1 + 0.2 = 0.3', () {
+      type('1 ÷ 3 × 3');
+      session.evaluate();
+      expect(session.currentValue!.isExact, isTrue);
+      expect(text(session.currentValue), '1');
+
+      session.clear();
+      type('0 . 1 + 0 . 2');
+      session.evaluate();
+      expect(text(session.currentValue), '0.3');
+    });
+
+    test('a fraction result seeds the next expression in parentheses', () {
+      type('1 ÷ 3');
+      session.evaluate();
+      expect(text(session.currentValue), '1/3');
+
+      session.input('÷');
+      expect(session.expression, '(1/3)÷');
+      type('2');
+      session.evaluate();
+      expect(text(session.currentValue), '1/6');
+    });
+
+    test('± on a fraction seed flips the sign inside the parentheses', () {
+      type('1 ÷ 3');
+      session.evaluate();
+      session.memoryAdd();
+      session.clear();
+      session.memoryRecall();
+      expect(session.expression, '(1/3)');
+
+      session.toggleSign();
+      expect(session.expression, '(-1/3)');
+      session.toggleSign();
+      expect(session.expression, '(1/3)');
+    });
+
+    test('an approximate result is marked and keeps its mark', () {
+      type('2');
+      session.input('√');
+      // The seed keeps the whole double, so it reads back as the same value.
+      expect(session.expression, '~1.4142135623730951');
+
+      session.toggleSign();
+      expect(session.expression, '~-1.4142135623730951');
+      session.evaluate();
+      expect(session.currentValue!.isExact, isFalse);
+      expect(text(session.currentValue), '~-1.41421356237');
+    });
+
+    test('√ and INV are exact when the result is rational', () {
+      type('9');
+      session.input('√');
+      expect(session.expression, '3');
+
+      session.clear();
+      type('4');
+      session.input('INV');
+      expect(session.expression, '0.25');
+    });
+
+    test('memory keeps exactness', () {
+      type('1 ÷ 3');
+      session.evaluate();
+      session.memoryAdd();
+      session.memoryAdd();
+      expect(text(session.memoryValue), '2/3');
+
+      session.memorySubtract();
+      expect(text(session.memoryValue), '1/3');
+    });
+
+    test('rpn: fractions type in and stack literals read back', () {
+      session.setMode(CalculatrixMode.rpn);
+      type('1 / 3');
+      session.enter();
+      type('3');
+      session.applyRpnBinary(RpnBinaryOperator.multiply);
+      expect(session.rpnTopValue!.isExact, isTrue);
+      expect(session.rpnTopLiteral, '[[1]]');
+
+      type('3');
+      session.applyRpnBinary(RpnBinaryOperator.divide);
+      expect(session.rpnTopLiteral, '[[1/3]]');
+
+      session.applyRpnUnary(RpnUnaryOperator.sqrt);
+      expect(session.rpnTopValue!.isExact, isFalse);
+      expect(session.rpnTopLiteral, startsWith('~[[0.577350269189'));
+    });
+
+    test('rpn: ± keeps the sign after the mark', () {
+      session.setMode(CalculatrixMode.rpn);
+      type('~ 0 . 5');
+      session.toggleSign();
+      expect(session.rpnDraft, '~-0.5');
+      session.toggleSign();
+      expect(session.rpnDraft, '~0.5');
+    });
+
+    test('an approximate seed with an exponent reads back as itself', () {
+      type('2 e 4 0');
+      session.input('√');
+      final double root = Calculatrix.evaluateRpn(<String>['~2e40', 'sqrt'])
+          .scalarValue;
+      expect(session.expression, startsWith('~'));
+
+      session.evaluate();
+      expect(session.hasError, isFalse);
+      expect(session.currentValue!.isExact, isFalse);
+      expect(session.currentValue!.scalarValue, root);
+    });
+
+    test('± on a fraction seed followed by an operator stays valid', () {
+      type('1 ÷ 3');
+      session.evaluate();
+      session.input('×');
+      type('3');
+      expect(session.expression, '(1/3)×3');
+
+      session.toggleSign();
+      expect(session.expression, '(-1/3)×3');
+      session.evaluate();
+      expect(session.hasError, isFalse);
+      expect(text(session.currentValue), '-1');
+    });
+
+    test('rpn: a draft token is read as rpn, as cx reads it (D59)', () {
+      session.setMode(CalculatrixMode.rpn);
+      type('1 . 5 / 2');
+      session.enter();
+      expect(session.hasError, isTrue);
+      expect(session.rpnStack, isEmpty);
+
+      session.clear();
+      type('- 5 / 3');
+      session.enter();
+      expect(session.hasError, isFalse);
+      expect(session.rpnTopLiteral, '[[-5/3]]');
+    });
+  });
 }
 
 // Regression fixture for round 4 defect 2: a macro whose first command

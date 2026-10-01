@@ -1,3 +1,5 @@
+import 'package:calculatrix/calculatrix.dart';
+
 class MatrixEditorDraft {
   MatrixEditorDraft({
     int? order,
@@ -210,10 +212,29 @@ class MatrixEditorDraft {
           return 'Enter a value for r${row + 1} c${column + 1}';
         }
 
-        if (num.tryParse(cell) == null) {
-          return 'r${row + 1} c${column + 1} must be a number, like -2 or 3.5';
+        final String? cellError = _cellError(cell);
+        if (cellError != null) {
+          return 'r${row + 1} c${column + 1} $cellError';
         }
       }
+    }
+
+    return null;
+  }
+
+  // A cell takes the numeric literals of core (runbook D50, D56, D59): a
+  // decimal, a fraction p/q, either with the mark `~`. A cell that reads as
+  // a literal but has no value (`1/0`, a literal over the digit limit) gets
+  // the core message.
+  static String? _cellError(String cell) {
+    if (!Calculatrix.isLiteralToken(cell) || cell.contains('[')) {
+      return 'must be a number, like -2, 3.5 or 1/3';
+    }
+
+    try {
+      Calculatrix.evaluateRpn(<String>[cell]);
+    } on CalculatrixError catch (error) {
+      return 'is not a valid number: ${error.message}';
     }
 
     return null;
@@ -225,54 +246,25 @@ class MatrixEditorDraft {
       throw FormatException(error);
     }
 
-    final List<List<num>> rows = <List<num>>[];
-
-    for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-      final List<num> parsedRow = <num>[];
-      for (int columnIndex = 0; columnIndex < columnCount; columnIndex++) {
-        final String cell = _cells[rowIndex][columnIndex];
-        final num? parsed = num.tryParse(cell);
-        if (parsed == null) {
-          throw FormatException(
-            'r${rowIndex + 1} c${columnIndex + 1} must be a number, like -2 or 3.5',
-          );
-        }
-
-        parsedRow.add(parsed);
-      }
-      rows.add(parsedRow);
-    }
-
+    // The cells go in as typed, so an exact entry stays exact and a marked
+    // one marks the matrix (runbook D56).
     final StringBuffer buffer = StringBuffer('[');
-    for (int r = 0; r < rows.length; r++) {
+    for (int r = 0; r < rowCount; r++) {
       if (r > 0) {
         buffer.write(',');
       }
       buffer.write('[');
-      for (int c = 0; c < rows[r].length; c++) {
+      for (int c = 0; c < columnCount; c++) {
         if (c > 0) {
           buffer.write(',');
         }
-        buffer.write(_formatNumber(rows[r][c]));
+        buffer.write(_cells[r][c]);
       }
       buffer.write(']');
     }
     buffer.write(']');
 
     return buffer.toString();
-  }
-
-  String _formatNumber(num value) {
-    if (value is int) {
-      return value.toString();
-    }
-
-    final double normalized = value.toDouble();
-    if (normalized == normalized.toInt().toDouble()) {
-      return normalized.toInt().toString();
-    }
-
-    return normalized.toString();
   }
 
   void _validateRowIndex(int rowIndex) {

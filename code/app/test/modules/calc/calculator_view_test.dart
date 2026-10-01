@@ -828,7 +828,7 @@ void main() {
       expect(find.descendant(of: _rpnStackCard(0), matching: find.text('X0')), findsOneWidget);
       expect(find.descendant(
         of: _rpnStackCard(0),
-        matching: find.text('[[4]]'),
+        matching: find.text('4'),
       ), findsOneWidget);
       expect(_rpnStackCard(1), findsNothing);
       expect(
@@ -1424,7 +1424,7 @@ void main() {
       expect(find.byKey(const ValueKey<String>('matrix-mode-panel')), findsNothing);
       expect(find.text('Stack 2'), findsOneWidget);
       expect(find.byKey(const ValueKey<String>('rpn-stack-card-0')), findsOneWidget);
-      expect(find.text('[1 0]\n[0 2]'), findsOneWidget);
+      expect(find.text('~[1 0]\n [0 2]'), findsOneWidget);
     });
 
     testWidgets('matrix editor disables identity for non-square shapes', (tester) async {
@@ -1514,6 +1514,20 @@ void main() {
       expect(_matrixEditableText(tester, 0, 0).controller.text, '0.');
     });
 
+    testWidgets('matrix editor ± keeps the sign after the mark (runbook D56)', (tester) async {
+      await tester.pumpWidget(const CalculatrixApp());
+
+      await _openMatrixEditor(tester);
+      await _enterMatrixCell(tester, 0, 0, '~0.5');
+
+      await _tapFinderCenter(tester, _matrixCell(0, 0));
+      await _tapCalculatorButton(tester, '±');
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '~-0.5');
+
+      await _tapCalculatorButton(tester, '±');
+      expect(_matrixEditableText(tester, 0, 0).controller.text, '~0.5');
+    });
+
     testWidgets('matrix editor keeps actions usable while editing a 4x4 draft', (tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(const CalculatrixApp());
@@ -1572,7 +1586,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('[[42]]'), findsOneWidget);
+      expect(find.text('42'), findsOneWidget);
       expect(find.byKey(const ValueKey<String>('calculator-expression-text')), findsNothing);
       handle.dispose();
     });
@@ -1693,7 +1707,7 @@ void main() {
       await _tapCalculatorButton(tester, 'DET');
 
       expect(
-        find.bySemanticsLabel(RegExp(r'Display: \[\[10\]\]')),
+        find.bySemanticsLabel(RegExp(r'Display: 10\b')),
         findsOneWidget,
       );
       handle.dispose();
@@ -1748,7 +1762,9 @@ void main() {
       expect(find.bySemanticsLabel(RegExp(r'Stack depth: 2')), findsOneWidget);
       expect(find.text('Stack 2'), findsOneWidget);
       expect(
-        find.bySemanticsLabel(RegExp(r'Display: \[\[1, 0\], \[0, 2\]\]')),
+        find.bySemanticsLabel(
+          RegExp(r'Display: approximately \[\[1, 0\], \[0, 2\]\]'),
+        ),
         findsOneWidget,
       );
       handle.dispose();
@@ -1874,7 +1890,7 @@ void main() {
 
       expect(_rpnStackCard(1), findsOneWidget);
       expect(
-        find.descendant(of: _rpnStackCard(1), matching: find.text('[[2]]')),
+        find.descendant(of: _rpnStackCard(1), matching: find.text('2')),
         findsOneWidget,
       );
       expect(
@@ -1893,7 +1909,7 @@ void main() {
               ),
             )
             .data,
-        '[[3]]',
+        '3',
       );
     });
 
@@ -1914,7 +1930,7 @@ void main() {
 
       expect(_rpnStackCard(1), findsOneWidget);
       expect(
-        find.descendant(of: _rpnStackCard(1), matching: find.text('[[2]]')),
+        find.descendant(of: _rpnStackCard(1), matching: find.text('2')),
         findsOneWidget,
       );
       expect(
@@ -1926,7 +1942,7 @@ void main() {
               ),
             )
             .data,
-        '[[-3]]',
+        '-3',
       );
     });
 

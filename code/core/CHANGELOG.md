@@ -246,6 +246,18 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   deferred (D53 amended). New: `Rational.root`, `Rational.floorRoot`,
   `Rational.simplestWithin`. The Giac tests cover every word and check
   that irrational results stay approximate.
+- Fraction literals and exact sessions (runbook-trust.md, step T5). An
+  integer fraction `p/q` is one exact numeric literal in RPN and inside a
+  matrix literal (D59), each part of an exact fraction held to `maxDigits`
+  (`~p/q` is exempt, like any marked literal); infix is unchanged.
+  `MatrixDisplayFormatter` prints exact values in full and marks
+  approximate ones with `~` in `compact`, `expanded` and `complex`, and the
+  new `text`, `mark` and `entry` give the `cx` stack-line form (D54).
+  `CalculatrixSession` no longer evaluates literals as approximate: memory
+  arithmetic, sign toggle, square root, inverse and the expression seeded
+  from a result keep exact values, and an approximate seed carries its
+  mark. `PushZerosCommand`, `PushOnesCommand` and `PushIdentityCommand`
+  push exact matrices, as `zeros`, `ones` and `identity` do.
 
 ### Fixed
 

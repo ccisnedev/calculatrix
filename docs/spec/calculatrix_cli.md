@@ -271,10 +271,12 @@ most 20 digits after the point as a decimal, any other rational as a
 fraction (`0.1 0.2 +` prints `0.3`, `1 3 /` prints `1/3`; D54). An
 approximate value goes through the display formatter of core, the same one
 the app uses: at most 12 significant digits, trailing zeros removed (runbook
-D45), with the mark `~` once in front of the value: `[[1 2] [3 4]] -1 ^`
+D45), with the mark `~` once in front of the value: `[[1 2] [3 4]] approx -1 ^`
 prints `~[[-2 1] [1.5 -0.5]]`. The stored value is unchanged, and JSON keeps
-the full double. `~` before a literal makes it approximate, so every text
-output can be typed back (D56).
+the full double. `~` before a literal makes it approximate (D56), and in RPN
+and inside a matrix literal an integer fraction `p/q` is one exact literal
+(`1/3`, `[[1/3 2]]`; D59), so every text output can be typed back. Infix
+keeps `/` as division.
 
 `eval rpn` and the shortcut print the whole stack the program leaves, every
 level, with no limit (runbook D47). A program that leaves the stack empty
