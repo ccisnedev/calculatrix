@@ -120,6 +120,31 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   candidates in a new `suggestions` field (`CalculatrixError.suggestions`,
   empty by default), and appends them to its own message when not empty.
 
+- Actionable agent-facing errors (issue #51): `RpnStackUnderflowError.message`
+  now names the word that underflowed and how far short the stack fell
+  (`"power needs 1 value on the stack, found 0."`), built lazily from a new
+  `needed`/`found` pair every `RpnEngine` throw site now records, once the
+  evaluator's dispatch loop has enriched the error with its word
+  (`CalculatrixError.enrichToken`); an error built with no token, or no
+  `needed`/`found`, keeps its original message exactly as before. A name
+  written into an infix expression (`sqrt(7)`, `e`, `ln(10)`) now raises
+  `ExpressionSyntaxError` (still `syntax-error`, same `details.position`)
+  explaining that infix only accepts numbers, matrix literals, the four
+  arithmetic operators, `^` and parentheses; when the name is a registered
+  RPN word or alias, the message also shows its RPN form (`cx eval rpn "7
+  sqrt"`), via `CalculatrixError.name`, newly set on the error. A
+  non-literal RPN word whose text looks like an infix expression (contains
+  `(`/`)`, or an operator sandwiched between operand-shaped characters,
+  such as `3.7^2.5`) now appends a hint to its `unknown-word` message
+  pointing at `cx eval infix`, both from `cx eval rpn` and from the root
+  `<program>` shortcut; the id, exit code and suggestions are unchanged.
+  `CalculatrixCommandRegistry.suggest()` now scales its distance threshold
+  to the needle's own length (`(needle.length - 1).clamp(0, maxDistance)`)
+  instead of a flat threshold, so a short token such as `e` no longer
+  pulls in unrelated one-character aliases (`+`, `-`, `*`, `/`) as "did you
+  mean" suggestions, while longer typos (`pow`, `dupp`, `transpos`) keep
+  suggesting the word they were obviously reaching for.
+
 ### Fixed
 
 - `Matrix.sqrt()` no longer rejects singular matrices that do have a real

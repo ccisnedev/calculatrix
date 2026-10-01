@@ -319,7 +319,18 @@ final class CalculatrixCommandRegistry {
           best = distance;
         }
       }
-      if (best != null && best <= maxDistance) {
+      // Scaled down for a short needle: a bare maxDistance of 2 puts every
+      // one-character symbolic alias ("+", "-", "*", "/", ...) within
+      // reach of any other single character, so a one-letter typo such as
+      // "e" would otherwise suggest "add", "subtract" and "multiply" by
+      // nothing more than their symbols. A needle only gets the full
+      // maxDistance once it is long enough that a match within it still
+      // shares most of its letters with the candidate.
+      final int effectiveMaxDistance = (needle.length - 1).clamp(
+        0,
+        maxDistance,
+      );
+      if (best != null && best <= effectiveMaxDistance) {
         distanceMatches.add(_CommandSuggestionCandidate(entry.name, best));
       }
     }

@@ -249,7 +249,27 @@ class Calculatrix {
     throw UnknownWordError(
       token,
       suggestions: CalculatrixCommandRegistry.standard.suggest(token),
+      infixHint: _looksLikeInfixExpression(token)
+          ? 'this looks like an infix expression: cx eval infix "$token"'
+          : null,
     );
+  }
+
+  // A non-word RPN token is flagged as "looks like infix" when it carries
+  // parentheses, or an operator sandwiched between two operand-shaped
+  // characters ("3.7^2.5"): neither can ever be a valid RPN word, but both
+  // are exactly what someone who meant to write an infix expression types.
+  // A plain negative literal such as "-5" never reaches this check at all
+  // (it parses as a number before _compileWord gets here), so there is no
+  // risk of this flagging it as infix-like.
+  static final RegExp _infixOperatorBetweenOperands = RegExp(
+    r'[0-9)][+\-*/^][0-9(]',
+  );
+
+  static bool _looksLikeInfixExpression(String token) {
+    return token.contains('(') ||
+        token.contains(')') ||
+        _infixOperatorBetweenOperands.hasMatch(token);
   }
 
   // Compiles a defined word's definition program to commands, by
@@ -584,6 +604,18 @@ class Calculatrix {
         continue;
       }
 
+      // Infix has no notion of a function call or a bare name at all: a
+      // letter-led run of characters here is never a valid infix token,
+      // whether it is a call-like "sqrt(7)" or a lone "e". Scanning the
+      // whole name (rather than letting the generic fallthrough below
+      // report only its first character) is what lets the error explain
+      // the limitation and, when the name is already a known RPN word or
+      // alias, show its RPN form (AC2, issue #51).
+      if (_isNameStart(char)) {
+        final int start = index;
+        throw _buildInfixNameError(expression, start);
+      }
+
       throw ExpressionSyntaxError(
         'Unexpected token near "$char".',
         errorId: CalculatrixErrorId.syntaxError,
@@ -913,6 +945,95 @@ class Calculatrix {
     return _isAsciiDigit(code) || code == _dotCode;
   }
 
+  static bool _isNameStart(String char) {
+    final int code = char.codeUnitAt(0);
+    return (code >= _lowerACode && code <= _lowerZCode) ||
+        (code >= _upperACode && code <= _upperZCode) ||
+        char == '_';
+  }
+
+  static bool _isNameChar(String char) {
+    return _isNameStart(char) || _isAsciiDigit(char.codeUnitAt(0));
+  }
+
+  // Scans the full run of name characters starting at `start` (already
+  // known to be a name start), rather than reporting just its first
+  // character: the resulting name is both what the error message names
+  // and what it looks up against the RPN registry.
+  static String _scanName(String expression, int start) {
+    int index = start;
+    while (index < expression.length && _isNameChar(expression[index])) {
+      index++;
+    }
+    return expression.substring(start, index);
+  }
+
+  // Finds the index just past the "(" at `openIndex`'s matching ")",
+  // accounting for nesting. Falls back to the end of the expression when
+  // the parenthesis is never closed, so a call-like name with an
+  // unbalanced opening paren still gets a best-effort example instead of
+  // crashing the error path itself.
+  static int _matchingParenEnd(String expression, int openIndex) {
+    int depth = 0;
+    for (int index = openIndex; index < expression.length; index++) {
+      if (expression[index] == '(') {
+        depth++;
+      } else if (expression[index] == ')') {
+        depth--;
+        if (depth == 0) {
+          return index + 1;
+        }
+      }
+    }
+    return expression.length;
+  }
+
+  // Builds the actionable error for a name found where infix expects a
+  // number, matrix literal, operator or parenthesis (AC2, issue #51).
+  // When `name` is already a registered RPN word or alias, the message
+  // shows its RPN form; a call-like "name(argument)" carries its argument
+  // over into that form ("sqrt(7)" -> "7 sqrt"), read verbatim rather than
+  // parsed, since only the one argument slot RPN would occupy is needed
+  // here, not a full nested expression evaluation.
+  static ExpressionSyntaxError _buildInfixNameError(
+    String expression,
+    int start,
+  ) {
+    final String name = _scanName(expression, start);
+    final int nameEnd = start + name.length;
+    const String limitation =
+        'infix accepts numbers, matrix literals, + - * / ^ and parentheses';
+
+    final bool isRegistered =
+        CalculatrixCommandRegistry.standard.lookup(name) != null;
+
+    String message;
+    if (isRegistered) {
+      String rpnForm = name;
+      if (nameEnd < expression.length && expression[nameEnd] == '(') {
+        final int closeIndex = _matchingParenEnd(expression, nameEnd);
+        final String argument = expression
+            .substring(nameEnd + 1, closeIndex > nameEnd ? closeIndex - 1 : closeIndex)
+            .trim();
+        if (argument.isNotEmpty) {
+          rpnForm = '$argument $name';
+        }
+      }
+      message = '$limitation; "$name" is an RPN word: cx eval rpn "$rpnForm"';
+    } else {
+      message = '$limitation; "$name" is a name, not a number.';
+    }
+
+    final ExpressionSyntaxError error = ExpressionSyntaxError(
+      message,
+      errorId: CalculatrixErrorId.syntaxError,
+      token: name,
+      position: start + 1,
+    );
+    error.name = name;
+    return error;
+  }
+
   static bool _isSignedNumberStart(
     String source,
     int index,
@@ -1019,6 +1140,10 @@ class Calculatrix {
   static const int _dotCode = 46;
   static const int _lowerECode = 101;
   static const int _upperECode = 69;
+  static const int _lowerACode = 97;
+  static const int _lowerZCode = 122;
+  static const int _upperACode = 65;
+  static const int _upperZCode = 90;
 }
 
 class _NumberScanResult {

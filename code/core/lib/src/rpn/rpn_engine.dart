@@ -47,6 +47,8 @@ class RpnEngine {
       throw RpnStackUnderflowError(
         'Cannot drop from an empty RPN stack.',
         errorId: CalculatrixErrorId.stackUnderflow,
+        needed: 1,
+        found: 0,
       );
     }
 
@@ -75,6 +77,8 @@ class RpnEngine {
       throw RpnStackUnderflowError(
         'Cannot peek from an empty RPN stack.',
         errorId: CalculatrixErrorId.stackUnderflow,
+        needed: 1,
+        found: 0,
       );
     }
 
@@ -86,6 +90,8 @@ class RpnEngine {
       throw RpnStackUnderflowError(
         'Cannot pop from an empty RPN stack.',
         errorId: CalculatrixErrorId.stackUnderflow,
+        needed: 1,
+        found: 0,
       );
     }
 
@@ -97,6 +103,8 @@ class RpnEngine {
       throw RpnStackUnderflowError(
         'A binary operation requires at least two values.',
         errorId: CalculatrixErrorId.stackUnderflow,
+        needed: 2,
+        found: _stack.length,
       );
     }
 
@@ -129,6 +137,8 @@ class RpnEngine {
       throw RpnStackUnderflowError(
         'A unary operation requires at least one value.',
         errorId: CalculatrixErrorId.stackUnderflow,
+        needed: 1,
+        found: 0,
       );
     }
 
@@ -179,6 +189,8 @@ class RpnEngine {
       throw RpnStackUnderflowError(
         'Stack index $indexFromTop exceeds current depth ${_stack.length}.',
         errorId: CalculatrixErrorId.stackUnderflow,
+        needed: indexFromTop,
+        found: _stack.length,
       );
     }
   }

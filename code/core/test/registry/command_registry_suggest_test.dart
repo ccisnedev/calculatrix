@@ -49,6 +49,33 @@ void main() {
 
       expect(suggestions.length, lessThanOrEqualTo(2));
     });
+
+    test('a single-character word suggests nothing: every symbolic alias '
+        '(+, -, *, /) is only one edit away, which would otherwise swamp '
+        'it with unrelated words', () {
+      expect(CalculatrixCommandRegistry.standard.suggest('e'), isEmpty);
+    });
+
+    test('a short but multi-character typo still suggests its target', () {
+      expect(
+        CalculatrixCommandRegistry.standard.suggest('pow'),
+        contains('power'),
+      );
+    });
+
+    test('a longer typo still suggests its target', () {
+      expect(
+        CalculatrixCommandRegistry.standard.suggest('dupp'),
+        contains('duplicate'),
+      );
+    });
+
+    test('a longer typo on a hyphenated name still suggests its target', () {
+      expect(
+        CalculatrixCommandRegistry.standard.suggest('transpos'),
+        contains('transpose'),
+      );
+    });
   });
 
   group('UnknownWordError carries suggestions (issue #41)', () {
