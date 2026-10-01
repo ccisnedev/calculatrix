@@ -86,4 +86,28 @@ void main() {
       expect(MatrixDisplayFormatter.compact(Matrix.scalar(1e-20)), '[[1e-20]]');
     });
   });
+
+  group('MatrixDisplayFormatter.number (runbook D45)', () {
+    test('rounds to 12 significant digits and trims trailing zeros', () {
+      expect(MatrixDisplayFormatter.number(-1.9999999999999996), '-2');
+      expect(MatrixDisplayFormatter.number(1.4999999999999998), '1.5');
+      expect(MatrixDisplayFormatter.number(2 / 3), '0.666666666667');
+    });
+
+    test('integers, zero and negative zero print without a point', () {
+      expect(MatrixDisplayFormatter.number(14), '14');
+      expect(MatrixDisplayFormatter.number(0), '0');
+      expect(MatrixDisplayFormatter.number(-0.0), '0');
+    });
+
+    test('matches the entries compact prints', () {
+      expect(
+        MatrixDisplayFormatter.number(1e20),
+        MatrixDisplayFormatter.compact(Matrix.scalar(1e20)).replaceAll(
+          RegExp(r'[\[\]]'),
+          '',
+        ),
+      );
+    });
+  });
 }

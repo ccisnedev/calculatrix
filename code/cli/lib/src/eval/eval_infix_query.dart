@@ -52,8 +52,7 @@ class EvalInfixQuery implements Query<EvalInfixInput, EvalOutput> {
       stdinReader: readStdin,
     );
     try {
-      final result = Calculatrix.evaluateInfix(expression);
-      return EvalOutput(result);
+      return EvalOutput([Calculatrix.evaluateInfix(expression)]);
     } on CalculatrixError catch (error) {
       throw toCommandException(error);
     }

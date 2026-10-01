@@ -60,6 +60,12 @@ class MatrixDisplayFormatter {
     }, growable: false).join('\n');
   }
 
+  /// Formats one entry the way [compact], [expanded] and [complex] do: at
+  /// most 12 significant digits, trailing zeros removed. Lets a caller with
+  /// its own layout (the CLI's HP 50g style stack lines) show the same
+  /// numbers as the app.
+  static String number(double value) => _formatNumber(value);
+
   static String _formatNumber(double value) {
     if (value == 0) {
       return '0';

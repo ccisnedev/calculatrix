@@ -270,6 +270,11 @@ trailing zeros removed (runbook D45). `[[1 2] [3 4]] -1 ^` prints
 `[[-2 1] [1.5 -0.5]]`. The stored value is unchanged, and JSON keeps the full
 double.
 
+`eval rpn` and the shortcut print the whole stack the program leaves, every
+level, with no limit (runbook D47). A program that leaves the stack empty
+(`1 drop`) prints an empty line and exits 0. `eval infix` always leaves one
+value.
+
 ```text
 $ cx '5 [[0 -1] [1 0]]'
 2: 5
@@ -280,11 +285,12 @@ $ cx '5 [[0 -1] [1 0]]'
 `Output.toJson()`. For `eval`:
 
 ```json
-{"stack": [5, [[0, -1], [1, 0]]]}
+{"stack": [{"level": 2, "value": 5}, {"level": 1, "value": [[0, -1], [1, 0]]}]}
 ```
 
-- The stack is an array, level 1 last: the array has the order in which the
-  values were pushed.
+- The stack is an array with one object per level, each naming its level,
+  in the order the text prints it: the highest level first, level 1 last.
+  An empty stack is `{"stack": []}`. `eval infix` gives one object, level 1.
 - A 1x1 matrix is a JSON number. Any other matrix is an array of rows, never
   flattened: the column vector `0 1 2 vector` is `[[0], [1]]`.
 - Numbers are JSON numbers. `Infinity` and `NaN` never appear: a non-finite
@@ -905,8 +911,8 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx version junk` † | `extraArgument`, 64; today `junk` is ignored |
 | `cx verison` | program `verison`, `unknown-word`, 65, suggests `cx version` |
 | `cx eval rpn '1 2 +'` | prints `1: 3`, 0 |
-| `cx eval rpn --json '1 2 +'` | `{"stack": [3]}`, 0 |
-| `cx eval rpn '1 2 +' --json` | `{"stack": [3]}`, 0 (GNU order, G6 amended 2026-09-29); `misplacedOption`, 7 with `POSIXLY_CORRECT` |
+| `cx eval rpn --json '1 2 +'` | `{"stack": [{"level": 1, "value": 3}]}`, 0 (D47) |
+| `cx eval rpn '1 2 +' --json` | `{"stack": [{"level": 1, "value": 3}]}`, 0 (GNU order, G6 amended 2026-09-29); `misplacedOption`, 7 with `POSIXLY_CORRECT` |
 | `cx eval rpn -f prog.rpn` | program from the file, 0 |
 | `cx eval rpn -f prog.rpn --json` | program from the file, JSON, 0 |
 | `cx eval rpn -f nope.rpn` | 7, file not found |
@@ -929,6 +935,11 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx eval rpn -qh` | `invalidShortOption`, 7: `-q -h` (G9) |
 | `cx eval rpn --trace '1 2 +'` | `unknownOption`, 7 (not in this stage) |
 | `cx eval rpn '1 +'` | `stack-underflow`, 65 |
+| `cx '5 [[0 -1] [1 0]]'` | prints `2: 5` then `1: [[0 -1] [1 0]]`, 0 (D47) |
+| `cx eval rpn --json '5 7 9'` | `{"stack": [{"level": 3, "value": 5}, {"level": 2, "value": 7}, {"level": 1, "value": 9}]}`, 0 (D47) |
+| `cx eval rpn '1 drop'` | prints an empty line, 0; with `--json`, `{"stack": []}` (D47) |
+| `cx eval rpn '2 3 /'` | prints `1: 0.666666666667`, 0; `--json` keeps `0.6666666666666666` (D45) |
+| `cx '1e300 1e300 *'` | `non-finite`, 65, `token: *`, `position: 13` (section 6) |
 | `cx '9 sqrt'`, `cx '9 √'`, `cx '9 SQRT'` | prints `1: 3`, 0 (D41) |
 | `cx '2 3 pwr'`, `cx '2 3 power'` | prints `1: 8`, 0 |
 | `cx '2 3 add'` | prints `1: 5`, 0: `add` is a name, `+` its alias (D41) |
@@ -986,7 +997,7 @@ records the ones that affect the whole stage (D25 to D45).
 | R13 | `power` | `B^Y = exp(Y · log B)`, with the full table in runbook D25. |
 | R14 | `--trace`, `--show-rpn` | Not in this stage; in the roadmap. |
 | R15 | `CliRequest.flags` | Removed in `cli_router` 0.2.0. |
-| R16 | JSON of `eval` | `{"stack": [...]}`, level 1 last, 1x1 as a number, other matrices as rows. |
+| R16 | JSON of `eval` | `{"stack": [...]}`, level 1 last, 1x1 as a number, other matrices as rows. Amended by runbook D47: one `{"level", "value"}` object per level. |
 | R17 | `doctor` | Local checks plus the newer-release check; states ok, warning, error; a failed lookup is a warning, never skipped; exit 78 on any error, with the error `doctor-check-failed` carrying every check result (section 5). |
 | R18 | Standard routes | `version`, `doctor`, `upgrade` and `uninstall` come from standard plugins inside `modular_cli_sdk` (8.7), registered explicitly; `doctor` gathers checks through the extension point `doctor.checks`. There is no `modular_cli_installer` package. |
 | R19 | `power`, closing the table | Order of checks by kinds; `i [[1 0] [0 2]] ^` is `ambiguous-power`; a non-square exponent is `dimension-mismatch` with any base (runbook D34). |

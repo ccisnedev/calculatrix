@@ -175,7 +175,9 @@ void main() {
       final code = await run(['eval', 'rpn', '--json', '1 2 +']);
       expect(code, ExitCode.ok);
       expect(jsonDecode(out.output), {
-        'stack': [3],
+        'stack': [
+          {'level': 1, 'value': 3},
+        ],
       });
     });
 
@@ -194,7 +196,9 @@ void main() {
         final code = await run(['eval', 'rpn', '-f', file.path, '--json']);
         expect(code, ExitCode.ok);
         expect(jsonDecode(out.output), {
-          'stack': [3],
+          'stack': [
+            {'level': 1, 'value': 3},
+          ],
         });
       },
     );
@@ -364,7 +368,9 @@ void main() {
       expect(err.output, firstErr);
       expect(first, ExitCode.ok);
       expect(jsonDecode(firstOut), {
-        'stack': [3],
+        'stack': [
+          {'level': 1, 'value': 3},
+        ],
       });
     });
 
@@ -490,6 +496,79 @@ void main() {
     test('cx eval rpn -- --help: --help becomes the program (G10)', () async {
       final code = await run(['eval', 'rpn', '--', '--help']);
       expect(code, ExitCode.dataError);
+    });
+  });
+
+  group('eval output: display formatter and whole stack (D45, D47)', () {
+    test("cx '[[1 2] [3 4]] inverse' prints 1: [[-2 1] [1.5 -0.5]]", () async {
+      final code = await run(['[[1 2] [3 4]] inverse']);
+      expect(code, ExitCode.ok);
+      expect(out.output, '1: [[-2 1] [1.5 -0.5]]\n');
+    });
+
+    test('--json keeps the full double the text rounds', () async {
+      final code = await run(['eval', 'rpn', '--json', '[[1 2] [3 4]] -1 ^']);
+      expect(code, ExitCode.ok);
+      final decoded = jsonDecode(out.output) as Map<String, dynamic>;
+      final level = (decoded['stack'] as List).single as Map;
+      expect(level['level'], 1);
+      expect(((level['value'] as List).first as List).first, isNot(-2));
+    });
+
+    test("cx eval rpn '2 3 /' prints 12 significant digits", () async {
+      final code = await run(['eval', 'rpn', '2 3 /']);
+      expect(code, ExitCode.ok);
+      expect(out.output, '1: 0.666666666667\n');
+    });
+
+    test("cx '5 [[0 -1] [1 0]]' prints every level, level 1 last", () async {
+      final code = await run(['5 [[0 -1] [1 0]]']);
+      expect(code, ExitCode.ok);
+      expect(out.output, '2: 5\n1: [[0 -1] [1 0]]\n');
+    });
+
+    test('cx eval rpn --json gives each level explicitly, in print order', () async {
+      final code = await run(['eval', 'rpn', '--json', '5 7 9']);
+      expect(code, ExitCode.ok);
+      expect(jsonDecode(out.output), {
+        'stack': [
+          {'level': 3, 'value': 5},
+          {'level': 2, 'value': 7},
+          {'level': 1, 'value': 9},
+        ],
+      });
+    });
+
+    test("cx eval rpn '1 drop' leaves an empty stack: no level, 0", () async {
+      final code = await run(['eval', 'rpn', '1 drop']);
+      expect(code, ExitCode.ok);
+      expect(out.output.trim(), isEmpty);
+      expect(err.output, isEmpty);
+    });
+
+    test("cx eval rpn --json '1 drop' is an empty stack array", () async {
+      final code = await run(['eval', 'rpn', '--json', '1 drop']);
+      expect(code, ExitCode.ok);
+      expect(jsonDecode(out.output), {'stack': <Object>[]});
+    });
+
+    test('cx eval infix --json gives its one value as level 1', () async {
+      final code = await run(['eval', 'infix', '--json', '1+2']);
+      expect(code, ExitCode.ok);
+      expect(jsonDecode(out.output), {
+        'stack': [
+          {'level': 1, 'value': 3},
+        ],
+      });
+    });
+
+    test("cx eval rpn --json '1e300 1e300 *' is non-finite, 65", () async {
+      final code = await run(['eval', 'rpn', '--json', '1e300 1e300 *']);
+      expect(code, ExitCode.dataError);
+      final error =
+          (jsonDecode(out.output + err.output) as Map)['error'] as Map;
+      expect(error['id'], 'non-finite');
+      expect(error['details'], {'token': '*', 'position': 13});
     });
   });
 
@@ -648,7 +727,7 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac(stack.single as num, 0.66666666666666666666);
+      expectNearGiac((stack.single as Map)['value'] as num, 0.66666666666666666666);
     });
 
     test("cx eval infix '2/3' matches Giac's 2/3 within 1e-12", () async {
@@ -656,7 +735,7 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac(stack.single as num, 0.66666666666666666666);
+      expectNearGiac((stack.single as Map)['value'] as num, 0.66666666666666666666);
     });
 
     // sqrt(2). Giac: evalf(sqrt(2)) = 1.4142135623730950488.
@@ -665,7 +744,7 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac(stack.single as num, 1.4142135623730950488);
+      expectNearGiac((stack.single as Map)['value'] as num, 1.4142135623730950488);
     });
 
     test("cx eval infix '√2' matches Giac's sqrt(2) within 1e-12", () async {
@@ -673,7 +752,7 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac(stack.single as num, 1.4142135623730950488);
+      expectNearGiac((stack.single as Map)['value'] as num, 1.4142135623730950488);
     });
 
     // 2^0.5: non-integer power, same value as sqrt(2) by construction.
@@ -683,7 +762,7 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac(stack.single as num, 1.4142135623730950488);
+      expectNearGiac((stack.single as Map)['value'] as num, 1.4142135623730950488);
     });
 
     test("cx eval infix '2^0.5' matches Giac's 2^0.5 within 1e-12", () async {
@@ -691,7 +770,7 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac(stack.single as num, 1.4142135623730950488);
+      expectNearGiac((stack.single as Map)['value'] as num, 1.4142135623730950488);
     });
 
     // Matrix product [[1,2],[3,4]] * [[5,6],[7,8]]. Giac:
@@ -706,7 +785,7 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectMatrixNearGiac(stack.single, <List<double>>[
+      expectMatrixNearGiac((stack.single as Map)['value'], <List<double>>[
         <double>[19, 22],
         <double>[43, 50],
       ]);
@@ -722,7 +801,7 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectMatrixNearGiac(stack.single, <List<double>>[
+      expectMatrixNearGiac((stack.single as Map)['value'], <List<double>>[
         <double>[19, 22],
         <double>[43, 50],
       ]);
@@ -748,7 +827,7 @@ void main() {
       expect(code, ExitCode.ok);
       final decoded = jsonDecode(out.output) as Map<String, dynamic>;
       final stack = decoded['stack'] as List;
-      expectNearGiac(stack.single as num, -1.0);
+      expectNearGiac((stack.single as Map)['value'] as num, -1.0);
     });
   });
 }
