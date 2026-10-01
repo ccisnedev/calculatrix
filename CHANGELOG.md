@@ -140,6 +140,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	`1/2/3` or `1/-2` are not literals (`unknown-word` in RPN,
 	`syntax-error` inside a matrix literal). Infix keeps `/` as division.
 	Shipped in `cx` 0.13.0.
+- Release fix, `cx` 0.13.1. The Windows build of 0.10.0 to 0.13.0 stopped
+	at the Giac differential test, so those releases were never published:
+	on the Windows runner `wsl` starts with no Ubuntu distribution and exits
+	at once, and the test failed writing to it instead of skipping. It now
+	skips, as it does when Giac is missing. No change to `cx` itself since
+	0.13.0.
 
 ### App
 
