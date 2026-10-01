@@ -88,22 +88,6 @@ void main() {
     });
   });
 
-  // Skipped, not deleted: both fail today (RED, confirmed) and cannot be
-  // made to pass from calculatrix code. Every "Usage: ..." line the CLI
-  // ever prints comes from modular_cli_sdk 0.8.1's HelpRenderer, whose
-  // constructor is `HelpRenderer(this.catalog)`
-  // (lib/src/help_renderer.dart:13), taking no program-name parameter, and
-  // whose `renderCommand` builds the line as `'Usage: ${_usageOf(contract)}'`
-  // (lib/src/help_renderer.dart:45) purely from the route, with no CLI
-  // identity woven in anywhere. `ModularCli(name: 'cx', ...)` stores that
-  // name on `hostMetadata` (lib/src/modular_cli.dart), but nothing threads
-  // it into `HelpRenderer`: every call site constructs it as
-  // `HelpRenderer(_catalog)` with no name argument
-  // (lib/src/modular_cli.dart:671, 961, 978, 992, 1091;
-  // lib/src/module_builder.dart:681, 740). Fixing this requires changing
-  // modular_cli_sdk itself (or cli_router, which defines none of this); it
-  // is out of scope for calculatrix's own code. Filed upstream as
-  // ccisnedev/modular_cli_sdk#38.
   group(
     'usage lines name cx (issue #22 acceptance item 3, PR #23 review)',
     () {
@@ -122,7 +106,6 @@ void main() {
         },
       );
     },
-    skip: 'Blocked on ccisnedev/modular_cli_sdk#38',
   );
 
   group('cx <program> shortcut', () {

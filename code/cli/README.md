@@ -79,5 +79,6 @@ covers both the PowerShell and the cmd.exe form.
 ## Global options
 
 `--json` for machine-readable output, `--quiet`/`-q` to suppress everything
-but the result, `--help`/`-h` for help. Exit codes follow the SDK's own
-`ExitCode` table (0 ok, 7 validation failure, 64 usage error, 65 data error).
+but the result, `--help`/`-h` for help (the same catalog as `cx help`),
+`--version` for the version (the same answer as `cx version`). Exit codes
+follow the SDK's own `ExitCode` table (0 ok, 7 validation failure, 64 usage error, 65 data error).

@@ -67,6 +67,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	their result, instead of about 15 s later: `modular_cli_sdk` 0.8.3 closes
 	the HTTP client its release lookup opens (modular_cli_sdk issue #44).
 	Shipped in `cx` 0.8.2.
+- Moved to `modular_cli_sdk` 0.9.0. Every `Usage:` line now names the
+	program (`Usage: cx <command> [options]`, `Usage: cx eval rpn [options]
+	[<program>]`; before, the name was empty). `cx --help` and `cx -h` print
+	the same catalog as `cx help`, with the same `--json`, and `cx --version`
+	answers like `cx version` (before, it was an unknown option, exit 7).
+	Nothing else changes: the rows, their examples and the banner on a bare
+	`cx` are the same. Shipped in `cx` 0.8.3.
 
 ## [0.7.1] - 2026-05-30
 
