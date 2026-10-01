@@ -210,6 +210,7 @@ class Calculatrix {
         end++;
       }
       _requireSufficientDepth(machine, token);
+      final List<Matrix> before = machine.stackSnapshot;
       for (int i = index; i < end; i++) {
         final _PositionedCommand positioned = commands[i];
         try {
@@ -222,7 +223,7 @@ class Calculatrix {
           rethrow;
         }
       }
-      _requireFiniteTop(machine, token);
+      _requireFiniteResults(before, machine.stackSnapshot, token);
       index = end;
     }
   }
@@ -230,24 +231,33 @@ class Calculatrix {
   // A word whose result overflows (`1e300 1e300 *`) must not leave
   // Infinity or NaN on the stack: spec section 6 makes any non-finite
   // value the error `non-finite`, reported on the word that produced it,
-  // as `^` already does on its own. Only level 1 is checked: a word that
-  // pushes a new value pushes it on top, and every value below it was
-  // checked when it was pushed.
-  static void _requireFiniteTop(
-    CalculatrixMachine machine,
+  // as `^` already does on its own. Every level from the lowest one the
+  // word changed up to level 1 is checked, since a word may push more than
+  // one value (`diagonalize` pushes P, then D); the levels below it are the
+  // same objects as before the word ran, already checked.
+  static void _requireFiniteResults(
+    List<Matrix> before,
+    List<Matrix> after,
     _PositionedToken token,
   ) {
-    final Matrix? top = machine.top;
-    if (top == null) return;
-    for (int row = 0; row < top.rowCount; row++) {
-      for (int column = 0; column < top.columnCount; column++) {
-        if (!top.at(row, column).isFinite) {
-          throw MatrixDomainError(
-            'Result is not a finite number.',
-            errorId: CalculatrixErrorId.nonFinite,
-            token: token.value,
-            position: token.position,
-          );
+    int first = 0;
+    while (first < before.length &&
+        first < after.length &&
+        identical(before[first], after[first])) {
+      first++;
+    }
+    for (int level = first; level < after.length; level++) {
+      final Matrix value = after[level];
+      for (int row = 0; row < value.rowCount; row++) {
+        for (int column = 0; column < value.columnCount; column++) {
+          if (!value.at(row, column).isFinite) {
+            throw MatrixDomainError(
+              'Result is not a finite number.',
+              errorId: CalculatrixErrorId.nonFinite,
+              token: token.value,
+              position: token.position,
+            );
+          }
         }
       }
     }

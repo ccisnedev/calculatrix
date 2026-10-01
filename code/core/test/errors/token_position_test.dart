@@ -115,6 +115,21 @@ void main() {
       }
     });
 
+    test('non-finite: a word that pushes two values is checked on both, '
+        'not only on level 1', () {
+      // diagonalize pushes P, then D: here D is finite and P is not.
+      try {
+        Calculatrix.evaluateRpnStack(<String>[
+          '[[0.001 1e308] [0 0]]',
+          'diagonalize',
+        ]);
+        fail('expected MatrixDomainError');
+      } on MatrixDomainError catch (error) {
+        expect(error.errorId, CalculatrixErrorId.nonFinite);
+        expect(error.token, 'diagonalize');
+      }
+    });
+
     test('non-finite: an overflowing infix product carries "*"', () {
       try {
         Calculatrix.evaluateInfix('1e300*1e300');
