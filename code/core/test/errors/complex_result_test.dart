@@ -52,6 +52,16 @@ void main() {
       );
     });
 
+    test('real eigenvalues far from zero are not complex-result: the '
+        'discriminant does not cancel', () {
+      final Matrix values = Matrix(<List<double>>[
+        <double>[1e8, 0],
+        <double>[0, 1e8 + 0.2],
+      ]).eigenvalues();
+      expect(values.at(0, 0), closeTo(1e8 + 0.2, 1e-6));
+      expect(values.at(1, 0), closeTo(1e8, 1e-6));
+    });
+
     test('a real spectrum is unchanged', () {
       expect(
         Calculatrix.evaluateRpn(
@@ -77,6 +87,23 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('spectral-norm and svd use the eigenvalues only inside, so they '
+        'never raise complex-result', () {
+      expect(
+        Calculatrix.evaluateRpn(
+          Calculatrix.tokenizeRpnLine('[[0 -1] [1 0]] spectral-norm'),
+        ).toString(),
+        Calculatrix.evaluateRpn(
+          Calculatrix.tokenizeRpnLine('1 approx'),
+        ).toString(),
+      );
+      final SvdDecomposition decomposition = Matrix(<List<double>>[
+        <double>[1e5, 0],
+        <double>[0, 1e5 + 1e-4],
+      ]).svd();
+      expect(decomposition.s.at(0, 0), closeTo(1e5 + 1e-4, 1e-6));
     });
   });
 }

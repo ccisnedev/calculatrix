@@ -624,12 +624,57 @@ class Matrix {
     );
   }
 
-  // A negative discriminant of a real 2x2 block proves a complex pair of
+  // A negative discriminant of a real 2x2 block means a complex pair of
   // eigenvalues, and a column of complex values has no representation yet
   // (runbook-trust.md D60; issue #64).
   static const String _complexEigenvaluesMessage =
       'The eigenvalues of this matrix are complex, and cx has no complex '
       'columns yet.';
+
+  /// The discriminant of the characteristic polynomial of the real 2x2
+  /// block [[a, b], [c, d]], as (a - d)^2 + 4bc rather than
+  /// trace^2 - 4 det: the two are equal, but the second cancels and can
+  /// turn negative for a matrix with real eigenvalues, such as
+  /// [[1e8, 0], [0, 1e8 + 0.2]]. A value within the rounding error of its
+  /// terms, or within [absoluteTolerance], is zero, so only a complex pair
+  /// the computation can tell apart from a double root is negative.
+  static double _discriminant2x2(
+    double a,
+    double b,
+    double c,
+    double d,
+    double absoluteTolerance,
+  ) {
+    final double difference = a - d;
+    final double square = difference * difference;
+    final double product = 4 * b * c;
+    final double discriminant = square + product;
+    final double roundingBound = 8 * _machineEpsilon * (square + product.abs());
+    if (discriminant.abs() <= absoluteTolerance ||
+        discriminant.abs() <= roundingBound) {
+      return 0;
+    }
+    return discriminant;
+  }
+
+  static const double _machineEpsilon = 2.220446049250313e-16;
+
+  /// Runs [compute], which uses the eigenvalues only inside, and turns a
+  /// `complex-result` into the generic error it was before D60: the result
+  /// of such a word is not a column of eigenvalues, and may well be real
+  /// (a rotation has a real logarithm).
+  static T _withoutComplexResult<T>(T Function() compute) {
+    try {
+      return compute();
+    } on MatrixDomainError catch (error) {
+      if (error.errorId != CalculatrixErrorId.complexResult) {
+        rethrow;
+      }
+      throw MatrixDomainError(
+        'Eigenvalues are undefined in the real domain for this matrix.',
+      );
+    }
+  }
 
   Matrix eigenvalues({
     double absoluteTolerance =
@@ -739,12 +784,7 @@ class Matrix {
     final double c = _rows[1][0];
     final double d = _rows[1][1];
     final double trace = a + d;
-    final double determinantValue = (a * d) - (b * c);
-
-    double discriminant = (trace * trace) - (4 * determinantValue);
-    if (discriminant.abs() <= absoluteTolerance) {
-      discriminant = 0;
-    }
+    final double discriminant = _discriminant2x2(a, b, c, d, absoluteTolerance);
 
     if (discriminant < 0) {
       throw MatrixDomainError(
@@ -1201,7 +1241,9 @@ class Matrix {
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
   }) {
     final Matrix ata = transpose() * this;
-    final Matrix eigs = ata.eigenvalues(absoluteTolerance: absoluteTolerance);
+    final Matrix eigs = _withoutComplexResult(
+      () => ata.eigenvalues(absoluteTolerance: absoluteTolerance),
+    );
     double maxEig = 0;
     for (int i = 0; i < eigs.rowCount; i++) {
       final double val = eigs.at(i, 0).abs();
@@ -1297,12 +1339,7 @@ class Matrix {
     double absoluteTolerance,
   ) {
     final double trace = a + d;
-    final double det = (a * d) - (b * c);
-    double discriminant = (trace * trace) - (4 * det);
-
-    if (discriminant.abs() <= absoluteTolerance) {
-      discriminant = 0;
-    }
+    final double discriminant = _discriminant2x2(a, b, c, d, absoluteTolerance);
 
     if (discriminant < 0) {
       throw MatrixDomainError(
@@ -2335,20 +2372,9 @@ class Matrix {
       return _log2x2ClosedForm(realEigenvalues, absoluteTolerance);
     }
 
-    final Diagonalization decomposition;
-    try {
-      decomposition = diagonalization(absoluteTolerance: absoluteTolerance);
-    } on MatrixDomainError catch (error) {
-      // A complex spectrum does not make the logarithm complex (a rotation
-      // has a real logarithm), so `complex-result` would be wrong here: it
-      // stays the generic error it was before D60.
-      if (error.errorId != CalculatrixErrorId.complexResult) {
-        rethrow;
-      }
-      throw MatrixDomainError(
-        'Eigenvalues are undefined in the real domain for this matrix.',
-      );
-    }
+    final Diagonalization decomposition = _withoutComplexResult(
+      () => diagonalization(absoluteTolerance: absoluteTolerance),
+    );
 
     final List<List<double>> logDiagonal = List<List<double>>.generate(
       rowCount,
@@ -2692,8 +2718,8 @@ class Matrix {
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
   }) {
     final Matrix ata = transpose() * this;
-    final Diagonalization decomposition = ata.diagonalization(
-      absoluteTolerance: absoluteTolerance,
+    final Diagonalization decomposition = _withoutComplexResult(
+      () => ata.diagonalization(absoluteTolerance: absoluteTolerance),
     );
 
     final Matrix v = decomposition.p;

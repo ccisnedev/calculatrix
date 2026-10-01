@@ -261,11 +261,14 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
 - Complex results (runbook-trust.md, step T6). New error id
   `CalculatrixErrorId.complexResult` (`complex-result`), raised as a
   `MatrixDomainError` by `Matrix.eigenvalues` and `Matrix.diagonalization`
-  when the negative discriminant of a real 2x2 block proves a complex pair
-  of eigenvalues, exact input included (D60). The QR iteration that does
-  not converge keeps its generic error, and `Matrix.ln` keeps it too: a
-  rotation has a real logarithm. The registry lists the id on `eigenvalues`
-  and `diagonalize`.
+  when the discriminant of a real 2x2 block is negative beyond its
+  rounding error, exact input included (D60). The discriminant is computed
+  as (a - d)^2 + 4bc, which does not cancel: before, a matrix with real
+  eigenvalues such as `[[1e8 0] [0 100000000.2]]` could fail. The QR
+  iteration that does not converge keeps its generic error, and so do
+  `Matrix.ln`, `Matrix.spectralNorm` and `Matrix.svd`, which use the
+  eigenvalues only inside: a rotation has a real logarithm. The registry
+  lists the id on `eigenvalues` and `diagonalize`.
 
 ### Fixed
 

@@ -27,8 +27,8 @@ The exact value is the only correct answer.
 ## The trap set through `cx`
 
 `trap-set.json` holds each trap as a `cx` program with the output `cx`
-must give, and `code/cli/test/trap_set_test.dart` runs them on every CI
-run. Traps 3 and 8 pass with an error, because `cx` has no correct value
+must give, and `code/cli/test/trap_set_test.dart` runs them with the CLI
+tests, which the CLI release workflow runs before every release. Traps 3 and 8 pass with an error, because `cx` has no correct value
 to give:
 
 - Trap 3: the matrix is singular, so `singular-matrix` is the answer.

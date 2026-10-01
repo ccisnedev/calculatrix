@@ -60,14 +60,16 @@ exact 2x2 matrix, so `-4 sqrt` gives the exact [[0, -2], [2, 0]] (2i).
 The embedding covers a single complex number. A result that would be a
 column of complex numbers, such as the eigenvalues of a real matrix with a
 complex pair, has no representation yet. `eigenvalues` and `diagonalize`
-raise `complex-result` (MatrixDomainError, CLI exit 65) when the negative
-discriminant of a real 2x2 block proves a complex pair, for exact and
-approximate input alike (runbook-trust.md D60):
+raise `complex-result` (MatrixDomainError, CLI exit 65) when the
+discriminant (a - d)^2 + 4bc of a real 2x2 block [[a, b], [c, d]] is
+negative beyond its rounding error, for exact and approximate input alike
+(runbook-trust.md D60):
 
 - eigenvalues([[0, -1], [1, 0]]) => complex-result (the spectrum is {i, -i})
 
 Words that use the spectrum only internally keep their own contract:
-ln(A) of a rotation is real, so `ln` never raises `complex-result`.
+ln(A) of a rotation is real, so `ln`, `spectral-norm` and `svd` never raise
+`complex-result`.
 Complex vectors as blocks of Phi (n complex numbers as a 2n x 2 matrix)
 are tracked in issue #64.
 
@@ -133,8 +135,8 @@ that is not exact never looks exact.
 
 Calculatrix uses explicit floating-point tolerances on approximate values.
 
-- defaultAbsoluteTolerance = 1e-14
-- defaultRelativeTolerance = 1e-13
+- defaultAbsoluteTolerance = 1e-12
+- defaultRelativeTolerance = 1e-10
 
 For numbers x, y:
 

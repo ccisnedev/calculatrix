@@ -9,7 +9,7 @@ keys verified with Giac.
 | `tasks-basic.txt` | The basic set: everyday scalar and matrix computations. |
 | `tasks-traps.txt` | The trap set: tasks where floating point or a common slip gives a wrong answer without any error. |
 | `answers.md` | The answer keys of both sets, and what `cx` gives on each trap. |
-| `trap-set.json` | Each trap as a `cx` program with the output `cx` must give. `code/cli/test/trap_set_test.dart` runs it in CI. |
+| `trap-set.json` | Each trap as a `cx` program with the output `cx` must give. `code/cli/test/trap_set_test.dart` runs it with the CLI tests. |
 | `run-trial.ps1` | Runs a set on Claude, Codex and Antigravity models, in `cx` mode or free mode. |
 | `summarize.ps1` | One row per run: time, exit code, tokens and cost. `run-trial.ps1` calls it at the end. |
 

@@ -158,8 +158,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	basic and trap task sets, their answer keys verified with Giac,
 	`run-trial.ps1` and `summarize.ps1`. `benchmark/trap-set.json` writes
 	each trap as a `cx` program with its expected output, and
-	`code/cli/test/trap_set_test.dart` runs it in RPN and infix on every CI
-	run: the trap set passes 8 of 8 through `cx` (acceptance 2 of #54).
+	`code/cli/test/trap_set_test.dart` runs it in RPN and infix with the CLI
+	tests, which the CLI release workflow runs before every release: the
+	trap set passes 8 of 8 through `cx` (acceptance 2 of #54).
 
 ### App
 
