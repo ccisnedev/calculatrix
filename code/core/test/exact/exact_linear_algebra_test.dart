@@ -500,6 +500,62 @@ void main() {
         _errorId(CalculatrixErrorId.limitExceeded),
       );
     });
+
+    test('a sum is checked after each term, even if it cancels later', () {
+      // 1/7 + 1/9 = 16/63 is over a limit of 1 digit, as with `+`.
+      final Matrix a = Matrix.exact(<List<Rational>>[
+        <Rational>[_q(1, 7)],
+        <Rational>[_q(1, 9)],
+        <Rational>[_q(-1, 7)],
+        <Rational>[_q(-1, 9)],
+      ]);
+      final Matrix ones = Matrix.exact(
+        List<List<Rational>>.generate(4, (_) => <Rational>[_q(1)]),
+      );
+      const ExactArithmetic tight = ExactArithmetic(maxDigits: 1);
+      expect(
+        () => tight.dot(a, ones),
+        _errorId(CalculatrixErrorId.limitExceeded),
+      );
+      expect(
+        () => tight.trace(
+          Matrix.exact(<List<Rational>>[
+            <Rational>[_q(1, 7), _q(0), _q(0)],
+            <Rational>[_q(0), _q(1, 9), _q(0)],
+            <Rational>[_q(0), _q(0), _q(-1, 9)],
+          ]),
+        ),
+        _errorId(CalculatrixErrorId.limitExceeded),
+      );
+    });
+
+    test('a huge common denominator is refused before it is used', () {
+      // lcm(1, ..., 3000) has about 1300 digits, though every entry is
+      // small.
+      final Matrix row = Matrix.exact(<List<Rational>>[
+        List<Rational>.generate(3000, (int i) => _q(1, i + 1)),
+      ]);
+      expect(
+        () => const ExactArithmetic(maxDigits: 100).rref(row),
+        _errorId(CalculatrixErrorId.limitExceeded),
+      );
+    });
+
+    test('rank checks its own digits', () {
+      expect(
+        () => const ExactArithmetic(maxDigits: 1).rank(
+          Matrix.exact(
+            _ints(
+              List<List<int>>.generate(
+                10,
+                (int r) => List<int>.generate(10, (int c) => r == c ? 1 : 0),
+              ),
+            ),
+          ),
+        ),
+        _errorId(CalculatrixErrorId.limitExceeded),
+      );
+    });
   });
 
   test('infix reaches the exact inverse through ^', () {

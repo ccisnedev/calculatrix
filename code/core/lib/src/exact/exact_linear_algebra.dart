@@ -24,7 +24,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
   /// none.
   Matrix inverse(Matrix a) {
     _requireSquare(a, 'inverse');
-    final _IntegerForm form = _IntegerForm.of(a);
+    final _IntegerForm form = _integerForm(a, 'The exact inverse');
     final int size = a.rowCount;
     final List<List<BigInt>> augmented = _augmentWithIdentity(form.rows);
     // The inverse is g * X / p for the X and the pivot p below, so its
@@ -66,7 +66,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
     if (a.isScalar) {
       return a;
     }
-    final _IntegerForm form = _IntegerForm.of(a);
+    final _IntegerForm form = _integerForm(a, 'The exact determinant');
     final int size = a.rowCount;
     // det(A) = det(B) / g^n: a minor of B over a power of g.
     _requireWithin(
@@ -78,7 +78,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
 
   /// The reduced row echelon form of [a], any shape.
   Matrix rref(Matrix a) {
-    final _IntegerForm form = _IntegerForm.of(a);
+    final _IntegerForm form = _integerForm(a, 'The exact row echelon form');
     // Row operations do not change the echelon form, so rref(A) is
     // rref(B): ratios of minors of B.
     _requireWithin('The exact row echelon form', _hadamardLog10(form.rows));
@@ -104,7 +104,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
 
   /// The rank of [a], any shape, as a 1x1 matrix.
   Matrix rank(Matrix a) {
-    final _IntegerForm form = _IntegerForm.of(a);
+    final _IntegerForm form = _integerForm(a, 'The exact rank computation');
     // The result is small, but the elimination still produces minors of B.
     _requireWithin('The exact rank computation', _hadamardLog10(form.rows));
     final _Elimination elimination = _Elimination.run(
@@ -112,7 +112,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
       pivotLimit: a.columnCount,
       reduce: false,
     );
-    return Matrix.exactScalar(Rational.fromInt(elimination.rank));
+    return check(Matrix.exactScalar(Rational.fromInt(elimination.rank)));
   }
 
   /// The sum of the diagonal of the square matrix [a], as a 1x1 matrix.
@@ -120,9 +120,9 @@ extension ExactLinearAlgebra on ExactArithmetic {
     _requireSquare(a, 'trace');
     Rational sum = Rational.zero;
     for (int i = 0; i < a.rowCount; i++) {
-      sum += a.exactAt(i, i);
+      sum = _within(sum + a.exactAt(i, i));
     }
-    return check(Matrix.exactScalar(sum));
+    return Matrix.exactScalar(sum);
   }
 
   /// The matrix of cofactors of the square matrix [a]: entry (i, j) is
@@ -135,7 +135,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
         errorId: CalculatrixErrorId.dimensionMismatch,
       );
     }
-    final _IntegerForm form = _IntegerForm.of(a);
+    final _IntegerForm form = _integerForm(a, 'The exact cofactor matrix');
     final int size = a.rowCount;
     final List<List<BigInt>> augmented = _augmentWithIdentity(form.rows);
     // A cofactor is a minor of B of size n - 1 over g^(n-1); the
@@ -217,7 +217,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
   /// it is.
   LuDecomposition lu(Matrix a) {
     _requireSquare(a, 'LU decomposition');
-    final _IntegerForm form = _IntegerForm.of(a);
+    final _IntegerForm form = _integerForm(a, 'The exact LU decomposition');
     // L and U are ratios of minors of B; U carries a further 1/g.
     _requireWithin(
       'The exact LU decomposition',
@@ -300,9 +300,9 @@ extension ExactLinearAlgebra on ExactArithmetic {
     }
     Rational sum = Rational.zero;
     for (int i = 0; i < a.rowCount; i++) {
-      sum += a.exactAt(i, 0) * b.exactAt(i, 0);
+      sum = _within(sum + _within(a.exactAt(i, 0) * b.exactAt(i, 0)));
     }
-    return check(Matrix.exactScalar(sum));
+    return Matrix.exactScalar(sum);
   }
 
   /// The cross product of two 3x1 column vectors.
@@ -372,6 +372,54 @@ extension ExactLinearAlgebra on ExactArithmetic {
     return (row + column).isEven ? value : -value;
   }
 
+  // [value], or `limit-exceeded` when it has more digits than the limit.
+  // A sum is checked after each term, as a chain of `+` would be, so it
+  // cannot grow without bound before the check.
+  Rational _within(Rational value) {
+    check(Matrix.exactScalar(value));
+    return value;
+  }
+
+  // [a] as integers over one common denominator. Every estimate of the
+  // words above is at least the Hadamard bound of B, which is at least
+  // log10(g / q) for the largest denominator q of [a]; so g is checked
+  // against that as it grows, and a g too large raises `limit-exceeded`
+  // before B is built (runbook D55).
+  _IntegerForm _integerForm(Matrix a, String what) {
+    BigInt largest = BigInt.one;
+    for (final List<Rational> row in a.exactRows) {
+      for (final Rational entry in row) {
+        if (entry.denominator > largest) {
+          largest = entry.denominator;
+        }
+      }
+    }
+    final double largestLog10 = Rational.log10Of(largest);
+    BigInt scale = BigInt.one;
+    for (final List<Rational> row in a.exactRows) {
+      for (final Rational entry in row) {
+        final BigInt gcd = scale.gcd(entry.denominator);
+        if (gcd != entry.denominator) {
+          scale = scale ~/ gcd * entry.denominator;
+          _requireWithin(what, Rational.log10Of(scale) - largestLog10);
+        }
+      }
+    }
+    return _IntegerForm(
+      a.exactRows
+          .map(
+            (List<Rational> row) => row
+                .map(
+                  (Rational entry) =>
+                      entry.numerator * (scale ~/ entry.denominator),
+                )
+                .toList(growable: false),
+          )
+          .toList(growable: false),
+      scale,
+    );
+  }
+
   // Raises `limit-exceeded` when a result bounded by 10^[log10Bound] can
   // have more digits than the limit (runbook D55). The small margin keeps
   // the rounding of the logarithms from undercounting a digit.
@@ -435,28 +483,6 @@ extension ExactLinearAlgebra on ExactArithmetic {
 /// An exact matrix A as integers over one common denominator g: A = B / g.
 final class _IntegerForm {
   _IntegerForm(this.rows, this.scale);
-
-  factory _IntegerForm.of(Matrix a) {
-    BigInt scale = BigInt.one;
-    for (final List<Rational> row in a.exactRows) {
-      for (final Rational entry in row) {
-        scale = scale ~/ scale.gcd(entry.denominator) * entry.denominator;
-      }
-    }
-    return _IntegerForm(
-      a.exactRows
-          .map(
-            (List<Rational> row) => row
-                .map(
-                  (Rational entry) =>
-                      entry.numerator * (scale ~/ entry.denominator),
-                )
-                .toList(growable: false),
-          )
-          .toList(growable: false),
-      scale,
-    );
-  }
 
   /// B, row by row; the elimination works on it in place.
   final List<List<BigInt>> rows;
