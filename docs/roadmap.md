@@ -24,6 +24,8 @@
 > from the tool itself (`cx commands`), machine-readable output (`--json`)
 > and a stable error contract. A feature an AI agent cannot discover or
 > check through the CLI is not finished.
+> The goal, principles, benchmark and stages are in
+> [mission.md](mission.md).
 
 > **Testing policy**:
 > 1. `code/core` must keep TDD and full unit/contract coverage for public semantics and new logic.
