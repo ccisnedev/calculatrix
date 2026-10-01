@@ -937,12 +937,12 @@ final class ApproxCommand extends CalculatrixCommand {
 
 /// `exact`: the value as an exact one, each entry the simplest rational
 /// that rounds to the same `double` (runbook D52). An exact value is left
-/// unchanged.
+/// unchanged. The result is held to the digit limit (runbook D55).
 final class ExactCommand extends CalculatrixCommand {
   const ExactCommand();
 
   @override
   void executeOn(RpnEngine engine) {
-    engine.push(engine.popAny().toExact());
+    engine.push(engine.exact.check(engine.popAny().toExact()));
   }
 }

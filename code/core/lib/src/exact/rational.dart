@@ -415,9 +415,17 @@ final class Rational implements Comparable<Rational> {
     return negative ? -magnitude : magnitude;
   }
 
-  static int _clampToInt(BigInt value) {
-    final BigInt max = BigInt.from(9007199254740991);
-    return value > max ? max.toInt() : value.toInt();
+  static int _clampToInt(BigInt value) =>
+      value > BigInt.from(maxEstimate) ? maxEstimate : value.toInt();
+
+  /// The largest digit estimate a `limit-exceeded` reports: the largest
+  /// `int` of the platform (2^63 - 1 on the VM, 2^53 - 1 on the web).
+  /// Larger estimates are reported as this value.
+  static final int maxEstimate = _largestInt();
+
+  static int _largestInt() {
+    final BigInt vm = (BigInt.one << 63) - BigInt.one;
+    return vm.isValidInt ? vm.toInt() : 9007199254740991;
   }
 
   static final RegExp _decimalPattern = RegExp(

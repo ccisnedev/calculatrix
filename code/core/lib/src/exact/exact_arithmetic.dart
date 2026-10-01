@@ -70,6 +70,18 @@ final class ExactArithmetic {
   /// `percent`: one hundredth of [a].
   Matrix percent(Matrix a) => scale(a, Rational(BigInt.one, BigInt.from(100)));
 
+  /// [value] itself when it is approximate or every entry is within the
+  /// limit; `limit-exceeded` otherwise. For values that enter the exact
+  /// world from outside an operation, such as `exact` (runbook D52).
+  Matrix check(Matrix value) {
+    if (value.isExact) {
+      for (final List<Rational> row in value.exactRows) {
+        row.forEach(_checked);
+      }
+    }
+    return value;
+  }
+
   Matrix scale(Matrix a, Rational factor) =>
       _map(a, (Rational x) => _checked(x * factor));
 
@@ -121,9 +133,9 @@ final class ExactArithmetic {
       Rational.log10Of(base.denominator),
     );
     final double estimate = exponent.abs().toDouble() * largestLog + 1;
-    final int estimated = estimate.isFinite && estimate < 9007199254740991
+    final int estimated = estimate.isFinite && estimate < Rational.maxEstimate
         ? estimate.floor()
-        : 9007199254740991;
+        : Rational.maxEstimate;
     if (estimated > maxDigits) {
       throw LimitExceededError(
         '${_powerText(base, exponent)} has about $estimated digits, over '

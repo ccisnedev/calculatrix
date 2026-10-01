@@ -107,6 +107,19 @@ void main() {
               .having((e) => e.message, 'message', contains('~-0.1')),
         ),
       );
+      for (final String program in ['[[1 -~0.1]]', '~[[1 -~0.1]]']) {
+        expect(
+          () => _rpn(program),
+          throwsA(
+            isA<ExpressionSyntaxError>().having(
+              (e) => e.message,
+              'message',
+              contains('~-0.1'),
+            ),
+          ),
+          reason: program,
+        );
+      }
       expect(
         () => Calculatrix.evaluateInfix('2*-~0.1'),
         throwsA(
@@ -134,6 +147,24 @@ void main() {
       expect(Calculatrix.evaluateInfix('1-~-0.5'), _approximateScalar(1.5));
       expect(Calculatrix.evaluateInfix('~[[1,2]]*2').isExact, isFalse);
       expect(Calculatrix.evaluateInfix('1/3+1/6'), _exactScalar(_q(1, 2)));
+    });
+
+    test('a marked matrix reads its entries as approximate, not exact', () {
+      for (final String literal in ['~[[1e-20000 1]]', '[[1e-20000 ~1]]']) {
+        final Matrix value = _rpn(literal);
+        expect(value.isExact, isFalse, reason: literal);
+        expect(value.rows, [
+          [0.0, 1.0],
+        ], reason: literal);
+      }
+    });
+
+    test('a matrix literal nested too deep is syntax-error', () {
+      expect(() => _rpn('[[[1]]]'), _errorId(CalculatrixErrorId.syntaxError));
+      final String deep =
+          '${List.filled(100000, '[').join()}1'
+          '${List.filled(100000, ']').join()}';
+      expect(() => _rpn(deep), _errorId(CalculatrixErrorId.syntaxError));
     });
 
     test('an approximate literal out of the double range is non-finite', () {
@@ -273,6 +304,18 @@ void main() {
       );
       expect(_rpn('1 3 / exact'), _exactScalar(_q(1, 3)));
     });
+
+    test('exact is held to the digit limit', () {
+      expect(
+        () => _rpn('~10 exact', maxDigits: 1),
+        throwsA(
+          isA<LimitExceededError>()
+              .having((e) => e.limit, 'limit', 1)
+              .having((e) => e.estimated, 'estimated', 2),
+        ),
+      );
+      expect(_rpn('~9 exact', maxDigits: 1), _exactScalar(_q(9)));
+    });
   });
 
   group('stack and structure words keep exactness (D53)', () {
@@ -399,6 +442,19 @@ void main() {
               .having((e) => e.estimated, 'estimated', 20001)
               .having((e) => e.token, 'token', '1e20000')
               .having((e) => e.position, 'position', 1),
+        ),
+      );
+    });
+
+    test('a huge literal reports its digit count, not a clamped one', () {
+      expect(
+        () => _rpn('1e1000000000000000000'),
+        throwsA(
+          isA<LimitExceededError>().having(
+            (e) => e.estimated,
+            'estimated',
+            1000000000000000001,
+          ),
         ),
       );
     });

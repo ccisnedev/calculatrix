@@ -92,8 +92,15 @@ abstract final class Literals {
 
   // One numeric entry, exact or approximate. [token] is the whole literal
   // it belongs to, for the messages.
-  static _Entry _parseNumber(String text, String token, int maxDigits) {
-    final bool marked = text.startsWith(approximateMark);
+  // With [approximate], the entry belongs to a marked matrix and is read
+  // as approximate even without its own mark.
+  static _Entry _parseNumber(
+    String text,
+    String token,
+    int maxDigits, {
+    bool approximate = false,
+  }) {
+    final bool marked = approximate || text.startsWith(approximateMark);
     final String unmarked = _unmark(text);
     if (_isNonFiniteWord(unmarked)) {
       throw MatrixDomainError(
@@ -128,7 +135,7 @@ abstract final class Literals {
   }
 
   static Matrix _parseMatrix(String token, int maxDigits) {
-    bool marked = token.startsWith(approximateMark);
+    final bool outerMark = token.startsWith(approximateMark);
     String body = _unmark(token);
     final bool negative = body.startsWith('-');
     body = _stripSign(body);
@@ -136,15 +143,21 @@ abstract final class Literals {
     final Object tree = _MatrixLiteralParser(body, token).parse();
     final List<List<String>> rows = _shape(tree as List<Object>, token);
 
+    // One `~`, outside or on any entry, makes the whole matrix approximate
+    // (runbook D56), so no entry is read as exact first.
+    final bool marked =
+        outerMark ||
+        rows.any(
+          (List<String> row) =>
+              row.any((String text) => text.startsWith(approximateMark)),
+        );
     final List<List<_Entry>> entries = <List<_Entry>>[
       for (final List<String> row in rows)
         <_Entry>[
-          for (final String text in row) _parseNumber(text, token, maxDigits),
+          for (final String text in row)
+            _parseNumber(text, token, maxDigits, approximate: marked),
         ],
     ];
-    marked =
-        marked ||
-        entries.any((List<_Entry> row) => row.any((_Entry e) => e.isMarked));
 
     final Matrix matrix;
     if (marked) {
@@ -211,8 +224,6 @@ final class _Entry {
   final Rational? exact;
   final double? approximate;
 
-  bool get isMarked => approximate != null;
-
   // An exact entry in a matrix made approximate by a `~` elsewhere.
   double toDouble(String token) {
     final double value = approximate ?? exact!.toDouble();
@@ -238,7 +249,7 @@ final class _MatrixLiteralParser {
   int _index = 0;
 
   Object parse() {
-    final Object value = _list();
+    final Object value = _list(1);
     _skipSpace();
     if (_index != _source.length) {
       throw _invalid();
@@ -246,7 +257,15 @@ final class _MatrixLiteralParser {
     return value;
   }
 
-  List<Object> _list() {
+  // A matrix literal nests two levels at most (`[[1 2] [3 4]]`); deeper
+  // nesting stops here, before any recursion that could exhaust the stack.
+  List<Object> _list(int depth) {
+    if (depth > 2) {
+      throw ExpressionSyntaxError(
+        'Matrix literal must contain only numbers.',
+        errorId: CalculatrixErrorId.syntaxError,
+      );
+    }
     _expect('[');
     final List<Object> items = <Object>[];
     _skipSpace();
@@ -255,7 +274,7 @@ final class _MatrixLiteralParser {
       return items;
     }
     while (true) {
-      items.add(_peek == '[' ? _list() : _entry());
+      items.add(_peek == '[' ? _list(depth + 1) : _entry());
       final bool spaced = _skipSpace();
       final String? next = _peek;
       if (next == ']') {
@@ -283,6 +302,14 @@ final class _MatrixLiteralParser {
       _index++;
     }
     final String text = _source.substring(start, _index);
+    final String? fix = Literals.misplacedMarkFix(text);
+    if (fix != null) {
+      throw ExpressionSyntaxError(
+        'The approximate mark goes before the sign: $fix',
+        errorId: CalculatrixErrorId.syntaxError,
+        token: _token,
+      );
+    }
     if (text.isEmpty || !Literals.isNumber(text)) {
       throw _invalid();
     }
