@@ -38,45 +38,55 @@ void main() {
       expect(out.output, contains("cx '5 7 power'"));
     });
 
-    test('every command the banner may list has its own example, none left '
-        'to fall back to a bare name/description row (issue #51 acceptance '
-        '1: commands list, doctor, upgrade, uninstall and version used to '
-        'have none)', () {
-      for (final cmd in bannerCommands) {
-        expect(cmd.example, isNotNull, reason: '"${cmd.name}" has no example');
-      }
-    });
+    test(
+      'every command the banner may list has its own example, none left '
+      'to fall back to a bare name/description row (issue #51 acceptance '
+      '1: commands list, doctor, upgrade, uninstall and version used to '
+      'have none)',
+      () {
+        for (final cmd in bannerCommands) {
+          expect(
+            cmd.example,
+            isNotNull,
+            reason: '"${cmd.name}" has no example',
+          );
+        }
+      },
+    );
 
-    test('every command row keeps at least a 2-space gap between every '
-        'column (name, description, example), the same as the banner '
-        '(issue #51 acceptance 7)', () async {
-      var sawRowWithExample = false;
-      for (final cmd in bannerCommands) {
-        final line = bannerCommandRow(cmd);
+    test(
+      'every command row keeps at least a 2-space gap between every '
+      'column (name, description, example), the same as the banner '
+      '(issue #51 acceptance 7)',
+      () async {
+        var sawRowWithExample = false;
+        for (final cmd in bannerCommands) {
+          final line = bannerCommandRow(cmd);
 
-        final nameEnd = line.indexOf(RegExp(r'  '), 4);
-        expect(
-          nameEnd,
-          greaterThan(4),
-          reason: 'no 2-space gap after the name column in: "$line"',
-        );
+          final nameEnd = line.indexOf(RegExp(r'  '), 4);
+          expect(
+            nameEnd,
+            greaterThan(4),
+            reason: 'no 2-space gap after the name column in: "$line"',
+          );
 
-        // The last "cx ", not the first: a description can itself contain
-        // "cx" followed by padding spaces ("remove cx", issue #51 AC1,
-        // once "uninstall" got its own example), and only the example
-        // column, always the final thing on the line, is what this gap
-        // check cares about.
-        final exampleStart = line.lastIndexOf('cx ');
-        if (exampleStart <= 0) continue;
-        sawRowWithExample = true;
-        expect(
-          line.substring(exampleStart - 2, exampleStart),
-          '  ',
-          reason: 'no 2-space gap before the example in: "$line"',
-        );
-      }
-      expect(sawRowWithExample, isTrue);
-    });
+          // The last "cx ", not the first: a description can itself contain
+          // "cx" followed by padding spaces ("remove cx", issue #51 AC1,
+          // once "uninstall" got its own example), and only the example
+          // column, always the final thing on the line, is what this gap
+          // check cares about.
+          final exampleStart = line.lastIndexOf('cx ');
+          if (exampleStart <= 0) continue;
+          sawRowWithExample = true;
+          expect(
+            line.substring(exampleStart - 2, exampleStart),
+            '  ',
+            reason: 'no 2-space gap before the example in: "$line"',
+          );
+        }
+        expect(sawRowWithExample, isTrue);
+      },
+    );
 
     test('cx -h gives the exact same text as cx --help', () async {
       final outLong = MemorySink();

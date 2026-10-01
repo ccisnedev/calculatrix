@@ -275,11 +275,7 @@ Future<int> runCalculatrixCli(
   }
 
   final BufferingSink bufferedErr = BufferingSink();
-  final int exitCode = await cli.run(
-    args,
-    stdout: realOut,
-    stderr: bufferedErr,
-  );
+  final int exitCode = await cli.run(args, stdout: realOut, stderr: bufferedErr);
   realErr.write(rewriteUnquotedProgramError(bufferedErr.text, args));
   return exitCode;
 }
