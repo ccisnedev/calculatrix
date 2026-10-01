@@ -232,8 +232,8 @@ void main() {
       expect(_rpn('[[1 2]] ~2 *').isExact, isFalse);
     });
 
-    test('a word not yet exact converts to approximate (D53)', () {
-      expect(_rpn('4 sqrt').isExact, isFalse);
+    test('an irrational result converts to approximate (D53)', () {
+      expect(_rpn('2 sqrt').isExact, isFalse);
       expect(_rpn('[[1 2] [3 4]] eigenvalues').isExact, isFalse);
       expect(_rpn('[[1 2] [3 4]] frobenius-norm').isExact, isFalse);
     });
@@ -272,8 +272,9 @@ void main() {
       );
     });
 
-    test('fractional powers are approximate', () {
-      expect(_rpn('4 1 2 / ^').isExact, isFalse);
+    test('fractional powers are exact only when rational', () {
+      expect(_rpn('4 1 2 / ^'), _exactScalar(_q(2)));
+      expect(_rpn('2 1 2 / ^').isExact, isFalse);
       expect(_rpn('2 ~3 ^'), _approximateScalar(8));
     });
   });

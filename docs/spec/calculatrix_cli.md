@@ -367,7 +367,8 @@ them. The semantics of `power`, the source of `log-undefined` and
 each numerator or denominator) is `limit-exceeded`, raised before the
 computation starts when the size can be estimated (`a^n`, and the
 Hadamard bound for `inverse`, `determinant`, `rref`, `rank`, `cofactors`,
-`adjugate` and `lu`), never an approximate result instead
+`adjugate` and `lu`, a norm bound on the characteristic polynomial for
+`eigenvalues`), never an approximate result instead
 (runbook-trust.md D55). `details` carry `limit`
 and `estimated`, and the message gives the next step: the same program with
 `approx` before the failing word, or `~` before a failing literal, and
@@ -990,6 +991,15 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx '[[1 2 3] [4 5 6] [7 8 10]] 3 / determinant'` | prints `1: -1/9`, 0 (trust D53) |
 | `cx --max-digits 50 '[[1e30 1] [1 1e30]] determinant'` | `limit-exceeded`, 65, `estimated: 61` from the Hadamard bound; suggests `cx '[[1e30 1] [1 1e30]] approx determinant'` (trust D55) |
 | `cx '[[1 2] [2 4]] inverse'` | `singular-matrix`, 65, `token: inverse` (D43) |
+| `cx '9 4 / sqrt'` | prints `1: 1.5`, 0: exact (trust D53) |
+| `cx '2 sqrt'` | prints `1: ~1.41421356237`, 0: irrational, so approximate (trust D53) |
+| `cx '27 8 / 2 3 / ^'` | prints `1: 2.25`, 0: exact (trust D53) |
+| `cx '[[5 4] [4 5]] sqrt'` | prints `1: [[2 1] [1 2]]`, 0: exact (trust D53) |
+| `cx '[[2 1] [1 2]] eigenvalues'` | prints `1: [[3] [1]]`, 0: exact (trust D53) |
+| `cx '[[1 2] [3 4]] eigenvalues'` | prints `1: ~[[5.37228132327] [-0.372281323269]]`, 0: irrational, so approximate (trust D53) |
+| `cx '[[0 -1] [1 0]] eigenvalues'` | `calculatrix-error`, 65: complex eigenvalues are deferred (trust D53) |
+| `cx '[[3 4]] frobenius-norm'` | prints `1: 5`, 0: exact (trust D53) |
+| `cx --max-digits 50 '[[1e30 1] [1 1e30]] eigenvalues'` | `limit-exceeded`, 65, `estimated: 62` from the norm bound; suggests `cx '[[1e30 1] [1 1e30]] approx eigenvalues'` (trust D55) |
 | `cx '-4 sqrt'` | the same result as `cx '-4 0.5 ^'`, bit for bit (D44) |
 | `cx '1 2 2 ->ARRY'` | `unknown-word`, 65 (D42) |
 | `cx eval infix '-1+2'` | prints `1: 1`, 0 |

@@ -229,6 +229,23 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   approximate methods, and `lu` picks the pivot of largest magnitude, as
   `luDecomposition` does. The Giac differential tests cover every new word,
   with more than 1100 cases.
+- Exact roots and eigenvalues (runbook-trust.md, step T4). The extension
+  `ExactRoots` adds `fractionalPower`, `frobeniusNorm`, `exp` and `ln`, and
+  `ExactLinearAlgebra.eigenvalues` joins it. `power` with a non-integer
+  exact exponent, `sqrt` (`0.5 power`, and `RpnEngine.applyUnary` too),
+  `frobenius-norm`, `eigenvalues`, `exp` and `ln` are exact on exact
+  operands when the result is rational (D53), and otherwise return the
+  approximate result, errors included. Scalars, complex numbers in their
+  2x2 form and diagonal matrices use closed forms (`-4 sqrt` is `2i`);
+  any other matrix gets its principal root approximately, converted to the
+  simplest nearby rationals and checked exactly. `eigenvalues` computes
+  the characteristic polynomial (Berkowitz) and its rational roots by
+  Hensel lifting modulo a small prime, largest first with multiplicity,
+  after a norm bound check against `maxDigits` (D55). `exp` and `ln` are
+  exact only for a zero matrix and the identity. Complex eigenvalues are
+  deferred (D53 amended). New: `Rational.root`, `Rational.floorRoot`,
+  `Rational.simplestWithin`. The Giac tests cover every word and check
+  that irrational results stay approximate.
 
 ### Fixed
 

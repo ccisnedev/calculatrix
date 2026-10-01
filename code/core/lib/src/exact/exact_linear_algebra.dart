@@ -331,6 +331,60 @@ extension ExactLinearAlgebra on ExactArithmetic {
     );
   }
 
+  /// The eigenvalues of the square matrix [a], largest first, as a column,
+  /// each repeated by its multiplicity. Exact when every root of the
+  /// characteristic polynomial is rational; otherwise the approximate
+  /// eigenvalues of the same matrix, as a whole (runbook D49, D53).
+  Matrix eigenvalues(Matrix a) {
+    if (!a.isSquare) {
+      return a.toApproximate().eigenvalues();
+    }
+    if (a.isScalar) {
+      return a;
+    }
+    const String what = 'The exact characteristic polynomial';
+    final _IntegerForm form = _integerForm(a, what);
+    final int size = a.rowCount;
+    BigInt squares = BigInt.zero;
+    for (final List<BigInt> row in form.rows) {
+      for (final BigInt entry in row) {
+        squares += entry * entry;
+      }
+    }
+    if (squares == BigInt.zero) {
+      return Matrix.exactFilled(size, 1, Rational.zero);
+    }
+    // The eigenvalues of A are those of B divided by g, and those of B are
+    // the roots of det(yI - B), monic with integer coefficients, so its
+    // rational roots are integers. Every coefficient, and every value
+    // Berkowitz's algorithm computes on the way, is at most
+    // (2 * |B|)^n, with |B| the Frobenius norm of B.
+    _requireWithin(
+      what,
+      size * (Rational.log10Of(squares) / 2 + _log10Of2) +
+          Rational.log10Of(BigInt.from(size + 1)),
+      bound: 'norm bound',
+    );
+    final List<BigInt>? roots = _integerRoots(
+      _characteristicPolynomial(form.rows),
+      Rational.floorRoot(squares, BigInt.two) + BigInt.one,
+      _within,
+    );
+    if (roots == null) {
+      return a.toApproximate().eigenvalues();
+    }
+    final List<Rational> values =
+        roots.map((BigInt root) => Rational(root, form.scale)).toList()
+          ..sort((Rational x, Rational y) => y.compareTo(x));
+    return check(
+      Matrix.exact(
+        values
+            .map((Rational value) => <Rational>[value])
+            .toList(growable: false),
+      ),
+    );
+  }
+
   // The determinant of A from its integer form: det(B) / g^n.
   Rational _determinant(_IntegerForm form, int size) {
     final List<List<BigInt>> rows = form.rows
@@ -423,7 +477,11 @@ extension ExactLinearAlgebra on ExactArithmetic {
   // Raises `limit-exceeded` when a result bounded by 10^[log10Bound] can
   // have more digits than the limit (runbook D55). The small margin keeps
   // the rounding of the logarithms from undercounting a digit.
-  void _requireWithin(String what, double log10Bound) {
+  void _requireWithin(
+    String what,
+    double log10Bound, {
+    String bound = 'Hadamard bound',
+  }) {
     final double margin = log10Bound * 1e-12 + 1e-9;
     final double estimate = (log10Bound + margin).floorToDouble() + 1;
     final int estimated = estimate.isFinite && estimate < Rational.maxEstimate
@@ -431,7 +489,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
         : Rational.maxEstimate;
     if (estimated > maxDigits) {
       throw LimitExceededError(
-        '$what could have up to $estimated digits (Hadamard bound), over '
+        '$what could have up to $estimated digits ($bound), over '
         'the limit of $maxDigits.',
         limit: maxDigits,
         estimated: estimated,
@@ -506,6 +564,296 @@ double _hadamardLog10(List<List<BigInt>> rows) {
     }
   }
   return sum;
+}
+
+const double _log10Of2 = 0.30102999566398120;
+
+// The coefficients of det(yI - [m]), highest degree first, by Berkowitz's
+// algorithm: division free, so every value stays an integer. With
+// m = [[a R] [C A]], the polynomial of m is a lower triangular Toeplitz
+// matrix with first column 1, -a, -R C, -R A C, ..., -R A^(n-2) C times
+// the polynomial of A.
+List<BigInt> _characteristicPolynomial(List<List<BigInt>> m) {
+  final int n = m.length;
+  if (n == 1) {
+    return <BigInt>[BigInt.one, -m[0][0]];
+  }
+  final List<BigInt> top = m[0].sublist(1);
+  final List<List<BigInt>> inner = <List<BigInt>>[
+    for (int r = 1; r < n; r++) m[r].sublist(1),
+  ];
+  List<BigInt> column = <BigInt>[for (int r = 1; r < n; r++) m[r][0]];
+  final List<BigInt> toeplitz = <BigInt>[BigInt.one, -m[0][0]];
+  for (int i = 0; i < n - 1; i++) {
+    if (i > 0) {
+      column = <BigInt>[
+        for (final List<BigInt> row in inner) _dotIntegers(row, column),
+      ];
+    }
+    toeplitz.add(-_dotIntegers(top, column));
+  }
+  final List<BigInt> rest = _characteristicPolynomial(inner);
+  return List<BigInt>.generate(n + 1, (int i) {
+    BigInt sum = BigInt.zero;
+    for (int j = 0; j <= i && j < n; j++) {
+      sum += toeplitz[i - j] * rest[j];
+    }
+    return sum;
+  }, growable: false);
+}
+
+BigInt _dotIntegers(List<BigInt> a, List<BigInt> b) {
+  BigInt sum = BigInt.zero;
+  for (int i = 0; i < a.length; i++) {
+    sum += a[i] * b[i];
+  }
+  return sum;
+}
+
+// Every root of the monic integer [polynomial] (highest degree first),
+// repeated by its multiplicity, when all of them are integers; null when
+// one is not. Its rational roots are integers, at most [bound] in absolute
+// value. They are the integer roots of its square-free part S, found
+// modulo a prime p for which S stays square-free (so each root is simple
+// there), lifted p-adically past 2 * [bound] and then checked exactly.
+// [within] checks the digits of the rationals of the square-free part.
+List<BigInt>? _integerRoots(
+  List<BigInt> polynomial,
+  BigInt bound,
+  Rational Function(Rational) within,
+) {
+  final List<BigInt> roots = <BigInt>[];
+  List<BigInt> rest = List<BigInt>.of(polynomial);
+  while (rest.length > 1 && rest.last == BigInt.zero) {
+    roots.add(BigInt.zero);
+    rest.removeLast();
+  }
+  if (rest.length == 1) {
+    return roots;
+  }
+  final List<BigInt> squareFree = _squareFreePart(rest, within);
+  for (final BigInt candidate in _liftedRoots(squareFree, bound)) {
+    while (rest.length > 1) {
+      final (List<BigInt>, BigInt) division = _divideByLinear(rest, candidate);
+      if (division.$2 != BigInt.zero) {
+        break;
+      }
+      roots.add(candidate);
+      rest = division.$1;
+    }
+  }
+  return rest.length == 1 ? roots : null;
+}
+
+// [p] / (y - [root]) by synthetic division: the quotient and the remainder
+// p([root]).
+(List<BigInt>, BigInt) _divideByLinear(List<BigInt> p, BigInt root) {
+  final List<BigInt> quotient = <BigInt>[];
+  BigInt carry = BigInt.zero;
+  for (int i = 0; i < p.length; i++) {
+    carry = carry * root + p[i];
+    if (i < p.length - 1) {
+      quotient.add(carry);
+    }
+  }
+  return (quotient, carry);
+}
+
+// The square-free part [p] / gcd([p], [p]') of a monic integer polynomial.
+// The gcd is monic over the rationals and divides [p], so by Gauss's lemma
+// it and the quotient have integer coefficients.
+List<BigInt> _squareFreePart(
+  List<BigInt> p,
+  Rational Function(Rational) within,
+) {
+  final List<Rational> f = p.map((BigInt c) => Rational(c)).toList();
+  final int degree = p.length - 1;
+  final List<Rational> derivative = <Rational>[
+    for (int i = 0; i < degree; i++) Rational(p[i] * BigInt.from(degree - i)),
+  ];
+  List<Rational> a = f;
+  List<Rational> b = _monic(derivative);
+  // Euclid's algorithm; b is monic and nonzero at every step.
+  while (b.length > 1) {
+    final List<Rational> remainder = _remainder(a, b, within);
+    if (remainder.isEmpty) {
+      break;
+    }
+    a = b;
+    b = _monic(remainder);
+  }
+  // A nonzero constant b means the gcd is 1.
+  final List<Rational> gcd = b;
+  if (gcd.length == 1) {
+    return p;
+  }
+  return _quotient(
+    f,
+    gcd,
+    within,
+  ).map((Rational c) => c.numerator).toList(growable: false);
+}
+
+List<Rational> _monic(List<Rational> p) {
+  final Rational lead = p.first;
+  return p.map((Rational c) => c / lead).toList();
+}
+
+// The remainder of [a] divided by the monic [b], without leading zeros
+// (empty when it is zero).
+List<Rational> _remainder(
+  List<Rational> a,
+  List<Rational> b,
+  Rational Function(Rational) within,
+) {
+  final List<Rational> r = List<Rational>.of(a);
+  final int steps = a.length - b.length + 1;
+  for (int i = 0; i < steps; i++) {
+    final Rational factor = r[i];
+    if (factor.isZero) {
+      continue;
+    }
+    for (int j = 1; j < b.length; j++) {
+      r[i + j] = within(r[i + j] - factor * b[j]);
+    }
+  }
+  final List<Rational> tail = r.sublist(steps < 0 ? 0 : steps);
+  final int firstNonzero = tail.indexWhere((Rational c) => !c.isZero);
+  return firstNonzero < 0 ? <Rational>[] : tail.sublist(firstNonzero);
+}
+
+// [a] / [b] for a monic [b] that divides [a].
+List<Rational> _quotient(
+  List<Rational> a,
+  List<Rational> b,
+  Rational Function(Rational) within,
+) {
+  final List<Rational> r = List<Rational>.of(a);
+  final List<Rational> quotient = <Rational>[];
+  for (int i = 0; i < a.length - b.length + 1; i++) {
+    final Rational factor = r[i];
+    quotient.add(factor);
+    for (int j = 1; j < b.length; j++) {
+      r[i + j] = within(r[i + j] - factor * b[j]);
+    }
+  }
+  return quotient;
+}
+
+// The integers c with |c| <= [bound] that may be roots of the monic,
+// square-free integer polynomial [s]: its roots modulo the first prime p
+// that keeps [s] square-free, each lifted by Newton's method modulo p^(2^k)
+// past 2 * [bound] and read in the symmetric range. Each candidate is
+// checked by the caller's exact division. Empty when no small prime works,
+// which leaves the eigenvalues approximate.
+List<BigInt> _liftedRoots(List<BigInt> s, BigInt bound) {
+  final List<BigInt> derivative = <BigInt>[
+    for (int i = 0; i < s.length - 1; i++) s[i] * BigInt.from(s.length - 1 - i),
+  ];
+  for (final int p in _smallPrimes()) {
+    final List<int> sModP = _reduce(s, p);
+    final List<int> derivativeModP = _reduce(derivative, p);
+    if (_gcdDegreeModP(sModP, derivativeModP, p) != 0) {
+      continue;
+    }
+    final List<BigInt> candidates = <BigInt>[];
+    final BigInt prime = BigInt.from(p);
+    final BigInt target = bound * BigInt.two;
+    for (int residue = 0; residue < p; residue++) {
+      if (_evaluateModP(sModP, residue, p) != 0) {
+        continue;
+      }
+      BigInt root = BigInt.from(residue);
+      BigInt modulus = prime;
+      while (modulus <= target) {
+        modulus *= modulus;
+        final BigInt slope = _evaluateModulo(derivative, root, modulus);
+        root =
+            (root -
+                _evaluateModulo(s, root, modulus) * slope.modInverse(modulus)) %
+            modulus;
+      }
+      final BigInt candidate = root * BigInt.two > modulus
+          ? root - modulus
+          : root;
+      if (candidate.abs() <= bound) {
+        candidates.add(candidate);
+      }
+    }
+    return candidates;
+  }
+  return <BigInt>[];
+}
+
+// [p] at [x] modulo [modulus], reduced at every step so that no value
+// grows past [modulus] squared.
+BigInt _evaluateModulo(List<BigInt> p, BigInt x, BigInt modulus) {
+  BigInt value = BigInt.zero;
+  for (final BigInt c in p) {
+    value = (value * x + c) % modulus;
+  }
+  return value;
+}
+
+List<int> _reduce(List<BigInt> p, int prime) {
+  final BigInt modulus = BigInt.from(prime);
+  final List<int> reduced = p.map((BigInt c) => (c % modulus).toInt()).toList();
+  final int firstNonzero = reduced.indexWhere((int c) => c != 0);
+  return firstNonzero < 0 ? <int>[] : reduced.sublist(firstNonzero);
+}
+
+int _evaluateModP(List<int> p, int x, int prime) {
+  int value = 0;
+  for (final int c in p) {
+    value = (value * x + c) % prime;
+  }
+  return value;
+}
+
+// The degree of gcd([a], [b]) over the integers modulo [prime] (both
+// reduced, highest degree first, empty for zero); -1 when both are zero.
+int _gcdDegreeModP(List<int> a, List<int> b, int prime) {
+  List<int> x = a;
+  List<int> y = b;
+  while (y.isNotEmpty) {
+    final int inverse = BigInt.from(
+      y.first,
+    ).modInverse(BigInt.from(prime)).toInt();
+    final List<int> r = List<int>.of(x);
+    for (int i = 0; i <= r.length - y.length; i++) {
+      final int factor = r[i] * inverse % prime;
+      if (factor == 0) {
+        continue;
+      }
+      for (int j = 0; j < y.length; j++) {
+        r[i + j] = (r[i + j] - factor * y[j]) % prime;
+      }
+    }
+    final List<int> tail = r.length >= y.length
+        ? r.sublist(r.length - y.length + 1)
+        : r;
+    final int firstNonzero = tail.indexWhere((int c) => c != 0);
+    x = y;
+    y = firstNonzero < 0 ? <int>[] : tail.sublist(firstNonzero);
+  }
+  return x.length - 1;
+}
+
+// The odd primes below 3000, in order.
+Iterable<int> _smallPrimes() sync* {
+  const int limit = 3000;
+  final List<bool> composite = List<bool>.filled(limit, false);
+  for (int n = 2; n < limit; n++) {
+    if (composite[n]) {
+      continue;
+    }
+    for (int m = n * n; m < limit; m += n) {
+      composite[m] = true;
+    }
+    if (n > 2) {
+      yield n;
+    }
+  }
 }
 
 /// Fraction-free elimination (Bareiss) of an integer matrix, in place.
