@@ -624,6 +624,13 @@ class Matrix {
     );
   }
 
+  // A negative discriminant of a real 2x2 block proves a complex pair of
+  // eigenvalues, and a column of complex values has no representation yet
+  // (runbook-trust.md D60; issue #64).
+  static const String _complexEigenvaluesMessage =
+      'The eigenvalues of this matrix are complex, and cx has no complex '
+      'columns yet.';
+
   Matrix eigenvalues({
     double absoluteTolerance =
         CalculatrixNumericPolicy.defaultAbsoluteTolerance,
@@ -741,7 +748,8 @@ class Matrix {
 
     if (discriminant < 0) {
       throw MatrixDomainError(
-        'Eigenvalues are undefined in the real domain for this matrix.',
+        _complexEigenvaluesMessage,
+        errorId: CalculatrixErrorId.complexResult,
       );
     }
 
@@ -1298,7 +1306,8 @@ class Matrix {
 
     if (discriminant < 0) {
       throw MatrixDomainError(
-        'Eigenvalues are undefined in the real domain for this matrix.',
+        _complexEigenvaluesMessage,
+        errorId: CalculatrixErrorId.complexResult,
       );
     }
 
@@ -2326,9 +2335,20 @@ class Matrix {
       return _log2x2ClosedForm(realEigenvalues, absoluteTolerance);
     }
 
-    final Diagonalization decomposition = diagonalization(
-      absoluteTolerance: absoluteTolerance,
-    );
+    final Diagonalization decomposition;
+    try {
+      decomposition = diagonalization(absoluteTolerance: absoluteTolerance);
+    } on MatrixDomainError catch (error) {
+      // A complex spectrum does not make the logarithm complex (a rotation
+      // has a real logarithm), so `complex-result` would be wrong here: it
+      // stays the generic error it was before D60.
+      if (error.errorId != CalculatrixErrorId.complexResult) {
+        rethrow;
+      }
+      throw MatrixDomainError(
+        'Eigenvalues are undefined in the real domain for this matrix.',
+      );
+    }
 
     final List<List<double>> logDiagonal = List<List<double>>.generate(
       rowCount,

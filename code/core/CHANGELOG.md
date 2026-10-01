@@ -258,6 +258,14 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   from a result keep exact values, and an approximate seed carries its
   mark. `PushZerosCommand`, `PushOnesCommand` and `PushIdentityCommand`
   push exact matrices, as `zeros`, `ones` and `identity` do.
+- Complex results (runbook-trust.md, step T6). New error id
+  `CalculatrixErrorId.complexResult` (`complex-result`), raised as a
+  `MatrixDomainError` by `Matrix.eigenvalues` and `Matrix.diagonalization`
+  when the negative discriminant of a real 2x2 block proves a complex pair
+  of eigenvalues, exact input included (D60). The QR iteration that does
+  not converge keeps its generic error, and `Matrix.ln` keeps it too: a
+  rotation has a real logarithm. The registry lists the id on `eigenvalues`
+  and `diagonalize`.
 
 ### Fixed
 

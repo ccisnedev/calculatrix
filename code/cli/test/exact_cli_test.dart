@@ -282,17 +282,20 @@ void main() {
       );
     });
 
-    test('complex eigenvalues stay an error', () async {
+    test('complex eigenvalues are complex-result (D60)', () async {
       final code = await run([
         'eval',
         'rpn',
         '--json',
         '[[0 -1] [1 0]] eigenvalues',
       ]);
-      expect(code, isNot(ExitCode.ok));
+      expect(code, ExitCode.dataError);
+      final error = errorOf();
+      expect(error['id'], 'complex-result');
       expect(
-        errorOf()['message'],
-        'Eigenvalues are undefined in the real domain for this matrix.',
+        error['message'],
+        'The eigenvalues of this matrix are complex, and cx has no complex '
+        'columns yet.',
       );
     });
 

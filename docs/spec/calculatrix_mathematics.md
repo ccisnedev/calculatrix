@@ -3,12 +3,21 @@
 ## 1. Scope
 
 This document defines the formal mathematical model implemented by Calculatrix.
-All runtime values are matrices over the real numbers.
+All runtime values are real matrices, and each value is either exact or
+approximate, as a whole (runbook-trust.md D49):
 
-- Domain: R^(m x n)
-- Scalar embedding: k in R is represented as [[k]] (1x1)
+- Exact domain: Q^(m x n). Entries are rationals, a pair of arbitrary-size
+  integers, always reduced, with a positive denominator; an integer is a
+  rational with denominator 1.
+- Approximate domain: F^(m x n), where F is the set of finite IEEE 754
+  doubles, a subset of R. Operations follow section 4.
+- Scalar embedding: k is represented as [[k]] (1x1)
 - Complex embedding: a + bi is represented as [[a, -b], [b, a]]
 - Core principle: matrix-first semantics in all operations and state transitions
+
+A value never mixes exact and approximate entries. Literals are exact
+(`0.1` is 1/10, `1/3` is one third; D50, D59), `~` before a literal makes it
+approximate (D56), and the exactness of a result follows section 4.
 
 This is a normative specification for core, app, and CLI behavior.
 
@@ -43,6 +52,25 @@ Properties used by the engine:
 - Phi(conj(z)) = Phi(z)^T
 - det(Phi(a+bi)) = a^2 + b^2
 
+Phi is defined over Q as well: a complex number with rational parts is an
+exact 2x2 matrix, so `-4 sqrt` gives the exact [[0, -2], [2, 0]] (2i).
+
+### 2.3 Complex Results of Real Words
+
+The embedding covers a single complex number. A result that would be a
+column of complex numbers, such as the eigenvalues of a real matrix with a
+complex pair, has no representation yet. `eigenvalues` and `diagonalize`
+raise `complex-result` (MatrixDomainError, CLI exit 65) when the negative
+discriminant of a real 2x2 block proves a complex pair, for exact and
+approximate input alike (runbook-trust.md D60):
+
+- eigenvalues([[0, -1], [1, 0]]) => complex-result (the spectrum is {i, -i})
+
+Words that use the spectrum only internally keep their own contract:
+ln(A) of a rotation is real, so `ln` never raises `complex-result`.
+Complex vectors as blocks of Phi (n complex numbers as a 2n x 2 matrix)
+are tracked in issue #64.
+
 ## 3. Operator Semantics
 
 ## 3.1 Shape Laws
@@ -75,7 +103,35 @@ This preserves natural expressions in complex form, for example:
 
 ## 4. Numerical Policy
 
-Calculatrix uses explicit floating-point tolerances.
+### 4.1 Exactness
+
+Exactness depends only on the values, never on a mode (runbook-trust.md
+D51, D53):
+
+- Exact with exact gives exact when the result is rational and can be
+  checked exactly: `+ - * /`, `negate`, `percent`, integer powers,
+  `inverse`, `determinant`, `rref`, `rank`, `trace`, `adjugate`,
+  `cofactors`, `lu`, `dot`, `cross`; `sqrt`, fractional powers,
+  `frobenius-norm` and `eigenvalues` when the result is rational; `exp` and
+  `ln` in trivial cases. Stack and structure words keep exactness.
+- An irrational result, or any other word, gives an approximate value.
+- One approximate operand makes the result approximate (contagion).
+- `approx` (alias `num`) and `exact` convert explicitly; `exact` takes the
+  simplest rational that rounds to the same double (D52).
+
+Exact computation uses no tolerance: equality and zero tests are exact,
+and elimination is fraction-free (Bareiss). Before computing, the size of
+an exact result is estimated (`a^n`, the Hadamard bound, a norm bound on
+the characteristic polynomial); over the limit, 10000 digits per numerator
+or denominator by default, the error is `limit-exceeded`, never an
+approximate result instead (D55).
+
+An approximate value is always shown with the mark `~` (D54), so a value
+that is not exact never looks exact.
+
+### 4.2 Tolerances of the Approximate Path
+
+Calculatrix uses explicit floating-point tolerances on approximate values.
 
 - defaultAbsoluteTolerance = 1e-14
 - defaultRelativeTolerance = 1e-13
@@ -163,7 +219,8 @@ Failure modes:
 
 ## 5.5 Eigen and Decompositions
 
-- eigenvalues(A): square only; real-domain only
+- eigenvalues(A): square only; real-domain only; a complex pair is
+  `complex-result` (section 2.3)
 - diagonalization(A): requires real spectrum and independent eigenvectors
 - luDecomposition(A): square only
 - qrDecomposition(A): rows >= columns
