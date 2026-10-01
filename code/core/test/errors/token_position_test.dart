@@ -98,6 +98,34 @@ void main() {
       },
     );
 
+    test('non-finite: an overflowing product carries the "*" token, and '
+        'the whole stack is checked the same way', () {
+      for (final List<String> tokens in <List<String>>[
+        <String>['1e300', '1e300', '*'],
+        <String>['[[1e300 1]]', '1e300', '*'],
+      ]) {
+        try {
+          Calculatrix.evaluateRpnStack(tokens);
+          fail('expected MatrixDomainError for $tokens');
+        } on MatrixDomainError catch (error) {
+          expect(error.errorId, CalculatrixErrorId.nonFinite);
+          expect(error.token, '*');
+          expect(error.position, tokens.join(' ').length);
+        }
+      }
+    });
+
+    test('non-finite: an overflowing infix product carries "*"', () {
+      try {
+        Calculatrix.evaluateInfix('1e300*1e300');
+        fail('expected MatrixDomainError');
+      } on MatrixDomainError catch (error) {
+        expect(error.errorId, CalculatrixErrorId.nonFinite);
+        expect(error.token, '*');
+        expect(error.position, 6);
+      }
+    });
+
     test('log-undefined: a non-integer power of a matrix with a non-positive '
         'real eigenvalue carries the "^" token', () {
       final List<String> tokens = <String>['[[-1,0],[0,2]]', '0.5', '^'];

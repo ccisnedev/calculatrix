@@ -74,6 +74,23 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	answers like `cx version` (before, it was an unknown option, exit 7).
 	Nothing else changes: the rows, their examples and the banner on a bare
 	`cx` are the same. Shipped in `cx` 0.8.3.
+- `eval rpn` and the `cx <program>` shortcut print the whole stack the
+	program leaves, highest level first and level 1 at the bottom (`2: 5`,
+	`1: 7`); before, a program that left more than one value failed with
+	`syntax-error`. A program that leaves the stack empty (`1 drop`) prints an
+	empty line and exits 0 (runbook D47).
+- Breaking: the JSON of `eval rpn` and `eval infix` names each level,
+	`{"stack": [{"level": 1, "value": 3}]}`, in the order the text prints;
+	before, it was `{"stack": [3]}` (runbook D47).
+- Text output shows each number through the display formatter of core, the
+	one the app uses: at most 12 significant digits, trailing zeros removed.
+	`[[1 2] [3 4]] -1 ^` prints `[[-2 1] [1.5 -0.5]]` instead of
+	`-1.9999999999999996`. `--json` keeps the full double (runbook D45).
+- A word whose result overflows (`1e300 1e300 *`) is the error
+	`non-finite`, exit 65, on that word's token and position, as spec section
+	6 requires; before, `cx` printed `1: Infinity` (or `NaN`) and exited 0,
+	and `--json` crashed. The app shows the same error for an overflowing
+	infix expression. Shipped in `cx` 0.9.0.
 
 ## [0.7.1] - 2026-05-30
 

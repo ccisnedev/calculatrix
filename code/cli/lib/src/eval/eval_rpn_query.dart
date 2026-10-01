@@ -53,8 +53,7 @@ class EvalRpnQuery implements Query<EvalRpnInput, EvalOutput> {
     );
     try {
       final tokens = Calculatrix.tokenizeRpnLine(program);
-      final result = Calculatrix.evaluateRpn(tokens);
-      return EvalOutput(result);
+      return EvalOutput(Calculatrix.evaluateRpnStack(tokens));
     } on CalculatrixError catch (error) {
       throw toCommandException(error);
     }

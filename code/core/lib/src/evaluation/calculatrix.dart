@@ -222,7 +222,34 @@ class Calculatrix {
           rethrow;
         }
       }
+      _requireFiniteTop(machine, token);
       index = end;
+    }
+  }
+
+  // A word whose result overflows (`1e300 1e300 *`) must not leave
+  // Infinity or NaN on the stack: spec section 6 makes any non-finite
+  // value the error `non-finite`, reported on the word that produced it,
+  // as `^` already does on its own. Only level 1 is checked: a word that
+  // pushes a new value pushes it on top, and every value below it was
+  // checked when it was pushed.
+  static void _requireFiniteTop(
+    CalculatrixMachine machine,
+    _PositionedToken token,
+  ) {
+    final Matrix? top = machine.top;
+    if (top == null) return;
+    for (int row = 0; row < top.rowCount; row++) {
+      for (int column = 0; column < top.columnCount; column++) {
+        if (!top.at(row, column).isFinite) {
+          throw MatrixDomainError(
+            'Result is not a finite number.',
+            errorId: CalculatrixErrorId.nonFinite,
+            token: token.value,
+            position: token.position,
+          );
+        }
+      }
     }
   }
 

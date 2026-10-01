@@ -69,9 +69,9 @@ CommandException toCommandException(CalculatrixError error) {
   );
 }
 
-/// The result matrix as the JSON `"stack"` array wants it (spec section 6):
-/// a 1x1 matrix is a bare number, any other matrix is an array of rows,
-/// never flattened.
+/// One stack value as the JSON `"value"` of a level wants it (spec section
+/// 6): a 1x1 matrix is a bare number, any other matrix is an array of rows,
+/// never flattened. Numbers keep the full double (runbook D45).
 Object matrixToJsonValue(Matrix matrix) {
   if (matrix.isScalar) return _jsonNumber(matrix.scalarValue);
   return [
@@ -83,8 +83,9 @@ Object matrixToJsonValue(Matrix matrix) {
   ];
 }
 
-/// The result matrix as one HP 50g-style stack line wants it (spec section
-/// 6): `1: 3`, `1: [[0 -1] [1 0]]`.
+/// One stack value as an HP 50g-style stack line wants it (spec section 6):
+/// `1: 3`, `1: [[0 -1] [1 0]]`. Each number goes through the display
+/// formatter of core, the one the app uses (runbook D45).
 String matrixToText(Matrix matrix) {
   if (matrix.isScalar) return _numberText(matrix.scalarValue);
   final rows = [
@@ -101,4 +102,4 @@ Object _jsonNumber(double value) {
   return value;
 }
 
-String _numberText(double value) => _jsonNumber(value).toString();
+String _numberText(double value) => MatrixDisplayFormatter.number(value);

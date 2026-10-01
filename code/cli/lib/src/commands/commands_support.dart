@@ -39,9 +39,9 @@ CalculatrixCommandCategory categoryFromCliName(String name) =>
 /// One example of a [CalculatrixCommandEntry], as JSON (spec section 7,
 /// issue #41 AC4: "every field of the entry, examples with their expected
 /// result"). The result is the full stack the example leaves, bottom to
-/// top, exactly as `eval`'s own `"stack"` array is shaped (spec section 6):
-/// most examples leave a single value, so most of these are one-element
-/// arrays.
+/// top, each value shaped as a `"value"` of `eval`'s own `"stack"` (spec
+/// section 6), without the level objects: most examples leave a single
+/// value, so most of these are one-element arrays.
 Map<String, dynamic> commandExampleToJson(CalculatrixCommandExample example) =>
     {
       'program': example.program,
