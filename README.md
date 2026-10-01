@@ -4,6 +4,8 @@
 > stack machine y un shell persistente `RPN` con editores invocados `INFIX` y
 > `MATRIX`.
 
+**Mission:** `cx` is to be the best computation tool for agents, human or AI. See [docs/mission.md](docs/mission.md).
+
 [![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
 
 ## Highlights (current)
