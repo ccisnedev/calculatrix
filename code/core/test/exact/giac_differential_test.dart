@@ -540,7 +540,7 @@ List<List<BigInt>> _integerIdentity(int n) =>
 void _rootCases(_Generator g, List<_Case> cases) {
   // Scalar powers p/q of n/d: exact ones built from q-th powers, and
   // random ones, mostly irrational. A negative base has the principal
-  // complex root |b|^(p/q) e^(i pi p/q), rational only for q = 2.
+  // complex root |b|^(p/q) e^(i pi p/q), rational only for q = 2 and 4.
   for (final int q in <int>[2, 3, 4, 5]) {
     for (int i = 0; i < 12; i++) {
       final int digits = <int>[1, 3, 12][i % 3];
@@ -565,6 +565,26 @@ void _rootCases(_Generator g, List<_Case> cases) {
         cases.add(_Case('T4 scalar sqrt d$digits #$i', '$n $d / sqrt', giac));
       }
     }
+  }
+  // Negative bases -4 x^4 / d^4, whose fourth roots (1 + i) x / d are
+  // rational, and -x^2 / d^2, whose fourth roots are not.
+  for (int i = 0; i < 12; i++) {
+    final int digits = <int>[1, 3, 12][i % 3];
+    final BigInt x = g.integer(digits).abs() + BigInt.one;
+    final BigInt d = g.denominator(digits);
+    final BigInt n = i.isEven
+        ? -BigInt.from(4) * x.pow(4)
+        : -(x.pow(2) * BigInt.two);
+    final BigInt denominator = i.isEven ? d.pow(4) : d.pow(2);
+    final int p = <int>[1, 3, -1, -3, 5][g.nextInt(5)];
+    final String root = _giacRoot(-n, denominator, 4);
+    cases.add(
+      _Case(
+        'T4 negative ^$p/4 d$digits #$i',
+        '$n $denominator / $p 4 / power',
+        'chk(cx2(simplify($root^($p)*exp(i*pi*($p)/4))))',
+      ),
+    );
   }
   cases
     ..add(_Case('T4 0 sqrt', '0 sqrt', 'chk(0)'))

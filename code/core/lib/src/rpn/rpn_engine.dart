@@ -192,9 +192,10 @@ class RpnEngine {
     late final Matrix result;
     switch (operatorType) {
       case RpnUnaryOperator.sqrt:
-        result = value.isExact
+        // A non-square matrix keeps the error of the approximate sqrt.
+        result = value.isExact && value.isSquare
             ? exact.fractionalPower(value, Rational(BigInt.one, BigInt.two))
-            : value.sqrt();
+            : value.toApproximate().sqrt();
       case RpnUnaryOperator.percent:
         result = value.isExact ? exact.percent(value) : value.scale(0.01);
     }

@@ -767,9 +767,11 @@ List<BigInt> _liftedRoots(List<BigInt> s, BigInt bound) {
       BigInt modulus = prime;
       while (modulus <= target) {
         modulus *= modulus;
-        final BigInt slope = _evaluate(derivative, root) % modulus;
+        final BigInt slope = _evaluateModulo(derivative, root, modulus);
         root =
-            (root - _evaluate(s, root) * slope.modInverse(modulus)) % modulus;
+            (root -
+                _evaluateModulo(s, root, modulus) * slope.modInverse(modulus)) %
+            modulus;
       }
       final BigInt candidate = root * BigInt.two > modulus
           ? root - modulus
@@ -783,10 +785,12 @@ List<BigInt> _liftedRoots(List<BigInt> s, BigInt bound) {
   return <BigInt>[];
 }
 
-BigInt _evaluate(List<BigInt> p, BigInt x) {
+// [p] at [x] modulo [modulus], reduced at every step so that no value
+// grows past [modulus] squared.
+BigInt _evaluateModulo(List<BigInt> p, BigInt x, BigInt modulus) {
   BigInt value = BigInt.zero;
   for (final BigInt c in p) {
-    value = value * x + c;
+    value = (value * x + c) % modulus;
   }
   return value;
 }

@@ -347,7 +347,7 @@ final class Rational implements Comparable<Rational> {
     final Rational center = Rational.fromDouble(value.abs());
     final Rational radius = Rational.fromDouble(tolerance);
     final Rational low = center - radius;
-    if (!(Rational.zero < low)) {
+    if (low < Rational.zero) {
       return Rational.zero;
     }
     final Rational found = _simplestBetween(low, center + radius);

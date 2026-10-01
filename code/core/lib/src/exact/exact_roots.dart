@@ -77,10 +77,18 @@ extension ExactRoots on ExactArithmetic {
 
   // b^(p/q) for a scalar b, or null when it is not rational. A negative b
   // has a complex principal root, |b|^(p/q) * e^(i*pi*p/q), with rational
-  // parts only for q = 2 (p is odd there, so e^(i*pi*p/2) is i or -i).
+  // parts only for q = 2 (p is odd there, so e^(i*pi*p/2) is i or -i) and
+  // q = 4 (e^(i*pi/4) is (1 + i) / sqrt(2)).
   Matrix? _scalarRootPower(Rational b, BigInt p, BigInt q) {
     if (b.isZero) {
       return p.isNegative ? null : Matrix.exactScalar(Rational.zero);
+    }
+    if (b.isNegative && q == _four) {
+      // The principal fourth root is the principal square root of the
+      // principal square root, |b|^(1/2) * i: rational parts need |b| to be
+      // a square, not a fourth power ((1 + i)^4 = -4).
+      final Matrix? squareRoot = _scalarRootPower(b, BigInt.one, _two);
+      return squareRoot == null ? null : _complexRootPower(squareRoot, p);
     }
     final Rational? root = b.abs().root(q);
     if (root == null) {
@@ -207,14 +215,13 @@ extension ExactRoots on ExactArithmetic {
       if (root == null) {
         continue;
       }
-      if (!p.isNegative) {
-        return power(root, p);
-      }
-      // A singular B has no negative power; the approximate error stands.
-      if (determinant(root).exactAt(0, 0).isZero) {
+      // A singular B has only a square root, as in the approximate power,
+      // whose logarithm is undefined there; the approximate error stands.
+      if ((p != BigInt.one || q != _two) &&
+          determinant(root).exactAt(0, 0).isZero) {
         break;
       }
-      return power(inverse(root), -p);
+      return p.isNegative ? power(inverse(root), -p) : power(root, p);
     }
     return _approximatePower(base, exponent);
   }

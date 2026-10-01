@@ -106,6 +106,8 @@ void main() {
       expect(Rational.simplestWithin(0.9999999999999998, 1e-9), Rational.one);
       expect(Rational.simplestWithin(-0.33333333331, 1e-9), _q(-1, 3));
       expect(Rational.simplestWithin(1e-12, 1e-9), Rational.zero);
+      // Strictly within: 0 is at distance 1 from 1, so not a candidate.
+      expect(Rational.simplestWithin(1.0, 1.0), Rational.one);
     });
   });
 
@@ -161,6 +163,35 @@ void main() {
       // Same as the approximate value.
       final List<List<double>> approximate = _rpn('-4 approx 3 2 / power').rows;
       expect(approximate[1][0], closeTo(-8, 1e-9));
+    });
+
+    test('negative bases have rational principal fourth roots', () {
+      // (-4)^(1/4) = 1 + i, (-4)^(3/4) = (1 + i)^3 = -2 + 2i,
+      // (-64)^(1/4) = 2 + 2i.
+      for (final (String program, int real, int imaginary)
+          in <(String, int, int)>[
+            ('-4 1 4 / power', 1, 1),
+            ('-4 3 4 / power', -2, 2),
+            ('-64 1 4 / power', 2, 2),
+          ]) {
+        final Matrix result = _rpn(program);
+        expect(
+          result,
+          _exactRows(
+            _rows(<List<Rational>>[
+              <Rational>[_q(real), _q(-imaginary)],
+              <Rational>[_q(imaginary), _q(real)],
+            ]),
+          ),
+          reason: program,
+        );
+        final List<List<double>> approximate = _rpn(
+          program.replaceFirst(' ', ' approx '),
+        ).rows;
+        expect(approximate[0][0], closeTo(real, 1e-9), reason: program);
+        expect(approximate[1][0], closeTo(imaginary, 1e-9), reason: program);
+      }
+      _expectApproximateLike('-2 1 4 / power', '-2 approx 1 4 / power');
     });
 
     test('zero to a negative power keeps the approximate error', () {
@@ -319,6 +350,20 @@ void main() {
     test('values with no real root keep the approximate errors', () {
       _expectSameError('[[1 2] [3 4]] sqrt', '[[1 2] [3 4]] approx sqrt');
       _expectSameError('[[1 2]] sqrt', '[[1 2]] approx sqrt');
+      // A singular matrix has a square root, and no other root.
+      expect(
+        _rpn('[[2 2] [2 2]] sqrt'),
+        _exactRows(
+          _rows(<List<Rational>>[
+            <Rational>[_q(1), _q(1)],
+            <Rational>[_q(1), _q(1)],
+          ]),
+        ),
+      );
+      _expectSameError(
+        '[[2 2] [2 2]] 3 2 / power',
+        '[[2 2] [2 2]] approx 3 2 / power',
+      );
       _expectSameError(
         '[[1 2] [3 4]] 1 3 / power',
         '[[1 2] [3 4]] approx 1 3 / power',
@@ -331,6 +376,24 @@ void main() {
       expect(engine.applyUnary(RpnUnaryOperator.sqrt), _exactScalar(_q(3, 2)));
       engine.push(Matrix.exactScalar(_q(2)));
       expect(engine.applyUnary(RpnUnaryOperator.sqrt).isExact, isFalse);
+    });
+
+    test('the app session sqrt keeps the non-square error', () {
+      String? message(Matrix value) {
+        final RpnEngine engine = RpnEngine()..push(value);
+        try {
+          engine.applyUnary(RpnUnaryOperator.sqrt);
+        } on CalculatrixError catch (error) {
+          return error.message;
+        }
+        return null;
+      }
+
+      final Matrix row = Matrix.exact(<List<Rational>>[
+        <Rational>[_q(1), _q(2)],
+      ]);
+      expect(message(row), isNotNull);
+      expect(message(row), message(row.toApproximate()));
     });
   });
 
