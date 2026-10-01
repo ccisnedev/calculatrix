@@ -892,8 +892,16 @@ Future<Map<int, String>?> _runGiac(
   for (int i = 0; i < expressions.length; i++) {
     input.writeln('print("R$i "+string(${expressions[i]}));');
   }
-  process.stdin.write(input.toString());
-  await process.stdin.close();
+  // A command that starts but exits at once (`wsl` with no Ubuntu
+  // distribution, as on the Windows CI runner) closes the pipe before the
+  // input is written: Giac cannot run here either.
+  try {
+    process.stdin.write(input.toString());
+    await process.stdin.close();
+  } on IOException {
+    await Future.wait(<Future<Object?>>[output, errors, process.exitCode]);
+    return null;
+  }
   final String text = '${await errors}\n${await output}'.replaceAll(
     '\u0000',
     '',

@@ -1,6 +1,6 @@
 name: calculatrix_cli
 description: Command-line interface for Calculatrix.
-version: 0.13.0
+version: 0.13.1
 publish_to: 'none'
 
 # The executable is `cx`, built from bin/cx.dart, with no alias of any kind
