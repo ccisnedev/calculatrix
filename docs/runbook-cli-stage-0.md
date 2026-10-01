@@ -419,6 +419,6 @@ S3 and S4 can run in parallel after S2.
   unmerged. D26 amended: `upgrade` and `uninstall` go through the normal
   approval prompt unless `--autoapprove` is given. D39 added: the review
   process rule.
-- 2026-10-01: S4f in PR #PRNUM, as step T1 of `runbook-trust.md`: D45 and D47
+- 2026-10-01: S4f in PR #58, as step T1 of `runbook-trust.md`: D45 and D47
   in `cx` 0.9.0. An empty stack prints an empty line (the SDK ends every
   text output with a newline); an overflowing word is `non-finite`.

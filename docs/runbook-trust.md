@@ -92,4 +92,4 @@ anything else made one error.
 ## Progress log
 
 - 2026-10-01: runbook created (T0).
-- 2026-10-01: T1 (S4f) in PR #PRNUM: text through the core display formatter, `eval rpn` prints the whole stack, one `{"level", "value"}` object per level in JSON, `cx` 0.9.0. An empty stack prints an empty line, not nothing: the SDK always ends a text output with a newline. An overflowing word is now `non-finite` (spec section 6) instead of printing `Infinity`.
+- 2026-10-01: T1 (S4f) in PR #58: text through the core display formatter, `eval rpn` prints the whole stack, one `{"level", "value"}` object per level in JSON, `cx` 0.9.0. An empty stack prints an empty line, not nothing: the SDK always ends a text output with a newline. An overflowing word is now `non-finite` (spec section 6) instead of printing `Infinity`.
