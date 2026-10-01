@@ -172,6 +172,14 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   CalculatrixErrorId.logUndefined`, so `[[-1 0] [0 2]] sqrt` and
   `[[-1 0] [0 2]] 0.5 power` raise `log-undefined` instead of the CLI's
   generic fallback error id.
+- Removed development meta references (runbook, issue, decision and
+  acceptance-criterion mentions) from `CalculatrixCommandEntry` user-facing
+  fields in `command_registry.dart`. Those references meant nothing to a
+  reader of `cx commands show|search|list` and leaked the development
+  process into the product; the ones worth keeping for maintainers now live
+  in a `//` comment beside the entry instead. `registry_text_test.dart`
+  guards against a regression by scanning every entry's user-facing string
+  fields for the same patterns (issue #43).
 
 ## [0.7.0] - 2026-05-21
 

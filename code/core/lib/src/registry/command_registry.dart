@@ -438,8 +438,9 @@ final class CalculatrixCommandRegistry {
       stackEffect: 'X -> X^(1/2)',
       preconditions: 'X is square (a scalar is 1x1, and therefore square)',
       description:
-          'The principal square root of X (0.5 power, runbook D43, D44); '
+          'The principal square root of X (0.5 power); '
           'a negative scalar gives the imaginary unit scaled accordingly.',
+      // 0.5 power: runbook D43, D44.
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('9 sqrt', Matrix.scalar(3)),
         CalculatrixCommandExample('9 √', Matrix.scalar(3)),
@@ -460,8 +461,9 @@ final class CalculatrixCommandRegistry {
       stackEffect: 'A -> A^-1',
       preconditions: 'A is square and not singular',
       description:
-          'The inverse of A (-1 power, runbook D43, D44): A times its '
+          'The inverse of A (-1 power): A times its '
           'inverse gives the identity.',
+      // -1 power: runbook D43, D44.
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[2 0] [0 4]] inverse',
@@ -504,15 +506,18 @@ final class CalculatrixCommandRegistry {
       hp50gReference: '^',
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'B Y -> B^Y',
+      // The full case table for squareness and size matching lives in
+      // runbook D25.
       preconditions:
           'B and Y are square (a scalar is square); when neither is a '
-          'scalar they have the same size (runbook D25 has the full case '
-          'table)',
+          'scalar they have the same size',
       description:
-          'Raises B to the power Y (runbook D25): '
+          'Raises B to the power Y: '
           'B^Y = exp(Y . log B). Exponent -1 and 0.5 use the exact '
-          'inverse and square-root algorithms instead (runbook D44); '
+          'inverse and square-root algorithms instead; '
           'inverse and sqrt are defined in terms of this word.',
+      // runbook D25 (the exp/log identity); runbook D44 (the -1 and 0.5
+      // shortcuts).
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('2 3 pwr', Matrix.scalar(8)),
         CalculatrixCommandExample('2 3 POWER', Matrix.scalar(8)),
@@ -539,7 +544,7 @@ final class CalculatrixCommandRegistry {
           'more scalars below n',
       description:
           'Builds the n x 1 column matrix [[x1] ... [xn]] from the n '
-          'scalars below the count n (issue #37, S4c). "0 vector" raises '
+          'scalars below the count n. "0 vector" raises '
           'dimension-mismatch: an empty matrix has no representation '
           '(Matrix itself rejects zero rows), so a zero-length vector is '
           'not buildable.',
@@ -582,7 +587,7 @@ final class CalculatrixCommandRegistry {
       stackEffect: '[[...]] -> [row1] ... [rown] n',
       description:
           'Splits a matrix into its rows, each a 1 x m matrix, followed by '
-          'the row count n at level 1 (issue #37, S4c). A scalar has a '
+          'the row count n at level 1. A scalar has a '
           'single row, itself.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('[[1 2] [3 4]] rows', <Matrix>[
@@ -610,9 +615,11 @@ final class CalculatrixCommandRegistry {
       stackEffect: 'A B -> [A B]',
       preconditions: 'A and B have the same number of rows',
       description:
-          'Places the columns of B to the right of A (issue #37, S4c): a '
+          'Places the columns of B to the right of A: a '
           'generalization of the single-column append to any matrix B of '
-          'matching row count, sharing its implementation (runbook D44).',
+          'matching row count.',
+      // Shares its implementation with the single-column append; runbook
+      // D44.
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '0 1 2 vector -1 0 2 vector append-cols',
@@ -640,9 +647,10 @@ final class CalculatrixCommandRegistry {
       stackEffect: 'A B -> A over B',
       preconditions: 'A and B have the same number of columns',
       description:
-          'Places the rows of B below A (issue #37, S4c): a generalization '
+          'Places the rows of B below A: a generalization '
           'of the single-row append to any matrix B of matching column '
-          'count, sharing its implementation (runbook D44).',
+          'count.',
+      // Shares its implementation with the single-row append; runbook D44.
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2]] [[3 4] [5 6]] append-rows',
@@ -686,7 +694,7 @@ final class CalculatrixCommandRegistry {
       preconditions: 'X is square (a scalar is 1x1, and therefore square)',
       description:
           'The principal matrix logarithm of X (Matrix.log); "log" stays '
-          'free for base 10 (runbook D46).',
+          'free for base 10.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('1 ln', Matrix.scalar(0)),
       ],
@@ -723,7 +731,7 @@ final class CalculatrixCommandRegistry {
           'holds at least n more values below n',
       description:
           'Copies the value at level n (1-based, level 1 is the top) to '
-          'the top of the stack (runbook D46).',
+          'the top of the stack.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 3 3 pick', <Matrix>[
           Matrix.scalar(1),
@@ -749,7 +757,7 @@ final class CalculatrixCommandRegistry {
           'holds at least n more values below n',
       description:
           'Moves the value at level n (1-based, level 1 is the top) to the '
-          'top of the stack (runbook D46).',
+          'top of the stack.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 3 3 roll', <Matrix>[
           Matrix.scalar(2),
@@ -784,7 +792,7 @@ final class CalculatrixCommandRegistry {
       definition: '1 pick',
       category: CalculatrixCommandCategory.stack,
       stackEffect: 'A -> A A',
-      description: 'Duplicates the top of the stack (1 pick, runbook D46).',
+      description: 'Duplicates the top of the stack (1 pick).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('5 duplicate', <Matrix>[
           Matrix.scalar(5),
@@ -804,9 +812,7 @@ final class CalculatrixCommandRegistry {
       definition: '2 pick',
       category: CalculatrixCommandCategory.stack,
       stackEffect: 'A B -> A B A',
-      description:
-          'Copies the second value from the top to the top (2 pick, '
-          'runbook D46).',
+      description: 'Copies the second value from the top to the top (2 pick).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 over', <Matrix>[
           Matrix.scalar(1),
@@ -823,7 +829,7 @@ final class CalculatrixCommandRegistry {
       definition: '2 roll',
       category: CalculatrixCommandCategory.stack,
       stackEffect: 'A B -> B A',
-      description: 'Swaps the top two values (2 roll, runbook D46).',
+      description: 'Swaps the top two values (2 roll).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 swap', <Matrix>[
           Matrix.scalar(2),
@@ -840,7 +846,7 @@ final class CalculatrixCommandRegistry {
       definition: '3 roll',
       category: CalculatrixCommandCategory.stack,
       stackEffect: 'A B C -> B C A',
-      description: 'Rotates the top three values (3 roll, runbook D46).',
+      description: 'Rotates the top three values (3 roll).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 3 rotate', <Matrix>[
           Matrix.scalar(2),
@@ -947,7 +953,7 @@ final class CalculatrixCommandRegistry {
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i -> A (row i removed)',
       preconditions: 'i is a 1-based row index of A',
-      description: 'Removes row i of A (1-based, runbook D46).',
+      description: 'Removes row i of A (1-based).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 1 delete-row',
@@ -970,7 +976,7 @@ final class CalculatrixCommandRegistry {
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j -> A (column j removed)',
       preconditions: 'j is a 1-based column index of A',
-      description: 'Removes column j of A (1-based, runbook D46).',
+      description: 'Removes column j of A (1-based).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 1 delete-col',
@@ -993,8 +999,7 @@ final class CalculatrixCommandRegistry {
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i -> A (row i duplicated)',
       preconditions: 'i is a 1-based row index of A',
-      description:
-          'Inserts a copy of row i right after it (1-based, runbook D46).',
+      description: 'Inserts a copy of row i right after it (1-based).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 1 duplicate-row',
@@ -1019,8 +1024,7 @@ final class CalculatrixCommandRegistry {
       stackEffect: 'A j -> A (column j duplicated)',
       preconditions: 'j is a 1-based column index of A',
       description:
-          'Inserts a copy of column j right after it (1-based, runbook '
-          'D46).',
+          'Inserts a copy of column j right after it (1-based).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 1 duplicate-col',
@@ -1043,7 +1047,7 @@ final class CalculatrixCommandRegistry {
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i k -> A (row i moved to position k)',
       preconditions: 'i and k are 1-based row indices of A',
-      description: 'Moves row i to position k (1-based, runbook D46).',
+      description: 'Moves row i to position k (1-based).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 2 1 move-row',
@@ -1066,7 +1070,7 @@ final class CalculatrixCommandRegistry {
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j k -> A (column j moved to position k)',
       preconditions: 'j and k are 1-based column indices of A',
-      description: 'Moves column j to position k (1-based, runbook D46).',
+      description: 'Moves column j to position k (1-based).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2 3] [4 5 6]] 3 1 move-col',
@@ -1205,7 +1209,7 @@ final class CalculatrixCommandRegistry {
       preconditions: 'A is square, with a real spectrum',
       description:
           'Diagonalizes A: leaves the eigenvector matrix P and the '
-          'diagonal eigenvalue matrix D, with D on top (issue #39, AC5).',
+          'diagonal eigenvalue matrix D, with D on top.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('[[3 0] [0 5]] diagonalize', <Matrix>[
           Matrix(<List<double>>[
@@ -1348,8 +1352,7 @@ final class CalculatrixCommandRegistry {
       preconditions: 'A is square',
       description:
           'The PLU decomposition of A: leaves the permutation P, the unit '
-          'lower-triangular L and the upper-triangular U, with U on top '
-          '(issue #39, AC5).',
+          'lower-triangular L and the upper-triangular U, with U on top.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('[[1 0] [0 1]] lu', <Matrix>[
           Matrix.identity(2),
@@ -1372,7 +1375,7 @@ final class CalculatrixCommandRegistry {
       preconditions: 'A has at least as many rows as columns',
       description:
           'The QR decomposition of A: leaves the orthogonal Q and the '
-          'upper-triangular R, with R on top (issue #39, AC5).',
+          'upper-triangular R, with R on top.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('[[1 0] [0 1]] qr', <Matrix>[
           Matrix.identity(2),
