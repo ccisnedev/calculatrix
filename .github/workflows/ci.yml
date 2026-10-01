@@ -27,8 +27,11 @@ jobs:
 
   # Core tests, with the differential tests against Giac (runbook D57).
   # Giac judges the exact results only; it is never shipped.
+  # The job takes under a minute; the timeouts stop a stalled apt-get from
+  # holding the runner for the default six hours.
   core:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: code/core
@@ -40,6 +43,7 @@ jobs:
           sdk: stable
 
       - name: Install Giac
+        timeout-minutes: 5
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xcas
