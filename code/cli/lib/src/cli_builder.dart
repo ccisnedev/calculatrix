@@ -28,13 +28,11 @@ import 'stdin_reader.dart';
 /// help text is not a terminal banner), so the two can never say different
 /// things about what `cx` can do.
 ///
-/// `modular_cli_sdk`'s `HelpRenderer` reads this single string for both a
-/// focused `Usage: ...` block (`--help`/`-h`) and this route's own row in
-/// the full catalog (`cx help`), with no way for calculatrix to give it two
-/// different texts for those two places, or a program name to put on the
-/// `Usage:` line: that line stays empty (a known limitation of the SDK this
-/// package does not patch, vendor or work around). Deliberately not headed
-/// "Commands:" the way the banner heads its own copy of these same rows:
+/// `modular_cli_sdk` prints this single string for `cx --help`, `cx -h` and
+/// this route's own row in the full catalog (`cx help`): all three show the
+/// same catalog, under a `Usage: cx <command> [options]` line (0.9.0).
+/// Deliberately not headed "Commands:" the way the banner heads its own
+/// copy of these same rows:
 /// `cx help` already prints a real "Commands:"/"Queries:" heading of its
 /// own right after this text, and a second, identical-looking heading one
 /// line above it would read as a mistake rather than as the list it is.
@@ -65,7 +63,7 @@ final CliContract _programShortcutContract = CliContract(
 /// `cx upgrade` (spec section 8.7: `VersionPlugin` and `ModularCli` are
 /// required to agree). ADR 0002 section 2 lets a shell version
 /// independently of the core package; this is not the core's version.
-const cxVersion = '0.8.2';
+const cxVersion = '0.8.3';
 
 /// `owner/repo` on GitHub `cx upgrade`, `cx uninstall` and `cx doctor` look
 /// releases up in (runbook D26, D31; spec 8.3, 8.7). The same repository
@@ -277,7 +275,11 @@ Future<int> runCalculatrixCli(
   }
 
   final BufferingSink bufferedErr = BufferingSink();
-  final int exitCode = await cli.run(args, stdout: realOut, stderr: bufferedErr);
+  final int exitCode = await cli.run(
+    args,
+    stdout: realOut,
+    stderr: bufferedErr,
+  );
   realErr.write(rewriteUnquotedProgramError(bufferedErr.text, args));
   return exitCode;
 }

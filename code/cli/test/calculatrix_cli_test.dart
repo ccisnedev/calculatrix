@@ -88,42 +88,22 @@ void main() {
     });
   });
 
-  // Skipped, not deleted: both fail today (RED, confirmed) and cannot be
-  // made to pass from calculatrix code. Every "Usage: ..." line the CLI
-  // ever prints comes from modular_cli_sdk 0.8.1's HelpRenderer, whose
-  // constructor is `HelpRenderer(this.catalog)`
-  // (lib/src/help_renderer.dart:13), taking no program-name parameter, and
-  // whose `renderCommand` builds the line as `'Usage: ${_usageOf(contract)}'`
-  // (lib/src/help_renderer.dart:45) purely from the route, with no CLI
-  // identity woven in anywhere. `ModularCli(name: 'cx', ...)` stores that
-  // name on `hostMetadata` (lib/src/modular_cli.dart), but nothing threads
-  // it into `HelpRenderer`: every call site constructs it as
-  // `HelpRenderer(_catalog)` with no name argument
-  // (lib/src/modular_cli.dart:671, 961, 978, 992, 1091;
-  // lib/src/module_builder.dart:681, 740). Fixing this requires changing
-  // modular_cli_sdk itself (or cli_router, which defines none of this); it
-  // is out of scope for calculatrix's own code. Filed upstream as
-  // ccisnedev/modular_cli_sdk#38.
-  group(
-    'usage lines name cx (issue #22 acceptance item 3, PR #23 review)',
-    () {
-      test('cx --help prints a Usage: line naming cx', () async {
-        final code = await run(['--help']);
-        expect(code, ExitCode.ok);
-        expect(out.output, contains('Usage: cx'));
-      });
+  group('usage lines name cx (issue #22 acceptance item 3, PR #23 review)', () {
+    test('cx --help prints a Usage: line naming cx', () async {
+      final code = await run(['--help']);
+      expect(code, ExitCode.ok);
+      expect(out.output, contains('Usage: cx'));
+    });
 
-      test(
-        'an option error under eval infix prints a Usage: line naming cx',
-        () async {
-          final code = await run(['eval', 'infix', '--bogus']);
-          expect(code, ExitCode.validationFailed);
-          expect(err.output, contains('Usage: cx eval infix'));
-        },
-      );
-    },
-    skip: 'Blocked on ccisnedev/modular_cli_sdk#38',
-  );
+    test(
+      'an option error under eval infix prints a Usage: line naming cx',
+      () async {
+        final code = await run(['eval', 'infix', '--bogus']);
+        expect(code, ExitCode.validationFailed);
+        expect(err.output, contains('Usage: cx eval infix'));
+      },
+    );
+  });
 
   group('cx <program> shortcut', () {
     test("cx '-1 2 +' evaluates and exits 0", () async {
@@ -525,68 +505,48 @@ void main() {
       expect(error['message'], contains('cx eval rpn "7 sqrt"'));
     });
 
-    test(
-      'cx eval infix "sqrt(1+2)" never suggests a command that would '
-      'itself fail (issue #51, AC2): "cx eval rpn \\"1+2 sqrt\\"" is two '
-      'tokens, the second of which is unknown-word',
-      () async {
-        final code = await run(['eval', 'infix', '--json', 'sqrt(1+2)']);
-        expect(code, ExitCode.dataError);
-        final decoded = jsonDecode(err.output) as Map<String, dynamic>;
-        final error = decoded['error'] as Map<String, dynamic>;
-        expect(error['message'], isNot(contains('cx eval rpn')));
-      },
-    );
+    test('cx eval infix "sqrt(1+2)" never suggests a command that would '
+        'itself fail (issue #51, AC2): "cx eval rpn \\"1+2 sqrt\\"" is two '
+        'tokens, the second of which is unknown-word', () async {
+      final code = await run(['eval', 'infix', '--json', 'sqrt(1+2)']);
+      expect(code, ExitCode.dataError);
+      final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+      final error = decoded['error'] as Map<String, dynamic>;
+      expect(error['message'], isNot(contains('cx eval rpn')));
+    });
 
-    test(
-      'cx eval infix "sqrt (7)" (space before the call) never suggests a '
-      'command that would itself underflow (issue #51, AC2)',
-      () async {
-        final code = await run(['eval', 'infix', '--json', 'sqrt (7)']);
-        expect(code, ExitCode.dataError);
-        final decoded = jsonDecode(err.output) as Map<String, dynamic>;
-        final error = decoded['error'] as Map<String, dynamic>;
-        expect(error['message'], isNot(contains('cx eval rpn')));
-      },
-    );
+    test('cx eval infix "sqrt (7)" (space before the call) never suggests a '
+        'command that would itself underflow (issue #51, AC2)', () async {
+      final code = await run(['eval', 'infix', '--json', 'sqrt (7)']);
+      expect(code, ExitCode.dataError);
+      final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+      final error = decoded['error'] as Map<String, dynamic>;
+      expect(error['message'], isNot(contains('cx eval rpn')));
+    });
 
-    test(
-      'cx eval infix "frobenius-norm(7)" names the whole hyphenated word, '
-      'not just "frobenius" (issue #51, AC2)',
-      () async {
-        final code = await run([
-          'eval',
-          'infix',
-          '--json',
-          'frobenius-norm(7)',
-        ]);
-        expect(code, ExitCode.dataError);
-        final decoded = jsonDecode(err.output) as Map<String, dynamic>;
-        final error = decoded['error'] as Map<String, dynamic>;
-        final details = error['details'] as Map<String, dynamic>;
-        expect(details['name'], 'frobenius-norm');
-        expect(error['message'], contains('cx eval rpn "7 frobenius-norm"'));
-      },
-    );
+    test('cx eval infix "frobenius-norm(7)" names the whole hyphenated word, '
+        'not just "frobenius" (issue #51, AC2)', () async {
+      final code = await run(['eval', 'infix', '--json', 'frobenius-norm(7)']);
+      expect(code, ExitCode.dataError);
+      final decoded = jsonDecode(err.output) as Map<String, dynamic>;
+      final error = decoded['error'] as Map<String, dynamic>;
+      final details = error['details'] as Map<String, dynamic>;
+      expect(details['name'], 'frobenius-norm');
+      expect(error['message'], contains('cx eval rpn "7 frobenius-norm"'));
+    });
 
     test('cx "3^-2" (shortcut) hints at eval infix instead of a plain '
         'unknown-word (issue #51, AC3)', () async {
       final code = await run(['3^-2']);
       expect(code, ExitCode.dataError);
-      expect(
-        err.output,
-        contains('this looks like an infix expression'),
-      );
+      expect(err.output, contains('this looks like an infix expression'));
     });
 
     test('cx eval rpn "1+.5" hints at eval infix instead of a plain '
         'unknown-word (issue #51, AC3)', () async {
       final code = await run(['eval', 'rpn', '1+.5']);
       expect(code, ExitCode.dataError);
-      expect(
-        err.output,
-        contains('this looks like an infix expression'),
-      );
+      expect(err.output, contains('this looks like an infix expression'));
     });
   });
 
