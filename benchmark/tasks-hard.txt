@@ -1,0 +1,11 @@
+1. Evaluate (1.0001^7) - 1.
+2. Find the dot product of the column vectors [10000000000000001, 1, -10000000000000000] and [1, 1, 1].
+3. Find the rank of [[1 1 1] [1 1.00000000000000000001 1] [1 1 1.00000000000000000001]].
+4. Find the determinant of [[100000000 100000001 1] [100000001 100000002 1] [1 1 1]].
+5. Give the reduced row echelon form of the augmented matrix [[1 1 2] [1 1 2.00000000000000000001]] for variables x and y, and state whether the system has a solution.
+6. Find the inverse of [[1 1] [1 1.00000000000000000001]].
+7. Find A^(-3) for A = [[1 2] [0 1]], using matrix multiplication.
+8. Find the Euclidean norm of the column vector [3/7, 4/7, 12/7].
+9. Find all eigenvalues, including algebraic multiplicities, of [[1 0.00000000000000000001] [0.00000000000000000001 1]].
+10. Find all eigenvalues, including algebraic multiplicities, of [[3 -4] [1 3]].
+11. Find an invertible matrix P and a diagonal matrix D over the complex numbers such that [[2 -1] [1 2]] = P D P^(-1).
