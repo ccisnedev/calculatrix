@@ -450,7 +450,13 @@ class CalculatrixSession {
     }
 
     _lastOperator = _toDisplayOperator(tokens[operatorIndex]);
-    _lastOperand = tokens.sublist(operatorIndex + 1).join();
+    _lastOperand = tokens
+        .sublist(operatorIndex + 1)
+        .map(
+          (String token) =>
+              token == Calculatrix.infixUnaryMinus ? '-' : token,
+        )
+        .join();
   }
 
   // The tokenizer already collapsed every signed number and signed matrix

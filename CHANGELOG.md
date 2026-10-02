@@ -151,6 +151,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	the new error id `complex-result`, exit 65, instead of the generic
 	`calculatrix-error`: `[[0 -1] [1 0]] eigenvalues` has no column of
 	complex values to print yet (issue #64). Shipped in `cx` 0.14.0.
+- Discoverability, after the round r2 of the benchmark (issue #66), `cx`
+	0.15.0. `cx commands show` prints each example with the exactness its
+	program gives (`2 3 + -> 5`, not `~5`). `exact` and `approx` explain
+	that values are exact unless marked `~` and the literal forms, and
+	`cx commands search literal`, `fraction` or `decimal` finds them. `cx
+	--help` has a paragraph on values and on `--`. A value that starts with
+	`-` and looks like an expression, such as `cx eval infix '-sqrt(-1)'`,
+	is still `invalid-short-option`, exit 7, but the message now gives the
+	command with `--` in place. In infix a unary minus negates any operand:
+	`-(2+3)` is -5 (it was a syntax error), and `-2^2` is -4, as in Giac
+	(it was 4).
 
 ### Benchmark
 

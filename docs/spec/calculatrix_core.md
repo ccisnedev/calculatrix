@@ -239,6 +239,12 @@ class Calculatrix {
 	with notation-specific syntax errors only for parsing/tokenization stages).
 8. The parser/evaluator domain is numeric-only (no symbols/variables), by
 	design, to remain outside CAS scope.
+9. Infix precedence, from loosest to tightest: `+ -`, then `* /`, then a
+	unary minus, then `^` (right-associative). A unary minus negates the
+	operand that follows it, whatever it is (`-(2+3)` is -5, `-√9` is -3),
+	and binds looser than `^`, as in standard notation and Giac: `-2^2` is
+	-(2^2) = -4, `(-2)^2` is 4, `2^-2` is 1/4 (runbook-trust.md D61). A
+	signed number that is not the base of `^` is still one literal (`3*-2`).
 
 ## 5. Error Taxonomy
 

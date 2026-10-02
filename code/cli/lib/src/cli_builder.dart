@@ -14,6 +14,7 @@ import 'eval/eval_contracts.dart';
 import 'eval/eval_infix_query.dart';
 import 'eval/eval_output.dart';
 import 'eval/eval_rpn_query.dart';
+import 'shortcut/option_like_value_error.dart';
 import 'shortcut/program_shortcut_query.dart';
 import 'shortcut/route_suggestion.dart';
 import 'shortcut/unquoted_program_error.dart';
@@ -46,6 +47,14 @@ String get _rootHelpDescription {
     '',
     'Run a calculation directly by quoting it as one argument, without '
         "naming a command at all, e.g.: cx '5 7 power'.",
+    '',
+    'Values are exact unless marked ~: integers of any size, decimals '
+        '(0.1 is 1/10), fractions (1/3, -5/3) and matrices of them '
+        '([[1 2] [3 4]], [[1/2 0] [0 1]]). A ~ in front makes a literal '
+        'approximate (~0.1, ~[[1 2]]); approx and exact convert. More: '
+        'cx commands show exact.',
+    'A value that starts with "-" goes after --, which ends the options: '
+        "cx eval infix -- '-(2+3)'.",
     'Each command also takes its own --help, e.g.: cx eval rpn --help.',
   ].join('\n');
 }
@@ -65,7 +74,7 @@ final CliContract _programShortcutContract = CliContract(
 /// `cx upgrade` (spec section 8.7: `VersionPlugin` and `ModularCli` are
 /// required to agree). ADR 0002 section 2 lets a shell version
 /// independently of the core package; this is not the core's version.
-const cxVersion = '0.14.0';
+const cxVersion = '0.15.0';
 
 /// `owner/repo` on GitHub `cx upgrade`, `cx uninstall` and `cx doctor` look
 /// releases up in (runbook D26, D31; spec 8.3, 8.7). The same repository
@@ -240,13 +249,15 @@ ModularCli buildCalculatrixCli({
 }
 
 /// Runs the `cx` CLI exactly as [buildCalculatrixCli] plus [ModularCli.run]
-/// would, except for one case: an unquoted program typed as several shell
-/// words (`cx 5 7 power`, issue #51 acceptance 4), where `modular_cli_sdk`
-/// itself can only report `extra-argument` with a generic, SDK-worded
-/// message. That one message is rewritten into something actionable
-/// ("quote the program as one argument") before it ever reaches [stderr];
-/// its id and the process exit code are both left exactly as
-/// `modular_cli_sdk` decided them.
+/// would, except for two cases where `modular_cli_sdk` itself can only
+/// report a generic, SDK-worded message: an unquoted program typed as
+/// several shell words (`cx 5 7 power`, issue #51 acceptance 4, reported
+/// as `extra-argument`), and a value that starts with "-" read as short
+/// options (`cx eval infix '-(2+3)'`, issue #66, reported as
+/// `invalid-short-option`). Those messages are rewritten into something
+/// actionable ("quote the program as one argument", "end the options with
+/// --") before they ever reach [stderr]; the id and the process exit code
+/// are both left exactly as `modular_cli_sdk` decided them.
 ///
 /// This is the one call `bin/cx.dart` makes, instead of building the CLI
 /// and calling [ModularCli.run] itself, so the rewrite applies the same
@@ -269,15 +280,21 @@ Future<int> runCalculatrixCli(
   final io.IOSink realOut = stdout ?? io.stdout;
   final io.IOSink realErr = stderr ?? io.stderr;
 
-  // Only an invocation that could possibly be an unquoted program is worth
+  // Only an invocation that could possibly be an unquoted program, or
+  // carries a value that would be read as options (issue #66), is worth
   // the extra buffering at all: everything else is written straight to
   // the real stream, exactly as a plain `cli.run` call would.
-  if (!looksLikeUnquotedProgram(args)) {
+  if (!looksLikeUnquotedProgram(args) && optionLikeValueIndex(args) < 0) {
     return cli.run(args, stdout: realOut, stderr: realErr);
   }
 
   final BufferingSink bufferedErr = BufferingSink();
   final int exitCode = await cli.run(args, stdout: realOut, stderr: bufferedErr);
-  realErr.write(rewriteUnquotedProgramError(bufferedErr.text, args));
+  realErr.write(
+    rewriteOptionLikeValueError(
+      rewriteUnquotedProgramError(bufferedErr.text, args),
+      args,
+    ),
+  );
   return exitCode;
 }

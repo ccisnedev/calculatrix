@@ -49,6 +49,10 @@ class Calculatrix {
   // already make while tokenizing. Re-implementing that call as a second,
   // separate character scan is what let a token such as "-[[3]]" (a signed
   // matrix literal) be mistaken for a binary subtraction.
+  //
+  // A unary minus that is not part of a literal ("-(2+3)", "-√9", and the
+  // "-" of "-2^2") is the token [infixUnaryMinus], never "-": a "-" in this
+  // list is always binary subtraction.
   static List<String> tokenizeInfixExpression(String expression) {
     return _tokenizeInfixPositioned(
       expression.trim(),
@@ -537,6 +541,11 @@ class Calculatrix {
     );
   }
 
+  /// The token [tokenizeInfixExpression] gives a unary minus that is not
+  /// part of a literal, such as the "-" of "-(2+3)" (issue #66). It cannot
+  /// be typed: the tokenizer never reads "u-" as one token.
+  static const String infixUnaryMinus = 'u-';
+
   static List<_PositionedToken> _tokenizeInfixPositioned(String expression) {
     final List<_PositionedToken> tokens = <_PositionedToken>[];
     int index = 0;
@@ -577,6 +586,18 @@ class Calculatrix {
         );
       }
 
+      // A signed number followed by "^" is a unary minus and a power,
+      // -(2^2), as in standard notation and Giac: the sign is not part of
+      // the base (issue #66). A "+" there changes nothing and is skipped.
+      if (_isSignedNumberStart(expression, index, tokens) &&
+          _isFollowedByPower(expression, index + 1)) {
+        if (char == '-') {
+          tokens.add(_PositionedToken(infixUnaryMinus, index + 1));
+        }
+        index++;
+        continue;
+      }
+
       if (_isSignedNumberStart(expression, index, tokens)) {
         final int start = index;
         final _NumberScanResult scan = _scanNumber(expression, index);
@@ -596,6 +617,17 @@ class Calculatrix {
         tokens.add(
           _PositionedToken(expression.substring(start, index), start + 1),
         );
+        continue;
+      }
+
+      // A sign in unary position that no literal claimed above, as in
+      // "-(2+3)" or "-√9": a "-" negates the operand that follows, a "+"
+      // leaves it as it is (issue #66).
+      if ((char == '-' || char == '+') && _isUnaryPosition(tokens)) {
+        if (char == '-') {
+          tokens.add(_PositionedToken(infixUnaryMinus, index + 1));
+        }
+        index++;
         continue;
       }
 
@@ -723,6 +755,12 @@ class Calculatrix {
           token: token,
           position: position,
         );
+      }
+
+      // The tokenizer emits a unary minus only where an operand is
+      // expected, and an operand must still follow it.
+      if (token == infixUnaryMinus) {
+        continue;
       }
 
       if (_isOperand(token)) {
@@ -861,9 +899,17 @@ class Calculatrix {
         continue;
       }
 
+      // A prefix operator: it waits on the stack for its operand, and an
+      // operator that binds less tightly pops it.
+      if (token == infixUnaryMinus) {
+        operators.add(positioned);
+        continue;
+      }
+
       if (_isOperator(token)) {
         while (operators.isNotEmpty &&
-            _isOperator(operators.last.value) &&
+            (_isOperator(operators.last.value) ||
+                operators.last.value == infixUnaryMinus) &&
             (_isRightAssociative(token)
                 ? _precedence(operators.last.value) > _precedence(token)
                 : _precedence(operators.last.value) >= _precedence(token))) {
@@ -934,11 +980,17 @@ class Calculatrix {
       output.add(op);
     }
 
-    return output;
+    return <_PositionedToken>[
+      for (final _PositionedToken positioned in output)
+        positioned.value == infixUnaryMinus
+            ? _PositionedToken('negate', positioned.position)
+            : positioned,
+    ];
   }
 
   static bool _isOperand(String token) {
-    return !_isOperator(token) &&
+    return token != infixUnaryMinus &&
+        !_isOperator(token) &&
         !_isFunction(token) &&
         !_isPostfixOperator(token) &&
         token != '(' &&
@@ -973,8 +1025,12 @@ class Calculatrix {
       case '*':
       case '/':
         return 2;
-      case '^':
+      // Unary minus binds tighter than "*" and "/" and looser than "^":
+      // -2^2 is -(2^2) and -(2+3)*4 is (-(2+3))*4.
+      case infixUnaryMinus:
         return 3;
+      case '^':
+        return 4;
       default:
         return -1;
     }
@@ -1149,14 +1205,29 @@ class Calculatrix {
     if (sign != '-' && sign != '+') {
       return false;
     }
-    final bool unaryPosition =
-        tokens.isEmpty ||
-        _isOperator(tokens.last.value) ||
-        _isFunction(tokens.last.value) ||
-        tokens.last.value == '(';
+    final bool unaryPosition = _isUnaryPosition(tokens);
     return unaryPosition &&
         index + 1 < source.length &&
         source[index + 1] == Literals.approximateMark;
+  }
+
+  // Where a sign is unary: at the start, or right after an operator, a
+  // function, "(" or another unary minus.
+  static bool _isUnaryPosition(List<_PositionedToken> tokens) =>
+      tokens.isEmpty ||
+      _isOperator(tokens.last.value) ||
+      _isFunction(tokens.last.value) ||
+      tokens.last.value == '(' ||
+      tokens.last.value == infixUnaryMinus;
+
+  // Whether the number that starts at [index] is followed, past any
+  // whitespace, by "^".
+  static bool _isFollowedByPower(String source, int index) {
+    int next = _scanNumber(source, index).nextIndex;
+    while (next < source.length && source[next].trim().isEmpty) {
+      next++;
+    }
+    return next < source.length && source[next] == '^';
   }
 
   static bool _isSignedNumberStart(
@@ -1169,11 +1240,7 @@ class Calculatrix {
       return false;
     }
 
-    final bool unaryPosition =
-        tokens.isEmpty ||
-        _isOperator(tokens.last.value) ||
-        _isFunction(tokens.last.value) ||
-        tokens.last.value == '(';
+    final bool unaryPosition = _isUnaryPosition(tokens);
 
     if (!unaryPosition) {
       return false;
@@ -1203,11 +1270,7 @@ class Calculatrix {
       return false;
     }
 
-    final bool unaryPosition =
-        tokens.isEmpty ||
-        _isOperator(tokens.last.value) ||
-        _isFunction(tokens.last.value) ||
-        tokens.last.value == '(';
+    final bool unaryPosition = _isUnaryPosition(tokens);
 
     if (!unaryPosition) {
       return false;

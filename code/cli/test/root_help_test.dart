@@ -38,6 +38,22 @@ void main() {
       expect(out.output, contains("cx '5 7 power'"));
     });
 
+    test('cx --help says values are exact unless marked ~, names the '
+        'literal forms, and how to pass a value that starts with "-" '
+        '(issue #66)', () async {
+      final out = MemorySink();
+      final err = MemorySink();
+      final cli = buildCalculatrixCli();
+      final code = await cli.run(['--help'], stdout: out, stderr: err);
+
+      expect(code, ExitCode.ok);
+      expect(out.output, contains('Values are exact unless marked ~'));
+      expect(out.output, contains('0.1 is 1/10'));
+      expect(out.output, contains('[[1 2] [3 4]]'));
+      expect(out.output, contains('cx commands show exact'));
+      expect(out.output, contains("cx eval infix -- '-(2+3)'"));
+    });
+
     test(
       'every command the banner may list has its own example, none left '
       'to fall back to a bare name/description row (issue #51 acceptance '

@@ -201,4 +201,27 @@ void main() {
       },
     );
   });
+
+  group('exactness and literals in the registry (issue #66)', () {
+    test('show add prints its exact examples without ~', () async {
+      final code = await run(['commands', 'show', 'add']);
+      expect(code, ExitCode.ok);
+      expect(out.output, contains('2 3 + -> 5\n'));
+      expect(out.output, isNot(contains('~')));
+    });
+
+    for (final String query in <String>['literal', 'fraction', 'decimal']) {
+      test('search $query finds exact', () async {
+        final code = await run(['commands', 'search', query]);
+        expect(code, ExitCode.ok);
+        expect(out.output, contains('exact: '));
+      });
+    }
+
+    test('search literal also finds approx, which explains ~', () async {
+      final code = await run(['commands', 'search', 'literal']);
+      expect(code, ExitCode.ok);
+      expect(out.output, contains('put ~ in front of the literal'));
+    });
+  });
 }

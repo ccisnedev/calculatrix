@@ -1280,6 +1280,23 @@ void main() {
     );
 
     test(
+      'repeat-equals on a multiplication whose right operand is a negated '
+      'group replays the negated group (issue #66)',
+      () {
+        session.input('2');
+        session.input('×');
+        session.input('-(3)');
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(-6));
+
+        session.evaluate();
+
+        expect(session.currentValue, Matrix.scalar(18));
+      },
+    );
+
+    test(
       'repeat-equals on a genuine binary subtraction between two matrix '
       "literals still repeats the subtraction operator, not the left-hand "
       "literal's sign",
