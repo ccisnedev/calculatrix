@@ -586,11 +586,20 @@ class Calculatrix {
         );
       }
 
-      // A signed number followed by "^" is a unary minus and a power,
-      // -(2^2), as in standard notation and Giac: the sign is not part of
-      // the base (issue #66). A "+" there changes nothing and is skipped.
-      if (_isSignedNumberStart(expression, index, tokens) &&
-          _isFollowedByPower(expression, index + 1)) {
+      // A signed number or matrix literal followed by "^" (past any "%")
+      // is a unary minus and a power, -(2^2), as in standard notation and
+      // Giac: the sign is not part of the base (issue #66). A "+" there
+      // changes nothing and is skipped.
+      if ((_isSignedNumberStart(expression, index, tokens) &&
+              _isFollowedByPower(
+                expression,
+                _scanNumber(expression, index + 1).nextIndex,
+              )) ||
+          (_isSignedBracketStart(expression, index, tokens) &&
+              _isFollowedByPower(
+                expression,
+                _scanBracketedLiteral(expression, index + 1),
+              ))) {
         if (char == '-') {
           tokens.add(_PositionedToken(infixUnaryMinus, index + 1));
         }
@@ -735,11 +744,14 @@ class Calculatrix {
       _InfixValidationFrame(),
     ];
     bool expectOperand = true;
+    String? previous;
 
     for (final _PositionedToken positioned in tokens) {
       final String token = positioned.value;
       final int position = positioned.position;
       final _InfixValidationFrame frame = frames.last;
+      final String? before = previous;
+      previous = token;
 
       // A postfix operator (e.g. "%") is exempt from the bare-function
       // guard below: it applies unambiguously to whatever value already
@@ -813,7 +825,12 @@ class Calculatrix {
         // functions stacked on this same frame from before it (e.g. the
         // outer "√" in "√√(16)") remain pending across the nested group
         // and must still be resolved once it closes.
-        if (frame.pendingFunctionCount > 0) {
+        // A unary minus between them ("√-(4)") leaves the function bare:
+        // the group is then the operand of the minus, not the function's
+        // own parentheses (issue #66).
+        if (frame.pendingFunctionCount > 0 &&
+            before != null &&
+            _isFunction(before)) {
           frame.pendingFunctionCount--;
         }
         frames.add(_InfixValidationFrame());
@@ -1220,11 +1237,12 @@ class Calculatrix {
       tokens.last.value == '(' ||
       tokens.last.value == infixUnaryMinus;
 
-  // Whether the number that starts at [index] is followed, past any
-  // whitespace, by "^".
+  // Whether the literal that ends at [index] is followed, past any
+  // whitespace and postfix operators ("2%^2"), by "^".
   static bool _isFollowedByPower(String source, int index) {
-    int next = _scanNumber(source, index).nextIndex;
-    while (next < source.length && source[next].trim().isEmpty) {
+    int next = index;
+    while (next < source.length &&
+        (source[next].trim().isEmpty || _isPostfixOperator(source[next]))) {
       next++;
     }
     return next < source.length && source[next] == '^';

@@ -3,21 +3,28 @@ import 'dart:convert';
 /// The characters that make an argument starting with `-` look like an
 /// expression rather than a cluster of short options: digits, operators,
 /// brackets, the approximate mark and spaces. `-qh` and `-fprog.rpn` have
-/// none of them; `-(2+3)`, `-sqrt(-1)` and `-x 2 +` do.
+/// none of them; `-sqrt(-1)`, `-e^2` and `-x 2 +` do.
 final RegExp _expressionCharacter = RegExp(r'[0-9()\[\]+\-*/^%√~ ]');
 
-/// The index in [args] of the first argument that starts with `-`, comes
-/// before any `--`, and looks like an expression (issue #66): an argument
-/// `modular_cli_sdk` reads as short options, although it was most likely
-/// meant as the value. -1 when there is none.
+final RegExp _letter = RegExp(r'^[A-Za-z]$');
+
+/// The index in [args] of the argument `modular_cli_sdk` rejects as
+/// `invalid-short-option`, when that argument looks like an expression
+/// (issue #66). -1 when there is none.
+///
+/// The SDK reads only `-` followed by a letter as an option (`-(2+3)` and
+/// `-2 3 +` are values already), accepts a lone short option such as `-q`,
+/// and rejects the first longer one, before any `--`. That first one is
+/// the argument the error is about: `-qh` in `cx eval infix -qh -2`, so no
+/// hint there.
 int optionLikeValueIndex(List<String> args) {
   for (int index = 0; index < args.length; index++) {
     final String arg = args[index];
     if (arg == '--') return -1;
-    if (arg.length < 2 || !arg.startsWith('-') || arg.startsWith('--')) {
+    if (arg.length < 3 || arg[0] != '-' || !_letter.hasMatch(arg[1])) {
       continue;
     }
-    if (_expressionCharacter.hasMatch(arg.substring(1))) return index;
+    return _expressionCharacter.hasMatch(arg.substring(1)) ? index : -1;
   }
   return -1;
 }
@@ -71,14 +78,16 @@ String rewriteOptionLikeValueError(String errorText, List<String> args) {
   return 'Error: $message [$_rejectionId]$rest';
 }
 
+// Every cx route takes one value, so the value goes last, after --, and
+// the arguments that followed it (such as --json) stay options.
 String _message(List<String> args, int index) {
   final String value = args[index];
   final String command = <String>[
     'cx',
     ...args.sublist(0, index),
+    ...args.sublist(index + 1),
     '--',
     "'$value'",
-    ...args.sublist(index + 1),
   ].join(' ');
   return '$value starts with "-", so it was read as options; to pass it '
       'as a value, end the options with --: $command';

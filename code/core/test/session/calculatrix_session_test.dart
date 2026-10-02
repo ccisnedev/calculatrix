@@ -1297,6 +1297,23 @@ void main() {
     );
 
     test(
+      'repeat-equals after a unary minus before a marked literal keeps the '
+      'two apart (issue #66)',
+      () {
+        session.input('2');
+        session.input('×');
+        session.input('- ~3');
+        session.evaluate();
+
+        expect(MatrixDisplayFormatter.text(session.currentValue!), '~-6');
+
+        session.evaluate();
+
+        expect(MatrixDisplayFormatter.text(session.currentValue!), '~18');
+      },
+    );
+
+    test(
       'repeat-equals on a genuine binary subtraction between two matrix '
       "literals still repeats the subtraction operator, not the left-hand "
       "literal's sign",

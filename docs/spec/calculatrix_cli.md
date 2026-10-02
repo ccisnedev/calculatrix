@@ -197,7 +197,8 @@ Global options, declared by the SDK on every route except the shortcut:
   shortcut accepts it: `cx -- '-x'`.
   When a token rejected by G9 looks like an expression (after its `-` it
   has a digit, an operator, a bracket, `~` or a space), the message says so
-  and gives the command with `--` in place, keeping the id and exit 7:
+  and gives the command with the value last, after `--`, and the other
+  arguments (such as `--json`) before it, keeping the id and exit 7:
   `cx eval infix '-sqrt(-1)'` reports "-sqrt(-1) starts with "-", so it was
   read as options; to pass it as a value, end the options with --: cx eval
   infix -- '-sqrt(-1)'" (issue #66). `cx --help` says the same.

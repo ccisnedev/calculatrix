@@ -52,6 +52,13 @@ void main() {
       expect(_infix('-([[1 2]])'), '[[-1 -2]]');
     });
 
+    test('a function before a negated group is still bare: √--(4)+5 is '
+        'a syntax error, √--(4) is 2', () {
+      expect(() => Calculatrix.evaluateInfix('√--(4)+5'), _syntaxError);
+      expect(_infix('√--(4)'), '2');
+      expect(_infix('(√--(4))+5'), '7');
+    });
+
     test('a unary minus with nothing after it is a syntax error', () {
       expect(() => Calculatrix.evaluateInfix('2*-'), _syntaxError);
       expect(() => Calculatrix.evaluateInfix('-'), _syntaxError);
@@ -82,6 +89,16 @@ void main() {
 
     test('2^-(1)*4 is (2^-1)*4 = 2', () {
       expect(_infix('2^-(1)*4'), '2');
+    });
+
+    test('a percent base: -2%^2 is -(2%^2), --2%^2 is 2%^2', () {
+      expect(_infix('-2%^2'), '-0.0004');
+      expect(_infix('--2%^2'), '0.0004');
+    });
+
+    test('a matrix base: -[[2 0] [0 3]]^2 is -([[2 0] [0 3]]^2)', () {
+      expect(_infix('-[[2 0] [0 3]]^2'), '[[-4 0] [0 -9]]');
+      expect(_infix('--[[2 0] [0 3]]^2'), '[[4 0] [0 9]]');
     });
 
     test('signed literals that are not a base keep their meaning', () {

@@ -1,5 +1,6 @@
 import '../errors/errors.dart';
 import '../evaluation/calculatrix.dart';
+import '../evaluation/literals.dart';
 import '../machine/calculatrix_command.dart';
 import '../machine/calculatrix_machine.dart';
 import '../machine/calculatrix_macro.dart';
@@ -450,13 +451,22 @@ class CalculatrixSession {
     }
 
     _lastOperator = _toDisplayOperator(tokens[operatorIndex]);
-    _lastOperand = tokens
-        .sublist(operatorIndex + 1)
-        .map(
-          (String token) =>
-              token == Calculatrix.infixUnaryMinus ? '-' : token,
-        )
-        .join();
+    // A unary minus is written back as "-", with a space before a marked
+    // literal: "-~3" would read as a misplaced mark (issue #66).
+    final List<String> operand = tokens.sublist(operatorIndex + 1);
+    final StringBuffer text = StringBuffer();
+    for (int index = 0; index < operand.length; index++) {
+      if (operand[index] != Calculatrix.infixUnaryMinus) {
+        text.write(operand[index]);
+        continue;
+      }
+      text.write('-');
+      if (index + 1 < operand.length &&
+          operand[index + 1].startsWith(Literals.approximateMark)) {
+        text.write(' ');
+      }
+    }
+    _lastOperand = text.toString();
   }
 
   // The tokenizer already collapsed every signed number and signed matrix
