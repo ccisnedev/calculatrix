@@ -77,5 +77,5 @@ graded blind against the keys of `r3-design.md`):
   (target: 12), and none found it on their own. In `cx` mode a run took
   about twice as long as the same model in free mode.
 - The wrong answers outside `cx` were misread inputs, an RREF left
-  unreduced (5 runs), a wrong dot product, a rank of 2 and a miscomputed
+  unreduced (6 runs), a wrong dot product, a rank of 2 and a miscomputed
   decimal. Per-run rows are in `runs/r3-hard-<mode>/friction.csv`.
