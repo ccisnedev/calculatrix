@@ -10,8 +10,12 @@ keys verified with Giac.
 | `tasks-traps.txt` | The trap set: tasks where floating point or a common slip gives a wrong answer without any error. |
 | `answers.md` | The answer keys of both sets, and what `cx` gives on each trap. |
 | `trap-set.json` | Each trap as a `cx` program with the output `cx` must give. `code/cli/test/trap_set_test.dart` runs it with the CLI tests. |
-| `run-trial.ps1` | Runs a set on Claude, Codex and Antigravity models, in `cx` mode or free mode. |
+| `tasks-hard.txt` | The hard set of round r3: eleven exact tasks, nine that `cx` solves and two it refuses with `complex-result`. |
+| `r3-design.md` | The design of round r3: modes, prompts, keys, grading and metrics. |
+| `r3-giac.txt` | The Giac transcript that verifies the r3 keys. |
+| `run-trial.ps1` | Runs a set on Claude, Codex and Antigravity models, in `cx` mode or free mode; the hard set adds the `available` and `hidden` modes. |
 | `summarize.ps1` | One row per run: time, exit code, tokens and cost. `run-trial.ps1` calls it at the end. |
+| `summarize-friction.ps1` | One row per hard-set run: time, raw tokens, and the command ledger each agent reports. `run-trial.ps1` calls it for the hard set. |
 
 ## Running a trial
 
@@ -35,6 +39,13 @@ keys verified with Giac.
 The CLIs `claude`, `codex` and `agy` must be installed and signed in.
 Grading is manual, against `answers.md`: for a trap, the exact value must
 be the answer the agent commits to, not a remark next to a float.
+
+Round r3 follows `r3-design.md` instead: an English prompt, four modes,
+a working directory outside the repository, and a command ledger in JSON.
+
+```powershell
+./benchmark/run-trial.ps1 -Round r3 -Tasks hard -Mode available -Only claude-haiku,codex-gpt-6-astra
+```
 
 ## Results so far
 
