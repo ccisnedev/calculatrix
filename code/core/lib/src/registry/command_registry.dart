@@ -1,6 +1,7 @@
 import '../errors/errors.dart';
 import '../evaluation/calculatrix.dart';
-import '../exact/rational.dart';
+import '../evaluation/literals.dart';
+import '../exact/exact_arithmetic.dart';
 import '../machine/calculatrix_command.dart';
 import '../machine/commands.dart';
 import '../matrix/matrix.dart';
@@ -25,6 +26,13 @@ enum CalculatrixCommandCategory {
   structure,
   linearAlgebra,
 }
+
+/// The value [literal] spells, as `cx` itself reads it: `5` and
+/// `[[1/2 0] [0 1/4]]` are exact, `~4` is approximate (runbook D49, D50,
+/// D56). Examples state their expected values this way so the exactness
+/// `cx commands show` prints is the exactness the program gives (issue #66).
+Matrix _value(String literal) =>
+    Literals.parse(literal, maxDigits: ExactArithmetic.defaultMaxDigits)!;
 
 /// One example RPN program from a registry entry's documentation (spec
 /// section 7, "Examples"). Executable, not prose: a core test runs every
@@ -445,8 +453,8 @@ final class CalculatrixCommandRegistry {
           '(1x1)',
       description: 'Adds A and B element-wise.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('2 3 +', Matrix.scalar(5)),
-        CalculatrixCommandExample('2 3 add', Matrix.scalar(5)),
+        CalculatrixCommandExample('2 3 +', _value('5')),
+        CalculatrixCommandExample('2 3 add', _value('5')),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
       seeAlso: const <String>['subtract'],
@@ -465,8 +473,8 @@ final class CalculatrixCommandRegistry {
           '(1x1)',
       description: 'Subtracts B from A element-wise.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('5 3 -', Matrix.scalar(2)),
-        CalculatrixCommandExample('5 3 subtract', Matrix.scalar(2)),
+        CalculatrixCommandExample('5 3 -', _value('2')),
+        CalculatrixCommandExample('5 3 subtract', _value('2')),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
       seeAlso: const <String>['add'],
@@ -485,8 +493,8 @@ final class CalculatrixCommandRegistry {
           'Multiplies A by B: matrix product, or scaling when either is '
           'a scalar.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('4 5 *', Matrix.scalar(20)),
-        CalculatrixCommandExample('4 5 multiply', Matrix.scalar(20)),
+        CalculatrixCommandExample('4 5 *', _value('20')),
+        CalculatrixCommandExample('4 5 multiply', _value('20')),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
       seeAlso: const <String>['divide'],
@@ -503,8 +511,8 @@ final class CalculatrixCommandRegistry {
       preconditions: 'B is a scalar (1x1) and not zero',
       description: 'Divides A by the scalar B.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('10 4 /', Matrix.scalar(2.5)),
-        CalculatrixCommandExample('10 4 divide', Matrix.scalar(2.5)),
+        CalculatrixCommandExample('10 4 /', _value('2.5')),
+        CalculatrixCommandExample('10 4 divide', _value('2.5')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.typeMismatch,
@@ -528,8 +536,8 @@ final class CalculatrixCommandRegistry {
           'a negative scalar gives the imaginary unit scaled accordingly.',
       // 0.5 power: runbook D43, D44.
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('9 sqrt', Matrix.scalar(3)),
-        CalculatrixCommandExample('9 √', Matrix.scalar(3)),
+        CalculatrixCommandExample('9 sqrt', _value('3')),
+        CalculatrixCommandExample('9 √', _value('3')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.dimensionMismatch,
@@ -554,17 +562,11 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[2 0] [0 4]] inverse',
-          Matrix(<List<double>>[
-            <double>[0.5, 0],
-            <double>[0, 0.25],
-          ]),
+          _value('[[0.5 0] [0 0.25]]'),
         ),
         CalculatrixCommandExample(
           '[[2 0] [0 4]] inv',
-          Matrix(<List<double>>[
-            <double>[0.5, 0],
-            <double>[0, 0.25],
-          ]),
+          _value('[[0.5 0] [0 0.25]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -582,8 +584,8 @@ final class CalculatrixCommandRegistry {
       arity: 1,
       description: 'X as a fraction of 100, e.g. "50 %" gives 0.5.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('50 %', Matrix.scalar(0.5)),
-        CalculatrixCommandExample('50 percent', Matrix.scalar(0.5)),
+        CalculatrixCommandExample('50 %', _value('0.5')),
+        CalculatrixCommandExample('50 percent', _value('0.5')),
       ],
       build: () => const PercentCommand(),
     ),
@@ -608,9 +610,9 @@ final class CalculatrixCommandRegistry {
       // runbook D25 (the exp/log identity); runbook D44 (the -1 and 0.5
       // shortcuts).
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('2 3 pwr', Matrix.scalar(8)),
-        CalculatrixCommandExample('2 3 POWER', Matrix.scalar(8)),
-        CalculatrixCommandExample('2 3 ^', Matrix.scalar(8)),
+        CalculatrixCommandExample('2 3 pwr', _value('8')),
+        CalculatrixCommandExample('2 3 POWER', _value('8')),
+        CalculatrixCommandExample('2 3 ^', _value('8')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.dimensionMismatch,
@@ -638,27 +640,9 @@ final class CalculatrixCommandRegistry {
           '(Matrix itself rejects zero rows), so a zero-length vector is '
           'not buildable.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample(
-          '0 1 2 vector',
-          Matrix(<List<double>>[
-            <double>[0],
-            <double>[1],
-          ]),
-        ),
-        CalculatrixCommandExample(
-          '5 1 vector',
-          Matrix(<List<double>>[
-            <double>[5],
-          ]),
-        ),
-        CalculatrixCommandExample(
-          '1 2 3 3 vector',
-          Matrix(<List<double>>[
-            <double>[1],
-            <double>[2],
-            <double>[3],
-          ]),
-        ),
+        CalculatrixCommandExample('0 1 2 vector', _value('[[0] [1]]')),
+        CalculatrixCommandExample('5 1 vector', _value('5')),
+        CalculatrixCommandExample('1 2 3 3 vector', _value('[[1] [2] [3]]')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.typeMismatch,
@@ -681,17 +665,13 @@ final class CalculatrixCommandRegistry {
           'single row, itself.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('[[1 2] [3 4]] rows', <Matrix>[
-          Matrix(<List<double>>[
-            <double>[1, 2],
-          ]),
-          Matrix(<List<double>>[
-            <double>[3, 4],
-          ]),
-          Matrix.scalar(2),
+          _value('[[1 2]]'),
+          _value('[[3 4]]'),
+          _value('2'),
         ]),
         CalculatrixCommandExample.stack('7 rows', <Matrix>[
-          Matrix.scalar(7),
-          Matrix.scalar(1),
+          _value('7'),
+          _value('1'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
@@ -714,17 +694,11 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '0 1 2 vector -1 0 2 vector append-cols',
-          Matrix(<List<double>>[
-            <double>[0, -1],
-            <double>[1, 0],
-          ]),
+          _value('[[0 -1] [1 0]]'),
         ),
         CalculatrixCommandExample(
           '[[1 2] [3 4]] [[5 6 7] [8 9 10]] append-cols',
-          Matrix(<List<double>>[
-            <double>[1, 2, 5, 6, 7],
-            <double>[3, 4, 8, 9, 10],
-          ]),
+          _value('[[1 2 5 6 7] [3 4 8 9 10]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
@@ -746,11 +720,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2]] [[3 4] [5 6]] append-rows',
-          Matrix(<List<double>>[
-            <double>[1, 2],
-            <double>[3, 4],
-            <double>[5, 6],
-          ]),
+          _value('[[1 2] [3 4] [5 6]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.dimensionMismatch],
@@ -770,7 +740,7 @@ final class CalculatrixCommandRegistry {
       preconditions: 'X is square (a scalar is 1x1, and therefore square)',
       description: 'The matrix exponential of X (Matrix.exp).',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('0 exp', Matrix.scalar(1)),
+        CalculatrixCommandExample('0 exp', _value('1')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -790,7 +760,7 @@ final class CalculatrixCommandRegistry {
           'The principal matrix logarithm of X (Matrix.log); "log" stays '
           'free for base 10.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('1 ln', Matrix.scalar(0)),
+        CalculatrixCommandExample('1 ln', _value('0')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -809,8 +779,8 @@ final class CalculatrixCommandRegistry {
       arity: 1,
       description: 'Negates A element-wise.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('5 negate', Matrix.scalar(-5)),
-        CalculatrixCommandExample('5 neg', Matrix.scalar(-5)),
+        CalculatrixCommandExample('5 negate', _value('-5')),
+        CalculatrixCommandExample('5 neg', _value('-5')),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
       seeAlso: const <String>['subtract'],
@@ -820,16 +790,28 @@ final class CalculatrixCommandRegistry {
       name: 'approx',
       aliases: const <String>['num'],
       hp50gReference: '->NUM',
-      searchTerms: const <String>['decimal', 'float', 'numeric'],
+      searchTerms: const <String>[
+        'decimal',
+        'float',
+        'numeric',
+        'approximate',
+        'literal',
+        '~',
+      ],
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'A -> ~A',
       arity: 1,
       description:
           'Makes A approximate: each entry becomes the nearest double. An '
-          'approximate value is left unchanged.',
+          'approximate value is left unchanged. To type an approximate '
+          'value directly, put ~ in front of the literal: ~0.1, ~-2, '
+          '~[[1 2] [3 4]].',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('1 3 / approx', Matrix.scalar(1 / 3)),
-        CalculatrixCommandExample('1 4 / num', Matrix.scalar(0.25)),
+        CalculatrixCommandExample(
+          '1 3 / approx',
+          _value('~0.3333333333333333'),
+        ),
+        CalculatrixCommandExample('1 4 / num', _value('~0.25')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -841,7 +823,15 @@ final class CalculatrixCommandRegistry {
     CalculatrixCommandEntry(
       name: 'exact',
       hp50gReference: '->Q',
-      searchTerms: const <String>['fraction', 'rational'],
+      searchTerms: const <String>[
+        'fraction',
+        'rational',
+        'literal',
+        'decimal',
+        'integer',
+        'matrix literal',
+        'exact by default',
+      ],
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: '~A -> A',
       arity: 1,
@@ -849,16 +839,13 @@ final class CalculatrixCommandRegistry {
           'Makes A exact: each entry becomes the simplest rational (smallest '
           'denominator) that rounds to the same double, so it never guesses '
           'beyond the precision of the double. An exact value is left '
-          'unchanged.',
+          'unchanged. Values are exact unless marked ~, so literals need no '
+          'conversion: integers of any size (3 40 ^ is '
+          '12157665459056928801), decimals (0.1 is 1/10), fractions (1/3, '
+          '-5/3) and matrices of them ([[1 1/2] [1/2 1/3]]).',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample(
-          '1 3 / approx exact',
-          Matrix.exactScalar(Rational(BigInt.one, BigInt.from(3))),
-        ),
-        CalculatrixCommandExample(
-          '0.1 approx exact',
-          Matrix.exactScalar(Rational(BigInt.one, BigInt.from(10))),
-        ),
+        CalculatrixCommandExample('1 3 / approx exact', _value('1/3')),
+        CalculatrixCommandExample('0.1 approx exact', _value('0.1')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -880,10 +867,10 @@ final class CalculatrixCommandRegistry {
           'the top of the stack.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 3 3 pick', <Matrix>[
-          Matrix.scalar(1),
-          Matrix.scalar(2),
-          Matrix.scalar(3),
-          Matrix.scalar(1),
+          _value('1'),
+          _value('2'),
+          _value('3'),
+          _value('1'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[
@@ -906,9 +893,9 @@ final class CalculatrixCommandRegistry {
           'top of the stack.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 3 3 roll', <Matrix>[
-          Matrix.scalar(2),
-          Matrix.scalar(3),
-          Matrix.scalar(1),
+          _value('2'),
+          _value('3'),
+          _value('1'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[
@@ -926,7 +913,7 @@ final class CalculatrixCommandRegistry {
       arity: 1,
       description: 'Removes the top of the stack.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample.stack('1 2 drop', <Matrix>[Matrix.scalar(1)]),
+        CalculatrixCommandExample.stack('1 2 drop', <Matrix>[_value('1')]),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
       seeAlso: const <String>['duplicate', 'pick', 'roll'],
@@ -943,12 +930,12 @@ final class CalculatrixCommandRegistry {
       description: 'Duplicates the top of the stack (1 pick).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('5 duplicate', <Matrix>[
-          Matrix.scalar(5),
-          Matrix.scalar(5),
+          _value('5'),
+          _value('5'),
         ]),
         CalculatrixCommandExample.stack('5 dup', <Matrix>[
-          Matrix.scalar(5),
-          Matrix.scalar(5),
+          _value('5'),
+          _value('5'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
@@ -964,9 +951,9 @@ final class CalculatrixCommandRegistry {
       description: 'Copies the second value from the top to the top (2 pick).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 over', <Matrix>[
-          Matrix.scalar(1),
-          Matrix.scalar(2),
-          Matrix.scalar(1),
+          _value('1'),
+          _value('2'),
+          _value('1'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
@@ -982,8 +969,8 @@ final class CalculatrixCommandRegistry {
       description: 'Swaps the top two values (2 roll).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 swap', <Matrix>[
-          Matrix.scalar(2),
-          Matrix.scalar(1),
+          _value('2'),
+          _value('1'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
@@ -1000,14 +987,14 @@ final class CalculatrixCommandRegistry {
       description: 'Rotates the top three values (3 roll).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('1 2 3 rotate', <Matrix>[
-          Matrix.scalar(2),
-          Matrix.scalar(3),
-          Matrix.scalar(1),
+          _value('2'),
+          _value('3'),
+          _value('1'),
         ]),
         CalculatrixCommandExample.stack('1 2 3 rot', <Matrix>[
-          Matrix.scalar(2),
-          Matrix.scalar(3),
-          Matrix.scalar(1),
+          _value('2'),
+          _value('3'),
+          _value('1'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
@@ -1029,7 +1016,7 @@ final class CalculatrixCommandRegistry {
           'Builds the r x c matrix of zeros (HP 50g CON with 0). "0 3 '
           'zeros" raises dimension-mismatch, like "0 vector".',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('2 3 zeros', Matrix.zeros(2, 3)),
+        CalculatrixCommandExample('2 3 zeros', _value('[[0 0 0] [0 0 0]]')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -1051,13 +1038,7 @@ final class CalculatrixCommandRegistry {
           'Builds the r x c matrix of ones (HP 50g CON with 1). "0 3 '
           'ones" raises dimension-mismatch, like "0 vector".',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample(
-          '2 2 ones',
-          Matrix(<List<double>>[
-            <double>[1, 1],
-            <double>[1, 1],
-          ]),
-        ),
+        CalculatrixCommandExample('2 2 ones', _value('[[1 1] [1 1]]')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -1078,7 +1059,10 @@ final class CalculatrixCommandRegistry {
           'Builds the n x n identity matrix. "0 identity" raises '
           'dimension-mismatch, like "0 vector".',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('3 identity', Matrix.identity(3)),
+        CalculatrixCommandExample(
+          '3 identity',
+          _value('[[1 0 0] [0 1 0] [0 0 1]]'),
+        ),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -1098,10 +1082,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] transpose',
-          Matrix(<List<double>>[
-            <double>[1, 3],
-            <double>[2, 4],
-          ]),
+          _value('[[1 3] [2 4]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
@@ -1121,9 +1102,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 1 delete-row',
-          Matrix(<List<double>>[
-            <double>[3, 4],
-          ]),
+          _value('[[3 4]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1146,10 +1125,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 1 delete-col',
-          Matrix(<List<double>>[
-            <double>[2],
-            <double>[4],
-          ]),
+          _value('[[2] [4]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1171,11 +1147,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 1 duplicate-row',
-          Matrix(<List<double>>[
-            <double>[1, 2],
-            <double>[1, 2],
-            <double>[3, 4],
-          ]),
+          _value('[[1 2] [1 2] [3 4]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1198,10 +1170,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 1 duplicate-col',
-          Matrix(<List<double>>[
-            <double>[1, 1, 2],
-            <double>[3, 3, 4],
-          ]),
+          _value('[[1 1 2] [3 3 4]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1224,10 +1193,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 2 1 move-row',
-          Matrix(<List<double>>[
-            <double>[3, 4],
-            <double>[1, 2],
-          ]),
+          _value('[[3 4] [1 2]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1249,10 +1215,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2 3] [4 5 6]] 3 1 move-col',
-          Matrix(<List<double>>[
-            <double>[3, 1, 2],
-            <double>[6, 4, 5],
-          ]),
+          _value('[[3 1 2] [6 4 5]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1273,11 +1236,8 @@ final class CalculatrixCommandRegistry {
       preconditions: 'A is square',
       description: 'The determinant of A.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample(
-          '[[2 0] [0 3]] determinant',
-          Matrix.scalar(6),
-        ),
-        CalculatrixCommandExample('[[2 0] [0 3]] det', Matrix.scalar(6)),
+        CalculatrixCommandExample('[[2 0] [0 3]] determinant', _value('6')),
+        CalculatrixCommandExample('[[2 0] [0 3]] det', _value('6')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -1295,7 +1255,7 @@ final class CalculatrixCommandRegistry {
       preconditions: 'A is square',
       description: 'The sum of the diagonal of A.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('[[1 2] [3 4]] trace', Matrix.scalar(5)),
+        CalculatrixCommandExample('[[1 2] [3 4]] trace', _value('5')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -1312,7 +1272,7 @@ final class CalculatrixCommandRegistry {
       arity: 1,
       description: 'The rank of A.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('[[1 2] [2 4]] rank', Matrix.scalar(1)),
+        CalculatrixCommandExample('[[1 2] [2 4]] rank', _value('1')),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
       seeAlso: const <String>['determinant', 'rref'],
@@ -1327,8 +1287,8 @@ final class CalculatrixCommandRegistry {
       arity: 1,
       description: 'The Frobenius norm of A.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample('[[3 4]] frobenius-norm', Matrix.scalar(5)),
-        CalculatrixCommandExample('[[3 4]] norm', Matrix.scalar(5)),
+        CalculatrixCommandExample('[[3 4]] frobenius-norm', _value('5')),
+        CalculatrixCommandExample('[[3 4]] norm', _value('5')),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
       seeAlso: const <String>['spectral-norm'],
@@ -1342,10 +1302,7 @@ final class CalculatrixCommandRegistry {
       arity: 1,
       description: 'The spectral (2-)norm of A: its largest singular value.',
       examples: <CalculatrixCommandExample>[
-        CalculatrixCommandExample(
-          '[[3 0] [0 4]] spectral-norm',
-          Matrix.scalar(4),
-        ),
+        CalculatrixCommandExample('[[3 0] [0 4]] spectral-norm', _value('~4')),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
       seeAlso: const <String>['frobenius-norm'],
@@ -1363,18 +1320,9 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[2 0] [0 3]] eigenvalues',
-          Matrix(<List<double>>[
-            <double>[3],
-            <double>[2],
-          ]),
+          _value('[[3] [2]]'),
         ),
-        CalculatrixCommandExample(
-          '[[2 0] [0 3]] eig',
-          Matrix(<List<double>>[
-            <double>[3],
-            <double>[2],
-          ]),
-        ),
+        CalculatrixCommandExample('[[2 0] [0 3]] eig', _value('[[3] [2]]')),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.stackUnderflow,
@@ -1395,14 +1343,8 @@ final class CalculatrixCommandRegistry {
           'diagonal eigenvalue matrix D, with D on top.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('[[3 0] [0 5]] diagonalize', <Matrix>[
-          Matrix(<List<double>>[
-            <double>[0, 1],
-            <double>[1, 0],
-          ]),
-          Matrix(<List<double>>[
-            <double>[5, 0],
-            <double>[0, 3],
-          ]),
+          _value('~[[0 1] [1 0]]'),
+          _value('~[[5 0] [0 3]]'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1423,10 +1365,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] cofactors',
-          Matrix(<List<double>>[
-            <double>[4, -3],
-            <double>[-2, 1],
-          ]),
+          _value('[[4 -3] [-2 1]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1447,17 +1386,11 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] adjugate',
-          Matrix(<List<double>>[
-            <double>[4, -2],
-            <double>[-3, 1],
-          ]),
+          _value('[[4 -2] [-3 1]]'),
         ),
         CalculatrixCommandExample(
           '[[1 2] [3 4]] adj',
-          Matrix(<List<double>>[
-            <double>[4, -2],
-            <double>[-3, 1],
-          ]),
+          _value('[[4 -2] [-3 1]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1478,7 +1411,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '1 2 3 3 vector 4 5 6 3 vector dot',
-          Matrix.scalar(32),
+          _value('32'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1499,11 +1432,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '1 0 0 3 vector 0 1 0 3 vector cross',
-          Matrix(<List<double>>[
-            <double>[0],
-            <double>[0],
-            <double>[1],
-          ]),
+          _value('[[0] [0] [1]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1523,10 +1452,7 @@ final class CalculatrixCommandRegistry {
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [2 4]] rref',
-          Matrix(<List<double>>[
-            <double>[1, 2],
-            <double>[0, 0],
-          ]),
+          _value('[[1 2] [0 0]]'),
         ),
       ],
       errors: const <CalculatrixErrorId>[CalculatrixErrorId.stackUnderflow],
@@ -1545,9 +1471,9 @@ final class CalculatrixCommandRegistry {
           'lower-triangular L and the upper-triangular U, with U on top.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('[[1 0] [0 1]] lu', <Matrix>[
-          Matrix.identity(2),
-          Matrix.identity(2),
-          Matrix.identity(2),
+          _value('[[1 0] [0 1]]'),
+          _value('[[1 0] [0 1]]'),
+          _value('[[1 0] [0 1]]'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1569,8 +1495,8 @@ final class CalculatrixCommandRegistry {
           'upper-triangular R, with R on top.',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample.stack('[[1 0] [0 1]] qr', <Matrix>[
-          Matrix.identity(2),
-          Matrix.identity(2),
+          _value('~[[1 0] [0 1]]'),
+          _value('~[[1 0] [0 1]]'),
         ]),
       ],
       errors: const <CalculatrixErrorId>[
@@ -1640,10 +1566,7 @@ int restrictedEditDistance(String a, String b) {
         distance[i - 1][j - 1] + cost, // substitution (or match)
       ].reduce((int x, int y) => x < y ? x : y);
 
-      if (i > 1 &&
-          j > 1 &&
-          a[i - 1] == b[j - 2] &&
-          a[i - 2] == b[j - 1]) {
+      if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1]) {
         final int transposition = distance[i - 2][j - 2] + 1;
         if (transposition < best) {
           best = transposition;

@@ -269,6 +269,21 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   `Matrix.ln`, `Matrix.spectralNorm` and `Matrix.svd`, which use the
   eigenvalues only inside: a rotation has a real logarithm. The registry
   lists the id on `eigenvalues` and `diagonalize`.
+- Issue #66. Every registry example states its expected values as `cx`
+  literals (`5`, `1/3`, `~0.3333333333333333`), and the registry test
+  checks that each example documents the exactness its program gives:
+  before, the examples were built from doubles, so `cx commands show add`
+  printed `2 3 + -> ~5`. `exact` and `approx` describe the literal forms
+  and the `~` mark, with the search terms `literal`, `fraction`, `decimal`,
+  `integer` and `approximate`.
+- Infix unary minus (issue #66, runbook-trust.md D61). A `-` where an
+  operand is expected negates the operand that follows, whatever it is:
+  `-(2+3)` is -5 and `2*-(3)` is -6, where both were syntax errors. It
+  binds looser than `^` and tighter than `*` and `/`, as in Giac: `-2^2` is
+  now -(2^2) = -4 (it was 4), `(-2)^2` is 4 and `2^-2` is 1/4.
+  `Calculatrix.tokenizeInfixExpression` returns such a minus as the new
+  token `Calculatrix.infixUnaryMinus`, and the session's repeat-equals
+  replays it as `-`.
 
 ### Fixed
 

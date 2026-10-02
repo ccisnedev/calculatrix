@@ -195,6 +195,13 @@ Global options, declared by the SDK on every route except the shortcut:
   operands; everything after it is an operand, including `--help`:
   `cx eval rpn --json -- '-x'`. `--` is grammar, not an option, so the
   shortcut accepts it: `cx -- '-x'`.
+  When a token rejected by G9 looks like an expression (after its `-` it
+  has a digit, an operator, a bracket, `~` or a space), the message says so
+  and gives the command with the value last, after `--`, and the other
+  arguments (such as `--json`) before it, keeping the id and exit 7:
+  `cx eval infix '-sqrt(-1)'` reports "-sqrt(-1) starts with "-", so it was
+  read as options; to pass it as a value, end the options with --: cx eval
+  infix -- '-sqrt(-1)'" (issue #66). `cx --help` says the same.
 - **G11. Negative numbers are operands.** A token looks like an option only if
   it is `-` followed by a letter, `--` followed by a letter, or exactly `--`.
   So `-1 2 +`, `->ARRY` and `-[...]` are operands (`cli_router` 0.1.1 already

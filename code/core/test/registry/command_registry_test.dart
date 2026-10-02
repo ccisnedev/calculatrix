@@ -251,6 +251,17 @@ void main() {
                 'Example "${example.program}" of "${entry.name}" did not '
                 'match its documented result.',
           );
+          // Equality between an exact and an approximate value compares
+          // their doubles, so exactness is checked on its own: an example
+          // documented as `~5` for an exact 5 tells an agent the results
+          // are floating point (issue #66).
+          expect(
+            result.map((Matrix value) => value.isExact).toList(),
+            example.expectedStack.map((Matrix value) => value.isExact).toList(),
+            reason:
+                'Example "${example.program}" of "${entry.name}" must '
+                'document the exactness its program gives.',
+          );
         }
       }
     });
