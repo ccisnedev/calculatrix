@@ -76,7 +76,7 @@ argument, which is D62.
 | U3 | #72 | The overview text: banner, install scripts. | U0 |
 | U4 | #73 | Syntax friction: infix call of an RPN word, `--` in a program, `power` documentation. | U0 |
 | U5 | #70 | Name table and the constants `pi`, `e`, `i`. | U0 |
-| U2 | #56 | Help after `modular_cli_sdk` 0.10.0 (ccisnedev/modular_cli_sdk#50). Not part of the first delivery. | SDK release |
+| U2 | #56 | Help after `modular_cli_sdk` 0.10.0 (ccisnedev/modular_cli_sdk#50). Done after the SDK release. | SDK release |
 
 ## Experiments (U5)
 
@@ -126,3 +126,4 @@ the spec. No contradiction.
 - 2026-10-02: U1 done (#68), U3 done (#72), U4 done (#73).
 - 2026-10-02: U5 done (#70). Experiments E1 to E3 recorded above, no contradiction. Name table in `code/core/lib/src/names/`, constants entries in the registry (category `constants`).
 - 2026-10-02: `cx` 0.16.0 (pubspec, `cxVersion`, root and core CHANGELOG).
+- 2026-10-02: U2 done (#56). `modular_cli_sdk` 0.10.0 published; the root row of the help says "Show the banner.", the overview and two hints are the help epilog, each command is listed once.

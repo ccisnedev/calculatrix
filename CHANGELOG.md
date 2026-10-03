@@ -174,7 +174,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	`power` is exact (#73). New names `pi` (also `π`), `e` and `i`:
 	`pi` and `e` are approximate, `i` is the exact matrix `[[0 -1] [1 0]]`,
 	in RPN and in infix (`e^(i*pi)`, `3+4*i`), listed by `cx commands list`
-	in the new category `constants` (#70).
+	in the new category `constants` (#70). `cx --help`, `cx -h` and
+	`cx help` list each command once: the root row says "Show the banner.",
+	and the overview and two hints follow the global options as the help
+	epilog of `modular_cli_sdk` 0.10.0 (#56).
 
 ### Benchmark
 

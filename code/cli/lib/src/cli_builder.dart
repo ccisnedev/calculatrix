@@ -3,7 +3,7 @@ import 'dart:io' as io;
 import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 
 import 'banner/banner_query.dart';
-import 'banner/banner_render.dart';
+import 'banner/overview.dart';
 import 'buffering_sink.dart';
 import 'commands/commands_contracts.dart';
 import 'commands/commands_list_query.dart';
@@ -21,44 +21,18 @@ import 'shortcut/shortcut_option_error.dart';
 import 'shortcut/unquoted_program_error.dart';
 import 'stdin_reader.dart';
 
-/// What `cx --help`, `cx -h` and `cx help` all show for the root route (the
-/// bare `cx`, with nothing else typed): what the program is, every command
-/// it has with a one-line description and, where there is one, the exact
-/// invocation that runs it, and how to run a program directly without
-/// naming a command at all. Built once, from [bannerCommands], the same
-/// list the banner itself renders, through [bannerCommandRow] (colorless:
-/// help text is not a terminal banner), so the two can never say different
-/// things about what `cx` can do.
-///
-/// `modular_cli_sdk` prints this single string for `cx --help`, `cx -h` and
-/// this route's own row in the full catalog (`cx help`): all three show the
-/// same catalog, under a `Usage: cx <command> [options]` line (0.9.0).
-/// Deliberately not headed "Commands:" the way the banner heads its own
-/// copy of these same rows:
-/// `cx help` already prints a real "Commands:"/"Queries:" heading of its
-/// own right after this text, and a second, identical-looking heading one
-/// line above it would read as a mistake rather than as the list it is.
-String get _rootHelpDescription {
-  final String commandRows = bannerCommands.map(bannerCommandRow).join('\n');
-  return <String>[
-    bannerTagline,
-    '',
-    'What each command does, with an example where one helps:',
-    commandRows,
-    '',
-    'Run a calculation directly by quoting it as one argument, without '
-        "naming a command at all, e.g.: cx '5 7 power'.",
-    '',
-    'Values are exact unless marked ~: integers of any size, decimals '
-        '(0.1 is 1/10), fractions (1/3, -5/3) and matrices of them '
-        '([[1 2] [3 4]], [[1/2 0] [0 1]]). A ~ in front makes a literal '
-        'approximate (~0.1, ~[[1 2]]); approx and exact convert. More: '
-        'cx commands show exact.',
-    'A value that starts with "-" goes after --, which ends the options: '
-        "cx eval infix -- '-(2+3)'.",
-    'Each command also takes its own --help, e.g.: cx eval rpn --help.',
-  ].join('\n');
-}
+/// The text `cx --help`, `cx -h` and `cx help` print after the global
+/// options (issue #56, `modular_cli_sdk` 0.10.0 `helpEpilog`): the overview
+/// the banner and the install scripts also show (runbook-agent-usability.md
+/// D64), then two hints. It used to be the root route's description, which
+/// the catalog prints as one cell of its table: the table broke, and every
+/// command was listed twice.
+final String _helpEpilog = <String>[
+  ...cxOverviewLines,
+  'Each command also takes its own --help, e.g.: cx eval rpn --help.',
+  'A program that starts with "-" goes after --: '
+      "cx -- '-1 2 +'.",
+].join('\n');
 
 /// `cx <program>`'s own contract (spec section 4, G4): one required
 /// positional and `--max-digits` (runbook D55), plus the global output
@@ -137,6 +111,7 @@ ModularCli buildCalculatrixCli({
     name: 'cx',
     version: cxVersion,
     suggestionDistance: _suggestionDistance,
+    helpEpilog: _helpEpilog,
   );
 
   cli.query<BannerInput, BannerOutput>(
@@ -152,7 +127,7 @@ ModularCli buildCalculatrixCli({
     ),
     globals: true,
     contract: CliContract.none,
-    description: _rootHelpDescription,
+    description: 'Show the banner.',
   );
 
   cli.plugin(VersionPlugin(version: cxVersion));
