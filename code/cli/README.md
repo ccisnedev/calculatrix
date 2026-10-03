@@ -80,5 +80,9 @@ covers both the PowerShell and the cmd.exe form.
 
 `--json` for machine-readable output, `--quiet`/`-q` to suppress everything
 but the result, `--help`/`-h` for help (the same catalog as `cx help`),
-`--version` for the version (the same answer as `cx version`). Exit codes
+`--version` for the version (the same answer as `cx version`). They apply to
+the `cx <program>` shortcut too, before or after the program:
+`cx --json '1 3 /'` and `cx '1 3 /' --json` print what `cx eval rpn --json
+'1 3 /'` prints. The options only `eval rpn` has, `--file` and `--stdin`, are
+rejected by the shortcut with the full spelling to type. Exit codes
 follow the SDK's own `ExitCode` table (0 ok, 7 validation failure, 64 usage error, 65 data error).

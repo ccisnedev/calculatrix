@@ -17,6 +17,7 @@ import 'eval/eval_rpn_query.dart';
 import 'shortcut/option_like_value_error.dart';
 import 'shortcut/program_shortcut_query.dart';
 import 'shortcut/route_suggestion.dart';
+import 'shortcut/shortcut_option_error.dart';
 import 'shortcut/unquoted_program_error.dart';
 import 'stdin_reader.dart';
 
@@ -60,8 +61,9 @@ String get _rootHelpDescription {
 }
 
 /// `cx <program>`'s own contract (spec section 4, G4): one required
-/// positional and `--max-digits` (runbook D55), not even the global options
-/// (`globals: false` where this is registered). Not [EvalContracts.rpn],
+/// positional and `--max-digits` (runbook D55), plus the global output
+/// options `--json` and `--quiet`/`-q` (`globals: true` where this is
+/// registered, runbook D62). Not [EvalContracts.rpn],
 /// which declares `--file`/`--stdin` and an optional `program`: those
 /// belong to the full `eval rpn` route, never to this shorter spelling of
 /// it.
@@ -240,7 +242,7 @@ ModularCli buildCalculatrixCli({
         maxDistance: _suggestionDistance,
       ),
     ),
-    globals: false,
+    globals: true,
     contract: _programShortcutContract,
     description: 'Shortcut for "eval rpn <program>".',
   );
@@ -284,15 +286,24 @@ Future<int> runCalculatrixCli(
   // carries a value that would be read as options (issue #66), is worth
   // the extra buffering at all: everything else is written straight to
   // the real stream, exactly as a plain `cli.run` call would.
-  if (!looksLikeUnquotedProgram(args) && optionLikeValueIndex(args) < 0) {
+  if (!looksLikeUnquotedProgram(args) &&
+      optionLikeValueIndex(args) < 0 &&
+      shortcutRejectedOption(args) == null) {
     return cli.run(args, stdout: realOut, stderr: realErr);
   }
 
   final BufferingSink bufferedErr = BufferingSink();
-  final int exitCode = await cli.run(args, stdout: realOut, stderr: bufferedErr);
+  final int exitCode = await cli.run(
+    args,
+    stdout: realOut,
+    stderr: bufferedErr,
+  );
   realErr.write(
-    rewriteOptionLikeValueError(
-      rewriteUnquotedProgramError(bufferedErr.text, args),
+    rewriteShortcutOptionError(
+      rewriteOptionLikeValueError(
+        rewriteUnquotedProgramError(bufferedErr.text, args),
+        args,
+      ),
       args,
     ),
   );

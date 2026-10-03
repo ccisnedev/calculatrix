@@ -144,13 +144,11 @@ void main() {
       expect(code, ExitCode.invalidUsage);
     });
 
-    test(
-      "cx '1 2 +' --json is rejected: the shortcut takes no options (G4)",
-      () async {
-        final code = await run(['1 2 +', '--json']);
-        expect(code, ExitCode.validationFailed);
-      },
-    );
+    test("cx '1 2 +' --file p.txt is rejected: the shortcut takes only the "
+        'global output options (G4, D62)', () async {
+      final code = await run(['1 2 +', '--file', 'p.txt']);
+      expect(code, ExitCode.validationFailed);
+    });
 
     test("cx -- '-x' treats -x as the program, not an option (G10)", () async {
       final code = await run(['--', '-x']);
