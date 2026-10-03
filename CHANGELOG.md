@@ -184,6 +184,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	in place (`cx -- '-pi'`). It applies when the name is a command word,
 	alias or constant, in any case; the error id and the exit code 7 do not
 	change.
+- `cx` 0.16.2. Uses `modular_cli_sdk` 0.11.0: an error that names no
+	command (`cx -pi`, `cx --file p.txt`) ends with one line, `Run "cx
+	--help" to see every command.`, instead of the whole catalog.
 
 ### Benchmark
 
