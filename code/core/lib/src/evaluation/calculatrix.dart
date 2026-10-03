@@ -193,6 +193,9 @@ class Calculatrix {
   ) {
     final List<_PositionedCommand> commands = <_PositionedCommand>[];
     for (final _PositionedToken positioned in tokens) {
+      if (positioned.value == '--') {
+        throw _doubleDashError(tokens, positioned);
+      }
       try {
         for (final CalculatrixCommand command in _compileWord(
           positioned.value,
@@ -206,6 +209,32 @@ class Calculatrix {
       }
     }
     return commands;
+  }
+
+  // `--` inside a program (issue #73, runbook D67): it ends the options of
+  // the command line, so it goes before the quoted program, never inside
+  // it. The message gives the form to type, built from the program without
+  // that token and one adjacent space (the tokens joined by one space, so
+  // that is the neighbour token's separator), with no suggestions: the
+  // registry would only offer the nearest word to "--".
+  static UnknownWordError _doubleDashError(
+    List<_PositionedToken> tokens,
+    _PositionedToken dash,
+  ) {
+    final String program = tokens
+        .where((_PositionedToken token) => !identical(token, dash))
+        .map((_PositionedToken token) => token.value)
+        .join(' ');
+    final String form = program.startsWith('-')
+        ? "cx eval rpn -- '$program'"
+        : "cx eval rpn '$program'";
+    return UnknownWordError(
+      dash.value,
+      position: dash.position,
+      message:
+          '"--" is not part of a program: it ends the options and goes '
+          'before the quoted program: $form',
+    );
   }
 
   // The command types a CalculatrixProgram is built from (compileInfix):
@@ -1124,18 +1153,22 @@ class Calculatrix {
     return -1;
   }
 
-  // The call-like argument text of a registered name's "(argument)", when
-  // one is both present (a closed parenthesis right after the name) and a
-  // plain number literal (issue #51, AC2): "sqrt(7)" qualifies, but
-  // "sqrt(1+2)" and "sqrt (7)" (space before the paren, so not call-like
-  // at all) do not, and neither does "sqrt(" (never closed). Read verbatim
-  // rather than parsed, since only the one argument slot RPN would occupy
-  // is needed here, not a full nested expression evaluation; restricted to
-  // a plain number because only a plain number is guaranteed to still mean
-  // the same thing once it is moved in front of the word instead of inside
-  // the call ("1+2 sqrt" is not "sqrt(1+2)", it is two RPN tokens, the
-  // second of which is unknown).
-  static String? _plainNumberCallArgument(String expression, int nameEnd) {
+  // The call-like arguments of a registered name's "(a, b, ...)", when the
+  // call is both present (a closed parenthesis right after the name) and
+  // made only of literals (issue #51, AC2; extended by issue #73, runbook
+  // D67): "sqrt(7)" gives ["7"], "power(2, 3)" gives ["2", "3"] and
+  // "inverse([[1 2] [3 4]])" gives ["[[1 2] [3 4]]"], each trimmed and
+  // verbatim. "sqrt(1+2)" and "sqrt (7)" (space before the paren, so not
+  // call-like at all) give null, and so do "sqrt(" (never closed), an empty
+  // argument or element, and any argument that is not a literal. Read
+  // verbatim rather than parsed, since only the argument slots RPN would
+  // occupy are needed here, not a full nested expression evaluation;
+  // restricted to literals because only a literal is guaranteed to still
+  // mean the same thing once it is moved in front of the word instead of
+  // inside the call ("1+2 sqrt" is not "sqrt(1+2)", it is two RPN tokens,
+  // the second of which is unknown). A comma inside brackets belongs to a
+  // matrix literal and does not separate arguments.
+  static List<String>? _literalCallArguments(String expression, int nameEnd) {
     if (nameEnd >= expression.length || expression[nameEnd] != '(') {
       return null;
     }
@@ -1143,15 +1176,62 @@ class Calculatrix {
     if (closeIndex < 0) {
       return null;
     }
-    final String argument = expression.substring(nameEnd + 1, closeIndex - 1).trim();
-    return double.tryParse(argument) != null ? argument : null;
+    final String inside = expression.substring(nameEnd + 1, closeIndex - 1);
+    final List<String> arguments = <String>[];
+    int depth = 0;
+    int start = 0;
+    for (int index = 0; index <= inside.length; index++) {
+      if (index < inside.length) {
+        final String character = inside[index];
+        if (character == '[') {
+          depth++;
+        } else if (character == ']') {
+          depth--;
+        }
+        if (character != ',' || depth != 0) {
+          continue;
+        }
+      }
+      arguments.add(inside.substring(start, index).trim());
+      start = index + 1;
+    }
+    for (final String argument in arguments) {
+      if (!_isSingleLiteral(argument)) {
+        return null;
+      }
+    }
+    return arguments;
+  }
+
+  // Whether `text` is exactly one literal: a number or one matrix literal,
+  // whose first bracket closes at its last character.
+  static bool _isSingleLiteral(String text) {
+    if (Literals.isNumber(text)) {
+      return true;
+    }
+    if (!Literals.looksLikeMatrix(text)) {
+      return false;
+    }
+    final int open = text.indexOf('[');
+    int depth = 0;
+    for (int index = open; index < text.length; index++) {
+      if (text[index] == '[') {
+        depth++;
+      } else if (text[index] == ']') {
+        depth--;
+        if (depth == 0) {
+          return index == text.length - 1;
+        }
+      }
+    }
+    return false;
   }
 
   // Builds the actionable error for a name found where infix expects a
   // number, matrix literal, operator or parenthesis (AC2, issue #51).
   // When `name` is already a registered RPN word or alias, the message
-  // shows its RPN form when a plain-number argument is available
-  // (_plainNumberCallArgument), or a generic, non-runnable description of
+  // shows its RPN form when the call's arguments are all literals
+  // (_literalCallArguments), or a generic, non-runnable description of
   // where the argument goes otherwise, rather than composing an RPN
   // command that would itself fail if the reader actually ran it.
   static ExpressionSyntaxError _buildInfixNameError(
@@ -1168,10 +1248,13 @@ class Calculatrix {
 
     String message;
     if (isRegistered) {
-      final String? argument = _plainNumberCallArgument(expression, nameEnd);
-      message = argument != null
+      final List<String>? arguments = _literalCallArguments(
+        expression,
+        nameEnd,
+      );
+      message = arguments != null
           ? '$limitation; "$name" is an RPN word: '
-                'cx eval rpn "$argument $name"'
+                'cx eval rpn "${arguments.join(' ')} $name"'
           : '$limitation; "$name" is an RPN word; in RPN the argument '
                 'comes first: x $name';
     } else {

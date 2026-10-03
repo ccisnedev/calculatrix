@@ -194,8 +194,9 @@ class UnknownWordError extends CalculatrixError {
     int? position,
     List<String> suggestions = const <String>[],
     String? infixHint,
+    String? message,
   }) : super(
-         _buildMessage(token, suggestions, infixHint),
+         message ?? _buildMessage(token, suggestions, infixHint),
          errorId: CalculatrixErrorId.unknownWord,
          token: token,
          position: position,

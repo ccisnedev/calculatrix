@@ -603,16 +603,23 @@ final class CalculatrixCommandRegistry {
           'B and Y are square (a scalar is square); when neither is a '
           'scalar they have the same size',
       description:
-          'Raises B to the power Y: '
-          'B^Y = exp(Y . log B). Exponent -1 and 0.5 use the exact '
-          'inverse and square-root algorithms instead; '
-          'inverse and sqrt are defined in terms of this word.',
+          'Raises B to the power Y. The result is exact when B and Y are '
+          'exact and Y is an integer, or when Y is a fraction p/q and the '
+          'root is rational; otherwise it is approximate, marked ~, '
+          'computed as exp(Y . log B). Exponents -1 and 0.5 use the '
+          'inverse and square-root algorithms; inverse and sqrt are '
+          'defined in terms of this word.',
       // runbook D25 (the exp/log identity); runbook D44 (the -1 and 0.5
-      // shortcuts).
+      // shortcuts); runbook-agent-usability.md D67 (exactness examples).
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('2 3 pwr', _value('8')),
         CalculatrixCommandExample('2 3 POWER', _value('8')),
         CalculatrixCommandExample('2 3 ^', _value('8')),
+        CalculatrixCommandExample('2 -3 ^', _value('0.125')),
+        CalculatrixCommandExample('8 1/3 ^', _value('2')),
+        // The double the program gives, sqrt(2), which `cx` shows as
+        // ~1.41421356237 (12 significant digits).
+        CalculatrixCommandExample('2 0.5 ^', Matrix.scalar(1.4142135623730951)),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.dimensionMismatch,
