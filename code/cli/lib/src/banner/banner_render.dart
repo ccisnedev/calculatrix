@@ -10,6 +10,8 @@
 /// test exercises the exact layout without faking a console.
 library;
 
+import 'overview.dart';
+
 /// The tagline printed next to the logo, and returned as `tagline` in JSON
 /// mode: a single source of truth for both (issue #26 scope 6).
 const String bannerTagline =
@@ -140,12 +142,24 @@ String renderBanner({
       .map((cmd) => _commandRow(cmd, c))
       .join('\n');
 
+  // The overview of D63: each line indented two spaces, its label (up to
+  // the first colon) dimmed, the rest uncolored.
+  final overview = cxOverviewLines
+      .map((line) {
+        final int colon = line.indexOf(':');
+        return '  ${c(_dim, line.substring(0, colon + 1))}'
+            '${line.substring(colon + 1)}';
+      })
+      .join('\n');
+
   final commands = '  ${c(_dim, 'Commands:')}\n$rows';
 
   final quickstart = '  ${c(_dim, 'Quickstart:')}  $bannerQuickstartCommand';
 
   final buffer = StringBuffer()
     ..write(logo)
+    ..write('\n\n')
+    ..write(overview)
     ..write('\n\n')
     ..write(commands)
     ..write('\n\n')
