@@ -3,6 +3,20 @@ import 'package:test/test.dart';
 
 void main() {
   group('Matrix construction', () {
+    test('the rows of a matrix cannot be replaced', () {
+      final Matrix exact = Matrix.exact(<List<Rational>>[
+        <Rational>[Rational.one],
+      ]);
+      final Matrix approximate = Matrix(<List<double>>[
+        <double>[1],
+      ]);
+      expect(
+        () => exact.exactRows[0] = <Rational>[Rational.zero],
+        throwsUnsupportedError,
+      );
+      expect(() => approximate.rows[0] = <double>[0], throwsUnsupportedError);
+    });
+
     test('creates scalar matrix', () {
       final Matrix scalar = Matrix.scalar(2);
 
@@ -297,21 +311,24 @@ void main() {
       );
     });
 
-    test('computes real eigenvalues for 3x3 general non-symmetric matrices', () {
-      // A = [[1,2,0],[0,3,0],[2,-4,2]], eigenvalues are 3, 2, 1
-      final Matrix value = Matrix(<List<double>>[
-        <double>[1, 2, 0],
-        <double>[0, 3, 0],
-        <double>[2, -4, 2],
-      ]);
+    test(
+      'computes real eigenvalues for 3x3 general non-symmetric matrices',
+      () {
+        // A = [[1,2,0],[0,3,0],[2,-4,2]], eigenvalues are 3, 2, 1
+        final Matrix value = Matrix(<List<double>>[
+          <double>[1, 2, 0],
+          <double>[0, 3, 0],
+          <double>[2, -4, 2],
+        ]);
 
-      final Matrix result = value.eigenvalues();
-      expect(result.rowCount, 3);
-      expect(result.columnCount, 1);
-      expect(result.at(0, 0), closeTo(3, 1e-9));
-      expect(result.at(1, 0), closeTo(2, 1e-9));
-      expect(result.at(2, 0), closeTo(1, 1e-9));
-    });
+        final Matrix result = value.eigenvalues();
+        expect(result.rowCount, 3);
+        expect(result.columnCount, 1);
+        expect(result.at(0, 0), closeTo(3, 1e-9));
+        expect(result.at(1, 0), closeTo(2, 1e-9));
+        expect(result.at(2, 0), closeTo(1, 1e-9));
+      },
+    );
 
     test('computes real eigenvalues for 4x4 symmetric matrices', () {
       // Symmetric: A = [[4,1,0,0],[1,3,1,0],[0,1,2,1],[0,0,1,1]]
@@ -327,8 +344,8 @@ void main() {
       expect(result.rowCount, 4);
       expect(result.columnCount, 1);
       // Verify descending order and known sum (trace = 10)
-      final double sum = result.at(0, 0) + result.at(1, 0) +
-          result.at(2, 0) + result.at(3, 0);
+      final double sum =
+          result.at(0, 0) + result.at(1, 0) + result.at(2, 0) + result.at(3, 0);
       expect(sum, closeTo(10, 1e-9));
       // Verify descending order
       expect(result.at(0, 0), greaterThan(result.at(1, 0)));
@@ -459,10 +476,7 @@ void main() {
         <double>[4, 5, 6],
       ]);
 
-      expect(
-        () => value.diagonalization(),
-        throwsA(isA<MatrixShapeError>()),
-      );
+      expect(() => value.diagonalization(), throwsA(isA<MatrixShapeError>()));
     });
 
     test('rejects diagonalization when spectrum is complex', () {
@@ -471,10 +485,7 @@ void main() {
         <double>[1, 0],
       ]);
 
-      expect(
-        () => value.diagonalization(),
-        throwsA(isA<MatrixDomainError>()),
-      );
+      expect(() => value.diagonalization(), throwsA(isA<MatrixDomainError>()));
     });
 
     test('computes trace for square matrices', () {
@@ -810,7 +821,11 @@ void main() {
       ]);
 
       expect(
-        base.appendRow(Matrix(<List<double>>[<double>[5, 6]])),
+        base.appendRow(
+          Matrix(<List<double>>[
+            <double>[5, 6],
+          ]),
+        ),
         Matrix(<List<double>>[
           <double>[1, 2],
           <double>[3, 4],
@@ -819,10 +834,12 @@ void main() {
       );
 
       expect(
-        base.appendColumn(Matrix(<List<double>>[
-          <double>[5],
-          <double>[6],
-        ])),
+        base.appendColumn(
+          Matrix(<List<double>>[
+            <double>[5],
+            <double>[6],
+          ]),
+        ),
         Matrix(<List<double>>[
           <double>[1, 2, 5],
           <double>[3, 4, 6],
@@ -912,13 +929,19 @@ void main() {
         throwsA(isA<MatrixShapeError>()),
       );
       expect(
-        () => base.appendColumn(Matrix(<List<double>>[<double>[5, 6]])),
+        () => base.appendColumn(
+          Matrix(<List<double>>[
+            <double>[5, 6],
+          ]),
+        ),
         throwsA(isA<MatrixShapeError>()),
       );
       expect(() => base.deleteRow(2), throwsA(isA<MatrixIndexError>()));
       expect(() => base.deleteColumn(2), throwsA(isA<MatrixIndexError>()));
       expect(
-        () => Matrix(<List<double>>[<double>[1, 2]]).deleteRow(0),
+        () => Matrix(<List<double>>[
+          <double>[1, 2],
+        ]).deleteRow(0),
         throwsA(isA<MatrixShapeError>()),
       );
       expect(
@@ -995,10 +1018,15 @@ void main() {
       ]);
       final result = aug.rref();
       // RREF: [[1, 0, 2], [0, 1, 1]]
-      expect(result.almostEquals(Matrix(<List<double>>[
-        [1, 0, 2],
-        [0, 1, 1],
-      ])), isTrue);
+      expect(
+        result.almostEquals(
+          Matrix(<List<double>>[
+            [1, 0, 2],
+            [0, 1, 1],
+          ]),
+        ),
+        isTrue,
+      );
     });
 
     test('rref of 3x4 augmented system', () {
@@ -1010,11 +1038,16 @@ void main() {
       ]);
       final result = aug.rref();
       // Solution: x=5, y=3, z=-2
-      expect(result.almostEquals(Matrix(<List<double>>[
-        [1, 0, 0, 5],
-        [0, 1, 0, 3],
-        [0, 0, 1, -2],
-      ])), isTrue);
+      expect(
+        result.almostEquals(
+          Matrix(<List<double>>[
+            [1, 0, 0, 5],
+            [0, 1, 0, 3],
+            [0, 0, 1, -2],
+          ]),
+        ),
+        isTrue,
+      );
     });
 
     test('rref of rank-deficient matrix has zero rows at bottom', () {
@@ -1035,9 +1068,18 @@ void main() {
     });
 
     test('rref of single row normalizes the leading entry', () {
-      final a = Matrix(<List<double>>[[4, 8, 12]]);
+      final a = Matrix(<List<double>>[
+        [4, 8, 12],
+      ]);
       final result = a.rref();
-      expect(result.almostEquals(Matrix(<List<double>>[[1, 2, 3]])), isTrue);
+      expect(
+        result.almostEquals(
+          Matrix(<List<double>>[
+            [1, 2, 3],
+          ]),
+        ),
+        isTrue,
+      );
     });
 
     test('rref of zero matrix is zero matrix', () {
@@ -1060,13 +1102,22 @@ void main() {
     });
 
     test('spectral norm of diagonal matrix is max |diagonal entry|', () {
-      final d = Matrix(<List<double>>[[3, 0], [0, -7]]);
+      final d = Matrix(<List<double>>[
+        [3, 0],
+        [0, -7],
+      ]);
       expect(d.spectralNorm().scalarValue, closeTo(7, 1e-10));
     });
 
     test('spectral norm is submultiplicative: ‖AB‖₂ ≤ ‖A‖₂ · ‖B‖₂', () {
-      final a = Matrix(<List<double>>[[1, 2], [3, 4]]);
-      final b = Matrix(<List<double>>[[5, 6], [7, 8]]);
+      final a = Matrix(<List<double>>[
+        [1, 2],
+        [3, 4],
+      ]);
+      final b = Matrix(<List<double>>[
+        [5, 6],
+        [7, 8],
+      ]);
       final normAB = (a * b).spectralNorm().scalarValue;
       final normA = a.spectralNorm().scalarValue;
       final normB = b.spectralNorm().scalarValue;
@@ -1077,12 +1128,19 @@ void main() {
       // 2D rotation by 30°
       final c = 0.8660254037844387; // cos(30°)
       final s = 0.5; // sin(30°)
-      final q = Matrix(<List<double>>[[c, -s], [s, c]]);
+      final q = Matrix(<List<double>>[
+        [c, -s],
+        [s, c],
+      ]);
       expect(q.spectralNorm().scalarValue, closeTo(1, 1e-10));
     });
 
     test('spectral norm works for non-square matrices', () {
-      final a = Matrix(<List<double>>[[1, 0], [0, 2], [0, 0]]);
+      final a = Matrix(<List<double>>[
+        [1, 0],
+        [0, 2],
+        [0, 0],
+      ]);
       // Singular values are 1 and 2 → spectral norm = 2
       expect(a.spectralNorm().scalarValue, closeTo(2, 1e-10));
     });

@@ -16,6 +16,7 @@ String categoryToCliName(CalculatrixCommandCategory category) =>
       CalculatrixCommandCategory.construction => 'construction',
       CalculatrixCommandCategory.structure => 'structure',
       CalculatrixCommandCategory.linearAlgebra => 'linear-algebra',
+      CalculatrixCommandCategory.constants => 'constants',
     };
 
 /// The [categoryToCliName] every declared category renders as, in

@@ -5,6 +5,7 @@ import '../exact/exact_arithmetic.dart';
 import '../machine/calculatrix_command.dart';
 import '../machine/commands.dart';
 import '../matrix/matrix.dart';
+import '../names/name_table.dart';
 
 /// Categories of the core command registry (spec section 7): a closed,
 /// machine-checkable set, so a caller such as `cx commands list --category`
@@ -25,6 +26,7 @@ enum CalculatrixCommandCategory {
   construction,
   structure,
   linearAlgebra,
+  constants,
 }
 
 /// The value [literal] spells, as `cx` itself reads it: `5` and
@@ -33,6 +35,16 @@ enum CalculatrixCommandCategory {
 /// `cx commands show` prints is the exactness the program gives (issue #66).
 Matrix _value(String literal) =>
     Literals.parse(literal, maxDigits: ExactArithmetic.defaultMaxDigits)!;
+
+/// The value of a system constant, read from the name table: the one
+/// source of the value (issue #70, runbook-agent-usability.md D66).
+Matrix _constant(String name) =>
+    CalculatrixNameTable.standard.lookup(name)!.value;
+
+/// The command that pushes the system constant [name], read from the name
+/// table when the command is built.
+CalculatrixCommand Function() _pushConstant(String name) =>
+    () => PushMatrixCommand(_constant(name));
 
 /// One example RPN program from a registry entry's documentation (spec
 /// section 7, "Examples"). Executable, not prose: a core test runs every
@@ -338,7 +350,9 @@ final class CalculatrixCommandRegistry {
         <_CommandSuggestionCandidate>[];
 
     for (final CalculatrixCommandEntry entry in entries) {
-      if (entry.searchTerms.any((String term) => term.toLowerCase() == needle)) {
+      if (entry.searchTerms.any(
+        (String term) => term.toLowerCase() == needle,
+      )) {
         exactSearchTermMatches.add(entry.name);
         continue;
       }
@@ -603,16 +617,23 @@ final class CalculatrixCommandRegistry {
           'B and Y are square (a scalar is square); when neither is a '
           'scalar they have the same size',
       description:
-          'Raises B to the power Y: '
-          'B^Y = exp(Y . log B). Exponent -1 and 0.5 use the exact '
-          'inverse and square-root algorithms instead; '
-          'inverse and sqrt are defined in terms of this word.',
+          'Raises B to the power Y. The result is exact when B and Y are '
+          'exact and Y is an integer, or when Y is a fraction p/q and the '
+          'root is rational; otherwise it is approximate, marked ~, '
+          'computed as exp(Y . log B). Exponents -1 and 0.5 use the '
+          'inverse and square-root algorithms; inverse and sqrt are '
+          'defined in terms of this word.',
       // runbook D25 (the exp/log identity); runbook D44 (the -1 and 0.5
-      // shortcuts).
+      // shortcuts); runbook-agent-usability.md D68 (exactness examples).
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('2 3 pwr', _value('8')),
         CalculatrixCommandExample('2 3 POWER', _value('8')),
         CalculatrixCommandExample('2 3 ^', _value('8')),
+        CalculatrixCommandExample('2 -3 ^', _value('0.125')),
+        CalculatrixCommandExample('8 1/3 ^', _value('2')),
+        // The double the program gives, sqrt(2), which `cx` shows as
+        // ~1.41421356237 (12 significant digits).
+        CalculatrixCommandExample('2 0.5 ^', Matrix.scalar(1.4142135623730951)),
       ],
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.dimensionMismatch,
@@ -1165,8 +1186,7 @@ final class CalculatrixCommandRegistry {
       // No declared arity: see the note on 'delete-row' above (issue #51,
       // AC8).
       preconditions: 'j is a 1-based column index of A',
-      description:
-          'Inserts a copy of column j right after it (1-based).',
+      description: 'Inserts a copy of column j right after it (1-based).',
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2] [3 4]] 1 duplicate-col',
@@ -1505,6 +1525,64 @@ final class CalculatrixCommandRegistry {
       ],
       seeAlso: const <String>['lu'],
       build: () => const QrDecompositionCommand(),
+    ),
+    CalculatrixCommandEntry(
+      name: 'pi',
+      aliases: const <String>['π'],
+      searchTerms: const <String>['constant'],
+      hp50gReference: 'π',
+      category: CalculatrixCommandCategory.constants,
+      stackEffect: '-> pi',
+      arity: 0,
+      description:
+          'The constant pi, 3.14159265358979..., as the nearest double: an '
+          'approximate value, marked ~. Also spelled π. A name of the name '
+          'table: it is not a number, so -pi and ~pi are not valid; write '
+          'pi negate and pi approx.',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample('pi', _constant('pi')),
+      ],
+      seeAlso: const <String>['e', 'i'],
+      build: _pushConstant('pi'),
+    ),
+    CalculatrixCommandEntry(
+      name: 'e',
+      searchTerms: const <String>['constant'],
+      hp50gReference: 'e',
+      category: CalculatrixCommandCategory.constants,
+      stackEffect: '-> e',
+      arity: 0,
+      description:
+          'The constant e, 2.71828182845904..., the base of the natural '
+          'logarithm, as the nearest double: an approximate value, marked '
+          '~. A name of the name table: it is not a number (1e3 is the '
+          'number 1000), so -e and ~e are not valid; write e negate and e '
+          'approx.',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample('e', _constant('e')),
+      ],
+      seeAlso: const <String>['pi', 'i', 'exp'],
+      build: _pushConstant('e'),
+    ),
+    CalculatrixCommandEntry(
+      name: 'i',
+      searchTerms: const <String>['constant', 'imaginary', 'complex'],
+      hp50gReference: 'i',
+      category: CalculatrixCommandCategory.constants,
+      stackEffect: '-> i',
+      arity: 0,
+      description:
+          'The imaginary unit as the exact 2x2 matrix [[0 -1] [1 0]], so '
+          'that i dup * is -1 (the matrix [[-1 0] [0 -1]]) and a + b i is '
+          'a matrix a I + b i (3 4 i * + is [[3 -4] [4 3]]). Exact, not '
+          'marked. It prints as that matrix.',
+      examples: <CalculatrixCommandExample>[
+        CalculatrixCommandExample('i', _value('[[0 -1] [1 0]]')),
+        CalculatrixCommandExample('i dup *', _value('[[-1 0] [0 -1]]')),
+        CalculatrixCommandExample('3 4 i * +', _value('[[3 -4] [4 3]]')),
+      ],
+      seeAlso: const <String>['pi', 'e'],
+      build: _pushConstant('i'),
     ),
   ]);
 }

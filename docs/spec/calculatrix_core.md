@@ -246,6 +246,28 @@ class Calculatrix {
 	-(2^2) = -4, `(-2)^2` is 4, `2^-2` is 1/4 (runbook-trust.md D61). A
 	signed number that is not the base of `^` is still one literal (`3*-2`).
 
+### 4.4 Name table (issue #70, runbook-agent-usability.md D66)
+
+`CalculatrixNameTable` maps a name, case-insensitively like the words of the
+registry, to a `CalculatrixNameBinding`: a value (`Matrix`), aliases and a
+read-only flag. `CalculatrixNameTable.standard` holds exactly the system
+constants and has no way to add a binding at run time (variables and
+programs are issue #79):
+
+| Name | Alias | Value | Kind |
+|---|---|---|---|
+| `pi` | `π` | `math.pi` | approximate |
+| `e` | none | `math.e` | approximate |
+| `i` | none | `[[0 -1] [1 0]]` | exact |
+
+Each constant is also an entry of `CalculatrixCommandRegistry.standard`
+(category `constants`, primitive, arity 0), so `cx commands show/search/list`
+document it. The entry pushes the value read from the name table: the value
+has one source. A name is resolved in RPN after literals and before the
+registry's "unknown word", and in infix as an operand. A constant is
+recognized only as a whole token: `1e3` stays the number 1000; `2e` and `e3`
+stay unknown. A matrix literal accepts no names.
+
 ## 5. Error Taxonomy
 
 Current implementation uses `ArgumentError` and `StateError`.

@@ -19,6 +19,7 @@ export 'src/machine/commands.dart';
 export 'src/machine/macros.dart';
 export 'src/matrix/matrix.dart';
 export 'src/matrix/matrix_display_formatter.dart';
+export 'src/names/name_table.dart';
 export 'src/numeric/numeric_policy.dart';
 export 'src/registry/command_registry.dart';
 export 'src/rpn/rpn_engine.dart';

@@ -162,6 +162,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	command with `--` in place. In infix a unary minus negates any operand:
 	`-(2+3)` is -5 (it was a syntax error), and `-2^2` is -4, as in Giac
 	(it was 4).
+- Agent usability (issue #80, runbook `docs/runbook-agent-usability.md`),
+	`cx` 0.16.0. The `cx <program>` shortcut accepts `--json` and
+	`--quiet`/`-q` before or after the program, as `cx eval rpn` does, and
+	rejects `--file` and `--stdin` naming the full spelling (#68, spec G4).
+	The banner and the install scripts show one overview text: RPN, infix,
+	matrices, exact and approximate values, and where to look for more
+	(#72). A call of an RPN word in infix, `inverse([[1 2] [3 4]])`, names
+	the program to type, and a `--` inside a program names the form that
+	puts it before the quoted program; `commands show power` says when
+	`power` is exact (#73). New names `pi` (also `π`), `e` and `i`:
+	`pi` and `e` are approximate, `i` is the exact matrix `[[0 -1] [1 0]]`,
+	in RPN and in infix (`e^(i*pi)`, `3+4*i`), listed by `cx commands list`
+	in the new category `constants` (#70). `cx --help`, `cx -h` and
+	`cx help` list each command once: the root row says "Show the banner.",
+	and the overview and two hints follow the global options as the help
+	epilog of `modular_cli_sdk` 0.10.0 (#56).
 
 ### Benchmark
 

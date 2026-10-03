@@ -1,6 +1,7 @@
 import '../errors/errors.dart';
 import '../exact/rational.dart';
 import '../matrix/matrix.dart';
+import '../names/name_table.dart';
 
 /// Numeric and matrix literals, shared by RPN and infix.
 ///
@@ -395,8 +396,29 @@ final class _MatrixLiteralParser {
       character == ',' ||
       character.trim().isEmpty;
 
-  ExpressionSyntaxError _invalid() => ExpressionSyntaxError(
-    'Invalid matrix literal: $_token',
-    errorId: CalculatrixErrorId.syntaxError,
+  // A name of the name table inside the literal (`[[pi 0] [0 1]]`) is the
+  // one cause of an invalid literal the message can name: entries must be
+  // numbers, and a constant is a name (runbook-agent-usability.md D67). A
+  // letter right after a digit or a dot is part of a number (`1e3`), not a
+  // name.
+  static final RegExp _nameInLiteral = RegExp(
+    r'(?<![0-9A-Za-z_.])[A-Za-zπ_][A-Za-z0-9_π]*',
   );
+
+  ExpressionSyntaxError _invalid() {
+    String? constant;
+    for (final RegExpMatch match in _nameInLiteral.allMatches(_token)) {
+      if (CalculatrixNameTable.standard.lookup(match.group(0)!) != null) {
+        constant = match.group(0);
+        break;
+      }
+    }
+    return ExpressionSyntaxError(
+      constant == null
+          ? 'Invalid matrix literal: $_token'
+          : 'Invalid matrix literal: $_token; entries must be numbers, '
+                '"$constant" is a constant',
+      errorId: CalculatrixErrorId.syntaxError,
+    );
+  }
 }

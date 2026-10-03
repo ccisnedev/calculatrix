@@ -57,6 +57,18 @@ cx eval rpn '1 2 +'
 cx eval infix "2+3*4"
 ```
 
+```bash
+cx 'pi'                        # ~3.14159265359
+cx 'i dup *'                   # [[-1 0] [0 -1]], exact
+cx eval infix 'e^(i*pi)'       # -1 as a matrix, to within 1e-14
+cx commands list --category constants
+```
+
+The constants are `pi` (also `π`) and `e`, approximate, and `i`, the exact
+matrix `[[0 -1] [1 0]]`. A constant is a name, not a number: in RPN write
+`pi negate` and `pi approx`, not `-pi` or `~pi`; a matrix literal takes
+numbers only.
+
 A bare `cx` prints a short banner. `cx <program>` is a shortcut for
 `cx eval rpn <program>`, so a single quoted RPN program can be evaluated
 directly, without typing `eval rpn`.
@@ -80,5 +92,9 @@ covers both the PowerShell and the cmd.exe form.
 
 `--json` for machine-readable output, `--quiet`/`-q` to suppress everything
 but the result, `--help`/`-h` for help (the same catalog as `cx help`),
-`--version` for the version (the same answer as `cx version`). Exit codes
+`--version` for the version (the same answer as `cx version`). They apply to
+the `cx <program>` shortcut too, before or after the program:
+`cx --json '1 3 /'` and `cx '1 3 /' --json` print what `cx eval rpn --json
+'1 3 /'` prints. The options only `eval rpn` has, `--file` and `--stdin`, are
+rejected by the shortcut with the full spelling to type. Exit codes
 follow the SDK's own `ExitCode` table (0 ok, 7 validation failure, 64 usage error, 65 data error).

@@ -78,7 +78,8 @@ void main() {
         'and the actual depth, both empty and one value short', () {
       for (final entry in CalculatrixCommandRegistry.standard.entries) {
         final int? arity = entry.arity;
-        if (arity == null) {
+        // A constant (arity 0) takes nothing, so it cannot underflow.
+        if (arity == null || arity == 0) {
           continue;
         }
         final String valueWord = arity == 1 ? 'value' : 'values';

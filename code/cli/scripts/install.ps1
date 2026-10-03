@@ -145,3 +145,9 @@ Write-Host ''
 Write-Host '>>> Calculatrix CLI installed successfully!'
 Write-Host "    Location: $installDir"
 Write-Host '    Restart your terminal to use `cx` from any directory.'
+Write-Host ''
+Write-Host "    RPN:      cx '2 3 +'   (one quoted program; it can leave several results: cx '2 sqrt 1 3 /')"
+Write-Host "    Infix:    cx eval infix '2+3'"
+Write-Host "    Values:   every value is a matrix, exact (1/3, 0.1) or approximate, marked ~ (~1.41421356237)"
+Write-Host "    Discover: cx commands search <term>, cx commands show <word>; add --json for JSON output"
+Write-Host '    More: cx --help'
