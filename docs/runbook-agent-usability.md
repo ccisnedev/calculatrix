@@ -80,9 +80,39 @@ argument, which is D61.
 
 ## Experiments (U5)
 
-Recorded before the production code of U5.
+Recorded before the production code of U5, with `cx` 0.15.0 (Windows 11).
 
-(pending)
+**E1, lexing today.** `unknown-word` and `syntax-error` are both exit 65.
+
+| Token | RPN | Infix | Matrix literal |
+|---|---|---|---|
+| `e`, `E` | `unknown-word` | `syntax-error`: "e" is a name, not a number | not run (names are not numbers) |
+| `1e3`, `1E3` | `1000` | `1000` | not run |
+| `2e` | `unknown-word` | `syntax-error`: Invalid numeric literal: 2e | not run |
+| `e3` | `unknown-word` | `syntax-error`: "e3" is a name, not a number | not run |
+| `-e` | `unknown-word` "Did you mean subtract" (as `-e` after `--`); without `--` the shortcut's parser says `unknown option '-e'` | `syntax-error`: "e" is a name, not a number | not run |
+| `~pi` | `unknown-word: ~pi` | `syntax-error`: the approximate mark must be followed by a number or a matrix literal | not run |
+| `pi` | `unknown-word` | `syntax-error`: "pi" is a name, not a number | not run |
+| `π` | `unknown-word` | `syntax-error`: Unexpected token near "π" | not run |
+| `[[pi 0] [0 1]]` | `syntax-error`: Invalid matrix literal | `syntax-error`: Invalid matrix literal | `syntax-error` |
+
+No result contradicts D65 or D66. `1e3` is a number today and stays one.
+
+**E2, collisions.** `pi`, `e`, `i` and `π` against the 48 registry entries
+(names, aliases, search terms) and the reserved route words (`eval`,
+`commands`, `version`, `upgrade`, `uninstall`, `doctor`, `help`): no
+collision. `lookup` finds none of the four. Suggestions today: `pii` gives
+`power`, `pick`, `eigenvalues`; `pi`, `e`, `i` and `π` give none. No
+contradiction.
+
+**E3, precision.** Giac 1.9.0 (WSL Ubuntu): `evalf(pi,30)` =
+3.14159265358979323846264338328 and `evalf(e,30)` =
+2.71828182845904523536028747135. Rounded to double they equal `math.pi`
+(3.141592653589793) and `math.e` (2.718281828459045) exactly. The residue of
+`[[0 -1] [1 0]] ~3.141592653589793 * exp` is
+`[[-0.9999999999999971 -6.33e-15] [6.33e-15 -0.9999999999999971]]`: the
+largest deviation from `[[-1 0] [0 -1]]` is 6.33e-15, under the `1e-14` of
+the spec. No contradiction.
 
 ## Decisions log
 
@@ -93,3 +123,5 @@ Recorded before the production code of U5.
 ## Progress log
 
 - 2026-10-02: runbook created (U0). Spec G4 amended to D62.
+- 2026-10-02: U1 done (#68), U3 done (#72), U4 done (#73).
+- 2026-10-02: U5 done (#70). Experiments E1 to E3 recorded above, no contradiction. Name table in `code/core/lib/src/names/`, constants entries in the registry (category `constants`).

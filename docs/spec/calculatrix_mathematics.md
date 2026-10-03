@@ -55,6 +55,22 @@ Properties used by the engine:
 Phi is defined over Q as well: a complex number with rational parts is an
 exact 2x2 matrix, so `-4 sqrt` gives the exact [[0, -2], [2, 0]] (2i).
 
+The word `i` pushes J as an exact value, [[0 -1] [1 0]] (issue #70,
+runbook-agent-usability.md D66). With it a complex number is typed as a
+matrix expression: `3 4 i * +` is Phi(3 + 4i) = [[3 -4] [4 3]], exact, and
+`i dup *` is -I2. It prints as the matrix; showing it as `i` is issue #78.
+
+The other system constants are real and approximate, marked `~`: `pi`
+(also `π`) is the double nearest to pi, 3.141592653589793, and `e` is the
+double nearest to e, 2.718281828459045. They agree with Giac's `evalf` of
+the same constants rounded to a double. Because `e` and `pi` are
+approximate, `e^(i*pi)` is [[-1 0] [0 -1]] to within 1e-14 (the residue of
+`J*pi exp` in doubles is under 7e-15), not exactly.
+
+The constants are names of the core name table, not numbers: `1e3` is the
+number 1000, `2e` and `e3` are not constants, and `-pi` and `~pi` are not
+valid in RPN (write `pi negate` and `pi approx`).
+
 ### 2.3 Complex Results of Real Words
 
 The embedding covers a single complex number. A result that would be a

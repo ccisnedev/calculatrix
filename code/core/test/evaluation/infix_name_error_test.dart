@@ -55,7 +55,7 @@ void main() {
     test('an alias (not the entry\'s own name) still resolves to a word', () {
       try {
         // "root" is not registered as a word of its own; this exercises a
-        // name that simply is not in the registry at all, same as "e"
+        // name that simply is not in the registry at all, same as "x"
         // below, rather than an alias (the registry has no alias for sqrt
         // other than its symbol, which cannot appear here as a name).
         Calculatrix.evaluateInfix('root(9)');
@@ -70,18 +70,18 @@ void main() {
     test('a bare name with no registry match explains the limitation '
         'without an RPN form', () {
       try {
-        Calculatrix.evaluateInfix('e');
+        Calculatrix.evaluateInfix('x');
         fail('expected ExpressionSyntaxError');
       } on ExpressionSyntaxError catch (error) {
         expect(error.errorId, CalculatrixErrorId.syntaxError);
-        expect(error.name, 'e');
+        expect(error.name, 'x');
         expect(
           error.message,
           contains(
             'infix accepts numbers, matrix literals, + - * / ^ and parentheses',
           ),
         );
-        expect(error.message, contains('"e" is a name, not a number'));
+        expect(error.message, contains('"x" is a name, not a number'));
         expect(error.message, isNot(contains('RPN word')));
       }
     });

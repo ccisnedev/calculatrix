@@ -153,6 +153,15 @@ List<_Case> _cases() {
   final List<_Case> cases = <_Case>[];
   final _Generator g = _Generator(54);
 
+  // The exact constant i (issue #70, runbook-agent-usability.md D66): the
+  // matrix [[0 -1] [1 0]], whose products and inverse are exact and agree
+  // with Giac's complex i written as cx's 2x2 form.
+  cases
+    ..add(_Case('constant i', 'i', 'chk(cx2(i))'))
+    ..add(_Case('constant i dup *', 'i dup *', 'chk(cx2(i*i))'))
+    ..add(_Case('constant 3 4 i * +', '3 4 i * +', 'chk(cx2(3+4*i))'))
+    ..add(_Case('constant i inverse', 'i inverse', 'chk(cx2(1/i))'));
+
   for (final int digits in <int>[1, 3, 12, 40, 200]) {
     for (int i = 0; i < 8; i++) {
       final _Operand a = g.operand(1, 1, digits);
@@ -1011,5 +1020,49 @@ void main() {
     expect(irrational, greaterThan(40));
     // The cases reach results near the default limit of 10000 digits.
     expect(largest, greaterThan(9000));
+  });
+
+  // The approximate constants and e^(i*pi) (issue #70, D66): Giac's
+  // evalf of pi and e, to 30 digits, rounds to the double cx holds, and
+  // e^(i*pi) is within 1e-14 of -1 in cx's 2x2 form.
+  test('Giac agrees on pi, e and e^(i*pi)', () async {
+    final Map<int, String>? result = await _runGiac(<String>[
+      'evalf(pi,30)',
+      'evalf(e,30)',
+      'cx2(simplify(exp(i*pi)))',
+    ], prelude: _giacPrelude);
+    if (result == null) {
+      if (Platform.environment['CALCULATRIX_REQUIRE_GIAC'] == '1') {
+        fail('Giac is required but did not run (${_giacCommand().join(' ')}).');
+      }
+      markTestSkipped(
+        'Giac is not available (${_giacCommand().join(' ')}); skipping.',
+      );
+      return;
+    }
+    expect(
+      double.parse(result[0]!),
+      Calculatrix.evaluateRpn(<String>['pi']).at(0, 0),
+    );
+    expect(
+      double.parse(result[1]!),
+      Calculatrix.evaluateRpn(<String>['e']).at(0, 0),
+    );
+
+    final List<double> giacMinusOne = result[2]!
+        .replaceAll(RegExp(r'matrix|[\[\]\s]'), '')
+        .split(',')
+        .map(double.parse)
+        .toList();
+    final Matrix ours = Calculatrix.evaluateInfix('e^(i*pi)');
+    final List<double> entries = <double>[
+      ours.at(0, 0),
+      ours.at(0, 1),
+      ours.at(1, 0),
+      ours.at(1, 1),
+    ];
+    for (int k = 0; k < 4; k++) {
+      expect(entries[k], closeTo(giacMinusOne[k], 1e-14), reason: 'entry $k');
+    }
   });
 }

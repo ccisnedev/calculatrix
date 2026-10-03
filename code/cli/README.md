@@ -57,6 +57,18 @@ cx eval rpn '1 2 +'
 cx eval infix "2+3*4"
 ```
 
+```bash
+cx 'pi'                        # ~3.14159265359
+cx 'i dup *'                   # [[-1 0] [0 -1]], exact
+cx eval infix 'e^(i*pi)'       # -1 as a matrix, to within 1e-14
+cx commands list --category constants
+```
+
+The constants are `pi` (also `π`) and `e`, approximate, and `i`, the exact
+matrix `[[0 -1] [1 0]]`. A constant is a name, not a number: in RPN write
+`pi negate` and `pi approx`, not `-pi` or `~pi`; a matrix literal takes
+numbers only.
+
 A bare `cx` prints a short banner. `cx <program>` is a shortcut for
 `cx eval rpn <program>`, so a single quoted RPN program can be evaluated
 directly, without typing `eval rpn`.

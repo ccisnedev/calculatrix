@@ -5,6 +5,7 @@ import '../machine/calculatrix_machine.dart';
 import '../machine/calculatrix_program.dart';
 import '../machine/commands.dart';
 import '../matrix/matrix.dart';
+import '../names/name_table.dart';
 import '../registry/command_registry.dart';
 import '../rpn/rpn_engine.dart';
 import 'literals.dart';
@@ -125,9 +126,7 @@ class Calculatrix {
   /// (D44, issue #39): `over` on the session behaves exactly as typing
   /// "2 pick" does anywhere else.
   static void executeWordOn(CalculatrixMachine machine, String word) {
-    machine.executeAtomic(
-      _compileWord(word, ExactArithmetic.defaultMaxDigits),
-    );
+    machine.executeAtomic(_compileWord(word, ExactArithmetic.defaultMaxDigits));
   }
 
   static CalculatrixMachine _newMachine(int maxDigits) {
@@ -287,10 +286,7 @@ class Calculatrix {
         try {
           machine.execute(positioned.command);
         } on CalculatrixError catch (error) {
-          error.enrichToken(
-            positioned.token.value,
-            positioned.token.position,
-          );
+          error.enrichToken(positioned.token.value, positioned.token.position);
           rethrow;
         }
       }
@@ -405,12 +401,40 @@ class Calculatrix {
       return _compileDefinition(entry.definition!, maxDigits);
     }
 
+    final UnknownWordError? signed = _signedConstantError(token);
+    if (signed != null) {
+      throw signed;
+    }
+
     throw UnknownWordError(
       token,
       suggestions: CalculatrixCommandRegistry.standard.suggest(token),
       infixHint: _looksLikeInfixExpression(token)
           ? 'this looks like an infix expression: cx eval infix "$token"'
           : null,
+    );
+  }
+
+  // A constant is a name, not a number: a sign or the approximate mark in
+  // front of it does not make a literal (runbook-agent-usability.md D66).
+  // The error names the words that do what the user meant, with no
+  // suggestions.
+  static UnknownWordError? _signedConstantError(String token) {
+    if (token.length < 2) {
+      return null;
+    }
+    final String prefix = token[0];
+    final String rest = token.substring(1);
+    if ((prefix != '-' && prefix != Literals.approximateMark) ||
+        CalculatrixNameTable.standard.lookup(rest) == null) {
+      return null;
+    }
+    return UnknownWordError(
+      token,
+      message: prefix == '-'
+          ? '"-" is not part of a name; to negate it: $rest negate'
+          : '"${Literals.approximateMark}" marks numeric literals only; to '
+                'make it approximate: $rest approx',
     );
   }
 
@@ -721,8 +745,22 @@ class Calculatrix {
       // report only its first character) is what lets the error explain
       // the limitation and, when the name is already a known RPN word or
       // alias, show its RPN form (AC2, issue #51).
-      if (_isNameStart(char)) {
+      //
+      // A name of the name table (pi, e, i, π; runbook-agent-usability.md
+      // D65, D66) is the exception: it is an operand, resolved later as the
+      // registry word of the same name. It is recognized only as a whole
+      // name (letters and digits, no hyphen), so "e3" and "pi2" are still
+      // names that are not constants, and "pi-e" is a subtraction.
+      if (char == 'π' || _isNameStart(char)) {
         final int start = index;
+        final String plain = char == 'π'
+            ? char
+            : _scanPlainName(expression, start);
+        if (CalculatrixNameTable.standard.lookup(plain) != null) {
+          tokens.add(_PositionedToken(plain, start + 1));
+          index = start + plain.length;
+          continue;
+        }
         throw _buildInfixNameError(expression, start);
       }
 
@@ -1098,6 +1136,16 @@ class Calculatrix {
     return _isNameStart(char) || _isAsciiDigit(char.codeUnitAt(0));
   }
 
+  // The run of name characters (letters, digits, "_") starting at `start`,
+  // with no hyphen: the whole name of a constant of the name table.
+  static String _scanPlainName(String expression, int start) {
+    int index = start;
+    while (index < expression.length && _isNameChar(expression[index])) {
+      index++;
+    }
+    return expression.substring(start, index);
+  }
+
   // Scans the full run of name characters starting at `start` (already
   // known to be a name start), rather than reporting just its first
   // character: the resulting name is both what the error message names
@@ -1276,7 +1324,8 @@ class Calculatrix {
   // D56). Returns the index just past it.
   static int _scanMarkedLiteral(String source, int start) {
     int index = start + 1;
-    if (index < source.length && (source[index] == '-' || source[index] == '+')) {
+    if (index < source.length &&
+        (source[index] == '-' || source[index] == '+')) {
       index++;
     }
     if (index < source.length && source[index] == '[') {
