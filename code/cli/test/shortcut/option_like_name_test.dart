@@ -134,6 +134,18 @@ void main() {
       expect(err, contains(_hint('-e', "cx eval rpn -f p.rpn -- '-e'")));
     });
 
+    test('cx -pi prints the hint and one line pointing to --help, not the '
+        'whole catalog (modular_cli_sdk 0.11.0)', () async {
+      final (code, err) = await _run(['-pi']);
+      expect(code, ExitCode.validationFailed);
+      expect(
+        err,
+        'Error: ${_hint('-pi', "cx -- '-pi'")} [invalid-short-option]\n'
+        '\n'
+        'Run "cx --help" to see every command.\n',
+      );
+    });
+
     test("cx -- '-pi' exits 65 and says how to negate", () async {
       final (code, err) = await _run(['--', '-pi']);
       expect(code, 65);
