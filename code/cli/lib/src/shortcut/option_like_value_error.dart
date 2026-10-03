@@ -10,9 +10,10 @@ final RegExp _expressionCharacter = RegExp(r'[0-9()\[\]+\-*/^%√~ ]');
 
 final RegExp _letter = RegExp(r'^[A-Za-z]$');
 
-/// The short options `cx` declares: `-q` and `-h`. Any other lone `-x`
-/// is an `unknown-option` for the SDK.
-const Set<String> _declaredShortOptions = <String>{'-q', '-h'};
+/// The short options `cx` declares: `-q` and `-h` everywhere, and `-f`
+/// (`--file`) on `eval rpn` and `eval infix`. Any other lone `-x` is an
+/// `unknown-option` for the SDK.
+const Set<String> _declaredShortOptions = <String>{'-q', '-h', '-f'};
 
 /// Whether [arg], an argument starting with `-` and a letter, looks like a
 /// value rather than options: its text after the dash has an expression

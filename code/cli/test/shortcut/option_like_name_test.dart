@@ -126,6 +126,14 @@ void main() {
       expect(err, isNot(contains('starts with "-"')));
     });
 
+    test('cx eval rpn -f program.rpn -e: -f is declared, so -e still gets '
+        'the hint (Codex review on #83)', () async {
+      expect(optionLikeValueIndex(['eval', 'rpn', '-f', 'p.rpn', '-e']), 4);
+      final (code, err) = await _run(['eval', 'rpn', '-f', 'p.rpn', '-e']);
+      expect(code, ExitCode.validationFailed);
+      expect(err, contains(_hint('-e', "cx eval rpn -f p.rpn -- '-e'")));
+    });
+
     test("cx -- '-pi' exits 65 and says how to negate", () async {
       final (code, err) = await _run(['--', '-pi']);
       expect(code, 65);
