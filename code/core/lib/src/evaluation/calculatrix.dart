@@ -210,7 +210,7 @@ class Calculatrix {
     return commands;
   }
 
-  // `--` inside a program (issue #73, runbook D67): it ends the options of
+  // `--` inside a program (issue #73, runbook D68): it ends the options of
   // the command line, so it goes before the quoted program, never inside
   // it. The message gives the form to type, built from the program without
   // that token and one adjacent space (the tokens joined by one space, so
@@ -416,7 +416,7 @@ class Calculatrix {
   }
 
   // A constant is a name, not a number: a sign or the approximate mark in
-  // front of it does not make a literal (runbook-agent-usability.md D66).
+  // front of it does not make a literal (runbook-agent-usability.md D67).
   // The error names the words that do what the user meant, with no
   // suggestions.
   static UnknownWordError? _signedConstantError(String token) {
@@ -746,14 +746,15 @@ class Calculatrix {
       // the limitation and, when the name is already a known RPN word or
       // alias, show its RPN form (AC2, issue #51).
       //
-      // A name of the name table (pi, e, i, π; runbook-agent-usability.md
-      // D65, D66) is the exception: it is an operand, resolved later as the
-      // registry word of the same name. It is recognized only as a whole
-      // name (letters and digits, no hyphen), so "e3" and "pi2" are still
-      // names that are not constants, and "pi-e" is a subtraction.
-      if (char == 'π' || _isNameStart(char)) {
+      // A name of the name table (pi, e, i, π, in any case;
+      // runbook-agent-usability.md D66, D67) is the exception: it is an
+      // operand, resolved later as the registry word of the same name. It
+      // is recognized only as a whole name (letters and digits, no hyphen),
+      // so "e3" and "pi2" are still names that are not constants, and
+      // "pi-e" is a subtraction.
+      if (char == 'π' || char == 'Π' || _isNameStart(char)) {
         final int start = index;
-        final String plain = char == 'π'
+        final String plain = char == 'π' || char == 'Π'
             ? char
             : _scanPlainName(expression, start);
         if (CalculatrixNameTable.standard.lookup(plain) != null) {
@@ -1204,7 +1205,7 @@ class Calculatrix {
   // The call-like arguments of a registered name's "(a, b, ...)", when the
   // call is both present (a closed parenthesis right after the name) and
   // made only of literals (issue #51, AC2; extended by issue #73, runbook
-  // D67): "sqrt(7)" gives ["7"], "power(2, 3)" gives ["2", "3"] and
+  // D68): "sqrt(7)" gives ["7"], "power(2, 3)" gives ["2", "3"] and
   // "inverse([[1 2] [3 4]])" gives ["[[1 2] [3 4]]"], each trimmed and
   // verbatim. "sqrt(1+2)" and "sqrt (7)" (space before the paren, so not
   // call-like at all) give null, and so do "sqrt(" (never closed), an empty

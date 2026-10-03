@@ -1,4 +1,4 @@
-// Issue #70 (runbook-agent-usability.md D66, step U5): the constants pi, e
+// Issue #70 (runbook-agent-usability.md D67, step U5): the constants pi, e
 // and i in RPN, in infix, and the lexing rules around them.
 import 'dart:math' as math;
 
@@ -172,6 +172,7 @@ void main() {
     test('names are case-insensitive and π works', () {
       expect(Calculatrix.evaluateInfix('2*PI').at(0, 0), 2 * math.pi);
       expect(Calculatrix.evaluateInfix('2*π').at(0, 0), 2 * math.pi);
+      expect(Calculatrix.evaluateInfix('2*Π').at(0, 0), 2 * math.pi);
     });
 
     test('-pi is a unary minus', () {
@@ -248,6 +249,17 @@ void main() {
         () => Calculatrix.evaluateInfix('2pi'),
       );
       expect(error.errorId, CalculatrixErrorId.syntaxError);
+    });
+  });
+
+  group('shared values', () {
+    test('a caller cannot change a constant for later evaluations', () {
+      final Matrix first = _rpn('i').single;
+      expect(
+        () => first.exactRows[0] = <Rational>[Rational.zero, Rational.zero],
+        throwsUnsupportedError,
+      );
+      expect(_text(_rpn('i dup *').single), '[[-1 0] [0 -1]]');
     });
   });
 }

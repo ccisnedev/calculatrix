@@ -51,16 +51,16 @@ class Matrix {
   /// range; [toApproximate] is the checked way to leave the exact domain.
   factory Matrix.exact(List<List<Rational>> rows) {
     _validateRectangular(rows);
-    final List<List<Rational>> exact = rows
-        .map((List<Rational> row) => List<Rational>.unmodifiable(row))
-        .toList(growable: false);
-    final List<List<double>> view = exact
-        .map(
-          (List<Rational> row) => List<double>.unmodifiable(
-            row.map((Rational value) => value.toDouble()),
-          ),
-        )
-        .toList(growable: false);
+    final List<List<Rational>> exact = List<List<Rational>>.unmodifiable(
+      rows.map((List<Rational> row) => List<Rational>.unmodifiable(row)),
+    );
+    final List<List<double>> view = List<List<double>>.unmodifiable(
+      exact.map(
+        (List<Rational> row) => List<double>.unmodifiable(
+          row.map((Rational value) => value.toDouble()),
+        ),
+      ),
+    );
     return Matrix._withExact(view, exact);
   }
 
@@ -363,11 +363,7 @@ class Matrix {
     return _rows.first.first;
   }
 
-  List<List<double>> get rows {
-    return _rows
-        .map((List<double> row) => List<double>.unmodifiable(row))
-        .toList(growable: false);
-  }
+  List<List<double>> get rows => _rows;
 
   double at(int row, int column) {
     return _rows[row][column];
@@ -2997,12 +2993,11 @@ class Matrix {
   }
 
   static List<List<double>> _normalize(List<List<double>> rows) {
-    return rows
-        .map(
-          (List<double> row) =>
-              List<double>.unmodifiable(List<double>.from(row)),
-        )
-        .toList(growable: false);
+    return List<List<double>>.unmodifiable(
+      rows.map(
+        (List<double> row) => List<double>.unmodifiable(List<double>.from(row)),
+      ),
+    );
   }
 
   static void _validateRectangular<E>(List<List<E>> rows) {
