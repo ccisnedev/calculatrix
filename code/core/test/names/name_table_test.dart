@@ -1,4 +1,4 @@
-// Issue #70 (runbook-agent-usability.md D65, D66, step U5): the name table
+// Issue #70 (runbook-agent-usability.md D66, D67, step U5): the name table
 // of core holds exactly the system constants pi, e and i, read-only.
 import 'dart:math' as math;
 
@@ -70,7 +70,7 @@ void main() {
     });
   });
 
-  group('registry and name table agree (D65)', () {
+  group('registry and name table agree (D66)', () {
     final CalculatrixCommandRegistry registry =
         CalculatrixCommandRegistry.standard;
 

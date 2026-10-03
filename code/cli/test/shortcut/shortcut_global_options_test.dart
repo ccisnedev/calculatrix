@@ -1,4 +1,4 @@
-// Issue #68 (runbook-agent-usability.md D62, spec G4): the `cx <program>`
+// Issue #68 (runbook-agent-usability.md D63, spec G4): the `cx <program>`
 // shortcut accepts the global output options `--json` and `--quiet`/`-q`,
 // before or after the program, exactly as `cx eval rpn` does, and rejects
 // the options only `eval rpn` has (`--file`, `--stdin`) with the full

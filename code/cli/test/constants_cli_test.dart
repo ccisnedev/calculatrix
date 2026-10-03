@@ -1,4 +1,4 @@
-// Issue #70 (runbook-agent-usability.md D65, D66, step U5): the constants
+// Issue #70 (runbook-agent-usability.md D66, D67, step U5): the constants
 // pi, e and i through `cx`: evaluation, discovery in the registry commands,
 // and the suggestion for a near miss.
 import 'package:calculatrix_cli/calculatrix_cli.dart';

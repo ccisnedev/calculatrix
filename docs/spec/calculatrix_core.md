@@ -246,7 +246,7 @@ class Calculatrix {
 	-(2^2) = -4, `(-2)^2` is 4, `2^-2` is 1/4 (runbook-trust.md D61). A
 	signed number that is not the base of `^` is still one literal (`3*-2`).
 
-### 4.4 Name table (issue #70, runbook-agent-usability.md D65)
+### 4.4 Name table (issue #70, runbook-agent-usability.md D66)
 
 `CalculatrixNameTable` maps a name, case-insensitively like the words of the
 registry, to a `CalculatrixNameBinding`: a value (`Matrix`), aliases and a

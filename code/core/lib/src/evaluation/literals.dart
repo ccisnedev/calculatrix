@@ -398,7 +398,7 @@ final class _MatrixLiteralParser {
 
   // A name of the name table inside the literal (`[[pi 0] [0 1]]`) is the
   // one cause of an invalid literal the message can name: entries must be
-  // numbers, and a constant is a name (runbook-agent-usability.md D66). A
+  // numbers, and a constant is a name (runbook-agent-usability.md D67). A
   // letter right after a digit or a dot is part of a number (`1e3`), not a
   // name.
   static final RegExp _nameInLiteral = RegExp(

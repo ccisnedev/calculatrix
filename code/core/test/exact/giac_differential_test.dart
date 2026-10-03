@@ -153,7 +153,7 @@ List<_Case> _cases() {
   final List<_Case> cases = <_Case>[];
   final _Generator g = _Generator(54);
 
-  // The exact constant i (issue #70, runbook-agent-usability.md D66): the
+  // The exact constant i (issue #70, runbook-agent-usability.md D67): the
   // matrix [[0 -1] [1 0]], whose products and inverse are exact and agree
   // with Giac's complex i written as cx's 2x2 form.
   cases
@@ -1022,7 +1022,7 @@ void main() {
     expect(largest, greaterThan(9000));
   });
 
-  // The approximate constants and e^(i*pi) (issue #70, D66): Giac's
+  // The approximate constants and e^(i*pi) (issue #70, D67): Giac's
   // evalf of pi and e, to 30 digits, rounds to the double cx holds, and
   // e^(i*pi) is within 1e-14 of -1 in cx's 2x2 form.
   test('Giac agrees on pi, e and e^(i*pi)', () async {

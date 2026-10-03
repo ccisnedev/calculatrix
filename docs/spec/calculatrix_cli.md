@@ -137,7 +137,7 @@ Global options, declared by the SDK on every route except the shortcut:
   literal segment wins over a parameter. So `cx version` is always the route,
   and `cx commands shwo power` is an error of the `commands` module, never a
   program.
-- **G4. The shortcut takes exactly one operand and only the global output options.** It is RPN only, from the inline operand only. `--json` and `--quiet`/`-q` are accepted before or after the program, as in `cx eval rpn`. Any other option is rejected, 7, with a message that names the full spelling: `cx '1 2 +' --file p.txt` gives "--file is not accepted by the shortcut; use: cx eval rpn '1 2 +' --file p.txt". `cx 1 2 +` (unquoted, three operands) is rejected as before (D61).
+- **G4. The shortcut takes exactly one operand and only the global output options.** It is RPN only, from the inline operand only. `--json` and `--quiet`/`-q` are accepted before or after the program, as in `cx eval rpn`. Any other option is rejected, 7, with a message that names the full spelling: `cx '1 2 +' --file p.txt` gives "--file is not accepted by the shortcut; use: cx eval rpn '1 2 +' --file p.txt". `cx 1 2 +` (unquoted, three operands) is rejected as before (D62).
 - **G5. Reserved words.** The literal children of the root are reserved:
   `eval`, `commands`, `version`, `upgrade`, `uninstall`, `doctor`, `help`. No
   RPN command, alias or search term may use one of them. The router exposes
@@ -951,8 +951,8 @@ packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
 | `cx ''`, `cx '   '` | 7, the program is empty (G12) |
 | `cx [[0 -1] [1 0]] det` unquoted | `extraArgument`, 64: quote the program (G4) |
 | `cx -1 2 +` unquoted | `extraArgument`, 64 (G4) |
-| `cx '1 2 +' --json` | same as `cx eval rpn '1 2 +' --json`, 0 (G4, D62) |
-| `cx '1 2 +' --file p.txt` | 7, `unknown-option`: --file is not accepted by the shortcut; use: cx eval rpn '1 2 +' --file p.txt (G4, D62) |
+| `cx '1 2 +' --json` | same as `cx eval rpn '1 2 +' --json`, 0 (G4, D63) |
+| `cx '1 2 +' --file p.txt` | 7, `unknown-option`: --file is not accepted by the shortcut; use: cx eval rpn '1 2 +' --file p.txt (G4, D63) |
 | `cx -- '-x'` | program `-x` (G10) |
 | `cx version`, `cx help`, `cx --help` | the route or the help, never a program (G3) |
 | `cx version --json` | version as JSON, 0 |
@@ -1055,7 +1055,7 @@ records the ones that affect the whole stage (D25 to D45).
 |---|---|---|
 | R1 | `upgrade`, `uninstall` | SDK commands with `--plan` / `--apply`, no default; `--apply` goes through the normal approval prompt unless `--autoapprove` is given (runbook D26, amended 2026-09-28); they come from `InstallationPlugin` (R18). Corrects runbook D3 and D15. |
 | R2 | Stdin | Read only with `--stdin`; `'1 2 +' \| cx` shows the banner (G2). |
-| R3 | Shortcut options | Only the global output options `--json` and `--quiet`/`-q` (G4, D62). |
+| R3 | Shortcut options | Only the global output options `--json` and `--quiet`/`-q` (G4, D63). |
 | R4 | Empty program | Error 7 from any source (G12). |
 | R5 | Order | POSIX: route, options, operands (G6). |
 | R6 | Flags | Presence only; no `=value`, no negation (G7). Can be extended later. |

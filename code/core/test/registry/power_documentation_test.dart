@@ -1,4 +1,4 @@
-// Issue #73 (runbook-agent-usability.md D67, step U4c): the registry
+// Issue #73 (runbook-agent-usability.md D68, step U4c): the registry
 // documents when `power` is exact and when it is approximate.
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';

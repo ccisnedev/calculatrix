@@ -5,7 +5,7 @@ import '../matrix/matrix.dart';
 
 /// One binding of the [CalculatrixNameTable]: a name, its aliases, the
 /// value it stands for, and whether the binding is read-only (issue #70,
-/// runbook-agent-usability.md D65).
+/// runbook-agent-usability.md D66).
 final class CalculatrixNameBinding {
   const CalculatrixNameBinding({
     required this.name,
@@ -30,7 +30,7 @@ final class CalculatrixNameBinding {
   Iterable<String> get words => <String>[name, ...aliases];
 }
 
-/// The name table of core (issue #70, runbook-agent-usability.md D65): maps
+/// The name table of core (issue #70, runbook-agent-usability.md D66): maps
 /// a name, case-insensitively like the words of the registry, to a
 /// [CalculatrixNameBinding]. RPN and infix resolve names through it.
 ///

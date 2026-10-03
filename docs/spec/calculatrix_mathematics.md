@@ -56,7 +56,7 @@ Phi is defined over Q as well: a complex number with rational parts is an
 exact 2x2 matrix, so `-4 sqrt` gives the exact [[0, -2], [2, 0]] (2i).
 
 The word `i` pushes J as an exact value, [[0 -1] [1 0]] (issue #70,
-runbook-agent-usability.md D66). With it a complex number is typed as a
+runbook-agent-usability.md D67). With it a complex number is typed as a
 matrix expression: `3 4 i * +` is Phi(3 + 4i) = [[3 -4] [4 3]], exact, and
 `i dup *` is -I2. It prints as the matrix; showing it as `i` is issue #78.
 

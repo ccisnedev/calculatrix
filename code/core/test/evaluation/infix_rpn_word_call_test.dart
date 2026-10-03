@@ -1,4 +1,4 @@
-// Issue #73 (runbook-agent-usability.md D67, step U4a): an infix call of an
+// Issue #73 (runbook-agent-usability.md D68, step U4a): an infix call of an
 // RPN word whose parentheses hold a comma-separated list of literals gets
 // the exact RPN program to type. Any other argument keeps the generic
 // message. Error id, position and name are unchanged.

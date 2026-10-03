@@ -28,15 +28,15 @@ frictions:
 
 | # | Decision | Source |
 |---|---|---|
-| D61 | **One quoted argument (#49).** A program is always one quoted argument. Operands are never joined. `cx 5 7 power` keeps failing with `extra-argument` and the actionable message already implemented (`cx received 3 arguments; quote the program as one argument: cx '5 7 power'`). The table of #49 is below. The agent trials (PR #53, benchmark r3 PR #69) show no agent trying the unquoted form. | Issue #80 |
-| D62 | **Global options on the shortcut (#68).** Amends spec G4: the `cx <program>` shortcut accepts the global output options `--json` and `--quiet`/`-q`, before or after the program, exactly as `cx eval rpn` does. Every other option that `cx eval rpn` has and the shortcut does not (`--file`, `--stdin`) is rejected (U1). | Issue #80 |
-| D63 | **One overview text (#72).** Defined once in code, shown by the banner, the help epilog (U2) and the install scripts. It presents RPN, infix, matrices and exact/approximate with equal weight. The symbolic form is not mentioned until it exists. | Issue #80 |
-| D64 | **No `batch` route (#74).** Several results in one call are already possible (one program leaves several values on the stack) and are documented in the overview. Labels (`tag`, HP `->TAG`) and isolated evaluation (HP `IFERR`) depend on name literals and program values and are analyzed in #79. | Issue #80 |
-| D65 | **Name table (#70).** Model B: a name table in core. RPN and infix resolve names through it. It holds only system constants, read-only. Variables and programs are #79. | Issue #80 |
-| D66 | **Constants (#70).** `pi` (alias `π`, approximate), `e` (approximate), `i` (exact, `[[0 -1] [1 0]]`), with the lexing rules of U5. | Issue #80 |
-| D67 | **Syntax friction (#73).** `--` inside a program and infix calls of RPN words get errors naming the exact form to type (U4). | Issue #80 |
+| D62 | **One quoted argument (#49).** A program is always one quoted argument. Operands are never joined. `cx 5 7 power` keeps failing with `extra-argument` and the actionable message already implemented (`cx received 3 arguments; quote the program as one argument: cx '5 7 power'`). The table of #49 is below. The agent trials (PR #53, benchmark r3 PR #69) show no agent trying the unquoted form. | Issue #80 |
+| D63 | **Global options on the shortcut (#68).** Amends spec G4: the `cx <program>` shortcut accepts the global output options `--json` and `--quiet`/`-q`, before or after the program, exactly as `cx eval rpn` does. Every other option that `cx eval rpn` has and the shortcut does not (`--file`, `--stdin`) is rejected (U1). | Issue #80 |
+| D64 | **One overview text (#72).** Defined once in code, shown by the banner, the help epilog (U2) and the install scripts. It presents RPN, infix, matrices and exact/approximate with equal weight. The symbolic form is not mentioned until it exists. | Issue #80 |
+| D65 | **No `batch` route (#74).** Several results in one call are already possible (one program leaves several values on the stack) and are documented in the overview. Labels (`tag`, HP `->TAG`) and isolated evaluation (HP `IFERR`) depend on name literals and program values and are analyzed in #79. | Issue #80 |
+| D66 | **Name table (#70).** Model B: a name table in core. RPN and infix resolve names through it. It holds only system constants, read-only. Variables and programs are #79. | Issue #80 |
+| D67 | **Constants (#70).** `pi` (alias `π`, approximate), `e` (approximate), `i` (exact, `[[0 -1] [1 0]]`), with the lexing rules of U5. | Issue #80 |
+| D68 | **Syntax friction (#73).** `--` inside a program and infix calls of RPN words get errors naming the exact form to type (U4). | Issue #80 |
 
-### D61: what `cx` receives and does, per shell
+### D62: what `cx` receives and does, per shell
 
 Run for real on Windows 11 with `cx` 0.15.0: bash is Git Bash, PowerShell is
 7, cmd.exe runs a `.bat` file. zsh cells are "documented, not run" (no zsh on
@@ -57,15 +57,15 @@ rejected with exit 64 and the message above.
 | quoted: `cx '5 -1 power'` | `0.2` | same | `0.2` | `cx "5 -1 power"`: `0.2` |
 
 The only way to give `cx` a program that works in every shell is one quoted
-argument, which is D61.
+argument, which is D62.
 
 ## Discarded
 
 - **Joining unquoted operands** (`cx 5 7 power` as `5 7 power`). It would
   need no quotes in PowerShell, but in Git Bash `*` is expanded to file
   names before `cx` sees it, so the join would silently run a program the
-  user did not type. It stays an error (D61).
-- **A `batch` route** (D64): the stack already returns several results.
+  user did not type. It stays an error (D62).
+- **A `batch` route** (D65): the stack already returns several results.
 
 ## Steps (one PR)
 
@@ -96,7 +96,7 @@ Recorded before the production code of U5, with `cx` 0.15.0 (Windows 11).
 | `π` | `unknown-word` | `syntax-error`: Unexpected token near "π" | not run |
 | `[[pi 0] [0 1]]` | `syntax-error`: Invalid matrix literal | `syntax-error`: Invalid matrix literal | `syntax-error` |
 
-No result contradicts D65 or D66. `1e3` is a number today and stays one.
+No result contradicts D66 or D67. `1e3` is a number today and stays one.
 
 **E2, collisions.** `pi`, `e`, `i` and `π` against the 48 registry entries
 (names, aliases, search terms) and the reserved route words (`eval`,
@@ -118,11 +118,11 @@ the spec. No contradiction.
 
 | Date | Decision |
 |---|---|
-| 2026-10-02 | D61 to D67 from issue #80. Numbering note: `docs/runbook-trust.md` already used the number D61 in its decisions log, for the infix unary minus of issue #66. The numbers D61 to D67 in this runbook are those of issue #80; a reference to "D61" is ambiguous across the two documents and names the file. |
+| 2026-10-02 | D62 to D68 from issue #80. `docs/runbook-trust.md` already uses D61 (infix unary minus, issue #66), so the numbers continue at D62. |
 
 ## Progress log
 
-- 2026-10-02: runbook created (U0). Spec G4 amended to D62.
+- 2026-10-02: runbook created (U0). Spec G4 amended to D63.
 - 2026-10-02: U1 done (#68), U3 done (#72), U4 done (#73).
 - 2026-10-02: U5 done (#70). Experiments E1 to E3 recorded above, no contradiction. Name table in `code/core/lib/src/names/`, constants entries in the registry (category `constants`).
 - 2026-10-02: `cx` 0.16.0 (pubspec, `cxVersion`, root and core CHANGELOG).

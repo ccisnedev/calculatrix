@@ -37,7 +37,7 @@ Matrix _value(String literal) =>
     Literals.parse(literal, maxDigits: ExactArithmetic.defaultMaxDigits)!;
 
 /// The value of a system constant, read from the name table: the one
-/// source of the value (issue #70, runbook-agent-usability.md D65).
+/// source of the value (issue #70, runbook-agent-usability.md D66).
 Matrix _constant(String name) =>
     CalculatrixNameTable.standard.lookup(name)!.value;
 
@@ -624,7 +624,7 @@ final class CalculatrixCommandRegistry {
           'inverse and square-root algorithms; inverse and sqrt are '
           'defined in terms of this word.',
       // runbook D25 (the exp/log identity); runbook D44 (the -1 and 0.5
-      // shortcuts); runbook-agent-usability.md D67 (exactness examples).
+      // shortcuts); runbook-agent-usability.md D68 (exactness examples).
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('2 3 pwr', _value('8')),
         CalculatrixCommandExample('2 3 POWER', _value('8')),

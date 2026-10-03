@@ -284,7 +284,7 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   `Calculatrix.tokenizeInfixExpression` returns such a minus as the new
   token `Calculatrix.infixUnaryMinus`, and the session's repeat-equals
   replays it as `-`.
-- Issue #70 (runbook-agent-usability.md D65, D66). `CalculatrixNameTable`
+- Issue #70 (runbook-agent-usability.md D66, D67). `CalculatrixNameTable`
   and `CalculatrixNameBinding`: a read-only name table, case-insensitive,
   whose `standard` instance holds the constants `pi` (alias `π`) and `e`,
   approximate, and `i`, the exact matrix `[[0 -1] [1 0]]`. Each is also a
@@ -294,7 +294,7 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   `3+4*i`, `-pi`). `1e3` stays a number; `-pi` and `~pi` in RPN are
   `unknown-word` with the words to type (`pi negate`, `pi approx`); a name in
   a matrix literal says `entries must be numbers, "pi" is a constant`.
-- Issue #73 (runbook-agent-usability.md D67). An infix call of an RPN word
+- Issue #73 (runbook-agent-usability.md D68). An infix call of an RPN word
   gives its RPN program when the arguments are literals; a `--` inside an RPN
   program is `unknown-word` with the form to type; `UnknownWordError` takes
   an optional `message`. The registry text of `power` states when the result

@@ -63,7 +63,7 @@ String get _rootHelpDescription {
 /// `cx <program>`'s own contract (spec section 4, G4): one required
 /// positional and `--max-digits` (runbook D55), plus the global output
 /// options `--json` and `--quiet`/`-q` (`globals: true` where this is
-/// registered, runbook D62). Not [EvalContracts.rpn],
+/// registered, runbook D63). Not [EvalContracts.rpn],
 /// which declares `--file`/`--stdin` and an optional `program`: those
 /// belong to the full `eval rpn` route, never to this shorter spelling of
 /// it.

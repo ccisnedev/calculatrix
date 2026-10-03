@@ -1,4 +1,4 @@
-// Issue #72 (runbook-agent-usability.md D63): one overview text, defined
+// Issue #72 (runbook-agent-usability.md D64): one overview text, defined
 // once in code, shown by the banner and by the install scripts. Every
 // example in it must run.
 import 'dart:io';
@@ -13,7 +13,7 @@ import 'package:test/test.dart';
 import '../support/memory_sink.dart';
 
 void main() {
-  group('cxOverviewLines (D63)', () {
+  group('cxOverviewLines (D64)', () {
     test('are exactly the four lines of the spec', () {
       expect(cxOverviewLines, <String>[
         "RPN:      cx '2 3 +'   (one quoted program; it can leave several "

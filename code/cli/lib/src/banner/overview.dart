@@ -1,5 +1,5 @@
 /// The overview of what `cx` does (issue #72, runbook-agent-usability.md
-/// D63), defined once. The banner, the install scripts and, once
+/// D64), defined once. The banner, the install scripts and, once
 /// `modular_cli_sdk` 0.10.0 is out, the help epilog (issue #56) show these
 /// lines, so they cannot say different things.
 ///

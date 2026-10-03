@@ -1,4 +1,4 @@
-// Issue #73 (runbook-agent-usability.md D67, step U4b): the token `--`
+// Issue #73 (runbook-agent-usability.md D68, step U4b): the token `--`
 // inside an RPN program raises `unknown-word`, with no suggestions and a
 // message that names the exact form to type: `--` ends the options and goes
 // before the quoted program.
