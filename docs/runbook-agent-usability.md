@@ -127,3 +127,4 @@ the spec. No contradiction.
 - 2026-10-02: U5 done (#70). Experiments E1 to E3 recorded above, no contradiction. Name table in `code/core/lib/src/names/`, constants entries in the registry (category `constants`).
 - 2026-10-02: `cx` 0.16.0 (pubspec, `cxVersion`, root and core CHANGELOG).
 - 2026-10-02: U2 done (#56). `modular_cli_sdk` 0.10.0 published; the root row of the help says "Show the banner.", the overview and two hints are the help epilog, each command is listed once.
+- 2026-10-02: `cx` 0.16.1 (#82): a program `-name` (`cx -pi`, `cx -e`) gets the `--` hint.

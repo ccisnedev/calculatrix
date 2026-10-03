@@ -178,6 +178,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	`cx help` list each command once: the root row says "Show the banner.",
 	and the overview and two hints follow the global options as the help
 	epilog of `modular_cli_sdk` 0.10.0 (#56).
+- `cx` 0.16.1 (issue #82). A program that starts with `-` and a name, such
+	as `cx -pi`, `cx -e` or `cx eval rpn -dup`, gets the same hint as the
+	other values read as options: the message gives the command with `--`
+	in place (`cx -- '-pi'`). It applies when the name is a command word,
+	alias or constant, in any case; the error id and the exit code 7 do not
+	change.
 
 ### Benchmark
 
