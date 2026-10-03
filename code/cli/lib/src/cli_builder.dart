@@ -76,7 +76,7 @@ final CliContract _programShortcutContract = CliContract(
 /// `cx upgrade` (spec section 8.7: `VersionPlugin` and `ModularCli` are
 /// required to agree). ADR 0002 section 2 lets a shell version
 /// independently of the core package; this is not the core's version.
-const cxVersion = '0.15.0';
+const cxVersion = '0.16.0';
 
 /// `owner/repo` on GitHub `cx upgrade`, `cx uninstall` and `cx doctor` look
 /// releases up in (runbook D26, D31; spec 8.3, 8.7). The same repository

@@ -125,3 +125,4 @@ the spec. No contradiction.
 - 2026-10-02: runbook created (U0). Spec G4 amended to D62.
 - 2026-10-02: U1 done (#68), U3 done (#72), U4 done (#73).
 - 2026-10-02: U5 done (#70). Experiments E1 to E3 recorded above, no contradiction. Name table in `code/core/lib/src/names/`, constants entries in the registry (category `constants`).
+- 2026-10-02: `cx` 0.16.0 (pubspec, `cxVersion`, root and core CHANGELOG).
