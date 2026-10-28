@@ -187,6 +187,10 @@ them.
   `limit-*` (E5), and with which word.
 - **O14. Infix grammar.** Precedence and associativity (is `-2^2` `-4`?),
   statement separators (`;`, newlines), comments.
+- **O15. Percent.** What `%` means in RPN (unary `x/100` today, or
+  binary `y x % -> x*y/100`) and how infix `%` translates to it. Today
+  `200+15%` is `200.15` in `cx` and `230` in the app (#86); with L3 one
+  meaning must hold everywhere.
 
 ## Superseded
 

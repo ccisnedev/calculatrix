@@ -46,16 +46,17 @@ match the roadmap. Then the language design continues.
     one asked and what it concluded.
   - `docs/pub.md` and `docs/android-release-signing.md` are checked
     against the current release process.
-- [ ] **1.6 Issues.** Each open issue is mapped to a roadmap stage,
-  rewritten, or closed with a reason. In particular: #1 and #2 against
-  the new roadmap; #92 and #79 against `language-decisions.md`.
-  #90 is fixed in core 0.8.0 (a negative real eigenvalue gives
-  `complex-result`) and can be closed. One defect found while rewriting
-  the specs is still open and needs an issue in `cli_router`: a global
-  option before a route (`cx --json version`) is `misplaced-option`,
-  exit 7, with a message that contradicts itself ("options go before
-  the program: --json belongs after 'version'").
-- [ ] **1.7 Merge.** One PR with phase 1 into main.
+- [x] **1.6 Issues.** Each open issue is mapped to a roadmap stage,
+  rewritten, or closed with a reason; the stages list their issues.
+  Closed: #1 and #2 (Giac and HP 50g parity are no longer goals), #79,
+  #92 and #74 (answered by `language-decisions.md` or replaced by
+  phase 2), #75 (duplicate of #64), #90 (fixed in core 0.8.0), #11, #18
+  and #50 (no case or need). A global option before a route
+  (`cx --json version`) fails with `misplaced-option`; the fix belongs
+  upstream, open as macss-dev/cli_router#10.
+- [ ] **1.7 CI runs the CLI.** `ci.yml` analyzes and tests `code/cli`
+  on every pull request (#95).
+- [ ] **1.8 Merge.** One PR with phase 1 into main.
 
 ## Phase 2. Language specification
 
@@ -70,6 +71,8 @@ match the roadmap. Then the language design continues.
 ## Working rules
 
 - **Simplicity first.** Clear code and processes come from simple ones.
+  The same holds for the products: the app and `cx` converge toward
+  clarity and order, with no complexity they do not need.
 - **Design decisions come from the user.** An automated review answers
   one bounded question (is the issue met, does main regress); a finding
   outside it becomes a new issue, not a change to the PR. If two or
