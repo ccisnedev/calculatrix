@@ -54,7 +54,7 @@ match the roadmap. Then the language design continues.
   and #50 (no case or need). A global option before a route
   (`cx --json version`) fails with `misplaced-option`; the fix belongs
   upstream, open as macss-dev/cli_router#10.
-- [ ] **1.7 CI runs the CLI.** `ci.yml` analyzes and tests `code/cli`
+- [x] **1.7 CI runs the CLI.** `ci.yml` analyzes and tests `code/cli`
   on every pull request (#95).
 - [ ] **1.8 Merge.** One PR with phase 1 into main.
 
