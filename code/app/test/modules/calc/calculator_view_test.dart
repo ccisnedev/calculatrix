@@ -745,7 +745,7 @@ void main() {
       expect(find.text('Stack 1'), findsNothing);
     });
 
-    testWidgets('basic module and fixed keypad expose the stable Stage 7 controls', (tester) async {
+    testWidgets('basic module and fixed keypad expose the stable controls', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       expect(_calculatorButton('7'), findsOneWidget);
@@ -1514,7 +1514,7 @@ void main() {
       expect(_matrixEditableText(tester, 0, 0).controller.text, '0.');
     });
 
-    testWidgets('matrix editor ± keeps the sign after the mark (runbook D56)', (tester) async {
+    testWidgets('matrix editor ± keeps the sign after the mark', (tester) async {
       await tester.pumpWidget(const CalculatrixApp());
 
       await _openMatrixEditor(tester);

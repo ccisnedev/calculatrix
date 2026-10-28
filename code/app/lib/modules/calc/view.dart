@@ -2987,7 +2987,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
 
   // A cell reads back as the same entry: an exact one in full (`1/3`), an
   // approximate one as its whole double with the mark (`~0.1`), which marks
-  // the matrix built from the cells (runbook D56).
+  // the matrix built from the cells.
   String _formatMatrixCellValue(Matrix matrix, int row, int column) {
     if (matrix.isExact) {
       return matrix.exactAt(row, column).toDisplayString();
@@ -3118,7 +3118,7 @@ class _MatrixEditorDialogState extends State<_MatrixEditorDialog> {
       final TextEditingController controller =
           _controllers[_selectedRow][_selectedColumn];
       // The sign goes after the approximate mark: `~0.5` becomes `~-0.5`,
-      // never `-~0.5` (runbook D56).
+      // never `-~0.5`.
       final String mark = controller.text.startsWith('~') ? '~' : '';
       final String currentValue = controller.text.substring(mark.length);
       final String nextValue;

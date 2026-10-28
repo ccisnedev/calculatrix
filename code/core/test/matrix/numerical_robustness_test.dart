@@ -69,10 +69,7 @@ void main() {
       });
 
       test('H(0) throws MatrixShapeError', () {
-        expect(
-          () => Matrix.hilbert(0),
-          throwsA(isA<MatrixShapeError>()),
-        );
+        expect(() => Matrix.hilbert(0), throwsA(isA<MatrixShapeError>()));
       });
     });
 
@@ -116,10 +113,7 @@ void main() {
       });
 
       test('P(0) throws MatrixShapeError', () {
-        expect(
-          () => Matrix.pascal(0),
-          throwsA(isA<MatrixShapeError>()),
-        );
+        expect(() => Matrix.pascal(0), throwsA(isA<MatrixShapeError>()));
       });
     });
 
@@ -148,8 +142,11 @@ void main() {
         // Below sub-diagonal should be zero
         for (int i = 2; i < 4; i++) {
           for (int j = 0; j < i - 1; j++) {
-            expect(f4.at(i, j), 0,
-                reason: 'F[$i,$j] should be 0 (below sub-diagonal)');
+            expect(
+              f4.at(i, j),
+              0,
+              reason: 'F[$i,$j] should be 0 (below sub-diagonal)',
+            );
           }
         }
       });
@@ -161,10 +158,7 @@ void main() {
       });
 
       test('F(0) throws MatrixShapeError', () {
-        expect(
-          () => Matrix.frank(0),
-          throwsA(isA<MatrixShapeError>()),
-        );
+        expect(() => Matrix.frank(0), throwsA(isA<MatrixShapeError>()));
       });
     });
   });
@@ -429,8 +423,11 @@ void main() {
       final eigs = f5.eigenvalues();
       expect(eigs.rowCount, 5);
       for (int i = 0; i < 5; i++) {
-        expect(eigs.at(i, 0), greaterThan(0),
-            reason: 'Frank(5) eigenvalue $i should be positive');
+        expect(
+          eigs.at(i, 0),
+          greaterThan(0),
+          reason: 'Frank(5) eigenvalue $i should be positive',
+        );
       }
     });
 
@@ -493,8 +490,11 @@ void main() {
       expect(a.rank().scalarValue, closeTo(4, 1e-10));
       // Last row of RREF should be all zeros
       for (int j = 0; j < 5; j++) {
-        expect(rref.at(4, j).abs(), lessThan(1e-10),
-            reason: 'RREF row 4 col $j should be ~0');
+        expect(
+          rref.at(4, j).abs(),
+          lessThan(1e-10),
+          reason: 'RREF row 4 col $j should be ~0',
+        );
       }
     });
   });
@@ -600,11 +600,8 @@ void main() {
         final normA = a.frobeniusNorm().scalarValue;
 
         final lu = a.luDecomposition();
-        final luResid = _frobeniusResidual(
-              lu.permutation * a,
-              lu.lower * lu.upper,
-            ) /
-            normA;
+        final luResid =
+            _frobeniusResidual(lu.permutation * a, lu.lower * lu.upper) / normA;
         expect(luResid, lessThan(1e-12));
 
         final qr = a.qrDecomposition();

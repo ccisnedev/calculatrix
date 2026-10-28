@@ -71,8 +71,7 @@ void main() {
     // "sqrt" is "0.5 power") inflated the depth the primitive saw, so even
     // remapping the inner failure's own needed/found could not have fixed
     // every case. The fix checks the real, pre-expansion depth against the
-    // word's own declared arity before any of its commands run (issue #51,
-    // AC5), so this walks every word the registry declares an arity for
+    // word's own declared arity before any of its commands run, so this walks every word the registry declares an arity for
     // and checks both an empty stack and a stack one value short of it.
     test('every registry word with a declared arity reports that arity '
         'and the actual depth, both empty and one value short', () {
@@ -129,58 +128,60 @@ void main() {
     // report its own type-mismatch from main, the one case a declared
     // arity would instead mask behind a stack-underflow that names the
     // wrong problem entirely ("zeros needs 2 values, found 1" instead of
-    // "zeros requires a non-negative integer count, found -1.0", issue
-    // #51, AC8 regression). None of these eight words declares an arity
+    // "zeros requires a non-negative integer count, found -1.0"). None of these eight words declares an arity
     // any more; this documents why, by reproducing the exact main-era
     // error id and message for each.
-    test(
-      'count/index-taking words without a declared arity still report '
-      'their own type-mismatch, not a stack-underflow, when the stack is '
-      'one value short of their real need (issue #51, AC8)',
-      () {
-        for (final entry in CalculatrixCommandRegistry.standard.entries) {
-          if (entry.arity != null) {
-            continue;
-          }
-          final String? message = switch (entry.name) {
-            'zeros' => 'zeros requires a non-negative integer count, '
-                'found -1.',
-            'ones' => 'ones requires a non-negative integer count, '
-                'found -1.',
-            'delete-row' => 'delete-row requires a positive integer index, '
-                'found -1.',
-            'delete-col' => 'delete-col requires a positive integer index, '
-                'found -1.',
-            'duplicate-row' =>
-              'duplicate-row requires a positive integer index, found -1.',
-            'duplicate-col' =>
-              'duplicate-col requires a positive integer index, found -1.',
-            'move-row' => 'move-row requires a positive integer index, '
-                'found -1.',
-            'move-col' => 'move-col requires a positive integer index, '
-                'found -1.',
-            _ => null,
-          };
-          if (message == null) {
-            // Some arity-less words (vector, pick, roll, rows, ...) are
-            // not count/index-taking in this same way; they are covered
-            // by their own dedicated tests elsewhere, not here.
-            continue;
-          }
-
-          try {
-            Calculatrix.evaluateRpn(<String>['-1', entry.name]);
-            fail('expected a type-mismatch for "${entry.name}"');
-          } on CalculatrixError catch (error) {
-            expect(
-              error.errorId,
-              CalculatrixErrorId.typeMismatch,
-              reason: 'word: ${entry.name}',
-            );
-            expect(error.message, message, reason: 'word: ${entry.name}');
-          }
+    test('count/index-taking words without a declared arity still report '
+        'their own type-mismatch, not a stack-underflow, when the stack is '
+        'one value short of their real need', () {
+      for (final entry in CalculatrixCommandRegistry.standard.entries) {
+        if (entry.arity != null) {
+          continue;
         }
-      },
-    );
+        final String? message = switch (entry.name) {
+          'zeros' =>
+            'zeros requires a non-negative integer count, '
+                'found -1.',
+          'ones' =>
+            'ones requires a non-negative integer count, '
+                'found -1.',
+          'delete-row' =>
+            'delete-row requires a positive integer index, '
+                'found -1.',
+          'delete-col' =>
+            'delete-col requires a positive integer index, '
+                'found -1.',
+          'duplicate-row' =>
+            'duplicate-row requires a positive integer index, found -1.',
+          'duplicate-col' =>
+            'duplicate-col requires a positive integer index, found -1.',
+          'move-row' =>
+            'move-row requires a positive integer index, '
+                'found -1.',
+          'move-col' =>
+            'move-col requires a positive integer index, '
+                'found -1.',
+          _ => null,
+        };
+        if (message == null) {
+          // Some arity-less words (vector, pick, roll, rows, ...) are
+          // not count/index-taking in this same way; they are covered
+          // by their own dedicated tests elsewhere, not here.
+          continue;
+        }
+
+        try {
+          Calculatrix.evaluateRpn(<String>['-1', entry.name]);
+          fail('expected a type-mismatch for "${entry.name}"');
+        } on CalculatrixError catch (error) {
+          expect(
+            error.errorId,
+            CalculatrixErrorId.typeMismatch,
+            reason: 'word: ${entry.name}',
+          );
+          expect(error.message, message, reason: 'word: ${entry.name}');
+        }
+      }
+    });
   });
 }

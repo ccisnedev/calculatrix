@@ -29,8 +29,8 @@ final class PushScalarCommand extends CalculatrixCommand {
 }
 
 /// The app's fixed-shape structure commands (and the macros built on them)
-/// push exact values, like the `zeros`, `ones` and `identity` words (runbook
-/// D53), so editing an exact matrix keeps it exact. The approximate factory
+/// push exact values, like the `zeros`, `ones` and `identity` words
+/// so editing an exact matrix keeps it exact. The approximate factory
 /// still validates the shape.
 final class PushZerosCommand extends CalculatrixCommand {
   const PushZerosCommand(this.rowCount, this.columnCount);
@@ -114,8 +114,7 @@ final class PowerCommand extends CalculatrixCommand {
     // An exact base takes an exact integer exponent exactly: any integer
     // for a scalar; for a square matrix, a negative power is a power of
     // its exact inverse. An exact fractional exponent gives an exact
-    // result when it is rational, and the approximate one otherwise
-    // (runbook D53).
+    // result when it is rational, and the approximate one otherwise.
     if (base.isExact &&
         integerExponent == null &&
         exponent.isExact &&
@@ -159,7 +158,7 @@ final class AppendColumnCommand extends CalculatrixCommand {
   }
 }
 
-/// `x1 ... xn n` gives the n x 1 column `[[x1] ... [xn]]` (issue #37, S4c).
+/// `x1 ... xn n` gives the n x 1 column `[[x1] ... [xn]]`.
 ///
 /// `n` needs the stack depth at run time (how many operands to gather is
 /// only known once `n` itself has been popped), so this cannot be a fixed
@@ -177,7 +176,7 @@ final class VectorCommand extends CalculatrixCommand {
 
     // Checked once, up front, rather than letting the loop below run out
     // and have its very last pop raise the engine's own generic "needs 1
-    // value" (issue #51, AC5 regression): that message names the wrong
+    // value": that message names the wrong
     // need entirely, since what actually falls short is not one value but
     // however many of the n values below the count are still missing.
     // `needed`/`found` here, not the fallback message text (which
@@ -211,7 +210,7 @@ final class VectorCommand extends CalculatrixCommand {
       );
     }
 
-    // Exact only when every value is exact (runbook D49).
+    // Exact only when every value is exact.
     final Iterable<Matrix> values = valuesTopToBottom.reversed;
     if (values.every((Matrix value) => value.isExact)) {
       engine.push(
@@ -234,7 +233,7 @@ final class VectorCommand extends CalculatrixCommand {
 }
 
 /// `[[...]]` gives `[row1] ... [rown] n`, each row a 1 x m matrix, followed
-/// by the row count (issue #37, S4c).
+/// by the row count.
 final class RowsCommand extends CalculatrixCommand {
   const RowsCommand();
 
@@ -253,9 +252,7 @@ final class RowsCommand extends CalculatrixCommand {
 }
 
 /// `A B` gives `[A B]` (A and B side by side); a generalization of
-/// [AppendColumnCommand] to any operand B with a matching row count (issue
-/// #37, S4c). Both share the single `Matrix.appendColumns` implementation
-/// (D44).
+/// [AppendColumnCommand] to any operand B with a matching row count. Both share the single `Matrix.appendColumns` implementation.
 final class AppendColsCommand extends CalculatrixCommand {
   const AppendColsCommand();
 
@@ -268,8 +265,8 @@ final class AppendColsCommand extends CalculatrixCommand {
 }
 
 /// `A B` gives A over B; a generalization of [AppendRowCommand] to any
-/// operand B with a matching column count (issue #37, S4c). Both share the
-/// single `Matrix.appendRows` implementation (D44).
+/// operand B with a matching column count. Both share the
+/// single `Matrix.appendRows` implementation.
 final class AppendRowsCommand extends CalculatrixCommand {
   const AppendRowsCommand();
 
@@ -347,7 +344,7 @@ int _requireNonNegativeIntegerCount(Matrix value, String word) {
 }
 
 /// Pops a 1-based index or stack level, rejecting a non-integer, negative
-/// or zero value as type-mismatch (runbook D46, issue #39, AC3). Shared by
+/// or zero value as type-mismatch. Shared by
 /// every word that takes a stack level (`pick`, `roll`) or a row/column
 /// index (`delete-row`, `move-col`, ...), so the format check lives in one
 /// place.
@@ -364,10 +361,10 @@ int _requirePositiveInteger(Matrix value, String word) {
 }
 
 /// Converts a 1-based row or column index to the 0-based index `Matrix`
-/// methods take, checking it against `count` first (runbook D46: "the
+/// methods take, checking it against `count` first (the
 /// conversion to the 0-based indices of the core happens once, in the
-/// words"; the `Matrix` methods keep their existing 0-based signature,
-/// issue #39 AC2). An index above `count` is dimension-mismatch (AC3), not
+/// words; the `Matrix` methods keep their existing 0-based signature).
+/// An index above `count` is dimension-mismatch, not
 /// `Matrix`'s own id-less `MatrixIndexError`: the word checks the bound
 /// before the 0-based index ever reaches the `Matrix` method, so that
 /// throw site is never hit from an RPN word.
@@ -729,10 +726,10 @@ final class LnCommand extends CalculatrixCommand {
   }
 }
 
-/// `n pick` (issue #39, S4d): the RPN word for `pick`, taking its stack
+/// `n pick`: the RPN word for `pick`, taking its stack
 /// level from the stack itself rather than a fixed int argument like
 /// [PickCommand], which the app's typed-command session still uses. Both
-/// delegate to the very same [RpnEngine.pick] (D44).
+/// delegate to the very same [RpnEngine.pick].
 final class PickWordCommand extends CalculatrixCommand {
   const PickWordCommand();
 
@@ -743,7 +740,7 @@ final class PickWordCommand extends CalculatrixCommand {
   }
 }
 
-/// `n roll` (issue #39, S4d): the RPN word for `roll`, the stack-argument
+/// `n roll`: the RPN word for `roll`, the stack-argument
 /// counterpart of [RollCommand]. See [PickWordCommand].
 final class RollWordCommand extends CalculatrixCommand {
   const RollWordCommand();
@@ -755,10 +752,10 @@ final class RollWordCommand extends CalculatrixCommand {
   }
 }
 
-/// `r c zeros` (issue #39, S4d): the RPN word for `zeros`, taking its shape
+/// `r c zeros`: the RPN word for `zeros`, taking its shape
 /// from the stack rather than a fixed int argument like [PushZerosCommand],
 /// which `macros.dart`'s app-facing macros still use. Both push the same
-/// exact zeros (D44, D53).
+/// exact zeros.
 final class ZerosCommand extends CalculatrixCommand {
   const ZerosCommand();
 
@@ -776,7 +773,7 @@ final class ZerosCommand extends CalculatrixCommand {
   }
 }
 
-/// `r c ones` (issue #39, S4d): the stack-argument counterpart of
+/// `r c ones`: the stack-argument counterpart of
 /// [PushOnesCommand]. See [ZerosCommand].
 final class OnesCommand extends CalculatrixCommand {
   const OnesCommand();
@@ -795,12 +792,12 @@ final class OnesCommand extends CalculatrixCommand {
   }
 }
 
-/// `n identity` (issue #39, S4d): the stack-argument counterpart of
+/// `n identity`: the stack-argument counterpart of
 /// [PushIdentityCommand]. `Matrix.identity` itself raises an id-less error
 /// for size 0 (a pre-existing gap left untouched, per the instruction to
 /// prefer validating in the word over changing `Matrix` semantics), so this
 /// word checks for a zero size itself and raises dimension-mismatch before
-/// ever calling `Matrix.identity` (AC3, issue #39: "0 identity" is
+/// ever calling `Matrix.identity` ("0 identity" is
 /// dimension-mismatch, like "0 vector" and "0 3 zeros").
 final class IdentityCommand extends CalculatrixCommand {
   const IdentityCommand();
@@ -821,12 +818,12 @@ final class IdentityCommand extends CalculatrixCommand {
   }
 }
 
-/// `A i delete-row` (issue #39, S4d): the RPN word for `delete-row`, taking
+/// `A i delete-row`: the RPN word for `delete-row`, taking
 /// its 1-based row index from the stack rather than a fixed int argument
 /// like [DeleteRowCommand], which the app's typed-command session still
-/// uses. Both share the very same [Matrix.deleteRow] (D44); this word does
-/// the 1-based-to-0-based conversion (D46) and the bounds check that
-/// produces dimension-mismatch (AC3) before calling it.
+/// uses. Both share the very same [Matrix.deleteRow]; this word does
+/// the 1-based-to-0-based conversion and the bounds check that
+/// produces dimension-mismatch before calling it.
 final class DeleteRowWordCommand extends CalculatrixCommand {
   const DeleteRowWordCommand();
 
@@ -844,7 +841,7 @@ final class DeleteRowWordCommand extends CalculatrixCommand {
   }
 }
 
-/// `A j delete-col` (issue #39, S4d): the stack-argument counterpart of
+/// `A j delete-col`: the stack-argument counterpart of
 /// [DeleteColumnCommand]. See [DeleteRowWordCommand].
 final class DeleteColumnWordCommand extends CalculatrixCommand {
   const DeleteColumnWordCommand();
@@ -863,7 +860,7 @@ final class DeleteColumnWordCommand extends CalculatrixCommand {
   }
 }
 
-/// `A i duplicate-row` (issue #39, S4d): the stack-argument counterpart of
+/// `A i duplicate-row`: the stack-argument counterpart of
 /// [DuplicateRowCommand]. See [DeleteRowWordCommand].
 final class DuplicateRowWordCommand extends CalculatrixCommand {
   const DuplicateRowWordCommand();
@@ -885,7 +882,7 @@ final class DuplicateRowWordCommand extends CalculatrixCommand {
   }
 }
 
-/// `A j duplicate-col` (issue #39, S4d): the stack-argument counterpart of
+/// `A j duplicate-col`: the stack-argument counterpart of
 /// [DuplicateColumnCommand]. See [DeleteRowWordCommand].
 final class DuplicateColumnWordCommand extends CalculatrixCommand {
   const DuplicateColumnWordCommand();
@@ -907,7 +904,7 @@ final class DuplicateColumnWordCommand extends CalculatrixCommand {
   }
 }
 
-/// `A i k move-row` (issue #39, S4d): the stack-argument counterpart of
+/// `A i k move-row`: the stack-argument counterpart of
 /// [MoveRowCommand]. `i` is typed (and therefore pushed) before `k`, so `k`
 /// is popped first. See [DeleteRowWordCommand].
 final class MoveRowWordCommand extends CalculatrixCommand {
@@ -934,7 +931,7 @@ final class MoveRowWordCommand extends CalculatrixCommand {
   }
 }
 
-/// `A j k move-col` (issue #39, S4d): the stack-argument counterpart of
+/// `A j k move-col`: the stack-argument counterpart of
 /// [MoveColumnCommand]. See [MoveRowWordCommand].
 final class MoveColumnWordCommand extends CalculatrixCommand {
   const MoveColumnWordCommand();
@@ -960,7 +957,7 @@ final class MoveColumnWordCommand extends CalculatrixCommand {
   }
 }
 
-/// `approx` (alias `num`): the value as an approximate one (runbook D52).
+/// `approx` (alias `num`): the value as an approximate one.
 /// An approximate value is left unchanged.
 final class ApproxCommand extends CalculatrixCommand {
   const ApproxCommand();
@@ -972,8 +969,8 @@ final class ApproxCommand extends CalculatrixCommand {
 }
 
 /// `exact`: the value as an exact one, each entry the simplest rational
-/// that rounds to the same `double` (runbook D52). An exact value is left
-/// unchanged. The result is held to the digit limit (runbook D55).
+/// that rounds to the same `double`. An exact value is left
+/// unchanged. The result is held to the digit limit.
 final class ExactCommand extends CalculatrixCommand {
   const ExactCommand();
 

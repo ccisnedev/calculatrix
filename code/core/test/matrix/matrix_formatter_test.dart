@@ -12,7 +12,7 @@ Matrix _exactComplex(Rational a, Rational b) => Matrix.exact(<List<Rational>>[
 ]);
 
 void main() {
-  group('MatrixDisplayFormatter (approximate values, runbook D54)', () {
+  group('MatrixDisplayFormatter (approximate values)', () {
     final Matrix matrix = Matrix(<List<double>>[
       <double>[1, 2],
       <double>[30, 400],
@@ -40,7 +40,7 @@ void main() {
     });
   });
 
-  group('MatrixDisplayFormatter (exact values, runbook D54)', () {
+  group('MatrixDisplayFormatter (exact values)', () {
     final Matrix matrix = Matrix.exact(<List<Rational>>[
       <Rational>[_q(1, 3), _q(2)],
       <Rational>[_q(-3, 5), _q(400)],
@@ -170,7 +170,7 @@ void main() {
     });
   });
 
-  group('MatrixDisplayFormatter large exponent display (issue #5 bug 1)', () {
+  group('MatrixDisplayFormatter large exponent display', () {
     test('1e20 preserves the exponent instead of trimming its digits', () {
       expect(MatrixDisplayFormatter.compact(Matrix.scalar(1e20)), '~[[1e+20]]');
     });
@@ -190,7 +190,7 @@ void main() {
     });
   });
 
-  group('MatrixDisplayFormatter.number (runbook D45)', () {
+  group('MatrixDisplayFormatter.number', () {
     test('rounds to 12 significant digits and trims trailing zeros', () {
       expect(MatrixDisplayFormatter.number(-1.9999999999999996), '-2');
       expect(MatrixDisplayFormatter.number(1.4999999999999998), '1.5');

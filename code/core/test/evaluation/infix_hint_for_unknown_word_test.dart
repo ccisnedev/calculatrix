@@ -54,8 +54,8 @@ void main() {
       expect(result, Matrix.scalar(-5));
     });
 
-    test('a signed right-hand operand still hints at eval infix (issue #51, '
-        'AC3: "3^-2" used to give a plain unknown-word)', () {
+    test('a signed right-hand operand still hints at eval infix '
+        '("3^-2", not a plain unknown-word)', () {
       try {
         Calculatrix.evaluateRpn(<String>['3^-2']);
         fail('expected UnknownWordError');
@@ -69,7 +69,7 @@ void main() {
     });
 
     test('a leading-decimal right-hand operand still hints at eval infix '
-        '(issue #51, AC3: "1+.5" used to give a plain unknown-word)', () {
+        '("1+.5", not a plain unknown-word)', () {
       try {
         Calculatrix.evaluateRpn(<String>['1+.5']);
         fail('expected UnknownWordError');

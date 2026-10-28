@@ -1,12 +1,12 @@
-// Differential tests of the exact words against Giac (runbook D57): step
-// T2's `+ - * /`, `negate`, `percent` and integer powers, and step T3's
+// Differential tests of the exact words against Giac: the arithmetic
+// `+ - * /`, `negate`, `percent` and integer powers; the linear algebra
 // `inverse`, `determinant`, `rref`, `rank`, `trace`, `adjugate`,
-// `cofactors`, `lu`, `dot`, `cross` and negative matrix powers, and step
-// T4's fractional powers (`sqrt` among them), `eigenvalues`,
+// `cofactors`, `lu`, `dot`, `cross` and negative matrix powers; and the
+// roots: fractional powers (`sqrt` among them), `eigenvalues`,
 // `frobenius-norm`, `exp` and `ln`, on generated exact inputs with fixed
 // seeds, from trivial sizes to results near the limit of 10000 digits.
 // Each case runs through the RPN evaluator and through Giac, and the two
-// results must agree entry by entry as exact rationals. For the T4 words
+// results must agree entry by entry as exact rationals. For the root words
 // Giac also says when the true result is not rational ("irr"); then cx
 // must give an approximate result or an error, never an exact one.
 //
@@ -153,7 +153,7 @@ List<_Case> _cases() {
   final List<_Case> cases = <_Case>[];
   final _Generator g = _Generator(54);
 
-  // The exact constant i (issue #70, runbook-agent-usability.md D67): the
+  // The exact constant i: the
   // matrix [[0 -1] [1 0]], whose products and inverse are exact and agree
   // with Giac's complex i written as cx's 2x2 form.
   cases
@@ -403,7 +403,7 @@ void _linearAlgebraCases(_Generator g, List<_Case> cases) {
     for (final int digits in <int>[1, 4, 15]) {
       for (int i = 0; i < 3; i++) {
         final _Operand a = g.operand(size, size, digits);
-        final String tag = 'T3 ${size}x$size d$digits';
+        final String tag = 'linear algebra ${size}x$size d$digits';
         _squareCases('$tag #$i', a, cases, g);
         if (size > 1 && i == 0) {
           _squareCases('$tag rank n-1', a.withDependentRows(1), cases, g);
@@ -423,7 +423,7 @@ void _linearAlgebraCases(_Generator g, List<_Case> cases) {
     if (a.isScalar) {
       continue;
     }
-    final String tag = 'T3 ${rows}x$columns #$i';
+    final String tag = 'linear algebra ${rows}x$columns #$i';
     cases
       ..add(_Case('$tag rref', '${a.rpn} rref', 'rref(${a.giac})'))
       ..add(_Case('$tag rank', '${a.rpn} rank', 'rank(${a.giac})'));
@@ -440,14 +440,14 @@ void _linearAlgebraCases(_Generator g, List<_Case> cases) {
       cases
         ..add(
           _Case(
-            'T3 dot $length d$digits #$i',
+            'linear algebra dot $length d$digits #$i',
             '${u.rpn} ${v.rpn} dot',
             'dot(${u.giacVector},${v.giacVector})',
           ),
         )
         ..add(
           _Case(
-            'T3 cross d$digits #$i',
+            'linear algebra cross d$digits #$i',
             '${x.rpn} ${y.rpn} cross',
             'cross(${x.giacVector},${y.giacVector})',
           ),
@@ -471,7 +471,7 @@ void _linearAlgebraCases(_Generator g, List<_Case> cases) {
     );
     cases.add(
       _Case(
-        'T3 near the limit $word',
+        'linear algebra near the limit $word',
         '${a.rpn} $word',
         '$giacWord(${a.giac})',
       ),
@@ -479,7 +479,7 @@ void _linearAlgebraCases(_Generator g, List<_Case> cases) {
   }
 }
 
-// Giac functions the T4 cases call. `chk` simplifies a result and gives
+// Giac functions the root cases call. `chk` simplifies a result and gives
 // it back when every entry is rational, or "irr"; `cx2` writes a complex
 // number in cx's 2x2 form; `egr` gives the eigenvalues of a matrix,
 // largest first and repeated by multiplicity, when all are rational.
@@ -568,10 +568,16 @@ void _rootCases(_Generator g, List<_Case> cases) {
           ? 'chk(cx2($root^($p)*exp(i*pi*($p)/$q)))'
           : 'chk($root^($p))';
       cases.add(
-        _Case('T4 scalar ^$p/$q d$digits #$i', '$n $d / $p $q / power', giac),
+        _Case(
+          'roots scalar ^$p/$q d$digits #$i',
+          '$n $d / $p $q / power',
+          giac,
+        ),
       );
       if (p == 1 && q == 2) {
-        cases.add(_Case('T4 scalar sqrt d$digits #$i', '$n $d / sqrt', giac));
+        cases.add(
+          _Case('roots scalar sqrt d$digits #$i', '$n $d / sqrt', giac),
+        );
       }
     }
   }
@@ -589,16 +595,16 @@ void _rootCases(_Generator g, List<_Case> cases) {
     final String root = _giacRoot(-n, denominator, 4);
     cases.add(
       _Case(
-        'T4 negative ^$p/4 d$digits #$i',
+        'roots negative ^$p/4 d$digits #$i',
         '$n $denominator / $p 4 / power',
         'chk(cx2(simplify($root^($p)*exp(i*pi*($p)/4))))',
       ),
     );
   }
   cases
-    ..add(_Case('T4 0 sqrt', '0 sqrt', 'chk(0)'))
-    ..add(_Case('T4 0 ^3/2', '0 3 2 / power', 'chk(0)'))
-    ..add(_Case('T4 0 ^-1/2', '0 -1 2 / power', _irrational));
+    ..add(_Case('roots 0 sqrt', '0 sqrt', 'chk(0)'))
+    ..add(_Case('roots 0 ^3/2', '0 3 2 / power', 'chk(0)'))
+    ..add(_Case('roots 0 ^-1/2', '0 -1 2 / power', _irrational));
 
   // Complex numbers [[a -b] [b a]]: square roots and their odd powers.
   // The exact ones are (x + yi)^2 / d^2.
@@ -624,7 +630,7 @@ void _rootCases(_Generator g, List<_Case> cases) {
     ], d);
     cases.add(
       _Case(
-        'T4 complex ^$p/2 d$digits #$i',
+        'roots complex ^$p/2 d$digits #$i',
         '${z.rpn} $p 2 / power',
         'chk(cx2(sqrt(($a+($b)*i)/$d)^($p)))',
       ),
@@ -661,7 +667,7 @@ void _rootCases(_Generator g, List<_Case> cases) {
         .join(',');
     cases.add(
       _Case(
-        'T4 diagonal ${n}x$n ^$p/$q #$i',
+        'roots diagonal ${n}x$n ^$p/$q #$i',
         '${m.rpn} $p $q / power',
         'chk(diag([$roots]))',
       ),
@@ -699,7 +705,7 @@ void _rootCases(_Generator g, List<_Case> cases) {
     final _Operand root = _Operand(x, d);
     cases.add(
       _Case(
-        'T4 general ${n}x$n ^$p/$q #$i',
+        'roots general ${n}x$n ^$p/$q #$i',
         '${base.rpn} $p $q / power',
         'chk(${root.giacMatrix}^($p))',
       ),
@@ -707,7 +713,7 @@ void _rootCases(_Generator g, List<_Case> cases) {
     if (p == 1 && q == 2) {
       cases.add(
         _Case(
-          'T4 general ${n}x$n sqrt #$i',
+          'roots general ${n}x$n sqrt #$i',
           '${base.rpn} sqrt',
           'chk(${root.giacMatrix})',
         ),
@@ -719,7 +725,7 @@ void _rootCases(_Generator g, List<_Case> cases) {
     final _Operand m = g.operand(2, 2, 2);
     cases.add(
       _Case(
-        'T4 random 2x2 sqrt #$i',
+        'roots random 2x2 sqrt #$i',
         '${m.rpn} sqrt',
         'chk(matpow(${m.giacMatrix},1/2))',
       ),
@@ -765,7 +771,7 @@ void _rootCases(_Generator g, List<_Case> cases) {
       }
       cases.add(
         _Case(
-          'T4 eigenvalues ${n}x$n d$digits #$i',
+          'roots eigenvalues ${n}x$n d$digits #$i',
           '${m.rpn} eigenvalues',
           'egr(${m.giacMatrix})',
         ),
@@ -775,14 +781,14 @@ void _rootCases(_Generator g, List<_Case> cases) {
   cases
     ..add(
       _Case(
-        'T4 eigenvalues rotation',
+        'roots eigenvalues rotation',
         '[[0 -1] [1 0]] eigenvalues',
         'egr([[0,-1],[1,0]])',
       ),
     )
     ..add(
       _Case(
-        'T4 eigenvalues nilpotent',
+        'roots eigenvalues nilpotent',
         '[[0 1 2] [0 0 3] [0 0 0]] eigenvalues',
         'egr([[0,1,2],[0,0,3],[0,0,0]])',
       ),
@@ -817,7 +823,7 @@ void _rootCases(_Generator g, List<_Case> cases) {
     ]) {
       cases.add(
         _Case(
-          'T4 frobenius-norm $tag #$i',
+          'roots frobenius-norm $tag #$i',
           '${m.rpn} frobenius-norm',
           'chk(sqrt(sum(apply(x->x^2,flatten(${m.giacMatrix})))))',
         ),
@@ -841,28 +847,28 @@ void _rootCases(_Generator g, List<_Case> cases) {
     cases
       ..add(
         _Case(
-          'T4 exp zero ${n}x$n',
+          'roots exp zero ${n}x$n',
           '${zero.rpn} exp',
           'chk(exp(${zero.giacMatrix}))',
         ),
       )
       ..add(
         _Case(
-          'T4 ln identity ${n}x$n',
+          'roots ln identity ${n}x$n',
           '${identity.rpn} ln',
           'chk(log(${identity.giacMatrix}))',
         ),
       )
       ..add(
         _Case(
-          'T4 exp diagonal ${n}x$n',
+          'roots exp diagonal ${n}x$n',
           '${diagonal.rpn} exp',
           'chk(exp(${diagonal.giacMatrix}))',
         ),
       )
       ..add(
         _Case(
-          'T4 ln diagonal ${n}x$n',
+          'roots ln diagonal ${n}x$n',
           '${diagonal.rpn} ln',
           'chk(log(${diagonal.giacMatrix}))',
         ),
@@ -968,61 +974,66 @@ void main() {
     );
   });
 
-  test('Giac agrees with every exact result of steps T2 to T4', () {
-    if (giac == null) {
-      // The CI job sets this, so a broken Giac install fails there instead
-      // of passing silently.
-      if (Platform.environment['CALCULATRIX_REQUIRE_GIAC'] == '1') {
-        fail('Giac is required but did not run (${_giacCommand().join(' ')}).');
-      }
-      markTestSkipped(
-        'Giac is not available (${_giacCommand().join(' ')}); skipping the '
-        'differential tests.',
-      );
-      return;
-    }
-    expect(cases.length, greaterThan(1000));
-    int largest = 0;
-    int irrational = 0;
-    for (int i = 0; i < cases.length; i++) {
-      final _Case c = cases[i];
-      final String? theirs = giac![i];
-      expect(theirs, isNotNull, reason: '${c.name}: no Giac result');
-      if (theirs == _irrational) {
-        // Not rational: an approximate result or an error, never exact.
-        irrational++;
-        try {
-          final Matrix result = Calculatrix.evaluateRpn(
-            Calculatrix.tokenizeRpnLine(c.rpn),
+  test(
+    'Giac agrees with every exact result of the arithmetic, linear algebra and root words',
+    () {
+      if (giac == null) {
+        // The CI job sets this, so a broken Giac install fails there instead
+        // of passing silently.
+        if (Platform.environment['CALCULATRIX_REQUIRE_GIAC'] == '1') {
+          fail(
+            'Giac is required but did not run (${_giacCommand().join(' ')}).',
           );
-          expect(result.isExact, isFalse, reason: '${c.name}: ${c.rpn}');
-        } on CalculatrixError {
-          // A value with no real result.
         }
-        continue;
+        markTestSkipped(
+          'Giac is not available (${_giacCommand().join(' ')}); skipping the '
+          'differential tests.',
+        );
+        return;
       }
-      final Matrix result = Calculatrix.evaluateRpn(
-        Calculatrix.tokenizeRpnLine(c.rpn),
-      );
-      expect(result.isExact, isTrue, reason: '${c.name}: ${c.rpn}');
-      final List<String> ours = <String>[
-        for (final List<Rational> row in result.exactRows)
-          for (final Rational entry in row) _text(entry),
-      ];
-      for (final List<Rational> row in result.exactRows) {
-        for (final Rational entry in row) {
-          largest = math.max(largest, entry.digits);
+      expect(cases.length, greaterThan(1000));
+      int largest = 0;
+      int irrational = 0;
+      for (int i = 0; i < cases.length; i++) {
+        final _Case c = cases[i];
+        final String? theirs = giac![i];
+        expect(theirs, isNotNull, reason: '${c.name}: no Giac result');
+        if (theirs == _irrational) {
+          // Not rational: an approximate result or an error, never exact.
+          irrational++;
+          try {
+            final Matrix result = Calculatrix.evaluateRpn(
+              Calculatrix.tokenizeRpnLine(c.rpn),
+            );
+            expect(result.isExact, isFalse, reason: '${c.name}: ${c.rpn}');
+          } on CalculatrixError {
+            // A value with no real result.
+          }
+          continue;
         }
+        final Matrix result = Calculatrix.evaluateRpn(
+          Calculatrix.tokenizeRpnLine(c.rpn),
+        );
+        expect(result.isExact, isTrue, reason: '${c.name}: ${c.rpn}');
+        final List<String> ours = <String>[
+          for (final List<Rational> row in result.exactRows)
+            for (final Rational entry in row) _text(entry),
+        ];
+        for (final List<Rational> row in result.exactRows) {
+          for (final Rational entry in row) {
+            largest = math.max(largest, entry.digits);
+          }
+        }
+        expect(ours, _giacEntries(theirs!), reason: '${c.name}: ${c.rpn}');
       }
-      expect(ours, _giacEntries(theirs!), reason: '${c.name}: ${c.rpn}');
-    }
-    // The T4 cases reach both kinds of result.
-    expect(irrational, greaterThan(40));
-    // The cases reach results near the default limit of 10000 digits.
-    expect(largest, greaterThan(9000));
-  });
+      // The root cases reach both kinds of result.
+      expect(irrational, greaterThan(40));
+      // The cases reach results near the default limit of 10000 digits.
+      expect(largest, greaterThan(9000));
+    },
+  );
 
-  // The approximate constants and e^(i*pi) (issue #70, D67): Giac's
+  // The approximate constants and e^(i*pi): Giac's
   // evalf of pi and e, to 30 digits, rounds to the double cx holds, and
   // e^(i*pi) is within 1e-14 of -1 in cx's 2x2 form.
   test('Giac agrees on pi, e and e^(i*pi)', () async {

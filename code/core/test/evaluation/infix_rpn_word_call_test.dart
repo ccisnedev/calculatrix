@@ -1,4 +1,4 @@
-// Issue #73 (runbook-agent-usability.md D68, step U4a): an infix call of an
+// An infix call of an
 // RPN word whose parentheses hold a comma-separated list of literals gets
 // the exact RPN program to type. Any other argument keeps the generic
 // message. Error id, position and name are unchanged.
@@ -17,7 +17,7 @@ ExpressionSyntaxError _infixError(String expression) {
 const String _generic = 'in RPN the argument comes first';
 
 void main() {
-  group('infix call of an RPN word with literal arguments (#73 a)', () {
+  group('infix call of an RPN word with literal arguments', () {
     test('inverse([[1 2] [3 4]]) gives the matrix program', () {
       final error = _infixError('inverse([[1 2] [3 4]])');
       expect(error.errorId, CalculatrixErrorId.syntaxError);

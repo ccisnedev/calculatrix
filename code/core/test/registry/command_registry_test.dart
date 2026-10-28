@@ -29,9 +29,9 @@ void main() {
     test(
       'never resolves a search term: it only finds an entry, it is not a word',
       () {
-        // "plus" is a search term of "add" (D41: names are words, symbols
-        // are aliases), not one of its aliases: it must not resolve here,
-        // and using it as an RPN word must raise unknown-word (AC4).
+        // "plus" is a search term of "add" (names are words, symbols are
+        // aliases), not one of its aliases: it must not resolve here,
+        // and using it as an RPN word must raise unknown-word.
         final CalculatrixCommandEntry add = CalculatrixCommandRegistry.standard
             .lookup('add')!;
         expect(add.searchTerms, contains('plus'));
@@ -50,7 +50,7 @@ void main() {
       },
     );
 
-    test('exposes every field of a spec section 7 entry', () {
+    test('exposes every field of a registry entry', () {
       final CalculatrixCommandEntry power = CalculatrixCommandRegistry.standard
           .lookup('power')!;
 
@@ -69,7 +69,7 @@ void main() {
 
     test('inverse, sqrt, duplicate, over, swap and rotate are defined words '
         'over power/pick/roll; every other entry is still primitive '
-        '(D43/D46, issues #35, #39, AC2)', () {
+        '', () {
       const Set<String> definedNames = <String>{
         'inverse',
         'sqrt',
@@ -99,7 +99,7 @@ void main() {
       expect(sqrt.definition, '0.5 power');
     });
 
-    test('no HP 50g reference is ever a name or alias (D42)', () {
+    test('no HP 50g reference is ever a name or alias', () {
       for (final CalculatrixCommandEntry entry
           in CalculatrixCommandRegistry.standard.entries) {
         final String? hp = entry.hp50gReference;
@@ -110,7 +110,7 @@ void main() {
             in CalculatrixCommandRegistry.standard.entries) {
           if (other.name == entry.name) {
             // A symbol such as "^" may legitimately be both power's own
-            // alias and its informative HP reference (D41, D42): the rule
+            // alias and its informative HP reference: the rule
             // is that an *HP-only* spelling (e.g. "->ARRY") is never a
             // word, not that an entry's alias can never equal its own HP
             // reference text.
@@ -210,33 +210,37 @@ void main() {
       );
     });
 
-    test('registers one entry per current operator, named per D41', () {
-      const Map<String, String> nameByAlias = <String, String>{
-        '+': 'add',
-        '-': 'subtract',
-        '*': 'multiply',
-        '/': 'divide',
-        '%': 'percent',
-        '√': 'sqrt',
-      };
-      nameByAlias.forEach((String alias, String name) {
-        final CalculatrixCommandEntry? byName = CalculatrixCommandRegistry
-            .standard
-            .lookup(name);
-        final CalculatrixCommandEntry? byAlias = CalculatrixCommandRegistry
-            .standard
-            .lookup(alias);
-        expect(byName, isNotNull, reason: '$name must be registered');
-        expect(byName!.name, name);
-        expect(byAlias, same(byName), reason: '$alias must alias $name');
-      });
+    test(
+      'registers one entry per current operator, named by word, symbols as aliases',
+      () {
+        const Map<String, String> nameByAlias = <String, String>{
+          '+': 'add',
+          '-': 'subtract',
+          '*': 'multiply',
+          '/': 'divide',
+          '%': 'percent',
+          '√': 'sqrt',
+        };
+        nameByAlias.forEach((String alias, String name) {
+          final CalculatrixCommandEntry? byName = CalculatrixCommandRegistry
+              .standard
+              .lookup(name);
+          final CalculatrixCommandEntry? byAlias = CalculatrixCommandRegistry
+              .standard
+              .lookup(alias);
+          expect(byName, isNotNull, reason: '$name must be registered');
+          expect(byName!.name, name);
+          expect(byAlias, same(byName), reason: '$alias must alias $name');
+        });
 
-      final CalculatrixCommandEntry power = CalculatrixCommandRegistry.standard
-          .lookup('power')!;
-      expect(power.aliases, unorderedEquals(<String>['pwr', '^']));
-    });
+        final CalculatrixCommandEntry power = CalculatrixCommandRegistry
+            .standard
+            .lookup('power')!;
+        expect(power.aliases, unorderedEquals(<String>['pwr', '^']));
+      },
+    );
 
-    test('runs every registered example and compares its result (AC6)', () {
+    test('runs every registered example and compares its result', () {
       for (final CalculatrixCommandEntry entry
           in CalculatrixCommandRegistry.standard.entries) {
         for (final CalculatrixCommandExample example in entry.examples) {
@@ -254,7 +258,7 @@ void main() {
           // Equality between an exact and an approximate value compares
           // their doubles, so exactness is checked on its own: an example
           // documented as `~5` for an exact 5 tells an agent the results
-          // are floating point (issue #66).
+          // are floating point.
           expect(
             result.map((Matrix value) => value.isExact).toList(),
             example.expectedStack.map((Matrix value) => value.isExact).toList(),
@@ -283,7 +287,7 @@ void main() {
   });
 
   group('_compileRpnToken through the registry', () {
-    test('resolves add/+ , subtract/-, multiply/*, divide// (D41)', () {
+    test('resolves add/+ , subtract/-, multiply/*, divide//', () {
       expect(
         Calculatrix.evaluateRpn(<String>['2', '3', '+']),
         Matrix.scalar(5),
@@ -329,7 +333,7 @@ void main() {
       );
     });
 
-    test('power, pwr and ^ all give 8 for 2 3 (AC3)', () {
+    test('power, pwr and ^ all give 8 for 2 3', () {
       expect(
         Calculatrix.evaluateRpn(<String>['2', '3', 'pwr']),
         Matrix.scalar(8),
@@ -344,7 +348,7 @@ void main() {
       );
     });
 
-    test('a word not in the registry still raises unknown-word (AC2)', () {
+    test('a word not in the registry still raises unknown-word', () {
       expect(
         () => Calculatrix.evaluateRpn(<String>['bogus']),
         throwsA(
@@ -357,7 +361,7 @@ void main() {
       );
     });
 
-    test('an HP 50g-only spelling is unknown-word, never a word (D42)', () {
+    test('an HP 50g-only spelling is unknown-word, never a word', () {
       expect(
         () => Calculatrix.evaluateRpn(<String>['1', '2', '2', '->ARRY']),
         throwsA(isA<UnknownWordError>()),

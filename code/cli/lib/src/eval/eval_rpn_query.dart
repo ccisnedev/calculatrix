@@ -7,7 +7,7 @@ import 'eval_contracts.dart';
 import 'eval_output.dart';
 import 'eval_support.dart';
 
-/// `cx eval rpn [<program>] [--file <path>] [--stdin]` (spec section 4).
+/// `cx eval rpn [<program>] [--file <path>] [--stdin]`.
 class EvalRpnInput extends Input {
   EvalRpnInput({
     required this.program,
@@ -27,7 +27,7 @@ class EvalRpnInput extends Input {
   final String? filePath;
   final bool readStdin;
 
-  /// `--max-digits`, or null for the default of runbook D55.
+  /// `--max-digits`, or null for the default digit limit.
   final int? maxDigits;
 
   @override
@@ -58,8 +58,9 @@ class EvalRpnQuery implements Query<EvalRpnInput, EvalOutput> {
       readStdin: input.readStdin,
       stdinReader: readStdin,
     );
-    final tokens = Calculatrix.tokenizeRpnLine(program);
+    List<String> tokens = const [];
     try {
+      tokens = Calculatrix.tokenizeRpnLine(program);
       return EvalOutput(
         Calculatrix.evaluateRpnStack(
           tokens,

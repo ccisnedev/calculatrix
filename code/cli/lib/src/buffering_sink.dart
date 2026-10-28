@@ -8,7 +8,7 @@ import 'dart:io';
 ///
 /// `runCalculatrixCli` is the one production caller: `modular_cli_sdk`
 /// writes its `extra-argument` error for the bare `<program>` shortcut
-/// (spec section 4, G4) in one call, with no seam to change its wording
+/// in one call, with no seam to change its wording
 /// before that write happens, so this buffers it instead and only then
 /// writes the (possibly rewritten) text to the real stream. Same shape as
 /// `test/support/memory_sink.dart`'s `MemorySink`, deliberately: this is

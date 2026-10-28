@@ -144,9 +144,18 @@ Related documents:
   A captured variable lives as long as some program still refers to it,
   even after the call that defined it returns.
 
+### Scope of computation
+
+- **L26. Numeric and symbolic, matrices first.** The language computes
+  exactly with numbers and symbolically with expressions (a CAS). In
+  both, the matrix is the unit of computation.
+- **L27. Pure Dart, Giac only as oracle.** The CAS is written in pure
+  Dart so the engine stays MIT; Giac is never linked and only checks
+  the engine in tests, under a clean-room policy (ADR 0004).
+
 ## Open
 
-O1–O3 were resolved as L22–L24, O9 as L25.
+O1–O3 were resolved as L22–L24, O9 as L25, O7 as L27.
 
 Next: O10 (function arity), then O4 (host parameters). Both change what
 `prepare` checks, and `engine-api-contract.md` cannot be updated without
@@ -160,13 +169,9 @@ them.
   between lines of the interactive calculator (as in the HP variable
   menu) are a different thing from variables that live until the end of
   one program (contract Q5).
-- **O6. Scope of the engine.** Exact numeric (integers, rationals,
-  complex, matrices) or also symbolic (a CAS)? Cross-engine determinism
-  (contract E2) is feasible for the first; symbolic simplification has
-  no canonical form in general.
-- **O7. Giac.** Proposed as a differential-testing oracle (the GPL-3
-  license does not restrict use in a test harness that is not
-  distributed), not as an engine. Not decided.
+- **O6. Canonical symbolic results.** How symbolic results stay
+  identical across engines (contract E2), since simplification has no
+  canonical form in general.
 - **O8. Element-wise operations** (`.==`, `.*`) and what `<` means on
   matrices.
 - **O10. Function arity.** E7 wants arity checked in `prepare`, but a
@@ -182,6 +187,10 @@ them.
   `limit-*` (E5), and with which word.
 - **O14. Infix grammar.** Precedence and associativity (is `-2^2` `-4`?),
   statement separators (`;`, newlines), comments.
+- **O15. Percent.** What `%` means in RPN (unary `x/100` today, or
+  binary `y x % -> x*y/100`) and how infix `%` translates to it. Today
+  `200+15%` is `200.15` in `cx` and `230` in the app (#86); with L3 one
+  meaning must hold everywhere.
 
 ## Superseded
 

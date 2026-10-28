@@ -1,13 +1,12 @@
-// Tests for runbook stage S2 (docs/runbook-cli-stage-0.md), covering every
-// row of docs/spec/calculatrix_cli.md section 13 that S2 delivers.
+// Tests for the grammar, banner and eval rows of the CLI contract.
 //
-// Excluded by the runbook's own scope: the version/doctor/upgrade/uninstall
-// rows, now covered by stage S3 in installation_test.dart, and the
-// commands/domain-error-id/"cx verison" suggestion rows (S4). A handful of
+// Excluded here: the version/doctor/upgrade/uninstall rows, covered in
+// installation_test.dart, and the commands/domain-error-id/"cx verison"
+// suggestion rows, covered in the commands tests. A handful of
 // grammar rows here necessarily surface a domain error from the core
 // evaluator (an ill-formed RPN or infix program); those are asserted only
 // on exit code 65, never on the specific error id, since the id catalog
-// itself is S4's concern. See the PR's "Open points".
+// is covered elsewhere.
 import 'dart:convert';
 import 'dart:io';
 
@@ -32,7 +31,7 @@ void main() {
     tempDir.deleteSync(recursive: true);
   });
 
-  // User decision (2026-09-29): cx follows GNU order by default (an option
+  // cx follows GNU order by default (an option
   // may follow an operand; cli_router permutes it in front before the
   // strict grammar runs), like macss, inquiry and skillwire. The production
   // entry point (bin/calculatrix_cli.dart) passes nothing, so cli_router
@@ -50,19 +49,19 @@ void main() {
     return cli.run(args, stdout: out, stderr: err, environment: environment);
   }
 
-  group('banner (G2, G3)', () {
+  group('banner', () {
     test('cx prints a banner naming the program cx and exits 0', () async {
       final code = await run([]);
       expect(code, ExitCode.ok);
       expect(out.output, contains('cx'));
       // The executable is `cx`; there is no `calculatrix` command name
-      // anywhere (issue #22). "Calculatrix" the product name, capitalized,
+      // anywhere. "Calculatrix" the product name, capitalized,
       // in prose is fine and does not trip this: the lowercase word
       // "calculatrix" is what would read as a command name.
       expect(out.output, isNot(contains('calculatrix')));
     });
 
-    test('cx ignores stdin and still prints the banner (G2)', () async {
+    test('cx ignores stdin and still prints the banner', () async {
       final code = await run(
         [],
         readStdin: () => fail('stdin must not be read'),
@@ -77,18 +76,18 @@ void main() {
       expect(cli.hostMetadata?.name, 'cx');
     });
 
-    test('cx help prints help and exits 0, not a program (G3)', () async {
+    test('cx help prints help and exits 0, not a program', () async {
       final code = await run(['help']);
       expect(code, ExitCode.ok);
     });
 
-    test('cx --help prints help and exits 0, not a program (G3)', () async {
+    test('cx --help prints help and exits 0, not a program', () async {
       final code = await run(['--help']);
       expect(code, ExitCode.ok);
     });
   });
 
-  group('usage lines name cx (issue #22 acceptance item 3, PR #23 review)', () {
+  group('usage lines name cx', () {
     test('cx --help prints a Usage: line naming cx', () async {
       final code = await run(['--help']);
       expect(code, ExitCode.ok);
@@ -112,7 +111,7 @@ void main() {
       expect(out.output, contains('1: 1'));
     });
 
-    test("cx '[[0 -1][1 0]] 2 ^' accepts adjacent rows (issue #29)", () async {
+    test("cx '[[0 -1][1 0]] 2 ^' accepts adjacent rows", () async {
       final code = await run(['[[0 -1][1 0]] 2 ^']);
       expect(code, ExitCode.ok);
       expect(out.output, contains('1: [[-1 0] [0 -1]]'));
@@ -124,42 +123,42 @@ void main() {
       expect(out.output, contains('1: -1'));
     });
 
-    test("cx '' rejects an empty program (G12)", () async {
+    test("cx '' rejects an empty program", () async {
       final code = await run(['']);
       expect(code, ExitCode.validationFailed);
     });
 
-    test("cx '   ' rejects a blank program (G12)", () async {
+    test("cx '   ' rejects a blank program", () async {
       final code = await run(['   ']);
       expect(code, ExitCode.validationFailed);
     });
 
-    test('an unquoted multi-token program is extraArgument, 64 (G4)', () async {
+    test('an unquoted multi-token program is extraArgument, 64', () async {
       final code = await run(['[[0', '-1]', '[1', '0]]', 'det']);
       expect(code, ExitCode.invalidUsage);
     });
 
-    test('cx -1 2 + unquoted is extraArgument, 64 (G4)', () async {
+    test('cx -1 2 + unquoted is extraArgument, 64', () async {
       final code = await run(['-1', '2', '+']);
       expect(code, ExitCode.invalidUsage);
     });
 
     test("cx '1 2 +' --file p.txt is rejected: the shortcut takes only the "
-        'global output options (G4, D63)', () async {
+        'global output options', () async {
       final code = await run(['1 2 +', '--file', 'p.txt']);
       expect(code, ExitCode.validationFailed);
     });
 
-    test("cx -- '-x' treats -x as the program, not an option (G10)", () async {
+    test("cx -- '-x' treats -x as the program, not an option", () async {
       final code = await run(['--', '-x']);
       // The grammar layer must accept "-x" as the operand rather than
       // reject it as an unknown option; what core then makes of the
-      // program "-x" is a domain-error-id concern deferred to S4.
+      // program "-x" is a domain-error-id concern covered elsewhere.
       expect(code, ExitCode.dataError);
     });
   });
 
-  group('eval rpn: sources (G1, G2)', () {
+  group('eval rpn: sources', () {
     test("cx eval rpn '1 2 +' prints 1: 3", () async {
       final code = await run(['eval', 'rpn', '1 2 +']);
       expect(code, ExitCode.ok);
@@ -203,14 +202,14 @@ void main() {
       expect(code, ExitCode.validationFailed);
     });
 
-    test('cx eval rpn -f empty.rpn rejects an empty program (G12)', () async {
+    test('cx eval rpn -f empty.rpn rejects an empty program', () async {
       final file = File('${tempDir.path}/empty.rpn')..writeAsStringSync('   ');
       final code = await run(['eval', 'rpn', '-f', file.path]);
       expect(code, ExitCode.validationFailed);
     });
 
     test(
-      'cx eval rpn -f prog.rpn PROGRAM is rejected: two sources (G1)',
+      'cx eval rpn -f prog.rpn PROGRAM is rejected: two sources',
       () async {
         final file = File('${tempDir.path}/prog.rpn')
           ..writeAsStringSync('1 2 +');
@@ -229,12 +228,12 @@ void main() {
       expect(out.output, contains('1: 3'));
     });
 
-    test('cx eval rpn --stdin rejects an empty program (G12)', () async {
+    test('cx eval rpn --stdin rejects an empty program', () async {
       final code = await run(['eval', 'rpn', '--stdin'], readStdin: () => '');
       expect(code, ExitCode.validationFailed);
     });
 
-    test('cx eval rpn PROGRAM ignores stdin (G2)', () async {
+    test('cx eval rpn PROGRAM ignores stdin', () async {
       final code = await run([
         'eval',
         'rpn',
@@ -244,12 +243,12 @@ void main() {
       expect(out.output, contains('1: 3'));
     });
 
-    test('cx eval rpn --stdin PROGRAM is rejected: two sources (G1)', () async {
+    test('cx eval rpn --stdin PROGRAM is rejected: two sources', () async {
       final code = await run(['eval', 'rpn', '--stdin', '1 2 +']);
       expect(code, ExitCode.validationFailed);
     });
 
-    test('cx eval rpn with no source is rejected: no program (G1)', () async {
+    test('cx eval rpn with no source is rejected: no program', () async {
       final code = await run(['eval', 'rpn']);
       expect(code, ExitCode.validationFailed);
     });
@@ -259,7 +258,7 @@ void main() {
   // its ExactlyOne(expression, file, stdin) constraint with `eval rpn`
   // (EvalContracts, eval_support.dart's resolveProgramSource), so every
   // source and rejection case there has an infix counterpart here too.
-  group('eval infix: sources (G1, G2)', () {
+  group('eval infix: sources', () {
     test(
       'cx eval infix -f expr.txt reads the expression from a file',
       () async {
@@ -281,13 +280,13 @@ void main() {
       expect(out.output, contains('1: 14'));
     });
 
-    test('cx eval infix with no source is rejected: no program (G1)', () async {
+    test('cx eval infix with no source is rejected: no program', () async {
       final code = await run(['eval', 'infix']);
       expect(code, ExitCode.validationFailed);
     });
 
     test(
-      'cx eval infix -f expr.txt EXPRESSION is rejected: two sources (G1)',
+      'cx eval infix -f expr.txt EXPRESSION is rejected: two sources',
       () async {
         final file = File('${tempDir.path}/expr.txt')
           ..writeAsStringSync('2+3*4');
@@ -297,7 +296,7 @@ void main() {
     );
 
     test(
-      'cx eval infix -f expr.txt --stdin is rejected: two sources (G1)',
+      'cx eval infix -f expr.txt --stdin is rejected: two sources',
       () async {
         final file = File('${tempDir.path}/expr.txt')
           ..writeAsStringSync('2+3*4');
@@ -306,24 +305,24 @@ void main() {
       },
     );
 
-    test('cx eval infix -f empty.txt rejects an empty program (G12)', () async {
+    test('cx eval infix -f empty.txt rejects an empty program', () async {
       final file = File('${tempDir.path}/empty.txt')..writeAsStringSync('   ');
       final code = await run(['eval', 'infix', '-f', file.path]);
       expect(code, ExitCode.validationFailed);
     });
 
-    test('cx eval infix --stdin rejects an empty program (G12)', () async {
+    test('cx eval infix --stdin rejects an empty program', () async {
       final code = await run(['eval', 'infix', '--stdin'], readStdin: () => '');
       expect(code, ExitCode.validationFailed);
     });
   });
 
-  group('eval rpn: option grammar (G6, G7, G8, G9)', () {
+  group('eval rpn: option grammar', () {
     // Moved to explicit strict-mode environment per the 2026-09-29 GNU-order
     // decision: under the default (GNU order), this same invocation is
     // accepted instead (see the two tests below), so this one is only
     // misplacedOption once POSIXLY_CORRECT is set.
-    test('cx eval rpn PROGRAM --json is misplacedOption, 7 (G6)', () async {
+    test('cx eval rpn PROGRAM --json is misplacedOption, 7', () async {
       final code = await run(
         ['eval', 'rpn', '1 2 +', '--json'],
         environment: const {'POSIXLY_CORRECT': '1'},
@@ -331,7 +330,7 @@ void main() {
       expect(code, ExitCode.validationFailed);
     });
 
-    // User decision (2026-09-29): cx follows GNU order by default (options
+    // cx follows GNU order by default (options
     // may follow operands), like macss, inquiry and skillwire; only
     // POSIXLY_CORRECT (read from the real environment) restores strict
     // POSIX order. Under the default (no POSIXLY_CORRECT, environment: {}),
@@ -392,13 +391,13 @@ void main() {
       expect(code, ExitCode.validationFailed);
     });
 
-    test('cx eval rpn -fprog.rpn is invalidShortOption, 7 (G9)', () async {
+    test('cx eval rpn -fprog.rpn is invalidShortOption, 7', () async {
       final code = await run(['eval', 'rpn', '-fprog.rpn']);
       expect(code, ExitCode.validationFailed);
     });
 
     test(
-      'cx eval rpn --file=-x.rpn reads a dash-prefixed filename (G8)',
+      'cx eval rpn --file=-x.rpn reads a dash-prefixed filename',
       () async {
         final previousCwd = Directory.current;
         Directory.current = tempDir;
@@ -425,13 +424,13 @@ void main() {
       expect(code, ExitCode.validationFailed);
     });
 
-    test('cx eval rpn --stdin=true is unexpectedValue, 7 (G7)', () async {
+    test('cx eval rpn --stdin=true is unexpectedValue, 7', () async {
       final code = await run(['eval', 'rpn', '--stdin=true']);
       expect(code, ExitCode.validationFailed);
     });
 
     test(
-      'cx eval rpn --stdin true: true becomes the program, two sources (G7)',
+      'cx eval rpn --stdin true: true becomes the program, two sources',
       () async {
         final code = await run(['eval', 'rpn', '--stdin', 'true']);
         expect(code, ExitCode.validationFailed);
@@ -442,10 +441,8 @@ void main() {
     // misplacedOption: GNU permutation only ever moves an option earlier
     // relative to operands, never across an unresolved route boundary, so
     // this stays rejected the same way under either ordering. Kept
-    // explicit here (strict mode) since it is one of the two tests
-    // labeled G6 (the other is above), per the 2026-09-29 GNU-order
-    // decision, even though its outcome does not depend on it.
-    test('cx -f prog.rpn eval rpn is misplacedOption, 7 (G6)', () async {
+    // explicit here (strict mode), even though its outcome does not depend on it.
+    test('cx -f prog.rpn eval rpn is misplacedOption, 7', () async {
       final code = await run(
         ['-f', 'prog.rpn', 'eval', 'rpn'],
         environment: const {'POSIXLY_CORRECT': '1'},
@@ -458,7 +455,7 @@ void main() {
       expect(code, ExitCode.ok);
     });
 
-    test('cx eval rpn -qh is invalidShortOption, 7 (G9)', () async {
+    test('cx eval rpn -qh is invalidShortOption, 7', () async {
       final code = await run(['eval', 'rpn', '-qh']);
       expect(code, ExitCode.validationFailed);
     });
@@ -473,7 +470,7 @@ void main() {
     test("cx eval rpn '1 +' fails as a domain error, 65", () async {
       final code = await run(['eval', 'rpn', '1 +']);
       // The specific error id (stack-underflow) is a domain-error-id
-      // concern deferred to S4; here only the exit code is asserted.
+      // concern covered elsewhere; here only the exit code is asserted.
       expect(code, ExitCode.dataError);
     });
 
@@ -488,17 +485,17 @@ void main() {
       expect(code, ExitCode.dataError);
     });
 
-    test('cx eval rpn -- --help: --help becomes the program (G10)', () async {
+    test('cx eval rpn -- --help: --help becomes the program', () async {
       final code = await run(['eval', 'rpn', '--', '--help']);
       expect(code, ExitCode.dataError);
     });
   });
 
-  group('eval output: display formatter and whole stack (D45, D47)', () {
+  group('eval output: display formatter and whole stack', () {
     test(
       "cx '~[[1 2] [3 4]] inverse' prints 1: ~[[-2 1] [1.5 -0.5]]",
       () async {
-        // An approximate value carries the mark once, in front (D54).
+        // An approximate value carries the mark once, in front.
         final code = await run(['~[[1 2] [3 4]] inverse']);
         expect(code, ExitCode.ok);
         expect(out.output, '1: ~[[-2 1] [1.5 -0.5]]\n');
@@ -574,7 +571,7 @@ void main() {
     });
   });
 
-  group('infix name errors in JSON (issue #51, AC2)', () {
+  group('infix name errors in JSON', () {
     // The error envelope goes to stderr, never stdout
     // (`_renderRecordedError` in modular_cli_sdk writes only to `err`; see
     // the equivalent assertion in commands_cli_test.dart).
@@ -590,7 +587,7 @@ void main() {
     });
 
     test('cx eval infix "sqrt(1+2)" never suggests a command that would '
-        'itself fail (issue #51, AC2): "cx eval rpn \\"1+2 sqrt\\"" is two '
+        'itself fail: "cx eval rpn \\"1+2 sqrt\\"" is two '
         'tokens, the second of which is unknown-word', () async {
       final code = await run(['eval', 'infix', '--json', 'sqrt(1+2)']);
       expect(code, ExitCode.dataError);
@@ -600,7 +597,7 @@ void main() {
     });
 
     test('cx eval infix "sqrt (7)" (space before the call) never suggests a '
-        'command that would itself underflow (issue #51, AC2)', () async {
+        'command that would itself underflow', () async {
       final code = await run(['eval', 'infix', '--json', 'sqrt (7)']);
       expect(code, ExitCode.dataError);
       final decoded = jsonDecode(err.output) as Map<String, dynamic>;
@@ -609,7 +606,7 @@ void main() {
     });
 
     test('cx eval infix "frobenius-norm(7)" names the whole hyphenated word, '
-        'not just "frobenius" (issue #51, AC2)', () async {
+        'not just "frobenius"', () async {
       final code = await run(['eval', 'infix', '--json', 'frobenius-norm(7)']);
       expect(code, ExitCode.dataError);
       final decoded = jsonDecode(err.output) as Map<String, dynamic>;
@@ -620,14 +617,14 @@ void main() {
     });
 
     test('cx "3^-2" (shortcut) hints at eval infix instead of a plain '
-        'unknown-word (issue #51, AC3)', () async {
+        'unknown-word', () async {
       final code = await run(['3^-2']);
       expect(code, ExitCode.dataError);
       expect(err.output, contains('this looks like an infix expression'));
     });
 
     test('cx eval rpn "1+.5" hints at eval infix instead of a plain '
-        'unknown-word (issue #51, AC3)', () async {
+        'unknown-word', () async {
       final code = await run(['eval', 'rpn', '1+.5']);
       expect(code, ExitCode.dataError);
       expect(err.output, contains('this looks like an infix expression'));
@@ -674,9 +671,9 @@ void main() {
   // Matrix's own `/` operator only supports a scalar, i.e. 1x1, denominator
   // (matrix-by-matrix division throws typeMismatch), so a Giac-checked
   // matrix inverse case built through `/` cannot be built here. `inverse`
-  // and `inv` are now registered RPN words (issue #35, defined as `-1
+  // and `inv` are now registered RPN words (defined as `-1
   // power`), but that word and its Giac cross-check belong with the rest
-  // of the S4 commands catalog coverage, not this Giac fixture group.
+  // of the commands catalog coverage, not this Giac fixture group.
   group('Giac-verified numeric results (non-trivial)', () {
     // Relative-tolerance comparison against a Giac-derived expected value,
     // matching the CLI's own JSON number (an int or a double per
@@ -808,7 +805,7 @@ void main() {
     });
 
     // Negative-number RPN program via the shortcut. The coordinator's
-    // literal "cx 1 -2 +" is three unquoted argv tokens, which G4 already
+    // literal "cx 1 -2 +" is three unquoted argv tokens, which the shortcut
     // rejects as extraArgument, 64 (see "cx -1 2 + unquoted is
     // extraArgument" above); the grammar only accepts a negative-number
     // RPN program as a single quoted argument, e.g. cx '1 -2 +', the same

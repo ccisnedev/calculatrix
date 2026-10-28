@@ -1,4 +1,4 @@
-// Tests for issue #66: a value that starts with "-" and looks like an
+// A value that starts with "-" and looks like an
 // expression, such as `cx eval infix '-sqrt(-1)'`, is read by
 // `modular_cli_sdk` as short options and rejected as `invalid-short-option`.
 // The error stays (POSIX: "--" ends the options), but its message now says
@@ -13,7 +13,7 @@ import 'package:test/test.dart';
 import '../support/memory_sink.dart';
 
 void main() {
-  group('optionLikeValueIndex (issue #66)', () {
+  group('optionLikeValueIndex', () {
     test('finds an argument that starts with "-" and looks like an '
         'expression', () {
       expect(optionLikeValueIndex(['eval', 'infix', '-sqrt(-1)']), 2);
@@ -38,7 +38,7 @@ void main() {
     });
   });
 
-  group('runCalculatrixCli on a value read as options (issue #66)', () {
+  group('runCalculatrixCli on a value read as options', () {
     test('the text error keeps its id and exit code and suggests --', () async {
       final out = MemorySink();
       final err = MemorySink();

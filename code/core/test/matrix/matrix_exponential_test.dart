@@ -28,21 +28,24 @@ void main() {
       expect(result.at(1, 1), closeTo(invE, 1e-10));
     });
 
-    test('exp(θ·J) for θ = π/2 = [[0, -1], [1, 0]] (near [[cos(π/2), -sin(π/2)], [sin(π/2), cos(π/2)]])', () {
-      // exp(π/2 · i) = cos(π/2) + sin(π/2)·i = 0 + 1·i = i
-      final double theta = math.pi / 2;
-      final Matrix thetaJ = Matrix.i.scale(theta);
-      final Matrix result = thetaJ.exp();
+    test(
+      'exp(θ·J) for θ = π/2 = [[0, -1], [1, 0]] (near [[cos(π/2), -sin(π/2)], [sin(π/2), cos(π/2)]])',
+      () {
+        // exp(π/2 · i) = cos(π/2) + sin(π/2)·i = 0 + 1·i = i
+        final double theta = math.pi / 2;
+        final Matrix thetaJ = Matrix.i.scale(theta);
+        final Matrix result = thetaJ.exp();
 
-      // Expected: [[cos(θ), -sin(θ)], [sin(θ), cos(θ)]]
-      final double c = math.cos(theta);
-      final double s = math.sin(theta);
+        // Expected: [[cos(θ), -sin(θ)], [sin(θ), cos(θ)]]
+        final double c = math.cos(theta);
+        final double s = math.sin(theta);
 
-      expect(result.at(0, 0), closeTo(c, 1e-10)); // cos(π/2) ≈ 0
-      expect(result.at(0, 1), closeTo(-s, 1e-10)); // -sin(π/2) ≈ -1
-      expect(result.at(1, 0), closeTo(s, 1e-10)); // sin(π/2) ≈ 1
-      expect(result.at(1, 1), closeTo(c, 1e-10)); // cos(π/2) ≈ 0
-    });
+        expect(result.at(0, 0), closeTo(c, 1e-10)); // cos(π/2) ≈ 0
+        expect(result.at(0, 1), closeTo(-s, 1e-10)); // -sin(π/2) ≈ -1
+        expect(result.at(1, 0), closeTo(s, 1e-10)); // sin(π/2) ≈ 1
+        expect(result.at(1, 1), closeTo(c, 1e-10)); // cos(π/2) ≈ 0
+      },
+    );
 
     test('exp(0) for 3×3 = I₃', () {
       final Matrix zero = Matrix.zeros(3, 3);

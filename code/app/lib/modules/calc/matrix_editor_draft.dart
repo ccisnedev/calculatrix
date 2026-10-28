@@ -222,9 +222,9 @@ class MatrixEditorDraft {
     return null;
   }
 
-  // A cell takes the numeric literals of core (runbook D50, D56, D59): a
-  // decimal, a fraction p/q, either with the mark `~`. A cell that reads as
-  // a literal but has no value (`1/0`, a literal over the digit limit) gets
+  // A cell takes the numeric literals of core: a decimal or a fraction p/q
+  // (an exact literal), either with the mark `~`. A cell that reads as a
+  // literal but has no value (`1/0`, a literal over the digit limit) gets
   // the core message.
   static String? _cellError(String cell) {
     if (!Calculatrix.isLiteralToken(cell) || cell.contains('[')) {
@@ -246,8 +246,8 @@ class MatrixEditorDraft {
       throw FormatException(error);
     }
 
-    // The cells go in as typed, so an exact entry stays exact and a marked
-    // one marks the matrix (runbook D56).
+    // The cells go in as typed, so an exact entry stays exact, and one
+    // `~` entry marks the whole matrix.
     final StringBuffer buffer = StringBuffer('[');
     for (int r = 0; r < rowCount; r++) {
       if (r > 0) {

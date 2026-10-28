@@ -1,8 +1,8 @@
 # calculatrix_cli
 
 The `cx` command-line interface for Calculatrix, built on `modular_cli_sdk`.
-See `docs/spec/calculatrix_cli.md` for the full grammar and behavior, and
-`docs/runbook-cli-stage-0.md` for how the CLI is being built in stages.
+Its version is in `pubspec.yaml`. See `docs/spec/calculatrix_cli.md` for the full
+grammar and behavior.
 
 The executable is named `cx`. There is no `calculatrix` executable and no
 alias of any kind: `cx` is what you run, directly (issue #22).
@@ -38,15 +38,15 @@ installs `cx` with no alias of any kind. See `scripts/install.ps1` and
 
 ```bash
 cx upgrade --plan     # preview
-cx upgrade --apply     # install the newest cli-v* release over this one
+cx upgrade --apply    # install the newest cli-v* release over this one
 cx doctor              # check PATH and whether a newer release exists
 cx uninstall --apply   # remove this install
 ```
 
-## Run
+## Run from source
 
 ```bash
-dart run bin/cx.dart
+dart run bin/cx.dart '1 2 +'
 ```
 
 ## Try it

@@ -1,4 +1,4 @@
-// Issue #68 (runbook-agent-usability.md D63, spec G4): the `cx <program>`
+// The `cx <program>`
 // shortcut accepts the global output options `--json` and `--quiet`/`-q`,
 // before or after the program, exactly as `cx eval rpn` does, and rejects
 // the options only `eval rpn` has (`--file`, `--stdin`) with the full
@@ -26,7 +26,7 @@ Future<_Run> _run(List<String> args) async {
 }
 
 void main() {
-  group('global options on the shortcut (#68)', () {
+  group('global options on the shortcut', () {
     test('cx --json \'1 3 /\' is identical to cx eval rpn --json', () async {
       final shortcut = await _run(['--json', '1 3 /']);
       final eval = await _run(['eval', 'rpn', '--json', '1 3 /']);
@@ -98,7 +98,7 @@ void main() {
       );
     });
 
-    test("cx '1 2 +' --file p.txt gives the message of the spec", () async {
+    test("cx '1 2 +' --file p.txt gives the full-spelling message", () async {
       final result = await _run(['1 2 +', '--file', 'p.txt']);
       expect(result.code, 7);
       expect(

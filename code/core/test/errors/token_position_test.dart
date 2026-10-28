@@ -1,6 +1,6 @@
-// Tests for issue #5 review round 1, finding 1: every domain error whose
+// Every domain error whose
 // cause traces back to an input token must carry that token and its
-// 1-based character position in the source program (spec section 2), not
+// 1-based character position in the source program, not
 // just the token in isolation. For RPN this is the character offset of the
 // token within `tokens.join(' ')` (the same string Calculatrix reports as
 // the evaluated expression); for infix it is the offset of the offending
@@ -21,7 +21,7 @@ int _expectedRpnPosition(List<String> tokens, int index) {
 }
 
 void main() {
-  group('RPN domain errors carry token and position (issue #5 section 2)', () {
+  group('RPN domain errors carry token and position', () {
     test(
       'unknown-word: an unrecognized word carries itself and position 1',
       () {
@@ -84,20 +84,17 @@ void main() {
       }
     });
 
-    test(
-      'non-finite: an overflowing approximate literal carries itself and '
-      'position 1',
-      () {
-        try {
-          Calculatrix.evaluateRpn(<String>['~1e999']);
-          fail('expected MatrixDomainError');
-        } on MatrixDomainError catch (error) {
-          expect(error.errorId, CalculatrixErrorId.nonFinite);
-          expect(error.token, '~1e999');
-          expect(error.position, 1);
-        }
-      },
-    );
+    test('non-finite: an overflowing approximate literal carries itself and '
+        'position 1', () {
+      try {
+        Calculatrix.evaluateRpn(<String>['~1e999']);
+        fail('expected MatrixDomainError');
+      } on MatrixDomainError catch (error) {
+        expect(error.errorId, CalculatrixErrorId.nonFinite);
+        expect(error.token, '~1e999');
+        expect(error.position, 1);
+      }
+    });
 
     test('non-finite: an overflowing product carries the "*" token, and '
         'the whole stack is checked the same way', () {
@@ -142,9 +139,9 @@ void main() {
       }
     });
 
-    test('log-undefined: a non-integer power of a matrix with a non-positive '
-        'real eigenvalue carries the "^" token', () {
-      final List<String> tokens = <String>['[[-1,0],[0,2]]', '0.5', '^'];
+    test('log-undefined: a non-integer power of a matrix with a zero '
+        'eigenvalue carries the "^" token', () {
+      final List<String> tokens = <String>['[[0,0],[0,2]]', '1.5', '^'];
       try {
         Calculatrix.evaluateRpn(tokens);
         fail('expected MatrixDomainError');
@@ -169,7 +166,7 @@ void main() {
     });
   });
 
-  group('Infix errors carry token and position (issue #5 section 2)', () {
+  group('Infix errors carry token and position', () {
     test('syntax-error carries the offending token and its 1-based offset', () {
       // "1 2 +": the second operand "2" is the offending token, at index 2
       // (0-based) in the string, i.e. 1-based position 3.
@@ -198,7 +195,7 @@ void main() {
     });
 
     test('leading whitespace in the original input line counts toward the '
-        'offending token\'s 1-based offset (review round 1 follow-up)', () {
+        'offending token\'s 1-based offset', () {
       // "  1/0": two leading spaces before "1/0", so "/" sits at 0-based
       // index 3 in the original line, i.e. 1-based position 4. The
       // expression must not be trimmed before positions are computed.
@@ -213,8 +210,7 @@ void main() {
     });
   });
 
-  group('RPN positions count leading whitespace in the input line '
-      '(review round 1 follow-up)', () {
+  group('RPN positions count leading whitespace in the input line', () {
     test('a raw token carrying leading whitespace still reports the '
         '1-based offset of the token itself, not of the whitespace', () {
       // A single raw token "  bogus" stands in for a caller that hands

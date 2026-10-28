@@ -1,7 +1,5 @@
-/// The overview of what `cx` does (issue #72, runbook-agent-usability.md
-/// D64), defined once. The banner, the install scripts and, once
-/// `modular_cli_sdk` 0.10.0 is out, the help epilog (issue #56) show these
-/// lines, so they cannot say different things.
+/// The overview of what `cx` does, defined once. The banner, the install
+/// scripts and the help epilog show these lines, so they cannot say different things.
 ///
 /// RPN, infix, matrices and exact/approximate values have equal weight. The
 /// symbolic form is not mentioned until it exists. ASCII only: the install

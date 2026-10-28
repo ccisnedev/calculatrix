@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 /// Patterns that mark a development meta reference (a runbook, a decision,
 /// an issue or PR, an acceptance criterion, a runbook step or the spec)
 /// leaking into user-facing text, mirroring the check the core package runs
-/// over its command registry (issue #43). Case-insensitive throughout.
+/// over its command registry. Case-insensitive throughout.
 ///
 /// A bare `D`, `R`, `S` or `AC` with no digits attached is never flagged: it
 /// is free to name a matrix or any other mathematical object.
@@ -31,12 +31,12 @@ Iterable<File> _dartFilesUnder(Directory dir) {
 void main() {
   test(
     'no CLI source line outside a full-line comment carries a development '
-    'meta reference (issue #43)',
+    'meta reference',
     () {
       // A cheap, line-oriented scan, not a full parse: it treats a line as
       // a code comment, and skips it, only when the line holds nothing but
-      // a `//` or `///` comment (matching the grep the issue was filed
-      // with). A reference inside an actual user-facing string literal, in
+      // a `//` or `///` comment (matching a plain grep for
+      // those patterns). A reference inside an actual user-facing string literal, in
       // error messages or help text, has nowhere to hide from it.
       final Directory libDir = Directory('lib');
       expect(libDir.existsSync(), isTrue, reason: 'lib directory not found');

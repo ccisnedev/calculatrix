@@ -7,7 +7,7 @@ import 'eval_contracts.dart';
 import 'eval_output.dart';
 import 'eval_support.dart';
 
-/// `cx eval infix [<expression>] [--file <path>] [--stdin]` (spec section 4).
+/// `cx eval infix [<expression>] [--file <path>] [--stdin]`.
 class EvalInfixInput extends Input {
   EvalInfixInput({
     required this.expression,
@@ -27,7 +27,7 @@ class EvalInfixInput extends Input {
   final String? filePath;
   final bool readStdin;
 
-  /// `--max-digits`, or null for the default of runbook D55.
+  /// `--max-digits`, or null for the default digit limit.
   final int? maxDigits;
 
   @override

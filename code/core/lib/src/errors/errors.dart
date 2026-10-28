@@ -1,4 +1,4 @@
-/// Structured domain error ids (spec section 6).
+/// Structured domain error ids.
 ///
 /// Every id here is a stable, kebab-case string suitable for machine
 /// consumption (for example, `{"error": {"id": ...}}` in a CLI's JSON
@@ -16,7 +16,8 @@ enum CalculatrixErrorId {
   ambiguousPower('ambiguous-power'),
   syntaxError('syntax-error'),
   limitExceeded('limit-exceeded'),
-  complexResult('complex-result');
+  complexResult('complex-result'),
+  notDiagonalizable('not-diagonalizable');
 
   const CalculatrixErrorId(this.id);
 
@@ -45,13 +46,13 @@ class CalculatrixError implements Exception {
   /// Human-readable explanation of the failure.
   String get message => _message;
 
-  /// "Did you mean" candidates (spec section 7, "Did you mean"), closest
+  /// "Did you mean" candidates, closest
   /// first. Empty when there is nothing close enough, or when this error
   /// has no notion of a suggestion at all. Only [UnknownWordError] sets
   /// this today, from [CalculatrixCommandRegistry.suggest].
   final List<String> suggestions;
 
-  /// The structured domain error id (spec section 6), when known.
+  /// The structured domain error id, when known.
   final CalculatrixErrorId? errorId;
 
   /// The offending token, when the evaluator knows it.
@@ -185,8 +186,7 @@ class UnsupportedCalculatrixOperationError extends CalculatrixError {
   });
 }
 
-/// An RPN word that does not name any known operator, function or literal
-/// (spec section 6). RPN never falls back to the infix evaluator for an
+/// An RPN word that does not name any known operator, function or literal. RPN never falls back to the infix evaluator for an
 /// unrecognized token; it raises this instead.
 class UnknownWordError extends CalculatrixError {
   UnknownWordError(
@@ -236,7 +236,7 @@ class EmptyMemoryError extends CalculatrixError {
   EmptyMemoryError(super.message);
 }
 
-/// An exact result that would be larger than the size limit (runbook D55):
+/// An exact result that would be larger than the size limit:
 /// raised before the computation, never replaced by an approximate result.
 /// [limit] and [estimated] count decimal digits of a numerator or
 /// denominator.

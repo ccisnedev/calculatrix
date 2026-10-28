@@ -147,10 +147,16 @@ void main() {
       expect(Matrix.complex(0, -1), Matrix.i.scale(-1));
     });
 
-    test('Matrix.complex(2, 3) * Matrix.complex(-1, 7) = Matrix.complex(-23, 11)', () {
-      // (2+3i)(-1+7i) = -2+14i - 3i + 21i² = -2+11i - 21 = -23+11i
-      expect(Matrix.complex(2, 3) * Matrix.complex(-1, 7), Matrix.complex(-23, 11));
-    });
+    test(
+      'Matrix.complex(2, 3) * Matrix.complex(-1, 7) = Matrix.complex(-23, 11)',
+      () {
+        // (2+3i)(-1+7i) = -2+14i - 3i + 21i² = -2+11i - 21 = -23+11i
+        expect(
+          Matrix.complex(2, 3) * Matrix.complex(-1, 7),
+          Matrix.complex(-23, 11),
+        );
+      },
+    );
 
     test('isComplexForm is true for Matrix.complex(a, b)', () {
       expect(Matrix.complex(3, 5).isComplexForm, isTrue);

@@ -1,4 +1,4 @@
-# check-caret.ps1: regression check for issue #22 (`cx`, not `calculatrix`,
+# check-caret.ps1: regression check (`cx, not `calculatrix`,
 # and no `.cmd`/`.bat` alias shim of any kind, because such a shim runs
 # through cmd.exe, which consumes `^` while parsing the command line before
 # the shim body ever runs).
@@ -13,7 +13,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$expected = '1: 1.4142135623730951'
+$expected = '1: ~1.41421356237'
 $anyFailed = $false
 
 function Test-CaretInvocation {

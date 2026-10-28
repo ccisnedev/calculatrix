@@ -1,7 +1,6 @@
-// Differential regression check against `origin/main` (PR #7,
-// feat/core-power-and-error-ids): a corpus of 6440 deterministic matrices
+// Differential regression check against `origin/main`: a corpus of 6440 deterministic matrices
 // was evaluated against every public Matrix API present on both branches.
-// Three distinct classes of regression (PR worse than main, main's own
+// Three distinct classes of regression (branch worse than main, main's own
 // value verified against a Julia 1.12.7 bare stdlib (Base/LinearAlgebra
 // only, no packages installed) reference) were found. Each is reproduced
 // here with a minimal case pulled directly from the differential corpus.
@@ -10,9 +9,9 @@
 // feat/core-power-and-error-ids branch. This minimal rebuild does not
 // touch exp(), eigenvalues() or spectralNorm() at all, so these tests
 // exercise main's untouched behavior directly; they are included here as
-// the required regression guard from the issue #5 rebuild plan, not
-// because this branch fixed any of these three regressions itself (they
-// were PR #7 regressions against main, and main never had them).
+// a required regression guard, not because this branch fixed any of
+// these three regressions itself (they were regressions of the earlier
+// branch against main, and main never had them).
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 

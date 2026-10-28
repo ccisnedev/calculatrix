@@ -68,7 +68,7 @@ final class CalculatrixMachine {
   // a defined word's expansion (e.g. "over" compiling to "2 pick"): a
   // reader of the word must see it either fully apply or not apply at all,
   // never left with just its literal operand (the "2") pushed and nothing
-  // else (D44, issue #39).
+  // else.
   void executeAtomic(Iterable<CalculatrixCommand> commands) {
     final List<Matrix> snapshot = _engine.stack;
     try {

@@ -23,17 +23,11 @@ void main() {
     });
 
     test('scalar(3) + Matrix.i = Matrix.complex(3, 1) = [[3,-1],[1,3]]', () {
-      expect(
-        Matrix.scalar(3) + Matrix.i,
-        Matrix.complex(3, 1),
-      );
+      expect(Matrix.scalar(3) + Matrix.i, Matrix.complex(3, 1));
     });
 
     test('Matrix.i + scalar(3) = Matrix.complex(3, 1)', () {
-      expect(
-        Matrix.i + Matrix.scalar(3),
-        Matrix.complex(3, 1),
-      );
+      expect(Matrix.i + Matrix.scalar(3), Matrix.complex(3, 1));
     });
 
     test('scalar(0) + Matrix.i = Matrix.i', () {
@@ -41,10 +35,7 @@ void main() {
     });
 
     test('scalar(3) + Matrix.complex(2, 5) = Matrix.complex(5, 5)', () {
-      expect(
-        Matrix.scalar(3) + Matrix.complex(2, 5),
-        Matrix.complex(5, 5),
-      );
+      expect(Matrix.scalar(3) + Matrix.complex(2, 5), Matrix.complex(5, 5));
     });
 
     test('scalar(k) + identity(3×3) promotes to k·I₃ + I₃', () {
@@ -75,17 +66,11 @@ void main() {
 
   group('Scalar promotion — subtraction', () {
     test('scalar(3) - Matrix.i = Matrix.complex(3, -1) = [[3,1],[-1,3]]', () {
-      expect(
-        Matrix.scalar(3) - Matrix.i,
-        Matrix.complex(3, -1),
-      );
+      expect(Matrix.scalar(3) - Matrix.i, Matrix.complex(3, -1));
     });
 
     test('Matrix.i - scalar(1) = Matrix.complex(-1, 1) = [[-1,-1],[1,-1]]', () {
-      expect(
-        Matrix.i - Matrix.scalar(1),
-        Matrix.complex(-1, 1),
-      );
+      expect(Matrix.i - Matrix.scalar(1), Matrix.complex(-1, 1));
     });
 
     test('scalar(5) - Matrix.identity(2) = 4·I₂', () {

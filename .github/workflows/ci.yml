@@ -25,7 +25,7 @@ jobs:
 
       - run: flutter test
 
-  # Core tests, with the differential tests against Giac (runbook D57).
+  # Core tests, with the differential tests against Giac.
   # Giac judges the exact results only; it is never shipped.
   # The job takes under a minute; the timeouts stop a stalled apt-get from
   # holding the runner for the default six hours.
@@ -55,6 +55,28 @@ jobs:
       - run: dart test
         env:
           CALCULATRIX_REQUIRE_GIAC: '1'
+
+  # CLI tests, so a pull request that breaks `cx` fails here and not at
+  # release time. The CLI reads the core by path, so this checkout tests
+  # both together.
+  cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: code/cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - run: dart pub get
+
+      - run: dart analyze
+
+      - run: dart test
 
   build-web:
     runs-on: ubuntu-latest

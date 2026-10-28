@@ -3,21 +3,24 @@ import 'package:test/test.dart';
 
 void main() {
   group('Calculatrix macros', () {
-    test('fill zeros like top replaces the top matrix with same-shape zeros', () {
-      final CalculatrixMachine machine = CalculatrixMachine();
+    test(
+      'fill zeros like top replaces the top matrix with same-shape zeros',
+      () {
+        final CalculatrixMachine machine = CalculatrixMachine();
 
-      machine.execute(
-        PushMatrixCommand(
-          Matrix(<List<double>>[
-            <double>[1, 2],
-            <double>[3, 4],
-          ]),
-        ),
-      );
-      machine.executeMacro(const FillZerosLikeTopMacro());
+        machine.execute(
+          PushMatrixCommand(
+            Matrix(<List<double>>[
+              <double>[1, 2],
+              <double>[3, 4],
+            ]),
+          ),
+        );
+        machine.executeMacro(const FillZerosLikeTopMacro());
 
-      expect(machine.top, Matrix.zeros(2, 2));
-    });
+        expect(machine.top, Matrix.zeros(2, 2));
+      },
+    );
 
     test('fill ones like top replaces the top matrix with same-shape ones', () {
       final CalculatrixMachine machine = CalculatrixMachine();

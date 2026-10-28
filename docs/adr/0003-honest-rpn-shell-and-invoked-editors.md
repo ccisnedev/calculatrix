@@ -105,7 +105,18 @@ The dynamic mode-specific command decks are replaced by one fixed module bar:
 Each module exposes up to 10 command slots without filler duplication.
 
 - Empty slots are acceptable.
-- Overflow uses explicit paging controls only when extra pages really exist.
+- Overflow uses explicit paging controls only when extra pages really exist:
+  `>` on the first page that overflows, `<` and `>` on intermediate pages.
+
+The `BASIC` module holds:
+
+```text
+ MRC  M-   M+   AC   C
+ ___  %   SQRT INV   i
+```
+
+`SQRT` stays in `BASIC` even though `MATH` exists; `MATH` holds the
+functions such as `log`, `ln` and `exp`.
 
 ### 7. Memory adopts pocket-calculator-style `MRC`
 

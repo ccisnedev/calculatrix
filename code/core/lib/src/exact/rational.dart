@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-/// An exact rational number (runbook D49): a pair of [BigInt], always
+/// An exact rational number: a pair of [BigInt], always
 /// reduced, with a positive denominator. An integer is a rational whose
 /// denominator is 1.
 ///
@@ -159,7 +159,7 @@ final class Rational implements Comparable<Rational> {
   int get hashCode => Object.hash(numerator, denominator);
 
   /// The decimal digits of the larger of numerator and denominator, the
-  /// quantity the size limit of runbook D55 counts.
+  /// quantity the size limit of an exact number counts.
   int get digits {
     final int n = digitCount(numerator);
     final int d = digitCount(denominator);
@@ -311,7 +311,7 @@ final class Rational implements Comparable<Rational> {
   }
 
   /// The simplest rational (smallest denominator, then smallest numerator)
-  /// whose nearest `double` is the finite [value] (runbook D52, the `exact`
+  /// whose nearest `double` is the finite [value] (the `exact`
   /// word): `0.1` gives 1/10 and the `double` nearest 1/3 gives 1/3. A
   /// `double` that is a whole number gives that whole number, the value it
   /// spells. Never beyond the precision of the `double`: the result rounds
@@ -417,7 +417,7 @@ final class Rational implements Comparable<Rational> {
     bytes.setUint32(4, low);
   }
 
-  /// The exact value a numeric literal spells (runbook D50), or null when
+  /// The exact value a numeric literal spells, or null when
   /// [text] is not a decimal literal: an optional sign, digits with an
   /// optional decimal point (`1`, `1.`, `.5`, `1.25`), and an optional
   /// exponent (`1e-3`, `2.5E+10`). `NaN` and `Infinity` are not literals of
@@ -500,7 +500,7 @@ final class Rational implements Comparable<Rational> {
     r'^([+-])?(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$',
   );
 
-  /// The text of runbook D54: an integer as an integer; a rational with a
+  /// The display text: an integer as an integer; a rational with a
   /// finite decimal expansion of at most 20 digits after the point as a
   /// decimal (`0.6`, `0.0009765625`); every other rational as a fraction
   /// (`1/3`).

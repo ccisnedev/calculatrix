@@ -1,298 +1,311 @@
-# Calculatrix Mathematical Specification (v0.6.6)
+# Calculatrix Mathematical Specification
 
-## 1. Scope
+Describes core 0.8.0.
 
-This document defines the formal mathematical model implemented by Calculatrix.
-All runtime values are real matrices, and each value is either exact or
-approximate, as a whole (runbook-trust.md D49):
+This document defines the mathematical model of `calculatrix_core`: what a
+value is, when a result is exact, and what each mathematical word computes.
+The literal syntax, the command registry and the list of error ids are in
+`calculatrix_core.md`; how values and errors are printed, and the exit codes,
+are in `calculatrix_cli.md`, section "Output and errors". Examples are RPN
+programs as `cx` runs them.
 
-- Exact domain: Q^(m x n). Entries are rationals, a pair of arbitrary-size
-  integers, always reduced, with a positive denominator; an integer is a
-  rational with denominator 1.
-- Approximate domain: F^(m x n), where F is the set of finite IEEE 754
-  doubles, a subset of R. Operations follow section 4.
-- Scalar embedding: k is represented as [[k]] (1x1)
-- Complex embedding: a + bi is represented as [[a, -b], [b, a]]
-- Core principle: matrix-first semantics in all operations and state transitions
+## 1. Values
 
-A value never mixes exact and approximate entries. Literals are exact
-(`0.1` is 1/10, `1/3` is one third; D50, D59), `~` before a literal makes it
-approximate (D56), and the exactness of a result follows section 4.
+Every value is a real matrix, and it is either exact or approximate as a
+whole. A value never mixes exact and approximate entries.
 
-This is a normative specification for core, app, and CLI behavior.
+- Exact: Q^(m x n). Each entry is a rational, a pair of integers of any size,
+  always reduced, with a positive denominator; an integer is a rational with
+  denominator 1.
+- Approximate: F^(m x n), where F is the set of finite IEEE 754 doubles.
 
-## 2. Canonical Embeddings
+Numeric literals are exact: `0.1` is 1/10, `1/3` is one third, `1e400` is
+10^400. A `~` before a literal makes it approximate (`~0.1`). The exact
+syntax is in `calculatrix_core.md`, section "Literals".
 
-### 2.1 Scalars as 1x1 Matrices
+### 1.1 Scalars and vectors
 
-For every scalar k in R:
+A scalar k is the 1x1 matrix [[k]]. There is no separate scalar engine:
+scalar operations are matrix operations on 1x1 shapes, and every contract is
+stated by shape. A vector of n entries is the n x 1 column matrix.
 
-k := Matrix.scalar(k) = [[k]]
+### 1.2 Complex numbers
 
-Consequences:
+The imaginary unit is J = [[0, -1], [1, 0]], with J^2 = -I. A complex number
+a + bi is the 2x2 matrix
 
-- Scalar operations are matrix operations restricted to 1x1 shape.
-- No separate scalar execution engine exists.
-- Operator contracts are shape-based, not type-based.
+    Phi(a + bi) = a*I + b*J = [[a, -b], [b, a]]
 
-### 2.2 Complex Numbers as 2x2 Real Matrices
+and a 2x2 matrix is "complex" (in complex form) exactly when its entries
+satisfy M[0][0] = M[1][1] and M[0][1] = -M[1][0]. Phi keeps sums and
+products, Phi(conj z) = Phi(z)^T (transpose is conjugation) and
+det Phi(a + bi) = a^2 + b^2. Phi is defined over Q too: a complex number with
+rational parts is an exact 2x2 matrix, so `-4 sqrt` is the exact
+[[0 -2] [2 0]] (2i).
 
-Define J (imaginary unit) as:
+### 1.3 Constants
 
-J = [[0, -1], [1, 0]], with J^2 = -I2
+- `i` is J, exact. `3 4 i * +` is [[3 -4] [4 3]] (3 + 4i, by the scalar
+  promotion of section 3), and `i dup *` is -I.
+- `pi` (also `π`) is the double nearest to pi, 3.141592653589793, and `e` the
+  double nearest to e, 2.718281828459045. Both are approximate.
 
-Map complex number z = a + bi to:
+Because `e` and `pi` are approximate, `e pi i * ^` (e^(i pi)) is
+~[[-1 -6.33e-15] [6.33e-15 -1]]: -I to within the rounding of doubles, not
+exactly. The constants are names, not numbers; their syntax is in
+`calculatrix_core.md`, section "Name table".
 
-Phi(z) = a*I2 + b*J = [[a, -b], [b, a]]
+## 2. Exactness
 
-Properties used by the engine:
+Exactness depends only on the values, never on a mode.
 
-- Phi(z1 + z2) = Phi(z1) + Phi(z2)
-- Phi(z1 * z2) = Phi(z1) * Phi(z2)
-- Phi(conj(z)) = Phi(z)^T
-- det(Phi(a+bi)) = a^2 + b^2
+- A word given exact operands gives an exact result when that result is
+  rational and can be computed and checked exactly:
+  - always: `+ - * /`, `negate`, `percent`, integer powers, `inverse`,
+    `determinant`, `rref`, `rank`, `trace`, `adjugate`, `cofactors`, `lu`,
+    `dot`, `cross`;
+  - when the result is rational: `sqrt` and fractional powers (section 6),
+    `frobenius-norm` (when the sum of squares is a rational square) and
+    `eigenvalues` (when every root of the characteristic polynomial is
+    rational);
+  - in the trivial cases only: `exp` of a zero matrix (the identity) and `ln`
+    of the identity (the zero matrix).
+- Every other result is approximate: an irrational result (`2 sqrt`), and
+  every result of `exp`, `ln`, `diagonalize`, `qr` and `spectral-norm`
+  outside the cases above.
+- Approximation is contagious: one approximate operand makes the result
+  approximate (`1 3 / ~1 *` is ~0.333333333333). The reverse never happens.
+- Stack, construction and structure words move or build entries without
+  computing, so they keep exactness; a word that joins values (`vector`,
+  `append-rows`, `append-cols`) is exact only when all of them are.
+- `approx` (alias `num`) makes a value approximate: each entry becomes the
+  nearest double; an entry too large for a double is `non-finite`, one too
+  small becomes 0. `exact` makes a value exact: each entry becomes the
+  simplest rational (smallest denominator) that rounds to the same double, so
+  `0.1 approx exact` is 1/10 again. Each is the identity on a value already
+  of its kind.
 
-Phi is defined over Q as well: a complex number with rational parts is an
-exact 2x2 matrix, so `-4 sqrt` gives the exact [[0, -2], [2, 0]] (2i).
+Exact computation uses no tolerance: equality and zero tests are exact, and a
+matrix is singular or not. Elimination is fraction-free (Bareiss) on the
+matrix brought to integers over one common denominator. Exact eigenvalues
+come from the characteristic polynomial (Berkowitz's algorithm, division
+free); its integer roots are found modulo a prime and lifted p-adically, then
+checked exactly. A non-integer power of a matrix that is not scalar, complex
+or diagonal is guessed from the approximate result and kept exact only when
+the guess Y satisfies Y^q = B^p exactly.
 
-The word `i` pushes J as an exact value, [[0 -1] [1 0]] (issue #70,
-runbook-agent-usability.md D67). With it a complex number is typed as a
-matrix expression: `3 4 i * +` is Phi(3 + 4i) = [[3 -4] [4 3]], exact, and
-`i dup *` is -I2. It prints as the matrix; showing it as `i` is issue #78.
+The size of an exact result is estimated before it is computed (n log10|b|
+for a power, the Hadamard bound for elimination, a norm bound for the
+characteristic polynomial). Over the limit, 10000 digits per numerator or
+denominator by default, the error is `limit-exceeded`, never an approximate
+result instead: `2 40000 ^` fails, `2 40000 approx ^` is approximate. The
+limit and its option are in `calculatrix_cli.md`, section "Output and
+errors".
 
-The other system constants are real and approximate, marked `~`: `pi`
-(also `π`) is the double nearest to pi, 3.141592653589793, and `e` is the
-double nearest to e, 2.718281828459045. They agree with Giac's `evalf` of
-the same constants rounded to a double. Because `e` and `pi` are
-approximate, `e^(i*pi)` is [[-1 0] [0 -1]] to within 1e-14 (the residue of
-`J*pi exp` in doubles is under 7e-15), not exactly.
+Rejected designs: a `rationalize` with a tolerance (it would guess a value the
+input does not determine); exactness per entry (a value is exact or
+approximate as a whole). Exact irrational values such as 3 + sqrt 3 are
+symbolic computation, a later phase of `docs/roadmap.md`.
 
-The constants are names of the core name table, not numbers: `1e3` is the
-number 1000, `2e` and `e3` are not constants, and `-pi` and `~pi` are not
-valid in RPN (write `pi negate` and `pi approx`).
+## 3. Operators
 
-### 2.3 Complex Results of Real Words
+For A of size m x n and B of size p x q:
 
-The embedding covers a single complex number. A result that would be a
-column of complex numbers, such as the eigenvalues of a real matrix with a
-complex pair, has no representation yet. `eigenvalues` and `diagonalize`
-raise `complex-result` (MatrixDomainError, CLI exit 65) when the
-discriminant (a - d)^2 + 4bc of a real 2x2 block [[a, b], [c, d]] is
-negative beyond its rounding error, for exact and approximate input alike
-(runbook-trust.md D60):
+- A + B and A - B are defined when the shapes match. A scalar meets an n x n
+  matrix (n > 1) as k*I: `3 i 2 * +` is [[3 -2] [2 3]] (3 + 2i), and
+  `[[1 2] [3 4]] 2 +` is [[3 2] [3 6]]. A scalar and a non-square matrix are
+  `dimension-mismatch`.
+- A * B is the matrix product when n = p, and scaling when either is a
+  scalar.
+- A / B is defined only for a scalar B (`type-mismatch` otherwise); division
+  by zero is `non-finite`.
+- `transpose`, `rref` and `rank` take any shape; `inverse`, `determinant`,
+  `trace`, `exp`, `ln`, `sqrt`, `eigenvalues`, `diagonalize` and `lu` take a
+  square matrix; `qr` needs rows >= columns.
 
-- eigenvalues([[0, -1], [1, 0]]) => complex-result (the spectrum is {i, -i})
+## 4. The approximate path
 
-Words that use the spectrum only internally keep their own contract:
-ln(A) of a rotation is real, so `ln`, `spectral-norm` and `svd` never raise
+An approximate value holds finite doubles only. After each word, an
+approximate result with an infinite or NaN entry is `non-finite`
+(`~1e308 ~1e308 +`).
+
+The approximate algorithms decide with explicit tolerances:
+
+- absolute tolerance 1e-12: pivots in elimination (`inverse`, `rank`,
+  `rref`, `lu`), deflation and near-zero eigenvalues, and results within it
+  of zero are set to 0;
+- relative tolerance 1e-10: convergence of the matrix square root.
+
+Two doubles x, y are nearly equal when |x - y| <= 1e-12 or
+|x - y| <= 1e-10 * max(|x|, |y|).
+
+## 5. Functions
+
+### 5.1 sqrt
+
+`sqrt` is `0.5 power` (section 6). On an exact base it follows the exact
+rules of section 6. On an approximate base:
+
+- scalar k >= 0: [[sqrt k]]; scalar k < 0: sqrt(|k|) * J;
+- complex form: the principal square root x + yi, with x >= 0 (and y >= 0
+  when x = 0), computed without cancellation;
+- any other square matrix: the Denman-Beavers (Newton) iteration on the
+  matrix scaled to unit norm. A singular matrix whose zero eigenvalue is
+  semisimple is split into its range and null space and the iteration runs on
+  the range. A matrix with a negative real eigenvalue, other than the complex
+  form, has a complex principal square root and is `complex-result`
+  (`[[-1 0] [0 2]] sqrt`); a matrix with no square root at all is
+  `log-undefined` (`[[0 1] [0 0]] sqrt`).
+
+### 5.2 exp
+
+- scalar: [[e^k]];
+- otherwise the indices are split into the groups that nonzero off-diagonal
+  entries couple, each group is a block computed alone, and each block B is
+  shifted by mu = trace(B)/n. If B - mu*I is exactly nilpotent,
+  exp(B) is e^mu times the finite series. Otherwise exp(B) is computed by
+  scaling and squaring: B / 2^s with infinity norm at most 0.5, its Taylor
+  series to the tolerance, then squared s times.
+- A pure imaginary theta*J gives the rotation
+  [[cos theta, -sin theta], [sin theta, cos theta]].
+- An overflowing result is `non-finite`.
+
+### 5.3 ln (principal logarithm)
+
+- scalar x > 0: [[ln x]]; x < 0: ln|x| + pi*i, in complex form; x = 0:
+  `log-undefined`;
+- complex form a + bi: ln r + theta*i, with r = sqrt(a^2 + b^2) and
+  theta = atan2(b, a);
+- other 2x2 matrices: the closed form c1*A + c0*I from the two eigenvalues
+  (Sylvester), so a defective matrix such as [[1 1] [0 1]] has a logarithm,
+  and a complex-conjugate pair gives a real result. The eigenvalues come
+  from the discriminant (a - d)^2 + 4bc, and ln l1 - ln l2 is computed as
+  ln(1 + (l1 - l2)/l2), so close eigenvalues lose no digits;
+- larger matrices: P * ln(D) * P^-1 from `diagonalize`, so a repeated
+  eigenvalue works (`[[2 0 0] [0 2 0] [0 0 3]] ln` is
+  diag(ln 2, ln 2, ln 3)) and a defective matrix is `not-diagonalizable`;
+- a real eigenvalue <= 0, or a singular matrix, is `log-undefined`.
+
+### 5.4 Eigenvalues and spectral words
+
+- `eigenvalues` gives a column, largest first. A 2x2 matrix uses the closed
+  form with the discriminant (a - d)^2 + 4bc of [[a, b], [c, d]], which does
+  not cancel as trace^2 - 4 det does; a larger one is reduced to Hessenberg
+  form (Householder) and iterated with shifted QR (Wilkinson shift, Givens
+  rotations).
+- `diagonalize` leaves P and D with A = P D P^-1; the columns of P are unit
+  eigenvectors. Eigenvalues within 1e-10 of each other, relative to the
+  largest, are one eigenvalue of multiplicity m, and its columns are a basis
+  of the null space of A - lambda*I (rank taken on A - lambda*I scaled by
+  the largest eigenvalue): `[[2 0] [0 2]] diagonalize` gives P = I and
+  D = 2I. When that null space has fewer than m dimensions, or P is
+  singular, the matrix is defective and the word raises
+  `not-diagonalizable` (`[[1 1] [0 1]] diagonalize`); it never returns a
+  singular P.
+- `spectral-norm` is the square root of the largest eigenvalue of A^T A.
+- `frobenius-norm` is the square root of the sum of the squared entries.
+
+### 5.5 Decompositions
+
+- `lu` leaves P, L, U with P A = L U, L unit lower triangular (partial
+  pivoting on the approximate path).
+- `qr` leaves Q, R with A = Q R, Q with orthonormal columns and R upper
+  triangular (Gram-Schmidt).
+
+### 5.6 Complex results of real words
+
+Phi covers one complex number, not a column of them. When a real 2x2 block
+[[a, b], [c, d]] met by `eigenvalues` or `diagonalize` has a discriminant
+(a - d)^2 + 4bc that is negative beyond its rounding error, the eigenvalues
+are a complex pair with no representation yet, and the word raises
+`complex-result`, for exact and approximate input alike:
+`[[0 -1] [1 0]] eigenvalues` (the spectrum is {i, -i}).
+
+The principal square root and a non-integer power of a matrix (not in
+complex form) with a negative real eigenvalue are complex too, and raise
+`complex-result`: `[[-1 0] [0 2]] sqrt`, `[[-1 0] [0 2]] 1.5 ^`.
+
+Words that use the spectrum only inside keep their own result: the logarithm
+of a rotation is real, so `ln` and `spectral-norm` never raise
 `complex-result`.
-Complex vectors as blocks of Phi (n complex numbers as a 2n x 2 matrix)
-are tracked in issue #64.
 
-## 3. Operator Semantics
-
-## 3.1 Shape Laws
-
-For A in R^(m x n), B in R^(p x q):
-
-- A + B defined iff m=p and n=q
-- A - B defined iff m=p and n=q
-- A * B defined iff n=p
-- A / B defined iff B is 1x1 (scalar denominator)
-
-### 3.2 Scalar Promotion Rule
-
-For element-wise + and - with one 1x1 scalar and one n x n matrix (n > 1):
-
-[[k]] is promoted to k*In
-
-This preserves natural expressions in complex form, for example:
-
-3 + (2*J) => 3*I2 + 2*J = [[3, -2], [2, 3]]
-
-### 3.3 Unary Operators
-
-- transpose(A) = A^T
-- inverse(A) defined for square non-singular A
-- determinant(A) defined for square A
-- trace(A) defined for square A
-- rref(A) defined for any A
-- rank(A) defined by rref pivot count
-
-## 4. Numerical Policy
-
-### 4.1 Exactness
-
-Exactness depends only on the values, never on a mode (runbook-trust.md
-D51, D53):
-
-- Exact with exact gives exact when the result is rational and can be
-  checked exactly: `+ - * /`, `negate`, `percent`, integer powers,
-  `inverse`, `determinant`, `rref`, `rank`, `trace`, `adjugate`,
-  `cofactors`, `lu`, `dot`, `cross`; `sqrt`, fractional powers,
-  `frobenius-norm` and `eigenvalues` when the result is rational; `exp` and
-  `ln` in trivial cases. Stack and structure words keep exactness.
-- An irrational result, or any other word, gives an approximate value.
-- One approximate operand makes the result approximate (contagion).
-- `approx` (alias `num`) and `exact` convert explicitly; `exact` takes the
-  simplest rational that rounds to the same double (D52).
-
-Exact computation uses no tolerance: equality and zero tests are exact,
-and elimination is fraction-free (Bareiss). Before computing, the size of
-an exact result is estimated (`a^n`, the Hadamard bound, a norm bound on
-the characteristic polynomial); over the limit, 10000 digits per numerator
-or denominator by default, the error is `limit-exceeded`, never an
-approximate result instead (D55).
-
-An approximate value is always shown with the mark `~` (D54), so a value
-that is not exact never looks exact.
-
-### 4.2 Tolerances of the Approximate Path
-
-Calculatrix uses explicit floating-point tolerances on approximate values.
-
-- defaultAbsoluteTolerance = 1e-12
-- defaultRelativeTolerance = 1e-10
-
-For numbers x, y:
-
-nearlyEqual(x, y) uses absolute and relative criteria.
-
-Policy goals:
-
-- deterministic behavior for tests and CI
-- stable comparisons after iterative algorithms
-- explicit rejection of exact-equality assumptions in floating-point paths
-
-## 5. Function Contracts and Limits
-
-## 5.1 sqrt
-
-Contract:
-
-- square matrices only
-- scalar k >= 0 => [[sqrt(k)]]
-- scalar k < 0 => sqrt(|k|)*J
-- matrix case: iterative method with convergence bounds
-
-Failure modes:
-
-- non-square => MatrixShapeError
-- no real-domain convergence => MatrixDomainError
-
-## 5.2 exp
-
-Contract:
-
-- square matrices only
-- computed by Taylor series sum(A^n/n!, n=0..N), N <= 50
-- stop condition uses infinity norm and absolute tolerance
-
-Special behaviors:
-
-- scalar: exp([[k]]) = [[e^k]]
-- pure imaginary theta*J gives rotation matrix
-
-## 5.3 log (principal)
-
-Contract:
-
-- square matrices only
-- scalar x > 0 => [[ln(x)]]
-- scalar x < 0 => complex principal value ln(|x|) + pi*i as 2x2 form
-- scalar x = 0 => domain error
-- complex-form [[a,-b],[b,a]] => ln(r) + theta*i where
-  r = sqrt(a^2+b^2), theta = atan2(b,a)
-- diagonalizable real-domain square matrices with positive spectrum:
-  log(A) = P*log(D)*P^-1
-
-Failure modes:
-
-- non-square => MatrixShapeError
-- invalid domain (zero or non-positive real spectrum for real branch)
-  => MatrixDomainError
-
-## 5.4 svd
-
-Contract:
-
-For A in R^(m x n), svd(A) returns (U, S, V^T) such that:
-
-A ~= U*S*V^T
-
-with:
-
-- U in R^(m x n)
-- S in R^(n x n), diagonal, sigma_i >= 0, sorted descending
-- V^T in R^(n x n)
-
-Current construction:
-
-- based on diagonalization of A^T*A
-- singular values: sigma_i = sqrt(lambda_i(A^T*A)) for lambda_i >= 0
-
-Failure modes:
-
-- if A^T*A cannot be diagonalized in real domain => MatrixDomainError
-
-## 5.5 Eigen and Decompositions
-
-- eigenvalues(A): square only; real-domain only; a complex pair is
-  `complex-result` (section 2.3)
-- diagonalization(A): requires real spectrum and independent eigenvectors
-- luDecomposition(A): square only
-- qrDecomposition(A): rows >= columns
-
-Error classes are explicit and stable:
-
-- MatrixShapeError
-- MatrixDomainError
-- MatrixIndexError
-
-## 6. Proof-Oriented Worked Examples
-
-## 6.1 Euler Identity in Matrix Form
-
-Let J = [[0,-1],[1,0]].
-
-exp(pi*J) = [[cos(pi), -sin(pi)], [sin(pi), cos(pi)]] = -I2
-
-Therefore:
-
-exp(pi*J) + I2 = 0
-
-## 6.2 Conjugation by Transpose
-
-For Z = [[a,-b],[b,a]]:
-
-Z^T = [[a,b],[-b,a]] = [[a,-(-b)],[(-b),a]] = Phi(a-bi)
-
-So transpose is complex conjugation on the embedded complex subalgebra.
-
-## 6.3 Spectral Invariant Used by SVD
-
-A^T*A is symmetric positive semidefinite.
-
-Its eigenvalues are non-negative and define singular values by:
-
-sigma_i = sqrt(lambda_i(A^T*A))
-
-Hence S is diagonal with sigma_i >= 0.
-
-## 7. Cross-Consumer Consistency Requirements
-
-The following are mandatory:
-
-- app and CLI must call core semantics, not re-implement algebra
-- display formatting may differ by consumer
-- computed matrix values and error classes must be identical across consumers
-
-## 8. Verification Baseline
-
-Current baseline for this spec:
-
-- core tests: 429 passing
-- app tests: 141 passing
-- cli tests: 12 passing
-
-All mathematical contracts in this document are backed by executable tests.
+## 6. power
+
+`power` (aliases `pwr`, `^`) is defined on matrices: B^Y = exp(Y * log B),
+with the principal logarithm and the matrix exponential of section 5. In the
+table, "scalar" is a 1x1 matrix and "complex" a 2x2 matrix in complex form
+(section 1.2). Complex matrices commute, so for them the order of the
+product Y * log B does not matter. `X exp` and `e X ^` agree to rounding.
+
+Exact operands take exact routes first:
+
+- exact B and an exact integer Y: repeated squaring, exact; a negative Y
+  raises the exact inverse of a matrix B (`[[1 2] [3 4]] -2 ^` is
+  [[5.5 -2.5] [-3.75 1.75]]);
+- exact B and an exact non-integer scalar Y = p/q: exact when the result is
+  rational. A scalar, a complex B (for q = 2) and a diagonal B use closed
+  forms; any other B uses the verified guess of section 2 (`8 1/3 ^` is 2,
+  `-4 1/4 ^` is [[1 -1] [1 1]], `[[1 1] [0 1]] 1/3 ^` is [[1 1/3] [0 1]]).
+  Otherwise the result is the approximate one, errors included
+  (`2 0.5 ^` is ~1.41421356237).
+
+On the approximate path, Y = 1/2 is the square root of section 5.1 and Y = -1
+on a matrix is its inverse, the same algorithms `sqrt` and `inverse` use.
+
+| # | Base B | Exponent Y | Result | Example |
+|---|---|---|---|---|
+| 1 | scalar | scalar | real power. B < 0 with a non-integer Y gives the complex principal value, as the square root of a negative number does | `-4 0.5 ^` is [[0 -2] [2 0]] |
+| 2 | scalar > 0 | square matrix | exp(ln B * Y), approximate | `e pi i * ^` is ~[[-1 -6.33e-15] [6.33e-15 -1]] |
+| 3 | complex, or scalar < 0 | complex | exp(Y * log B), approximate | `i i ^` is ~[[0.2079 0] [0 0.2079]], e^(-pi/2) |
+| 4 | square | integer scalar | repeated multiplication; a negative integer uses the inverse; a singular B with a negative integer is `singular-matrix`; Y = 0 gives I | `[[1 1] [0 1]] 3 ^` is [[1 3] [0 1]]; `[[1 2] [2 4]] -1 ^` is `singular-matrix` |
+| 5 | square | non-integer scalar | exp(y * log B). A base that is neither scalar nor complex, with a negative real eigenvalue, is `complex-result`; with a zero eigenvalue, `log-undefined` (see below). For y = 1/2 it is the principal square root, so a singular base with no negative eigenvalue has a result; a base with no square root at all is `log-undefined` | `[[2 0] [0 3]] 0.5 ^` is ~[[1.4142 0] [0 1.7321]]; `[[1 1] [0 1]] 0.5 ^` is [[1 0.5] [0 1]] (not diagonalizable); `[[0 0] [0 4]] 0.5 ^` is [[0 0] [0 2]] |
+| 6 | any other pair with Y not a scalar (order of checks, below) | square, not scalar | `ambiguous-power`: exp(Y log B) and exp(log B Y) differ when Y and log B do not commute. Row 3 is the exception | `[[1 1] [0 1]] [[0 1] [1 0]] ^`: log B is [[0 1] [0 0]], and the two orders give [[1 0] [0 2.7183]] and [[2.7183 0] [0 1]] |
+| 7 | 0 | scalar | Y > 0 gives 0; `0 0 ^` gives 1; Y < 0 is `non-finite` | `0 -1 ^` is `non-finite`; `0 0.5 ^` is 0 |
+| 8 | 0, or a singular matrix, where the case needs log B (never for y = 1/2, row 5) | | `log-undefined` | `0 pi i * ^`; `[[1 2] [2 4]] 1.5 ^` |
+| 9 | not square | any | `dimension-mismatch` | `[[1 2]] 2 ^` |
+| 10 | any | not square | `dimension-mismatch` | `2 [[1 2]] ^`, `[[1 0] [0 1]] [[1 2]] ^` |
+| 11 | n x n | m x m, n != m, neither scalar | `dimension-mismatch` | `[[1 0] [0 1]] [[1 0 0] [0 1 0] [0 0 1]] ^` |
+| 12 | scalar < 0 | square, not complex, not scalar | `ambiguous-power`: log B is complex (2x2) and does not match Y | `-2 [[1 0] [0 2]] ^`: log -2 is [[0.6931 -3.1416] [3.1416 0.6931]], which does not commute with Y |
+| 13 | any approximate | any, result overflows | `non-finite`. An exact result never overflows: it is exact, or `limit-exceeded` over the digit limit | `~10 400 ^` is `non-finite`; `10 400 ^` is the exact 10^400 |
+
+Approximate entries above are rounded to 4 decimals; `cx` prints 12
+significant digits.
+
+**Order of the checks.** The first rule that applies decides. The kinds of B
+and Y decide, never a numerical test of whether they commute:
+
+1. Dimensions: B is square (row 9), Y is square (row 10), and when neither is
+   a scalar both have the same size (row 11). Otherwise `dimension-mismatch`.
+2. Y is a scalar: rows 1, 4, 5, 7, 8 and 13. For a scalar base, row 7 comes
+   before row 4: `0 -1 ^` and `0 inverse` are `non-finite`.
+3. Y is not a scalar: B = 0 is `log-undefined` (row 8); B scalar > 0 is
+   row 2; B complex or scalar < 0, with Y complex, is row 3. Every other
+   pair is `ambiguous-power` (rows 6 and 12): `i [[1 0] [0 2]] ^` is
+   `ambiguous-power`.
+
+**A matrix with no real logarithm.** `[[-1 0] [0 2]] 0.5 ^` has no real
+result: the base has a negative eigenvalue and is not in complex form, so its
+principal value is complex. It is `complex-result`, as is
+`[[-1 0] [0 2]] 1.5 ^`; a negative scalar keeps its complex form
+(`-4 0.5 ^`, row 1). A complex number is only a*I + b*J; a matrix whose entries
+would be complex has no representation yet. Turning this error into a value
+later breaks no one.
+
+`inverse` is defined as `-1 power` and `sqrt` as `0.5 power`, and each gives
+bitwise the same result as its definition.
+
+## 7. Worked identities
+
+- Euler: exp(pi*J) = [[cos pi, -sin pi], [sin pi, cos pi]] = -I, so
+  exp(pi*J) + I = 0. With the approximate `pi`, `pi i * exp` is -I within
+  7e-15 (section 1.3).
+- Conjugation: for Z = Phi(a + bi), Z^T = [[a, b], [-b, a]] = Phi(a - bi).
+
+## 8. Consistency and verification
+
+- The app and the CLI call core; they never reimplement the mathematics.
+  Display may differ by consumer; values, exactness and error ids may not.
+- Every rule here has a core test. The power table is tested row by row in
+  `code/core/test/matrix/power_test.dart` and, for `inverse` and `sqrt`, in
+  `code/core/test/registry/defined_words_test.dart`. Every exact word is
+  tested against Giac in `code/core/test/exact/giac_differential_test.dart`.

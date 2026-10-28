@@ -5,21 +5,20 @@ import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 
 import 'banner_render.dart';
 
-/// `cx` (no route): prints a short, branded banner and exits 0 (spec
-/// section 4, D4; branding per issue #26).
+/// `cx` (no route): prints a short, branded banner and exits 0.
 ///
 /// Registered at the root (`''`) so a bare invocation resolves to this query
 /// instead of the SDK's generic help catalog, and so `cx <word>` for a
 /// reserved word (once one is registered, e.g. `version` in a later stage)
 /// resolves to that word's own route rather than falling through to the
-/// `eval rpn` shortcut (G3).
+/// `eval rpn` shortcut.
 ///
 /// The actual layout is [renderBanner], a pure function: this class only
 /// resolves the facts it needs (version, update notice, whether the output
 /// stream can take color, which routes the CLI registers) and hands them
 /// over. [hasTerminal], [supportsAnsiEscapes] and [readEnvironmentVariable]
 /// default to the real `stdout` and process environment, and exist only so
-/// a test can inject a fake console instead (issue #26 rule).
+/// a test can inject a fake console instead.
 class BannerQuery implements Query<BannerInput, BannerOutput> {
   BannerQuery(
     this.input, {
@@ -91,8 +90,7 @@ class BannerInput extends Input {
 class BannerOutput extends Output {
   BannerOutput({this.version, required String text}) : _text = text;
 
-  /// Known only once [BannerQuery] was given one (issue #26 scope 5): the
-  /// version constant and the `cli-v*` release check are wired after #25.
+  /// Known only once [BannerQuery] was given one.
   final String? version;
 
   final String _text;

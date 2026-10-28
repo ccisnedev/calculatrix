@@ -1,6 +1,5 @@
-// Tests for runbook stage S4e (docs/runbook-cli-stage-0.md): `cx commands
-// show`, `cx commands search`, `cx commands list` and the "did you mean"
-// this stage adds (issue #41). Excluded from calculatrix_cli_test.dart's
+// Tests for `cx commands show`, `cx commands search`, `cx commands list`
+// and the "did you mean" they add. Excluded from calculatrix_cli_test.dart's
 // scope on purpose (see that file's own header comment).
 import 'dart:convert';
 
@@ -24,7 +23,7 @@ void main() {
     return cli.run(args, stdout: out, stderr: err, environment: const {});
   }
 
-  group('cx commands show (issue #41, AC1)', () {
+  group('cx commands show', () {
     test(
       'show power prints name, aliases, category and stack effect',
       () async {
@@ -72,7 +71,7 @@ void main() {
     });
 
     test('show hcat (a search term, never a word) is unknown-word, '
-        'suggesting append-cols (AC1, AC5)', () async {
+        'suggesting append-cols', () async {
       final code = await run(['commands', 'show', '--json', 'hcat']);
       expect(code, ExitCode.dataError);
       // The error envelope goes to stderr, never stdout
@@ -93,7 +92,7 @@ void main() {
     });
   });
 
-  group('cx commands search (issue #41, AC2)', () {
+  group('cx commands search', () {
     test('search column finds append-cols and vector', () async {
       final code = await run(['commands', 'search', 'column']);
       expect(code, ExitCode.ok);
@@ -137,7 +136,7 @@ void main() {
     });
   });
 
-  group('cx commands list (issue #41, AC3)', () {
+  group('cx commands list', () {
     test('list --category stack lists only the stack category', () async {
       final code = await run(['commands', 'list', '--category', 'stack']);
       expect(code, ExitCode.ok);
@@ -179,7 +178,7 @@ void main() {
     });
   });
 
-  group('cx help and the banner list commands (AC7)', () {
+  group('cx help and the banner list commands', () {
     test('the bare banner mentions the commands route', () async {
       final code = await run([]);
       expect(code, ExitCode.ok);
@@ -192,7 +191,7 @@ void main() {
         // `cx --help` alone is the root query's own contract help, which
         // names only itself. The whole catalog is `cx help` (the literal
         // route, auto-registered by the SDK from `cli.catalog`), never a
-        // second, hand-kept list (AC7).
+        // second, hand-kept list.
         final code = await run(['help']);
         expect(code, ExitCode.ok);
         expect(out.output, contains('commands show'));
@@ -202,7 +201,7 @@ void main() {
     );
   });
 
-  group('exactness and literals in the registry (issue #66)', () {
+  group('exactness and literals in the registry', () {
     test('show add prints its exact examples without ~', () async {
       final code = await run(['commands', 'show', 'add']);
       expect(code, ExitCode.ok);

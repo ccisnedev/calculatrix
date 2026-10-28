@@ -33,8 +33,7 @@ jobs:
 
       - run: flutter build web --release
 
-      # cx's own installers (runbook docs/runbook-cli-stage-0.md, "Publishing
-      # (dogfood)") are served from this same site, at
+      # cx's own installers are served from this same site, at
       # https://calculatrix.ccisne.dev/install.ps1 and /install.sh, mirroring
       # how ccisnedev/inquiry serves its installers from its own Pages site.
       # code/cli/scripts/install.ps1 and install.sh are the source of truth;

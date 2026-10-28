@@ -210,22 +210,28 @@ void main() {
       expect(engine.pop(), Matrix.scalar(20));
     });
 
-    test('pick throws range error for a malformed index, underflow beyond depth', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(1);
+    test(
+      'pick throws range error for a malformed index, underflow beyond depth',
+      () {
+        final RpnEngine engine = RpnEngine();
+        engine.pushScalar(1);
 
-      expect(() => engine.pick(0), throwsA(isA<RpnStackRangeError>()));
-      expect(() => engine.pick(2), throwsA(isA<RpnStackUnderflowError>()));
-      expect(() => engine.pick(0), throwsA(isA<RpnStackError>()));
-    });
+        expect(() => engine.pick(0), throwsA(isA<RpnStackRangeError>()));
+        expect(() => engine.pick(2), throwsA(isA<RpnStackUnderflowError>()));
+        expect(() => engine.pick(0), throwsA(isA<RpnStackError>()));
+      },
+    );
 
-    test('roll throws range error for a malformed index, underflow beyond depth', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(1);
+    test(
+      'roll throws range error for a malformed index, underflow beyond depth',
+      () {
+        final RpnEngine engine = RpnEngine();
+        engine.pushScalar(1);
 
-      expect(() => engine.roll(0), throwsA(isA<RpnStackRangeError>()));
-      expect(() => engine.roll(2), throwsA(isA<RpnStackUnderflowError>()));
-    });
+        expect(() => engine.roll(0), throwsA(isA<RpnStackRangeError>()));
+        expect(() => engine.roll(2), throwsA(isA<RpnStackUnderflowError>()));
+      },
+    );
 
     test('applyUnary throws stack error on empty stack', () {
       final RpnEngine engine = RpnEngine();
@@ -236,58 +242,67 @@ void main() {
       );
     });
 
-    test('applyBinary keeps both operands on the stack when the operation throws', () {
-      final RpnEngine engine = RpnEngine();
-      engine.pushScalar(3);
-      engine.pushScalar(0);
+    test(
+      'applyBinary keeps both operands on the stack when the operation throws',
+      () {
+        final RpnEngine engine = RpnEngine();
+        engine.pushScalar(3);
+        engine.pushScalar(0);
 
-      expect(
-        () => engine.applyBinary(RpnBinaryOperator.divide),
-        throwsA(isA<MatrixDomainError>()),
-      );
+        expect(
+          () => engine.applyBinary(RpnBinaryOperator.divide),
+          throwsA(isA<MatrixDomainError>()),
+        );
 
-      expect(engine.depth, 2);
-      expect(engine.pop(), Matrix.scalar(0));
-      expect(engine.pop(), Matrix.scalar(3));
-    });
+        expect(engine.depth, 2);
+        expect(engine.pop(), Matrix.scalar(0));
+        expect(engine.pop(), Matrix.scalar(3));
+      },
+    );
 
-    test('applyBinary keeps both matrices on the stack when the operation is unsupported', () {
-      final RpnEngine engine = RpnEngine();
-      final Matrix left = Matrix(<List<double>>[
-        <double>[3, 1],
-        <double>[7, 3],
-      ]);
-      final Matrix right = Matrix(<List<double>>[
-        <double>[2, 1],
-        <double>[1, 1],
-      ]);
-      engine.push(left);
-      engine.push(right);
+    test(
+      'applyBinary keeps both matrices on the stack when the operation is unsupported',
+      () {
+        final RpnEngine engine = RpnEngine();
+        final Matrix left = Matrix(<List<double>>[
+          <double>[3, 1],
+          <double>[7, 3],
+        ]);
+        final Matrix right = Matrix(<List<double>>[
+          <double>[2, 1],
+          <double>[1, 1],
+        ]);
+        engine.push(left);
+        engine.push(right);
 
-      expect(
-        () => engine.applyBinary(RpnBinaryOperator.divide),
-        throwsA(isA<UnsupportedCalculatrixOperationError>()),
-      );
+        expect(
+          () => engine.applyBinary(RpnBinaryOperator.divide),
+          throwsA(isA<UnsupportedCalculatrixOperationError>()),
+        );
 
-      expect(engine.depth, 2);
-      expect(engine.pop(), right);
-      expect(engine.pop(), left);
-    });
+        expect(engine.depth, 2);
+        expect(engine.pop(), right);
+        expect(engine.pop(), left);
+      },
+    );
 
-    test('applyUnary keeps the operand on the stack when the operation throws', () {
-      final RpnEngine engine = RpnEngine();
-      final Matrix nonSquare = Matrix(<List<double>>[
-        <double>[1, 2],
-      ]);
-      engine.push(nonSquare);
+    test(
+      'applyUnary keeps the operand on the stack when the operation throws',
+      () {
+        final RpnEngine engine = RpnEngine();
+        final Matrix nonSquare = Matrix(<List<double>>[
+          <double>[1, 2],
+        ]);
+        engine.push(nonSquare);
 
-      expect(
-        () => engine.applyUnary(RpnUnaryOperator.sqrt),
-        throwsA(isA<MatrixShapeError>()),
-      );
+        expect(
+          () => engine.applyUnary(RpnUnaryOperator.sqrt),
+          throwsA(isA<MatrixShapeError>()),
+        );
 
-      expect(engine.depth, 1);
-      expect(engine.pop(), nonSquare);
-    });
+        expect(engine.depth, 1);
+        expect(engine.pop(), nonSquare);
+      },
+    );
   });
 }

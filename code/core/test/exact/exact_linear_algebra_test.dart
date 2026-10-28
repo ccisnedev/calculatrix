@@ -1,7 +1,7 @@
-// Exact linear algebra in core (runbook-trust.md, step T3): `inverse`,
+// Exact linear algebra in core: `inverse`,
 // `determinant`, `rref`, `rank`, `trace`, `adjugate`, `cofactors`, `lu`,
-// `dot`, `cross` and negative matrix powers on exact values (D53), and the
-// Hadamard estimate of the size limit (D55). Giac checks the same words on
+// `dot`, `cross` and negative matrix powers on exact values, and the
+// Hadamard estimate of the size limit. Giac checks the same words on
 // generated inputs in giac_differential_test.dart.
 import 'dart:math' as math;
 
@@ -412,7 +412,7 @@ void main() {
       );
     });
 
-    test('one approximate vector makes the result approximate (D51)', () {
+    test('one approximate vector makes the result approximate', () {
       expect(_rpn('[[1] [2]] ~[[3] [4]] dot').isExact, isFalse);
       expect(_rpn('~[[1] [2] [3]] [[4] [5] [6]] cross').isExact, isFalse);
     });
@@ -450,7 +450,7 @@ void main() {
     }
   });
 
-  group('the size limit (D55)', () {
+  group('the size limit', () {
     test('a determinant over the limit fails before computing', () {
       expect(
         () => _rpn('[[1e30 1] [1 1e30]] determinant', maxDigits: 50),

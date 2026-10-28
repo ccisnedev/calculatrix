@@ -1,6 +1,6 @@
-// Exact numbers in core (runbook-trust.md, step T2): exact literals (D50),
-// the approximate mark (D56), contagion (D51), approx and exact (D52),
-// which words keep exactness (D53) and the size limit (D55).
+// Exact numbers in core: exact literals,
+// the approximate mark, contagion, approx and exact,
+// which words keep exactness and the size limit.
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
@@ -39,7 +39,7 @@ Matcher _errorId(CalculatrixErrorId id) => throwsA(
 );
 
 void main() {
-  group('exact literals (D50)', () {
+  group('exact literals', () {
     test('a decimal literal is the rational it spells', () {
       expect(_rpn('0.1'), _exactScalar(_q(1, 10)));
       expect(_rpn('-2.5e1'), _exactScalar(_q(-25)));
@@ -77,7 +77,7 @@ void main() {
     });
   });
 
-  group('fraction literals (D59)', () {
+  group('fraction literals', () {
     test('p/q is the exact rational, in RPN and in matrix literals', () {
       expect(_rpn('1/3'), _exactScalar(_q(1, 3)));
       expect(_rpn('-5/3'), _exactScalar(_q(-5, 3)));
@@ -137,7 +137,7 @@ void main() {
     });
 
     // A marked fraction is exempt, like any marked literal: the limit's own
-    // hint suggests the mark (runbook D55, D56).
+    // hint suggests the mark.
     test('each part is held to the digit limit', () {
       expect(
         () => _rpn('1/${'9' * 30}', maxDigits: 20),
@@ -153,7 +153,7 @@ void main() {
     });
   });
 
-  group('the approximate mark (D56)', () {
+  group('the approximate mark', () {
     test('~ before a literal makes it approximate, sign included', () {
       expect(_rpn('~0.1'), _approximateScalar(0.1));
       expect(_rpn('~-0.1'), _approximateScalar(-0.1));
@@ -252,7 +252,7 @@ void main() {
     });
   });
 
-  group('exact arithmetic and contagion (D51, D53)', () {
+  group('exact arithmetic and contagion', () {
     test('+ - * / negate percent stay exact on exact operands', () {
       expect(_rpn('1 3 / 1 6 / +'), _exactScalar(_q(1, 2)));
       expect(_rpn('1 3 / 1 2 / -'), _exactScalar(_q(-1, 6)));
@@ -308,7 +308,7 @@ void main() {
       expect(_rpn('[[1 2]] ~2 *').isExact, isFalse);
     });
 
-    test('an irrational result converts to approximate (D53)', () {
+    test('an irrational result converts to approximate', () {
       expect(_rpn('2 sqrt').isExact, isFalse);
       expect(_rpn('[[1 2] [3 4]] eigenvalues').isExact, isFalse);
       expect(_rpn('[[1 2] [3 4]] frobenius-norm').isExact, isFalse);
@@ -355,7 +355,7 @@ void main() {
     });
   });
 
-  group('approx, num and exact (D52)', () {
+  group('approx, num and exact', () {
     test('approx and num convert to approximate', () {
       expect(_rpn('1 3 / approx'), _approximateScalar(1 / 3));
       expect(_rpn('1 4 / num'), _approximateScalar(0.25));
@@ -394,7 +394,7 @@ void main() {
     });
   });
 
-  group('stack and structure words keep exactness (D53)', () {
+  group('stack and structure words keep exactness', () {
     test('stack words', () {
       final List<Matrix> stack = _stack('1 3 / ~2 swap dup');
       expect(stack.map((Matrix m) => m.isExact), [false, true, true]);
@@ -454,7 +454,7 @@ void main() {
     });
   });
 
-  group('size limit (D55)', () {
+  group('size limit', () {
     test('a power over the limit raises limit-exceeded before computing', () {
       expect(
         () => _rpn('3 1000000 ^'),

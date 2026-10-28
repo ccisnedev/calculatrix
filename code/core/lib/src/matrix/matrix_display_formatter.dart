@@ -1,8 +1,7 @@
 import '../errors/errors.dart';
 import 'matrix.dart';
 
-/// The display text of values, shared by the app and `cx` (runbook D45,
-/// D54).
+/// The display text of values, shared by the app and `cx`.
 ///
 /// An exact entry prints in full, as [Rational.toDisplayString] does
 /// (`3`, `0.6`, `1/3`). An approximate entry prints with at most 12
@@ -11,7 +10,7 @@ import 'matrix.dart';
 class MatrixDisplayFormatter {
   const MatrixDisplayFormatter._();
 
-  /// The mark of an approximate value (runbook D54), or `''` for an exact
+  /// The mark of an approximate value, or `''` for an exact
   /// one.
   static String mark(Matrix matrix) => matrix.isExact ? '' : '~';
 
@@ -21,7 +20,7 @@ class MatrixDisplayFormatter {
       ? matrix.exactAt(row, column).toDisplayString()
       : _formatNumber(matrix.at(row, column));
 
-  /// One value as a stack line of `cx` shows it (spec section 6): a scalar
+  /// One value as a stack line of `cx` shows it: a scalar
   /// alone (`3`, `1/3`, `~0.333333333333`), any other matrix as rows
   /// separated by spaces (`[[1 2] [3 4]]`), with the mark of an
   /// approximate value in front.

@@ -1,4 +1,4 @@
-// Tests for issue #66, point 4: a minus sign in infix negates any operand
+// A minus sign in infix negates any operand
 // that follows it, not only a numeric literal, with the precedence of
 // standard notation and Giac: tighter than "*" and "/", looser than "^".
 
@@ -17,7 +17,7 @@ final Matcher _syntaxError = throwsA(
 );
 
 void main() {
-  group('unary minus before any operand (issue #66)', () {
+  group('unary minus before any operand', () {
     test('-(2+3) is -5', () {
       expect(_infix('-(2+3)'), '-5');
     });
@@ -65,7 +65,7 @@ void main() {
     });
   });
 
-  group('precedence of unary minus (issue #66)', () {
+  group('precedence of unary minus', () {
     test('-2^2 is -(2^2) = -4, as in Giac', () {
       expect(_infix('-2^2'), '-4');
       expect(_infix('- 2 ^ 2'), '-4');
@@ -110,7 +110,7 @@ void main() {
     });
   });
 
-  group('tokenizeInfixExpression (issue #66)', () {
+  group('tokenizeInfixExpression', () {
     test('a unary minus is its own token, never "-"', () {
       expect(Calculatrix.tokenizeInfixExpression('2*-(3)'), <String>[
         '2',

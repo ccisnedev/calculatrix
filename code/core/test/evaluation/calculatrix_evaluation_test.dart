@@ -7,7 +7,9 @@ void main() {
       final CalculatrixProgram program = Calculatrix.compileInfix('3 + 4 * 5');
 
       expect(
-        program.commands.map((CalculatrixCommand command) => command.runtimeType),
+        program.commands.map(
+          (CalculatrixCommand command) => command.runtimeType,
+        ),
         orderedEquals(<Type>[
           PushMatrixCommand,
           PushMatrixCommand,
@@ -18,15 +20,18 @@ void main() {
       );
     });
 
-    test('compiled infix programs execute to the same result as evaluateInfix', () {
-      final String expression = '[[1,2]] * [[3],[4]]';
-      final CalculatrixMachine machine = CalculatrixMachine();
-      final CalculatrixProgram program = Calculatrix.compileInfix(expression);
+    test(
+      'compiled infix programs execute to the same result as evaluateInfix',
+      () {
+        final String expression = '[[1,2]] * [[3],[4]]';
+        final CalculatrixMachine machine = CalculatrixMachine();
+        final CalculatrixProgram program = Calculatrix.compileInfix(expression);
 
-      machine.executeProgram(program);
+        machine.executeProgram(program);
 
-      expect(machine.top, Calculatrix.evaluateInfix(expression));
-    });
+        expect(machine.top, Calculatrix.evaluateInfix(expression));
+      },
+    );
 
     test('evaluates scalar infix expression with precedence', () {
       final Matrix result = Calculatrix.evaluateInfix('3 + 4 * 5');
@@ -84,15 +89,18 @@ void main() {
       expect(result, Matrix.scalar(7));
     });
 
-    test('preserves matrix literals as typed push commands during infix compilation', () {
-      final CalculatrixProgram program = Calculatrix.compileInfix(
-        '[[1,2],[3,4]] * [[5],[6]]',
-      );
+    test(
+      'preserves matrix literals as typed push commands during infix compilation',
+      () {
+        final CalculatrixProgram program = Calculatrix.compileInfix(
+          '[[1,2],[3,4]] * [[5],[6]]',
+        );
 
-      expect(program.commands.first, isA<PushMatrixCommand>());
-      expect(program.commands[1], isA<PushMatrixCommand>());
-      expect(program.commands.last, isA<MultiplyCommand>());
-    });
+        expect(program.commands.first, isA<PushMatrixCommand>());
+        expect(program.commands[1], isA<PushMatrixCommand>());
+        expect(program.commands.last, isA<MultiplyCommand>());
+      },
+    );
 
     test('evaluates scalar division in rpn mode', () {
       final Matrix result = Calculatrix.evaluateRpn(<String>['10', '4', '/']);
@@ -202,21 +210,18 @@ void main() {
       },
     );
 
-    test(
-      'subtracting a bracketed matrix literal from a scalar is unaffected '
-      'by the signed-matrix-literal grammar',
-      () {
-        final Matrix result = Calculatrix.evaluateInfix('2 - [[1,2],[3,4]]');
+    test('subtracting a bracketed matrix literal from a scalar is unaffected '
+        'by the signed-matrix-literal grammar', () {
+      final Matrix result = Calculatrix.evaluateInfix('2 - [[1,2],[3,4]]');
 
-        expect(
-          result,
-          Matrix(<List<double>>[
-            <double>[1, -2],
-            <double>[-3, -2],
-          ]),
-        );
-      },
-    );
+      expect(
+        result,
+        Matrix(<List<double>>[
+          <double>[1, -2],
+          <double>[-3, -2],
+        ]),
+      );
+    });
 
     test('evaluates non-square outer product in infix mode', () {
       final Matrix result = Calculatrix.evaluateInfix('[[1],[2]] * [[3,4]]');
@@ -314,13 +319,16 @@ void main() {
       expect(infix, Matrix.scalar(11));
     });
 
-    test('produces numerically equivalent floating results across notations', () {
-      final Matrix infix = Calculatrix.evaluateInfix('0.1 + 0.2');
-      final Matrix rpn = Calculatrix.evaluateRpn(<String>['0.1', '0.2', '+']);
+    test(
+      'produces numerically equivalent floating results across notations',
+      () {
+        final Matrix infix = Calculatrix.evaluateInfix('0.1 + 0.2');
+        final Matrix rpn = Calculatrix.evaluateRpn(<String>['0.1', '0.2', '+']);
 
-      expect(infix.almostEquals(rpn), isTrue);
-      expect(infix.almostEquals(Matrix.scalar(0.3)), isTrue);
-    });
+        expect(infix.almostEquals(rpn), isTrue);
+        expect(infix.almostEquals(Matrix.scalar(0.3)), isTrue);
+      },
+    );
 
     test('throws syntax error for invalid infix', () {
       expect(

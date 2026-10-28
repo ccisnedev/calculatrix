@@ -1,9 +1,10 @@
+import 'dart:convert';
+
 /// Every top-level word `buildCalculatrixCli` registers a real route under
 /// (the `eval`/`commands` modules, and the `version`/`doctor`/`upgrade`/
 /// `uninstall`/`help` plugin commands). An invocation whose first argument
 /// is none of these, and is not an option, never reaches a named command at
-/// all: it only ever matches the bare `<program>` shortcut (spec section 4,
-/// G4), so more than one such argument can only mean the program itself was
+/// all: it only ever matches the bare `<program>` shortcut, so more than one such argument can only mean the program itself was
 /// typed unquoted, one RPN word per shell argument, instead of as the one
 /// quoted string the shortcut's contract requires.
 const Set<String> reservedTopLevelWords = <String>{
@@ -16,6 +17,20 @@ const Set<String> reservedTopLevelWords = <String>{
   'help',
 };
 
+/// [args] without the global output options `--json`, `-q` and `--quiet`,
+/// which are not part of the program.
+List<String> _withoutOutputOptions(List<String> args) {
+  final List<String> words = <String>[];
+  bool afterDashes = false;
+  for (final String arg in args) {
+    if (afterDashes || !_outputOptions.contains(arg)) words.add(arg);
+    if (arg == '--') afterDashes = true;
+  }
+  return words;
+}
+
+const Set<String> _outputOptions = <String>{'--json', '-q', '--quiet'};
+
 /// Whether [args] looks like an RPN program typed as separate shell words
 /// (`cx 5 7 power`) rather than one quoted string (`cx '5 7 power'`):
 /// more than one argument, the first of which neither names a registered
@@ -26,8 +41,9 @@ const Set<String> reservedTopLevelWords = <String>{
 /// once `modular_cli_sdk` has already rejected the invocation with
 /// `extra-argument` (see [rewriteUnquotedProgramError]).
 bool looksLikeUnquotedProgram(List<String> args) {
-  if (args.length < 2) return false;
-  final String first = args.first;
+  final List<String> words = _withoutOutputOptions(args);
+  if (words.length < 2) return false;
+  final String first = words.first;
   if (first.startsWith('-')) return false;
   return !reservedTopLevelWords.contains(first);
 }
@@ -40,7 +56,7 @@ bool looksLikeUnquotedProgram(List<String> args) {
 final RegExp _errorLinePattern = RegExp(r'^Error: .* \[([\w-]+)\]$');
 
 /// Rewrites `modular_cli_sdk`'s own `extra-argument` message, recorded when
-/// the bare `<program>` shortcut (spec section 4, G4) was given more than
+/// the bare `<program>` shortcut was given more than
 /// one argument, into one that says what actually went wrong and how to
 /// fix it: the program was typed as several shell words instead of one
 /// quoted string.
@@ -50,8 +66,7 @@ final RegExp _errorLinePattern = RegExp(r'^Error: .* \[([\w-]+)\]$');
 /// straight to the real stream so this can run first; see
 /// `runCalculatrixCli`). Only the first line, the one `Error: ... [id]`
 /// line, is ever replaced; anything after it (a positional-argument usage
-/// block, when `modular_cli_sdk` resolved one) is kept verbatim, since
-/// AC8's "no other change" covers it too.
+/// block, when `modular_cli_sdk` resolved one) is kept verbatim.
 ///
 /// Leaves [errorText] untouched whenever either guard fails: [args] does
 /// not look like an unquoted program ([looksLikeUnquotedProgram]), or the
@@ -62,6 +77,29 @@ final RegExp _errorLinePattern = RegExp(r'^Error: .* \[([\w-]+)\]$');
 String rewriteUnquotedProgramError(String errorText, List<String> args) {
   if (!looksLikeUnquotedProgram(args)) return errorText;
 
+  final List<String> words = _withoutOutputOptions(args);
+  final String hint =
+      'cx received ${words.length} arguments; quote the program as one '
+      "argument: cx '${words.join(' ')}'";
+
+  final String trimmed = errorText.trimRight();
+  if (trimmed.startsWith('{')) {
+    try {
+      final Object? decoded = jsonDecode(trimmed);
+      if (decoded is Map<String, dynamic> &&
+          decoded['error'] is Map<String, dynamic>) {
+        final Map<String, dynamic> error =
+            decoded['error'] as Map<String, dynamic>;
+        if (error['id'] != 'extra-argument') return errorText;
+        error['message'] = hint;
+        return '${jsonEncode(decoded)}${errorText.substring(trimmed.length)}';
+      }
+    } on FormatException {
+      return errorText;
+    }
+    return errorText;
+  }
+
   final int firstLineEnd = errorText.indexOf('\n');
   final String firstLine = firstLineEnd == -1
       ? errorText
@@ -71,9 +109,5 @@ String rewriteUnquotedProgramError(String errorText, List<String> args) {
   final RegExpMatch? match = _errorLinePattern.firstMatch(firstLine);
   if (match == null || match.group(1) != 'extra-argument') return errorText;
 
-  final String quoted = args.join(' ');
-  final String rewrittenMessage =
-      'cx received ${args.length} arguments; quote the program as one '
-      "argument: cx '$quoted'";
-  return 'Error: $rewrittenMessage [extra-argument]$rest';
+  return 'Error: $hint [extra-argument]$rest';
 }

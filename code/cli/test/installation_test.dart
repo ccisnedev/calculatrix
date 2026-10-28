@@ -1,18 +1,14 @@
-// Tests for runbook stage S3 (docs/runbook-cli-stage-0.md, "Publishing
-// (dogfood)"), covering the version/doctor/upgrade/uninstall rows of
-// docs/spec/calculatrix_cli.md section 13 that calculatrix_cli_test.dart
-// (stage S2) explicitly excludes.
+// Tests for the version/doctor/upgrade/uninstall rows, which
+// calculatrix_cli_test.dart explicitly excludes.
 //
 // A failed release lookup exits 2 (`ExitCode.apiError`, what
-// InstallationPlugin throws), as docs/spec/calculatrix_cli.md section 6
-// and section 13 record since the 2026-09-29 amendment.
+// InstallationPlugin throws).
 //
-// Open point: the spec's section 13 row "cx --json version -> version as
-// JSON, 0 (GNU order, G6 amended 2026-09-29)" does not hold against the
-// pinned cli_router 0.2.1, which rejects any option before the first route
-// word as misplaced-option, exit 7, with or without POSIXLY_CORRECT. The
-// test for that row asserts the spec and is skipped until
-// ccisnedev/cli_router#10 is fixed; nothing here works around it.
+// Open point: `cx --json version` should print the version as JSON, exit 0
+// (GNU order), but the pinned cli_router 0.2.1 rejects any option before the
+// first route word as misplaced-option, exit 7, with or without
+// POSIXLY_CORRECT. The test for that row asserts the expected behavior and
+// is skipped until cli_router is fixed; nothing here works around it.
 //
 // No test here calls `cx upgrade --apply`/`cx uninstall --apply` down a path
 // that would let `ReplaceInstallation` actually run: doing so through the
@@ -66,7 +62,7 @@ void main() {
     return cli.run(args, stdout: out, stderr: err);
   }
 
-  group('version (VersionPlugin, spec 8.7)', () {
+  group('version (VersionPlugin)', () {
     test('cx version prints the name and version, exit 0', () async {
       final code = await run(['version']);
       expect(code, ExitCode.ok);
@@ -83,8 +79,7 @@ void main() {
     });
 
     test(
-      'cx --json version prints version as JSON, exit 0 (spec section 13, '
-      'GNU order)',
+      'cx --json version prints version as JSON, exit 0 (GNU order)',
       () async {
         final code = await run(['--json', 'version']);
         expect(code, ExitCode.ok);
@@ -93,7 +88,7 @@ void main() {
         expect(decoded['version'], cxVersion);
       },
       skip:
-          'Blocked on ccisnedev/cli_router#10: 0.2.1 rejects a global option '
+          'Blocked on cli_router 0.2.1, which rejects a global option '
           'before the first route word as misplaced-option, exit 7.',
     );
 
@@ -116,7 +111,7 @@ void main() {
     });
   });
 
-  group('doctor (DoctorPlugin, InstallationPlugin, D31)', () {
+  group('doctor (DoctorPlugin, InstallationPlugin)', () {
     test('all checks ok: exit 0, both "path" and "release" reported', () async {
       final code = await run(
         ['doctor', '--json'],
@@ -159,7 +154,7 @@ void main() {
       expect(out.output, contains('warning'));
     });
 
-    test('cx not found on PATH is an error: exit 78 (D31, D40)', () async {
+    test('cx not found on PATH is an error: exit 78', () async {
       final code = await run(
         ['doctor'],
         pathLookup: (executable) => null,
@@ -176,8 +171,7 @@ void main() {
         'newest cli-v* one', () async {
       // A repository with both an app release (v9.9.9, deliberately a
       // "newer"-looking number) and this CLI's own cli-v1.0.0: only the
-      // second is a candidate (runbook D31, "3. releases/latest is
-      // ambiguous").
+      // second is a candidate (releases/latest is ambiguous here).
       final releaseSource = FakeReleaseSource(
         releases: [
           _release('v9.9.9', asset: 'Calculatrix-windows-x64.zip'),
@@ -206,7 +200,7 @@ void main() {
     });
   });
 
-  group('upgrade (InstallationPlugin, D26)', () {
+  group('upgrade (InstallationPlugin)', () {
     test('cx upgrade alone needs --plan or --apply: exit 7', () async {
       final code = await run(
         ['upgrade'],
@@ -246,14 +240,14 @@ void main() {
         platformOps: platformOps,
       );
 
-      // Spec section 13: release-lookup-failed, 2.
+      // A failed release lookup is release-lookup-failed, exit 2.
       expect(code, ExitCode.apiError);
       expect(err.output, contains('release-lookup-failed'));
       expect(platformOps.calls, isEmpty);
     });
   });
 
-  group('uninstall (InstallationPlugin, D26)', () {
+  group('uninstall (InstallationPlugin)', () {
     test('cx uninstall --apply removes the CLI: exit 0', () async {
       final platformOps = FakePlatformOps(assetName: _platformAsset);
       final code = await run([

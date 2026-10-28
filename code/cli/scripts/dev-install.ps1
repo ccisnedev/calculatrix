@@ -18,7 +18,7 @@ Write-Host "Installing to $installDir..."
 # Create directories
 New-Item -ItemType Directory -Force "$binDir" | Out-Null
 
-# Copy the binary. No alias, no shim of any kind (issue #22): `cx.exe` is
+# Copy the binary. No alias, no shim of any kind: `cx.exe` is
 # what the user runs directly. A `.cmd`/`.bat` shim runs through cmd.exe,
 # which treats `^` as its own escape character while parsing the command
 # line, before the shim body ever runs; that silently mangled

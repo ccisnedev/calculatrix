@@ -56,17 +56,9 @@ List<String> _windowsExecutableNames(
   ];
 }
 
-/// Contributes the "binary on `PATH`" check that
-/// `docs/spec/calculatrix_cli.md` section 5 and runbook D31 require for `cx
-/// doctor`, and that `InstallationPlugin` no longer provides: its own doc
-/// comment (`installation_plugin.dart`) records that the `binary` and
-/// `alias` checks it used to contribute were removed before
-/// `modular_cli_sdk` 0.8.0 shipped, since neither macss nor inquiry checked
-/// its own binary is reachable (both assume `doctor` running at all proves
-/// it). `cx` still wants the check (D31, amended 2026-09-29 to drop only the
-/// alias half, since `cx` has no alias, D40), so it contributes its own,
-/// exactly as spec section 8.7 anticipates: "A CLI can contribute its own
-/// checks to `doctor.checks` from a plugin of its own."
+/// Contributes the `cx doctor` check that the `cx` binary is on `PATH`.
+/// `modular_cli_sdk`'s `InstallationPlugin` does not provide it, so `cx`
+/// contributes its own through `doctor.checks`.
 ///
 /// Requires `modular_cli.doctor`, exactly as `InstallationPlugin` does, so
 /// `DoctorPlugin` has already declared the extension point this plugin

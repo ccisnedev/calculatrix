@@ -1,4 +1,4 @@
-// Coverage for issue #51 acceptance 4: `cx 5 7 power` used to fail with
+// Coverage for the unquoted program: `cx 5 7 power` used to fail with
 // "Error: unexpected argument '7' [extra-argument]", an SDK-worded message
 // that never says the actual problem (the program was typed as separate
 // shell words instead of one quoted string). The id and exit code stay
@@ -28,8 +28,14 @@ void main() {
       expect(looksLikeUnquotedProgram(['help']), isFalse);
     });
 
-    test('an option as the first argument is never an unquoted program', () {
-      expect(looksLikeUnquotedProgram(['--json', '5', '7']), isFalse);
+    test('an option other than --json, -q as the first argument is never an '
+        'unquoted program', () {
+      expect(looksLikeUnquotedProgram(['--max-digits', '5', '7']), isFalse);
+    });
+
+    test('--json and -q are not part of the program', () {
+      expect(looksLikeUnquotedProgram(['--json', '5', '7']), isTrue);
+      expect(looksLikeUnquotedProgram(['-q', '5']), isFalse);
     });
 
     test('no arguments at all is never an unquoted program', () {

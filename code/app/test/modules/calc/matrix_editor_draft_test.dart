@@ -55,7 +55,7 @@ void main() {
     });
   });
 
-  group('MatrixEditorDraft cells (runbook D56, D59)', () {
+  group('MatrixEditorDraft cells (a ~ marks a literal approximate, p/q is an exact fraction)', () {
     MatrixEditorDraft draftWith(String a, String b) => MatrixEditorDraft(
       order: null,
       rowCount: 1,

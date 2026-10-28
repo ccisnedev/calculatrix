@@ -1,10 +1,10 @@
 name: calculatrix_cli
 description: Command-line interface for Calculatrix.
-version: 0.16.2
+version: 0.16.3
 publish_to: 'none'
 
-# The executable is `cx`, built from bin/cx.dart, with no alias of any kind
-# (issue #22). `dart compile exe` (scripts/dev-install.ps1) does not read
+# The executable is `cx`, built from bin/cx.dart, with no alias of any kind.
+# `dart compile exe` (scripts/dev-install.ps1) does not read
 # this, but a `dart pub global activate` install would, so it is declared
 # here too.
 executables:

@@ -1,4 +1,4 @@
-// Tests for issue #82: a program that starts with "-" followed by a name
+// A program that starts with "-" followed by a name
 // (`cx -pi`, `cx -e`) is read as options. The message now points to "--"
 // when the name is a registry word, alias or constant.
 import 'dart:convert';
@@ -22,7 +22,7 @@ Future<(int, String)> _run(List<String> args) async {
 }
 
 void main() {
-  group('optionLikeValueIndex on a dash and a name (issue #82)', () {
+  group('optionLikeValueIndex on a dash and a name', () {
     test('finds a registry word, alias or constant', () {
       expect(optionLikeValueIndex(['-pi']), 0);
       expect(optionLikeValueIndex(['-PI']), 0);
@@ -38,7 +38,7 @@ void main() {
     });
   });
 
-  group('runCalculatrixCli on a dash and a name (issue #82)', () {
+  group('runCalculatrixCli on a dash and a name', () {
     test('cx -pi', () async {
       final (code, err) = await _run(['-pi']);
       expect(code, ExitCode.validationFailed);
@@ -120,14 +120,14 @@ void main() {
       expect(err, startsWith("Error: unknown option '-x' [unknown-option]"));
     });
 
-    test('cx program --file keeps the #68 message', () async {
+    test('cx program --file keeps the shortcut message', () async {
       final (_, err) = await _run(['1 2 +', '--file', 'p.txt']);
       expect(err, contains('--file is not accepted by the shortcut'));
       expect(err, isNot(contains('starts with "-"')));
     });
 
     test('cx eval rpn -f program.rpn -e: -f is declared, so -e still gets '
-        'the hint (Codex review on #83)', () async {
+        'the hint', () async {
       expect(optionLikeValueIndex(['eval', 'rpn', '-f', 'p.rpn', '-e']), 4);
       final (code, err) = await _run(['eval', 'rpn', '-f', 'p.rpn', '-e']);
       expect(code, ExitCode.validationFailed);

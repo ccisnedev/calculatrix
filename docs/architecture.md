@@ -1,264 +1,102 @@
 # Architecture
 
-## Overview
+How the code is organized today, and where it is going. What the language
+and each package do is specified elsewhere; this document says where things
+live and how they depend on each other.
 
-Calculatrix is a shared-core calculator system.
+## Packages
 
-- `package:calculatrix` is the semantic source of truth.
-- `calculatrix_app` is the Flutter consumer shell.
-- `calculatrix_cli` is the command-line consumer.
+| Directory | Package | Role |
+|---|---|---|
+| `code/core` | `calculatrix` | The engine and the source of truth: values, both notations, the vocabulary, errors and display text. Pure Dart, no runtime dependencies. Spec: `spec/calculatrix_core.md`, `spec/calculatrix_mathematics.md`. |
+| `code/cli` | `calculatrix_cli` | `cx`, the command line, declared on `modular_cli_sdk` and `cli_router`. Spec: `spec/calculatrix_cli.md`. |
+| `code/app` | `calculatrix_app` | The Flutter calculator (Android, Windows, web). |
 
-This document reflects the current post-`v0.7.0` shell line, published in the
-Flutter app as `v0.7.1`. The user-facing app is no longer infix-first: the
-persistent surface is an honest `RPN` shell, while `Infix` and `Matrix` are
-invoked editors over a pre-stack draft. Complex-number support, matrix-first
-memory, and advanced linear algebra already live in the shared core; app and
-CLI remain thin consumers of that same kernel.
+`code/design` holds the logo. `code/api`, `code/db` and `code/infra` are
+empty placeholders. `benchmark/` (at the root) holds the agent benchmark
+described in `mission.md`.
 
-## Runtime Truth
+The app and the CLI depend on core (`path: ../core`) and never duplicate
+its math: they parse their own input surface (keys, arguments), call core,
+and present what it returns. Values, exactness and error ids are the same
+in every consumer; only presentation may differ. Core depends on neither.
 
-Evaluation no longer lives in app-local tokenizer/parser/evaluator code.
-App and CLI delegate computation to the core package.
+## Core
 
-```text
-Infix input (String)     -> Calculatrix.compileInfix(...) -> CalculatrixProgram
-						 -> CalculatrixMachine.executeProgram(...) -> Matrix
-RPN input (List<String>) -> typed commands / evaluateRpn(...)
-						 -> CalculatrixMachine -> Matrix
-```
+Everything is exported from `code/core/lib/calculatrix.dart`; the sources are
+under `lib/src/`. The table in `spec/calculatrix_core.md`, section "Package
+structure and public API", lists every library. Where to look:
 
-All values are matrices. Scalars are represented as `1x1` matrices. Consumer
-layers may choose to display `1x1` results as scalar text, but that does not
-change the matrix-first semantics of the core.
+- **Values** (`matrix/matrix.dart`). Every value is an immutable `Matrix`:
+  a scalar is 1x1, a vector n x 1, a complex number a 2x2 real block. A
+  matrix is exact (`BigInt` rationals, `exact/`) or approximate (doubles)
+  as a whole. Exact arithmetic, exact linear algebra and exact roots, with
+  the digit limit, live in `exact/`; tolerances of the approximate path in
+  `numeric/numeric_policy.dart`.
+- **RPN machine.** `rpn/rpn_engine.dart` is the stack; `machine/` holds
+  `CalculatrixMachine`, which runs typed commands, macros and programs,
+  and leaves the stack untouched when a command fails.
+- **Entry points and infix** (`evaluation/`). `Calculatrix` evaluates RPN
+  and infix; infix compiles (shunting-yard) to the same commands RPN runs,
+  so each operation has one implementation. Literal parsing is in
+  `literals.dart`.
+- **Registry** (`registry/command_registry.dart`). The whole vocabulary:
+  names, aliases, arity, help text, examples, and the command each word
+  builds. RPN resolves words through it; `cx commands` and the "did you
+  mean" suggestions read it.
+- **Name table** (`names/name_table.dart`). Names and constants.
+- **Errors** (`errors/errors.dart`). `CalculatrixError` and its
+  subclasses, each with a stable `CalculatrixErrorId`.
+- **Formatter** (`matrix/matrix_display_formatter.dart`). Display text
+  shared by the app and the CLI.
+- **Session** (`session/calculatrix_session.dart`). The keypad session
+  the app drives: drafts, stack and memory.
 
-Complex-number workflows also remain matrix-first: the imaginary unit and all
-complex arithmetic are represented through real matrices in the core instead of
-through a separate consumer-side complex type.
+## App
 
-## Responsibility Split
+The app has one persistent shell, `RPN`, over the committed stack. `Infix`
+and `Matrix` are editors invoked over a pre-stack draft, which is never
+labeled as a stack register; the keypad and the module bar are fixed. The
+model is `adr/0003-honest-rpn-shell-and-invoked-editors.md`.
 
-| Layer | Responsibility |
-|-------|----------------|
-| `package:calculatrix` | `Matrix`, `CalculatrixMachine`, typed commands/macros/programs, infix compilation/evaluation, session facade, numeric policy, error taxonomy |
-| `calculatrix_app` | Persistent `RPN` shell, pre-stack draft lifecycle, invoked `Infix` / `Matrix` editors, fixed module bar, stack visualization, matrix-editor seeding and web-input hardening, memory UX, truthful formatting, accessibility |
-| `calculatrix_cli` | Argument parsing, infix/RPN/command/macro routing, core invocation, output formatting, exit behavior |
+The code is in `code/app/lib/modules/calc/`: `controller.dart` (state, over
+a core `CalculatrixSession`), `matrix_editor_draft.dart` (the matrix
+editor's draft) and `view.dart` (the widgets).
 
-## Consumer Shell Model (v0.7.1)
+## Testing
 
-The current application model is a single shell with specialized surfaces, not
-multiple independent calculators.
+- Test-driven: a behavior change starts with a failing test.
+- Core: unit tests under `code/core/test/`, one directory per library.
+  Every exact word is also tested against Giac
+  (`test/exact/giac_differential_test.dart`): Giac is a test oracle only,
+  never linked or shipped, and expectations come from mathematics; see
+  `adr/0004-pure-dart-engine-and-clean-room.md`. CI runs them on Linux with
+  Giac installed and fails if it is missing; elsewhere they skip.
+- CLI: tests under `code/cli/test/`, including the benchmark trap set.
+- App: controller and editor-draft unit tests, widget tests for the shell
+  contracts, and an integration test under `code/app/integration_test/`.
 
-- One shared calculator shell
-- One persistent shell mode: `RPN`
-- Two invoked editors over the same pre-stack draft: `Infix` and `Matrix`
-- One labeled `Draft` surface distinct from committed `X0`, `X1`, `X2`, ...
-- Fixed module taxonomy instead of mode-specific dynamic deck families, with
-	overflow paging where a module has more than one command page
-- Fixed keypad layout with contextual command modules above it
-- Stack visualization in the persistent `RPN` shell
-- Matrix-first committed-value and memory presentation; scalar shorthand is
-	used only when the underlying value is truly scalar
-- The `Infix` editor keeps `DRAFT` and `MEM` on a single status rail so the
-	remaining display area is spent on the expression viewport and value preview
-- Accessibility semantics for stack depth, display value, infix memory, and
-	infix expression are expected to announce once each, without duplicated
-	screen-reader output from visible text children
-- Square keys across supported screen sizes
-- Display/keypad height guided by a golden-ratio-like split when constraints allow
+## Releases
 
-### Draft and Editor Contract
+Each package has its own version and its own tags: `vX.Y.Z` for the app,
+`cli-vX.Y.Z` for the CLI (`adr/0002-versioning-and-changelog-policy.md`).
+Release workflows are in `.github/workflows/`.
 
-- The app-side matrix editor serializes values to the same bracket literal accepted by the core package, for example `[[1,2],[3,4]]`.
-- When the active infix draft already contains a parseable matrix literal that
-	fits within `4x4`, opening the `Matrix` editor seeds the editor from that
-	matrix instead of forcing a blank draft.
-- The app maintains one pre-stack draft that is not part of the committed `RPN` stack until a real commit occurs.
-- The shell renders that pre-stack surface as `Draft` (or `Error` when appropriate), never as an `X` register.
-- Entering the `Infix` editor opens that draft as an infix expression draft.
-- Entering the `Matrix` editor opens that draft as a matrix-construction draft.
-- In the `Infix` editor, `=` remains an infix-only action, while `ENTER` resolves the draft to matrices, pushes the resulting value onto the stack, and returns to the `RPN` shell.
-- In the `Matrix` editor, `ENTER` validates and pushes the matrix draft onto the stack, then returns to the `RPN` shell.
-- `CANCEL` discards the pending editor draft and returns to `RPN`.
-- CLI workflows use the same literal format directly on the command line, so copy/paste between app and CLI remains lossless.
+## Planned
 
-### Draft and Stack Boundary Contract
+The stages and their order are in `roadmap.md`; the language design is in
+`spec/language-decisions.md`. In brief:
 
-- The committed stack remains the only truthful source of `X0`, `X1`, `X2`, ... register numbering.
-- A pending draft must never be mislabeled as `X0` or as any other committed register.
-- Touch interaction on committed stack cards is read-only; editor entry happens only through explicit `EDIT` commands.
-- Matrix-building actions remain draft-local until confirmation, while committed stack operations continue to route through public core commands or macros.
-
-## Testing Policy
-
-- **TDD is mandatory** for all new behavior.
-- `code/core` should maintain full unit and contract coverage for public semantics and new logic.
-- `code/app` stateful logic should target full unit coverage for controllers, view-models, and editor state.
-- Widget tests should guard only critical UI contracts: semantics, fixed module bar, truthful committed stack numbering, square key geometry, matrix rendering, and stack summaries.
-- `code/app/integration_test` should cover canonical end-to-end user journeys for released features.
-- Browser accessibility-tree inspection on Flutter web and Windows shell validation complement widget and Android integration coverage for release-facing UX changes.
-- `code/cli` should add automated unit and smoke/integration coverage for argument parsing, output formatting, and representative commands.
-- Stage completion should include focused validation of core tests/analyze, Flutter tests, app integration flows, and CLI automation/smokes.
-
-## RPN Interaction Contract (v0.7.1)
-
-### Shared Current Value
-
-- The shell maintains one committed current value, `X`, which is always the top of the committed `RPN` stack.
-- The `Infix` editor works over a draft and may resolve that draft to a matrix result, but the committed `RPN` stack remains the runtime source of truth.
-- Opening or closing an editor must not silently mutate committed `X`.
-- If the committed `RPN` stack mutates `X`, any stale `Infix` repeat-`=` state must be invalidated.
-
-### Draft and Editor State
-
-- `RPN` is the only persistent user-visible shell state.
-- The shell may still maintain a direct `RPN` input draft while the user is typing in the shell.
-- The shell also maintains one editor-owned pre-stack draft for the invoked `Infix` and `Matrix` editors.
-- Entering an editor must be explicit through the `EDIT` module; the shell must not silently reinterpret one draft as another.
-
-### Primary Action Key
-
-- In the persistent `RPN` shell, the bottom-right key is `ENTER` and continues to commit the current shell draft onto the stack.
-- In the `Infix` editor, `=` is an infix-only action, while `ENTER` resolves the editor draft to matrices, pushes the result to the stack, and returns to `RPN`.
-- In the `Matrix` editor, `ENTER` confirms the matrix draft, pushes it onto the stack, and returns to `RPN`.
-- `v0.7.1` still does **not** overload `ENTER` as implicit duplicate; duplication stays explicit via `dup`.
-
-### Operator Semantics
-
-- If a draft operand is active, unary and binary operators commit that draft before delegating to the core stack engine.
-- Unary operators (`√`, `%`) apply to the top of the committed stack.
-- Binary operators (`+`, `-`, `*`, `/`) apply to the top two committed stack values.
-- Error behavior follows the core error taxonomy exposed by `package:calculatrix`.
-
-### Fixed Shell Keys
-
-- The fixed keypad layout is:
-
-```text
- 7   8   9   ÷   INFIX
- 4   5   6   ×   DELETE
- 1   2   3   -   =
- 0   .   ±   +   ENTER
-```
-
-- `INFIX` invokes the `Infix` editor from the `RPN` shell.
-- `DELETE` edits the active draft when a draft exists.
-- When no draft exists, the same physical `DELETE` key may act as `DROP` over committed `X0`.
-- Outside the `Infix` editor, `=` has no independent shell meaning; `ENTER` is the stack-facing evaluation and commit action.
-
-### Clear and Editing Semantics
-
-- `DELETE` edits only the active draft operand when a draft exists.
-- `DELETE` does not mutate already committed stack values unless it is explicitly acting as contextual `DROP` on `X0` with no draft active.
-- `C` clears the active draft when a draft exists.
-- `C` clears the stack and transient error state when no draft is active.
-- `CANCEL` inside an invoked editor discards the pending editor draft and returns to `RPN`.
-
-### Memory Semantics
-
-- Memory is matrix-first in the core session model.
-- `MRC` behaves like a pocket-calculator memory recall/clear key: the first press recalls the committed matrix value, and the second consecutive press clears memory.
-- `M+` and `M-` operate through the same shared core matrix rules instead of scalar-only consumer special cases.
-- Explicit memory semantics still live in the core package even when the shell presents them through compact calculator-style controls.
-
-### Display Semantics
-
-- In the `RPN` shell, the display may show the active shell draft in a `Draft` card when editing, otherwise the top-of-stack summary for committed `X`.
-- In an invoked editor, the display shows the active editor draft and editor-local feedback.
-- In the `Infix` editor, `DRAFT` and `MEM` share a single status rail so most
-	of the display remains available to expression editing.
-- A dedicated stack surface shows recent stack levels and current depth.
-- The committed stack surface never relabels a draft as `X0`.
-- Display labels, stack depth, infix memory, and infix expression semantics are
-	treated as single announcements; visible text under a semantic label must not
-	create duplicate screen-reader output.
-- Memory previews and committed-value formatting stay matrix-first and honest;
-	non-scalar values are not coerced into fake scalar or algebraic shorthand.
-- Matrix rendering policy belongs to the consumer shell, while matrix computation remains in the core package.
-
-## Release Status (v0.7.1)
-
-The project is now well beyond the old Stage 3 gate. The current documentation
-baseline is the honest-shell line completed in `v0.7.0` and hardened in the
-Flutter app's `v0.7.1` patch line.
-
-The stabilized foundation now includes:
-
-- `package:calculatrix` exports a public matrix stack machine, typed commands, typed macros, and typed programs.
-- Infix compiles to typed programs executed by the same machine layer.
-- Complex-number workflows use the same matrix-first kernel, including the
-	imaginary-unit matrix representation.
-- Advanced linear algebra already ships through the public core surface,
-	including determinant, LU, QR, eigen workflows, diagonalization, norms,
-	rank, adjugate/cofactor workflows, vector operations, `rref`, `svd`, `exp`,
-	and `log`.
-- The app shell already ships as one persistent `RPN` shell with invoked
-	`Infix` and `Matrix` editors, truthful committed stack numbering, fixed
-	modules, and fixed keypad geometry.
-- The current `v0.7.1` shell line adds post-release hardening for infix display
-	density, matrix-editor seeding/web reliability, and accessibility semantics.
-- The CLI already routes infix, RPN, public commands, and public macros through the shared core.
-- Public docs and versioned shell contracts continue to track the canonical
-	core model.
-- Core, CLI, Flutter tests, and release-facing shell validation remain the
-	standard gate for new work.
-
-## Planned Distribution Architecture (next stage)
-
-The next roadmap stage does not change runtime semantics. It adds a delivery
-layer around the existing consumers so the already-stable app can ship through
-public channels reproducibly.
-
-- GitHub Actions should become the canonical release orchestrator once the
-	existing validation matrix passes.
-- Android delivery target: a signed release AAB with the final public
-	`applicationId` / namespace and the metadata required by Google Play.
-- Windows delivery targets: a Store-ready Windows package identity plus a
-	signed artifact lineage that can also feed `winget`.
-- Web delivery target: `flutter build web` published to `calculatrix.ccisne.dev`
-	from the same validated revision used for app artifacts.
-- Privacy policy and other public legal pages now live in the publisher legal
-	site at `https://ccisne.dev/legal/`; store listings, certificates/secrets,
-	and release notes remain delivery assets adjacent to the repo rather than part
-	of the semantic core, but they are required for public distribution.
-- Current state: the web build is live at `calculatrix.ccisne.dev` through
-	`pages-release.yml`; `android-release.yml` builds the signed AAB and
-	`windows-release.yml` builds the installer and portable zip when a GitHub
-	release is published. Google Play is in closed testing; `winget` and the
-	Microsoft Store are not published yet.
-
-The stack machine contract is part of
-[spec/calculatrix_core.md](spec/calculatrix_core.md).
-
-## Kernel Seam (planned)
-
-Planned for Stage 9 onward; see [runbook-1.0.0.md](runbook-1.0.0.md) and
-issue #1. Nothing in this section is implemented yet.
-
-- `package:calculatrix` owns the contract: the `Value` model, the
-	`CalculatrixKernel` interface, commands, the command registry, and a
-	conformance suite exported as `package:calculatrix/conformance.dart`.
-- `DartKernel` lives inside core under `lib/src/kernel/dart/` and is the
-	default. Core keeps working on its own, in pure Dart.
-- Other kernels are separate packages that implement the interface, named
-	`calculatrix_*`. The first is `calculatrix_giac` (`code/giac/`), an adapter
-	over Giac through a C shim, FFI on native and WASM on the web.
-- Core never depends on a kernel package. Consumers choose the kernel.
-- A command no selected kernel supports fails with
-	`UnsupportedCalculatrixOperationError`.
-- The command registry records name, HP 50g name, module, arity, label, and
-	supported kernels. The app module bar and the CLI aliases are generated
-	from it: one module is one button, one command is one button.
-- Decisions still open, each in its own ADR before code depends on it: the
-	kernel seam and execution model (ADR 0004), the value model and symbolic
-	values (ADR 0005, amends ADR 0003), licensing (ADR 0006), and an optional
-	`CompositeKernel` (ADR 0007).
-- Licensing: core stays MIT; `calculatrix_giac`, and the app and CLI from
-	their first Giac-linked release, are GPL-3.0-or-later.
-
-## Cleanup Status
-
-The historical app-side tokenizer/parser/evaluator pipeline has been removed
-from `calculatrix_app`. Current consumers rely exclusively on the shared core
-package for evaluation semantics.
-Only shell concerns remain in the app: editor entry, matrix entry, display,
-stack presentation, fixed-module navigation, memory UX, and accessibility.
+- **Language implementation.** A compiler that checks a program (names,
+  arity, types) before it runs and reports line and column, and an
+  interpreter for the versioned language spec. Infix becomes a translation
+  to RPN.
+- **Documents.** `cx` runs the `calculatrix` code blocks of a Markdown
+  file.
+- **Editor tooling.** A language server on the compiler, a VS Code
+  extension, a formatter and a linter.
+- **Embeddable engine.** The host-neutral API of
+  `spec/engine-api-contract.md`, available outside Dart through a C
+  interface and WASM.
+- **Symbolic computation.** A matrix-first CAS, in pure Dart inside the
+  engine, checked against an independent system.

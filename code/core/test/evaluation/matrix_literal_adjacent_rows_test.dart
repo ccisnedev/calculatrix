@@ -1,4 +1,4 @@
-// Tests for issue #29: matrix literals whose rows touch with no whitespace
+// Matrix literals whose rows touch with no whitespace
 // between them, `[[0 -1][1 0]]` (the logo's form, code/design/logo.svg, and
 // the HP 50g's own notation), mean the same as the spaced form
 // `[[0 -1] [1 0]]`.
@@ -35,7 +35,7 @@ void main() {
     <double>[0, -1],
   ]);
 
-  group('RPN, adjacent rows (issue #29)', () {
+  group('RPN, adjacent rows', () {
     test('[[0 -1][1 0]] is the same matrix as [[0 -1] [1 0]]', () {
       expect(_rpn('[[0 -1][1 0]]'), _rpn('[[0 -1] [1 0]]'));
     });
@@ -58,13 +58,13 @@ void main() {
     });
   });
 
-  group('Infix, adjacent rows (issue #29)', () {
+  group('Infix, adjacent rows', () {
     test('[[0 -1][1 0]]^2 matches RPN', () {
       expect(Calculatrix.evaluateInfix('[[0 -1][1 0]]^2'), minusIdentity);
     });
   });
 
-  group('Existing forms are unchanged (issue #29)', () {
+  group('Existing forms are unchanged', () {
     final Matrix expected = Matrix(<List<double>>[
       <double>[1, 2],
       <double>[3, 4],
@@ -81,7 +81,7 @@ void main() {
     }
   });
 
-  group('Invalid input is still rejected (issue #29)', () {
+  group('Invalid input is still rejected', () {
     test('two top-level literals written together: [1 2][3 4]', () {
       expect(() => _rpn('[1 2][3 4]'), _syntaxError);
     });

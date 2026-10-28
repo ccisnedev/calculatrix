@@ -1,6 +1,6 @@
-// Exact roots and eigenvalues in core (runbook-trust.md, step T4):
+// Exact roots and eigenvalues in core:
 // fractional powers and `sqrt`, `frobenius-norm`, the trivial cases of
-// `exp` and `ln`, and `eigenvalues` on exact values (D53), exact only when
+// `exp` and `ln`, and `eigenvalues` on exact values, exact only when
 // the result is rational. Giac checks the same words on generated inputs
 // in giac_differential_test.dart.
 import 'package:calculatrix/calculatrix.dart';

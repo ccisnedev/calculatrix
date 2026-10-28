@@ -65,7 +65,7 @@ own error id.
 
 | Limit | Default | Error id |
 |---|---|---|
-| `maxDigits`: digits of any integer, numerator or denominator (D55) | 10 000 | `limit-digits` |
+| `maxDigits`: digits of any integer, numerator or denominator | 10 000 | `limit-digits` |
 | `maxSteps`: words executed in one run | to define | `limit-steps` |
 | `maxStackDepth` | to define | `limit-stack` |
 | `maxSourceLength`, in bytes | to define | `limit-source` |
@@ -209,7 +209,7 @@ price.run(base="100", tax="18/100", discount="1/10").single().text  # "531/5"
 |---|---|
 | `Engine.eval` | `Calculatrix.evaluateRpnStack(tokens, maxDigits:)` |
 | `prepare` / `Program` | Partly exists: `_compileRpnCommands` builds commands, but it is private and checks nothing beforehand |
-| `maxDigits` | `ExactArithmetic.defaultMaxDigits`, `LimitExceededError` (D55) |
+| `maxDigits` | `ExactArithmetic.defaultMaxDigits`, `LimitExceededError` |
 | Error ids | `CalculatrixErrorId`; a span is only `token` + `position`, with no line, column or phase |
 | Result JSON | `cx --json` (`level`, `exact`, `value`); approximate values go out as JSON numbers, which E14 forbids |
 | Bindings, `steps`, other limits | Do not exist |

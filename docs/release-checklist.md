@@ -1,27 +1,24 @@
 # Release Checklist
 
-Checklist for coordinated Calculatrix releases under ADR 0002.
+Checklist for Calculatrix releases under ADR 0002. Each publishable package
+is released on its own.
 
 ## 1. Scope
 
-- [ ] Confirm release scope: coordinated product release, core-only, app-only, or CLI-only.
-- [ ] Confirm whether version synchronization is mandatory for this release.
-- [ ] Confirm the target version fits the active pre-`1.0.0` scheme (`0.N.P` slices, `0.N.0` stage closures).
+- [ ] Name the package being released (core, CLI, app) and its new version.
+- [ ] Choose the bump from the change to that package's contract (SemVer; before `1.0.0` a breaking change may bump the minor version).
 
 ## 2. Versioning
 
-- [ ] Set `code/core/pubspec.yaml` to the canonical release version `X.Y.Z`.
-- [ ] For coordinated releases, set `code/cli/pubspec.yaml` to the same `X.Y.Z`.
-- [ ] For coordinated releases, set `code/app/pubspec.yaml` to `X.Y.Z+N`.
-- [ ] Verify app, CLI, and core visible versions match when the release is coordinated.
-- [ ] If this closes a roadmap stage before `1.0.0`, use the next stable `0.N.0` version.
-- [ ] Do not create or retain git release tags for internal `0.x` releases.
+- [ ] Set the version in that package's `pubspec.yaml` (`X.Y.Z`; the app adds `+N`).
+- [ ] If the package depends on another package of this repository, confirm the dependency range it was built and tested with.
+- [ ] Tag the published revision with the package's prefix (`vX.Y.Z` app, `cli-vX.Y.Z` CLI) and never move a published tag.
 
 ## 3. Changelogs
 
-- [ ] Update the root `CHANGELOG.md` with repository-facing release notes.
-- [ ] Update `code/core/CHANGELOG.md` with package-facing release notes when core semantics change.
-- [ ] Make release scope explicit in the changelog entry: core-only, coordinated, app-only, or CLI-only.
+- [ ] Update `code/core/CHANGELOG.md` for a core release.
+- [ ] Update the root `CHANGELOG.md` for a CLI or app release.
+- [ ] Name the package and version in the changelog entry.
 
 ## 4. Static Validation
 

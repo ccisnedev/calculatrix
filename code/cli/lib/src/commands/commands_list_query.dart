@@ -4,8 +4,7 @@ import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 
 import 'commands_support.dart';
 
-/// `cx commands list [--category <name>]` (spec section 7; issue #41,
-/// AC3). `category`, once present, is already one of
+/// `cx commands list [--category <name>]`. `category`, once present, is already one of
 /// [commandCategoryCliNames]: the SDK's own `CliParam.enumeration`
 /// rejected anything else before this ever ran.
 class ListInput extends Input {
@@ -30,7 +29,7 @@ class ListOutput extends Output {
     'commands': entries.map(commandEntryToJson).toList(),
   };
 
-  // Grouped by category (AC3), in the registry enumeration's own order,
+  // Grouped by category, in the registry enumeration's own order,
   // never a second, CLI-side list of category names.
   @override
   String toText() {

@@ -1,4 +1,4 @@
-// Acceptance test for issue #19: Matrix.sqrt() must return the real
+// Matrix.sqrt() must return the real
 // principal square root of a singular matrix whose zero eigenvalue is
 // semisimple, instead of rejecting every singular input outright. This
 // also covers four regressions found in review of the first fix: a
@@ -41,7 +41,7 @@ void main() {
   );
 
   group('Matrix.sqrt() on singular matrices - matches Giac to 1e-12 relative '
-      'Frobenius error (issue #19 acceptance criterion)', () {
+      'Frobenius error', () {
     test('fixture file exists and has at least 3 cases', () {
       expect(
         fixtureFile.existsSync(),
@@ -98,60 +98,63 @@ void main() {
     }
   });
 
-  group('Matrix.sqrt() regressions found in review of the issue #19 fix', () {
-    test('a singular matrix can have a non-semisimple *nonzero* eigenvalue: '
-        'only the zero eigenvalue needs to be semisimple, since the '
-        'nonzero part is handed to the ordinary Newton path, which does '
-        'not require diagonalizability, only invertibility '
-        '(regression: the first fix wrongly required every eigenvalue to '
-        'be semisimple)', () {
-      // A = [[0,0,0],[0,1,1],[0,0,1]]: eigenvalue 0 is semisimple
-      // (rank(A) == rank(A^2) == 2), but the eigenvalue-1 block
-      // [[1,1],[0,1]] is a genuine (non-diagonalizable) Jordan block. Its
-      // principal square root is [[1,0.5],[0,1]], since
-      // [[1,0.5],[0,1]] * [[1,0.5],[0,1]] = [[1,1],[0,1]] exactly.
-      //
-      // Giac's matpow returns undef for this matrix (it does not perform
-      // this range/null-space split), so there is no numeric Giac
-      // reference to check against; this case is verified purely by exact
-      // reconstruction (X*X = A), together with the expected closed-form
-      // value derived by hand above.
-      final Matrix value = Matrix(<List<double>>[
-        <double>[0, 0, 0],
-        <double>[0, 1, 1],
-        <double>[0, 0, 1],
-      ]);
-      final Matrix expected = Matrix(<List<double>>[
-        <double>[0, 0, 0],
-        <double>[0, 1, 0.5],
-        <double>[0, 0, 1],
-      ]);
+  group(
+    'Matrix.sqrt() regressions found in review of the singular-matrix fallback',
+    () {
+      test('a singular matrix can have a non-semisimple *nonzero* eigenvalue: '
+          'only the zero eigenvalue needs to be semisimple, since the '
+          'nonzero part is handed to the ordinary Newton path, which does '
+          'not require diagonalizability, only invertibility '
+          '(regression: the first fix wrongly required every eigenvalue to '
+          'be semisimple)', () {
+        // A = [[0,0,0],[0,1,1],[0,0,1]]: eigenvalue 0 is semisimple
+        // (rank(A) == rank(A^2) == 2), but the eigenvalue-1 block
+        // [[1,1],[0,1]] is a genuine (non-diagonalizable) Jordan block. Its
+        // principal square root is [[1,0.5],[0,1]], since
+        // [[1,0.5],[0,1]] * [[1,0.5],[0,1]] = [[1,1],[0,1]] exactly.
+        //
+        // Giac's matpow returns undef for this matrix (it does not perform
+        // this range/null-space split), so there is no numeric Giac
+        // reference to check against; this case is verified purely by exact
+        // reconstruction (X*X = A), together with the expected closed-form
+        // value derived by hand above.
+        final Matrix value = Matrix(<List<double>>[
+          <double>[0, 0, 0],
+          <double>[0, 1, 1],
+          <double>[0, 0, 1],
+        ]);
+        final Matrix expected = Matrix(<List<double>>[
+          <double>[0, 0, 0],
+          <double>[0, 1, 0.5],
+          <double>[0, 0, 1],
+        ]);
 
-      final Matrix actual = value.sqrt();
+        final Matrix actual = value.sqrt();
 
-      final double relativeError = _relativeFrobeniusError(actual, expected);
-      expect(
-        relativeError,
-        lessThanOrEqualTo(1e-9),
-        reason:
-            'expected $expected, got $actual '
-            '(relative Frobenius error $relativeError)',
-      );
+        final double relativeError = _relativeFrobeniusError(actual, expected);
+        expect(
+          relativeError,
+          lessThanOrEqualTo(1e-9),
+          reason:
+              'expected $expected, got $actual '
+              '(relative Frobenius error $relativeError)',
+        );
 
-      final Matrix squared = actual * actual;
-      final double reconstructionError = _relativeFrobeniusError(
-        squared,
-        value,
-      );
-      expect(
-        reconstructionError,
-        lessThanOrEqualTo(1e-9),
-        reason:
-            'X*X should reconstruct the original matrix $value, '
-            'got $squared (relative Frobenius error $reconstructionError)',
-      );
-    });
-  });
+        final Matrix squared = actual * actual;
+        final double reconstructionError = _relativeFrobeniusError(
+          squared,
+          value,
+        );
+        expect(
+          reconstructionError,
+          lessThanOrEqualTo(1e-9),
+          reason:
+              'X*X should reconstruct the original matrix $value, '
+              'got $squared (relative Frobenius error $reconstructionError)',
+        );
+      });
+    },
+  );
 
   group('Matrix.sqrt() regression: scale invariance (probe found after the '
       'first three regressions were fixed)', () {
@@ -188,7 +191,7 @@ void main() {
   });
 
   group('Matrix.sqrt() differential test: pre-existing (main) behavior for '
-      'nonsingular targets is unchanged by the issue #19 fallback', () {
+      'nonsingular targets is unchanged by the singular-matrix fallback', () {
     test('nonsingular well-conditioned matrix still goes through the plain '
         'Newton path and returns the exact same result as before '
         '(matrix_test.dart: [[5,4],[4,5]] -> [[2,1],[1,2]])', () {
@@ -216,7 +219,7 @@ void main() {
   });
 
   group('Matrix.sqrt() on singular matrices with no real square root '
-      '(issue #19)', () {
+      '', () {
     test('raises MatrixDomainError for a nilpotent Jordan block '
         '(Giac: matpow([[0,1],[0,0]],1/2) -> "Unable to transpose Error: '
         'Bad Argument Value")', () {

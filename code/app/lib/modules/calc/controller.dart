@@ -116,7 +116,7 @@ class CalculatorController extends ChangeNotifier {
 
   /// The stack as the display shows it, top first: each value through the
   /// core formatter, exact in full or approximate with the mark `~`
-  /// (runbook D54).
+  /// (an exact value in full, an approximate one marked once).
   List<String> get rpnStackTexts => _session.rpnStack.reversed
       .map(_formatHonestValue)
       .toList(growable: false);
@@ -389,7 +389,7 @@ class CalculatorController extends ChangeNotifier {
     return _formatHonestValue(memory);
   }
 
-  // The same formatter as cx (runbook D54): an exact value in full
+  // The same formatter as cx: an exact value in full
   // (`1/3`), an approximate one with 12 digits and the mark (`~0.333...`).
   String _formatHonestValue(Matrix value) {
     if (value.isScalar) {
@@ -522,6 +522,6 @@ class _MemoryStatusPreview {
 }
 
 /// [text] as a screen reader should say it: a leading approximate mark
-/// `~` (runbook D54) is read as "approximately".
+/// `~` is read as "approximately".
 String spokenValue(String text) =>
     text.startsWith('~') ? 'approximately ${text.substring(1)}' : text;

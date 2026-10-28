@@ -34,7 +34,7 @@ class Calculatrix {
     // characters wherever they fall (its main loop's own `char.trim().isEmpty`
     // check), so trimming here bought nothing but made every token position
     // an offset into the trimmed string instead of the original input line
-    // (spec section 6) -- a leading-whitespace expression such as "  1/0"
+    // -- a leading-whitespace expression such as "  1/0"
     // reported its "/" at position 2 instead of the correct 4.
     final List<_PositionedToken> infixTokens = _tokenizeInfixPositioned(
       expression,
@@ -60,11 +60,10 @@ class Calculatrix {
     ).map((_PositionedToken token) => token.value).toList();
   }
 
-  /// Evaluates an infix expression. Exact literals give exact results
-  /// (runbook D50); [maxDigits] is the size limit of runbook D55. With
+  /// Evaluates an infix expression. Exact literals give exact results;
+  /// [maxDigits] is the size limit of an exact number, in digits. With
   /// [approximate], the result is converted to an approximate value, for a
-  /// caller that only handles those (the app, until step T5 of the
-  /// runbook).
+  /// caller that only handles those.
   static Matrix evaluateInfix(
     String expression, {
     int maxDigits = ExactArithmetic.defaultMaxDigits,
@@ -107,7 +106,7 @@ class Calculatrix {
 
   /// Runs `tokens` as an RPN program and returns the full stack it leaves,
   /// bottom to top, instead of requiring a single result (unlike
-  /// [evaluateRpn]). Needed for words such as `rows` (issue #37, S4c) whose
+  /// [evaluateRpn]). Needed for words such as `rows` whose
   /// documented, tested behavior leaves more than one value on the stack.
   static List<Matrix> evaluateRpnStack(
     List<String> tokens, {
@@ -118,12 +117,11 @@ class Calculatrix {
 
   /// Compiles `word` through the command registry, exactly as any RPN
   /// token is compiled (a primitive word to its own command, a defined
-  /// word such as `over` (runbook D43) to the commands its definition
+  /// word such as `over` to the commands its definition
   /// program compiles to, recursively), and runs the result on `machine`
   /// as one atomic unit. Used by [CalculatrixSession]'s dup/over/swap/rot
   /// actions so a defined word runs through this one compile path instead
-  /// of a hand-written command that would duplicate its own definition
-  /// (D44, issue #39): `over` on the session behaves exactly as typing
+  /// of a hand-written command that would duplicate its own definition: `over` on the session behaves exactly as typing
   /// "2 pick" does anywhere else.
   static void executeWordOn(CalculatrixMachine machine, String word) {
     machine.executeAtomic(_compileWord(word, ExactArithmetic.defaultMaxDigits));
@@ -149,7 +147,7 @@ class Calculatrix {
   }
 
   // Assigns each raw RPN token its 1-based character position in the
-  // "input line" (spec section 6): the same string evaluateRpn reports as
+  // "input line": the same string evaluateRpn reports as
   // the expression, tokens.join(' '), so a caller reading a reported
   // position can find the token by counting characters into that exact
   // string. Blank tokens (e.g. from a stray double space) are dropped
@@ -179,13 +177,13 @@ class Calculatrix {
   // CalculatrixCommandRegistry) is enriched with that token right here.
   //
   // A single input token compiles to more than one command exactly when
-  // it names a defined word (runbook D43): _compileWord then expands its
+  // it names a defined word: _compileWord then expands its
   // definition through this very same compiler path, so a token such as
   // "inverse" can compile down to the two commands "-1 power" would
   // compile to. Every command produced this way is paired with the
   // *original* input token (not the defined word's own inner tokens), so
   // an error raised while executing one of them is still reported against
-  // the word the user actually wrote (issue #35, AC4).
+  // the word the user actually wrote.
   static List<_PositionedCommand> _compilePositionedCommands(
     List<_PositionedToken> tokens,
     int maxDigits,
@@ -210,7 +208,7 @@ class Calculatrix {
     return commands;
   }
 
-  // `--` inside a program (issue #73, runbook D68): it ends the options of
+  // `--` inside a program: it ends the options of
   // the command line, so it goes before the quoted program, never inside
   // it. The message gives the form to type, built from the program without
   // that token and one adjacent space (the tokens joined by one space, so
@@ -296,8 +294,8 @@ class Calculatrix {
   }
 
   // A word whose result overflows (`1e300 1e300 *`) must not leave
-  // Infinity or NaN on the stack: spec section 6 makes any non-finite
-  // value the error `non-finite`, reported on the word that produced it,
+  // Infinity or NaN on the stack: any non-finite
+  // value is the error `non-finite`, reported on the word that produced it,
   // as `^` already does on its own. Every level from the lowest one the
   // word changed up to level 1 is checked, since a word may push more than
   // one value (`diagonalize` pushes P, then D); the levels below it are the
@@ -336,7 +334,7 @@ class Calculatrix {
 
   // Checks the real, pre-expansion stack depth against the arity of the
   // user-facing word `token` names, before any of the commands its own
-  // expansion produced run (issue #51, AC5). Needed because a defined
+  // expansion produced run. Needed because a defined
   // word's expansion can inflate the depth an inner primitive sees: "sqrt"
   // is defined as "0.5 power", so by the time PowerCommand itself runs,
   // the stack already holds the literal 0.5 it just pushed, and
@@ -376,16 +374,15 @@ class Calculatrix {
   }
 
   // Every non-literal word is resolved through the core command registry
-  // (case-insensitive, by name or alias), not through a hardcoded switch
-  // (issue #32): a literal comes first, both because a numeric or matrix
+  // (case-insensitive, by name or alias), not through a hardcoded switch: a literal comes first, both because a numeric or matrix
   // token can never collide with a registered word and because the
   // registry has nothing to say about literals in the first place. A
-  // defined entry (runbook D43) expands to the commands its own
+  // defined entry expands to the commands its own
   // definition program compiles to, via _compileDefinition, which
   // tokenizes the definition with the exact same tokenizeRpnLine used for
   // any other RPN input and recurses back through this function -- so a
   // defined word's compiled result is, command for command, identical to
-  // typing its definition out by hand (issue #35, AC3).
+  // typing its definition out by hand.
   static List<CalculatrixCommand> _compileWord(String token, int maxDigits) {
     final Matrix? literal = Literals.parse(token, maxDigits: maxDigits);
     if (literal != null) {
@@ -416,7 +413,7 @@ class Calculatrix {
   }
 
   // A constant is a name, not a number: a sign or the approximate mark in
-  // front of it does not make a literal (runbook-agent-usability.md D67).
+  // front of it does not make a literal.
   // The error names the words that do what the user meant, with no
   // suggestions.
   static UnknownWordError? _signedConstantError(String token) {
@@ -447,7 +444,7 @@ class Calculatrix {
   // risk of this flagging it as infix-like.
   //
   // The right-hand operand may itself carry a sign ("3^-2") or lead with a
-  // bare decimal point ("1+.5"), issue #51 AC3: both are operand-shaped to
+  // bare decimal point ("1+.5"): both are operand-shaped to
   // a person reading the token, even though neither is a digit or "("
   // itself, which the original character class alone required.
   static final RegExp _infixOperatorBetweenOperands = RegExp(
@@ -465,7 +462,7 @@ class Calculatrix {
   // input goes through) and compiling each of its words through
   // _compileWord, recursively. A definition can itself reference another
   // defined word: CalculatrixCommandRegistry rejects a cyclic definition
-  // at construction time (issue #35, AC5), so this recursion is always
+  // at construction time, so this recursion is always
   // finite.
   static List<CalculatrixCommand> _compileDefinition(
     String definition,
@@ -480,8 +477,7 @@ class Calculatrix {
 
   /// Whether `token` is a literal (a finite number or a matrix literal)
   /// rather than a word the command registry must resolve. Exposed for
-  /// [CalculatrixCommandRegistry]'s definition validation (issue #35,
-  /// AC5): a defined word's definition may reference literals freely,
+  /// [CalculatrixCommandRegistry]'s definition validation: a defined word's definition may reference literals freely,
   /// only its non-literal words must resolve in the registry. The same
   /// classification _compileWord itself uses, so the registry's notion of
   /// "literal" never drifts from the compiler's.
@@ -524,7 +520,7 @@ class Calculatrix {
       final int start = index;
       while (index < line.length && !_isRpnTokenSeparator(line[index])) {
         if (line[index] == '[') {
-          index = _scanBracketedLiteral(line, index);
+          index = _scanBracketedLiteral(line, index, tokenStart: start);
           continue;
         }
         index++;
@@ -572,7 +568,13 @@ class Calculatrix {
   // Scans a balanced-bracket span starting at a '[' and returns the index
   // just past its matching ']'. Shared by _tokenizeInfix and
   // tokenizeRpnLine so both agree on where a matrix literal ends.
-  static int _scanBracketedLiteral(String source, int start) {
+  // An unbalanced literal is a syntax error at [tokenStart] (default
+  // [start]), naming the rest of the source from there as its token.
+  static int _scanBracketedLiteral(
+    String source,
+    int start, {
+    int? tokenStart,
+  }) {
     int index = start;
     int depth = 0;
     while (index < source.length) {
@@ -588,14 +590,17 @@ class Calculatrix {
       index++;
     }
 
+    final int from = tokenStart ?? start;
     throw ExpressionSyntaxError(
       'Unbalanced matrix literal brackets.',
       errorId: CalculatrixErrorId.syntaxError,
+      token: source.substring(from).trimRight(),
+      position: from + 1,
     );
   }
 
   /// The token [tokenizeInfixExpression] gives a unary minus that is not
-  /// part of a literal, such as the "-" of "-(2+3)" (issue #66). It cannot
+  /// part of a literal, such as the "-" of "-(2+3)". It cannot
   /// be typed: the tokenizer never reads "u-" as one token.
   static const String infixUnaryMinus = 'u-';
 
@@ -641,7 +646,7 @@ class Calculatrix {
 
       // A signed number or matrix literal followed by "^" (past any "%")
       // is a unary minus and a power, -(2^2), as in standard notation and
-      // Giac: the sign is not part of the base (issue #66). A "+" there
+      // Giac: the sign is not part of the base. A "+" there
       // changes nothing and is skipped.
       if ((_isSignedNumberStart(expression, index, tokens) &&
               _isFollowedByPower(
@@ -684,7 +689,7 @@ class Calculatrix {
 
       // A sign in unary position that no literal claimed above, as in
       // "-(2+3)" or "-√9": a "-" negates the operand that follows, a "+"
-      // leaves it as it is (issue #66).
+      // leaves it as it is.
       if ((char == '-' || char == '+') && _isUnaryPosition(tokens)) {
         if (char == '-') {
           tokens.add(_PositionedToken(infixUnaryMinus, index + 1));
@@ -727,7 +732,7 @@ class Calculatrix {
 
       // "NaN" is not a digit-led token, so the number scan above never
       // starts on it, but it is still a recognized (non-finite) numeric
-      // literal (issue #5 bug 4): let it through as an ordinary operand
+      // literal: let it through as an ordinary operand
       // token instead of raising syntax-error here, so the RPN token
       // compiler's own finite-value check (shared with plain RPN input)
       // is what rejects it, with the non-finite id instead of
@@ -744,10 +749,10 @@ class Calculatrix {
       // whole name (rather than letting the generic fallthrough below
       // report only its first character) is what lets the error explain
       // the limitation and, when the name is already a known RPN word or
-      // alias, show its RPN form (AC2, issue #51).
+      // alias, show its RPN form.
       //
-      // A name of the name table (pi, e, i, π, in any case;
-      // runbook-agent-usability.md D66, D67) is the exception: it is an
+      // A name of the name table (pi, e, i, π, in any case)
+      // is the exception: it is an
       // operand, resolved later as the registry word of the same name. It
       // is recognized only as a whole name (letters and digits, no hyphen),
       // so "e3" and "pi2" are still names that are not constants, and
@@ -895,7 +900,7 @@ class Calculatrix {
         // and must still be resolved once it closes.
         // A unary minus between them ("√-(4)") leaves the function bare:
         // the group is then the operand of the minus, not the function's
-        // own parentheses (issue #66).
+        // own parentheses.
         if (frame.pendingFunctionCount > 0 &&
             before != null &&
             _isFunction(before)) {
@@ -1157,7 +1162,7 @@ class Calculatrix {
   // start: the registry has words of its own written with a hyphen
   // ("frobenius-norm", "append-cols"), and the whole word, not just the
   // run of letters up to its first hyphen, is what both the lookup below
-  // and the message need to name (issue #51, AC2). A "-" with nothing
+  // and the message need to name. A "-" with nothing
   // name-shaped after it (end of input, a digit, another "-") is left
   // alone: infix has no bare names at all, so nothing here depends on
   // telling an actual subtraction apart from one, only on not swallowing
@@ -1184,9 +1189,8 @@ class Calculatrix {
   // accounting for nesting, or -1 when the parenthesis is never closed:
   // the caller then knows there is no real argument to read out, rather
   // than reading one out of a substring range that was never a closed
-  // group in the first place (issue #51, AC1; this used to crash on a
-  // truncated call such as "sqrt(" by handing the caller a range past the
-  // end of the very "(" it opened).
+  // group in the first place (a truncated call such as "sqrt(" has no
+  // closing parenthesis, so there is no range to hand the caller).
   static int _matchingParenEnd(String expression, int openIndex) {
     int depth = 0;
     for (int index = openIndex; index < expression.length; index++) {
@@ -1204,8 +1208,8 @@ class Calculatrix {
 
   // The call-like arguments of a registered name's "(a, b, ...)", when the
   // call is both present (a closed parenthesis right after the name) and
-  // made only of literals (issue #51, AC2; extended by issue #73, runbook
-  // D68): "sqrt(7)" gives ["7"], "power(2, 3)" gives ["2", "3"] and
+  // made only of literals:
+  // "sqrt(7)" gives ["7"], "power(2, 3)" gives ["2", "3"] and
   // "inverse([[1 2] [3 4]])" gives ["[[1 2] [3 4]]"], each trimmed and
   // verbatim. "sqrt(1+2)" and "sqrt (7)" (space before the paren, so not
   // call-like at all) give null, and so do "sqrt(" (never closed), an empty
@@ -1277,7 +1281,7 @@ class Calculatrix {
   }
 
   // Builds the actionable error for a name found where infix expects a
-  // number, matrix literal, operator or parenthesis (AC2, issue #51).
+  // number, matrix literal, operator or parenthesis.
   // When `name` is already a registered RPN word or alias, the message
   // shows its RPN form when the call's arguments are all literals
   // (_literalCallArguments), or a generic, non-runnable description of
@@ -1290,7 +1294,8 @@ class Calculatrix {
     final String name = _scanName(expression, start);
     final int nameEnd = start + name.length;
     const String limitation =
-        'infix accepts numbers, matrix literals, + - * / ^ and parentheses';
+        'infix accepts numbers, matrix literals, the constants pi (π) e i, '
+        '+ - * / ^ √ % and parentheses';
 
     final bool isRegistered =
         CalculatrixCommandRegistry.standard.lookup(name) != null;
@@ -1321,8 +1326,8 @@ class Calculatrix {
   }
 
   // Scans a literal that starts with the approximate mark at `start`: a
-  // number or a matrix literal, either with an optional sign (runbook
-  // D56). Returns the index just past it.
+  // number or a matrix literal, either with an optional sign.
+  // Returns the index just past it.
   static int _scanMarkedLiteral(String source, int start) {
     int index = start + 1;
     if (index < source.length &&
@@ -1494,7 +1499,7 @@ class _NumberScanResult {
 
 // A token paired with its 1-based character position in the source
 // program (the RPN "input line", tokens.join(' '), or the raw infix
-// expression string; spec section 6). Threaded through tokenizing,
+// expression string). Threaded through tokenizing,
 // validation, shunting-yard reordering and command compiling so that
 // whichever input token ultimately causes a domain error is still known
 // by the time that error is thrown or caught.
@@ -1507,7 +1512,7 @@ class _PositionedToken {
 
 // A compiled command paired with the original input token that produced
 // it. For a primitive word this is a 1:1 pairing exactly like before; for
-// a defined word (runbook D43) every command its definition expands to
+// a defined word every command its definition expands to
 // shares the same originating token, so an execution-time error is
 // enriched with the word the user wrote (e.g. "inverse"), never with a
 // word from inside its definition (e.g. "power") -- see

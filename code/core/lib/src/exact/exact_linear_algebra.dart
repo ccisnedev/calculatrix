@@ -3,11 +3,10 @@ import '../matrix/matrix.dart';
 import 'exact_arithmetic.dart';
 import 'rational.dart';
 
-/// The exact linear algebra of runbook D53 for step T3: `inverse`,
+/// The exact linear algebra: `inverse`,
 /// `determinant`, `rref`, `rank`, `trace`, `adjugate`, `cofactors`, `lu`,
 /// `dot` and `cross`, on exact matrices only. The caller dispatches here
-/// when every operand is exact and takes the approximate route otherwise
-/// (runbook D51).
+/// when every operand is exact and takes the approximate route otherwise.
 ///
 /// Shapes and error ids follow the approximate methods of [Matrix], so a
 /// program fails the same way whichever kind of value it carries; only
@@ -18,7 +17,7 @@ import 'rational.dart';
 /// integers over one common denominator, and every value the elimination
 /// produces is then a minor of that integer matrix. Hadamard's bound (the
 /// product of the row lengths) bounds every minor, so it estimates the
-/// size of the result before anything is computed (runbook D55).
+/// size of the result before anything is computed.
 extension ExactLinearAlgebra on ExactArithmetic {
   /// The inverse of the square matrix [a]; `singular-matrix` when it has
   /// none.
@@ -334,7 +333,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
   /// The eigenvalues of the square matrix [a], largest first, as a column,
   /// each repeated by its multiplicity. Exact when every root of the
   /// characteristic polynomial is rational; otherwise the approximate
-  /// eigenvalues of the same matrix, as a whole (runbook D49, D53).
+  /// eigenvalues of the same matrix, as a whole.
   Matrix eigenvalues(Matrix a) {
     if (!a.isSquare) {
       return a.toApproximate().eigenvalues();
@@ -438,7 +437,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
   // words above is at least the Hadamard bound of B, which is at least
   // log10(g / q) for the largest denominator q of [a]; so g is checked
   // against that as it grows, and a g too large raises `limit-exceeded`
-  // before B is built (runbook D55).
+  // before B is built.
   _IntegerForm _integerForm(Matrix a, String what) {
     BigInt largest = BigInt.one;
     for (final List<Rational> row in a.exactRows) {
@@ -475,7 +474,7 @@ extension ExactLinearAlgebra on ExactArithmetic {
   }
 
   // Raises `limit-exceeded` when a result bounded by 10^[log10Bound] can
-  // have more digits than the limit (runbook D55). The small margin keeps
+  // have more digits than the limit. The small margin keeps
   // the rounding of the logarithms from undercounting a digit.
   void _requireWithin(
     String what,

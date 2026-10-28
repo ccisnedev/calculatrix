@@ -9,13 +9,13 @@
 # here as its source of truth.
 #
 # Modeled on ccisnedev/inquiry's code/site/install.ps1, adapted for
-# calculatrix (runbook docs/runbook-cli-stage-0.md, "Publishing (dogfood)"):
+# calculatrix:
 #   - this repository also publishes app releases tagged vX.Y.Z, so this
 #     script lists releases and picks the newest cli-v* one instead of
 #     calling GET /releases/latest, which would resolve to whichever kind of
-#     release happens to be newest (constraint 3 in the runbook, D31);
+#     release happens to be newest;
 #   - no `iq.cmd` (or any other) alias or shim is created: `cx` is the only
-#     executable, with no alias of any kind (issue #22, D40);
+#     executable, with no alias of any kind;
 #   - there is no host/skill deployment step: calculatrix has none;
 #   - the collision check below is calculatrix-specific: inquiry's script
 #     has none.
@@ -81,8 +81,8 @@ if (-not $cliReleases) {
     exit 1
 }
 
-# Sorted by parsed version rather than trusted API order (constraint 3 in
-# the runbook, D31: this repository also publishes app releases, so
+# Sorted by parsed version rather than trusted API order (this repository
+# also publishes app releases, so
 # /releases/latest is never called, and the newest cli-v* one is picked
 # explicitly here instead of assuming the list already comes newest-first).
 $release = $cliReleases |

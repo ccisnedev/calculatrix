@@ -1,4 +1,4 @@
-// Issue #70 (runbook-agent-usability.md D67, step U5): the constants pi, e
+// The constants pi, e
 // and i in RPN, in infix, and the lexing rules around them.
 import 'dart:math' as math;
 
@@ -230,7 +230,7 @@ void main() {
       }
     });
 
-    test('a name that is an RPN word keeps the U4 error', () {
+    test('a name that is an RPN word keeps the unknown-word error', () {
       final ExpressionSyntaxError error = _error(
         () => Calculatrix.evaluateInfix('sqrt(4)'),
       );

@@ -609,7 +609,7 @@ void main() {
       openInfixEditor();
     });
 
-    test('1÷3 is exact and ×3 gives back 1 (runbook D54)', () {
+    test('1÷3 is exact and ×3 gives back 1', () {
       controller.input('1');
       controller.input('÷');
       controller.input('3');
@@ -908,7 +908,7 @@ void main() {
     });
   });
 
-  group('CalculatorController - exact values (runbook T5, D54)', () {
+  group('CalculatorController - exact values (exact in full, approximate marked once)', () {
     test('the rpn stack shows each value through the core formatter', () {
       controller.setMode(CalculatorMode.rpn);
       controller.insertMatrixLiteral('[[1/3,2]]');
