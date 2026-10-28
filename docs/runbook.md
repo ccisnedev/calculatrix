@@ -37,7 +37,7 @@ match the roadmap. Then the language design continues.
   Done when: `git grep -n runbook` outside `docs/` finds only the
   CHANGELOGs' past entries and the two tests that keep the word out of
   user-facing text.
-- [ ] **1.5 The rest of the docs.**
+- [x] **1.5 The rest of the docs.**
   - `docs/architecture.md` (written at v0.7.1) describes the current
     packages and the planned engine and tools.
   - The READMEs show current versions (`code/core/README.md` says

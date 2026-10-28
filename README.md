@@ -1,104 +1,47 @@
 # Calculatrix
 
-> Calculadora multiplataforma matrix-first con un core canónico basado en
-> stack machine y un shell persistente `RPN` con editores invocados `INFIX` y
-> `MATRIX`.
+> Ecosistema de cálculo matricial, numérico y simbólico: un lenguaje con dos
+> notaciones (infix y RPN), motores que lo ejecutan y las herramientas para
+> usarlo. Todo valor es una matriz: un escalar es 1x1.
 
-**Mission:** `cx` is to be the best computation tool for agents, human or AI. See [docs/mission.md](docs/mission.md).
+**Misión:** `cx` quiere ser la mejor herramienta de cálculo para agentes,
+humanos o IA. Ver [docs/mission.md](docs/mission.md). El camino está en
+[docs/roadmap.md](docs/roadmap.md) y el trabajo en curso en
+[docs/runbook.md](docs/runbook.md).
 
-[![CI](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/matarama-dev/calculatrix/actions/workflows/ci.yml)
+[![CI](https://github.com/ccisnedev/calculatrix/actions/workflows/ci.yml/badge.svg)](https://github.com/ccisnedev/calculatrix/actions/workflows/ci.yml)
 
-## Highlights (current)
+## Paquetes
 
-- `package:calculatrix` es la fuente semántica única para app y CLI.
-- El core público expone `CalculatrixMachine`, comandos tipados, macros
-  públicas, programas tipados e `CalculatrixSession`.
-- `Infix` compila al mismo kernel matricial que usan `RPN` y los workflows
-  directos por comando.
-- En `v0.3.20`, el core compartido añade LU y QR como descomposiciones públicas
-  y las expone en la máquina tipada, el CLI y la app `RPN`.
-- `DET`, `LU` y `QR` viven sobre el mismo contrato stack-first: una operación
-  simple devuelve una matriz escalar; una descomposición expande varios
-  factores sobre la pila canónica.
-- En `v0.3.21`, LU y QR quedan endurecidos con cobertura explícita para pivoteo,
-  singularidad, matrices altas y columnas linealmente dependientes.
-- En `v0.3.30`, el workstation `Matrix` puede lanzar LU y QR directamente hacia
-  la pila canónica cuando entras desde `RPN`, sin perder el flujo de edición.
-- En `v0.3.31`, Stage 4 queda cubierto también por un workflow end-to-end que
-  mezcla creación matricial, macro en `RPN`, QR y retorno a `Infix`.
-- `v0.4.0` cierra Stage 4 como release estable: determinante, LU, QR y sus
-  workflows visibles quedan alineados entre core, app y CLI.
-- En `v0.4.10`, el core añade eigenvalues reales para matrices `1x1` y `2x2`,
-  el CLI los expone como `eig` y la app `RPN` los publica con `EIG` en el deck
-  `FACT`.
-- La línea `v0.3.1` mantiene `√` inmediato y `%` tipo Casio en `Infix`, sin
-  alterar los contratos públicos de parser ni `RPN`.
-- La app usa un keypad fijo `4x5` y una barra fija de módulos: `BASIC`,
-  `STACK`, `MATH`, `MATRIX`, `VECTOR`, `FACT`, `PROP`, `EDIT`, `BUILD`, `MEM`.
-- La app Flutter expone un shell persistente `RPN`; `INFIX` y `MATRIX` se
-  abren como editores explícitos sobre un draft pre-stack.
-- El draft del shell se presenta como `Draft`, separado del `X0` comprometido,
-  que conserva su numeración veraz mientras no haya commit real.
-- El workstation matricial soporta edición estructural acotada `2x2` a `4x4`,
-  presets, reordenamiento y confirmación canónica del literal final.
-- El CLI soporta modos `infix`, `rpn`, `command` y `macro` sobre la misma
-  API pública.
-- En `command`, si una secuencia deja varios resultados, el CLI los imprime
-  como `X0`, `X1`, `X2`, ... siguiendo el orden visible de la pila `RPN`.
-- La política numérica, los errores tipados y la memoria matricial viven en el
-  core compartido.
+Cada paquete versiona por separado
+([ADR 0002](docs/adr/0002-versioning-and-changelog-policy.md)); la versión
+vigente está en su `pubspec.yaml`.
 
-## Superficies públicas
+| Paquete | Qué es |
+|---|---|
+| [`code/core`](code/core) | `calculatrix`, el motor de referencia en Dart puro. Fuente semántica única. |
+| [`code/cli`](code/cli) | `cx`, la línea de comandos sobre el core. |
+| [`code/app`](code/app) | La calculadora Flutter (Android, Windows, web) sobre el core. |
 
-- `code/core`: paquete Dart público `calculatrix`.
-- `code/app`: shell Flutter sobre el core compartido.
-- `code/cli`: interfaz de línea de comandos sobre el mismo vocabulario público.
-
-## Arquitectura
-
-La lógica matemática y operativa vive en `package:calculatrix`. Flutter y CLI
-son capas consumidoras sobre ese mismo núcleo.
-
-```
-code/core/lib/
-  calculatrix.dart
-  src/
-    machine/      # stack machine, typed commands, macros, programs
-    evaluation/   # compileInfix, evaluateInfix, evaluateRpn
-    matrix/       # Matrix y display formatting
-    session/      # interactive shared session facade
-    errors/       # public typed error taxonomy
-
-code/app/lib/modules/calc/
-  controller.dart  # presentation adapter over CalculatrixSession
-  view.dart        # shell RPN persistente, draft pre-stack y editores invocados
-
-code/cli/bin/
-  calculatrix_cli.dart
-```
+El motor es Dart puro y de sala limpia: Giac se usa solo como oráculo en los
+tests, nunca como núcleo
+([ADR 0004](docs/adr/0004-pure-dart-engine-and-clean-room.md)).
 
 ## Primeros pasos
 
 ```bash
-cd code/core
-dart analyze
-dart test
-
-cd ../cli
-dart analyze
-dart test
-
-cd ../app
-flutter pub get
-flutter analyze
-flutter test
-flutter test integration_test/calculator_test.dart -d windows
+cd code/core && dart pub get && dart analyze && dart test
+cd ../cli && dart pub get && dart analyze && dart test
+cd ../app && flutter pub get && flutter analyze && flutter test
 ```
+
+Los tests de `code/core` comparan resultados exactos contra Giac (`xcas`); sin
+él se omiten salvo que se defina `CALCULATRIX_REQUIRE_GIAC=1`.
 
 ## Ejemplos CLI
 
-El ejecutable es `cx`, sin alias de ningún tipo (issue #22). Ver
-[code/cli/README.md](code/cli/README.md) para la gramática completa.
+El ejecutable es `cx`. Instalación y gramática completa en
+[code/cli/README.md](code/cli/README.md).
 
 ```bash
 cx '1 2 +'
@@ -106,18 +49,25 @@ cx eval rpn '1 2 +'
 cx eval infix "2+3*4"
 ```
 
-En cmd.exe (no PowerShell), una expresión con `^` debe ir entre comillas,
-por ejemplo `cx eval infix "2^0.5"`.
+En cmd.exe (no PowerShell), una expresión con `^` debe ir entre comillas:
+`cx eval infix "2^0.5"`.
 
 ## CI/CD
 
-GitHub Actions valida core, app y CLI, y genera artefacto web en builds
-exitosos.
+- `ci.yml`: analiza y prueba app, core (con Giac) y CLI, y construye la web.
+- `pages-release.yml`: publica la web en https://calculatrix.ccisne.dev con un
+  push a `main`.
+- `cli-release.yml`: un push a `main` que cambia la versión de
+  `code/cli/pubspec.yaml` crea el release `cli-vX.Y.Z` con `cx` para Windows y
+  Linux.
+- `windows-release.yml` y `android-release.yml`: al publicar un release `vX.Y.Z`
+  de la app adjuntan el instalador y el `.aab`.
 
-## Roadmap
+Ver [docs/release-checklist.md](docs/release-checklist.md) y
+[docs/pub.md](docs/pub.md).
 
-Ver [docs/roadmap.md](docs/roadmap.md) para el cierre de `v0.3.0`, el parche
-`v0.3.1`, los slices `v0.3.10`, `v0.3.20`, `v0.3.21`, `v0.3.30`, `v0.3.31`, el
-corte estable `v0.4.0` de Stage 4 y el primer slice `v0.4.10` posterior, y la
-continuación del roadmap. Ver
-también [docs/architecture.md](docs/architecture.md) para el modelo canónico actual.
+## Documentos
+
+- [docs/architecture.md](docs/architecture.md): modelo del core.
+- [docs/spec/](docs/spec): especificaciones de lo que existe.
+- [docs/adr/](docs/adr): decisiones de arquitectura.

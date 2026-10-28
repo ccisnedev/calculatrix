@@ -9,10 +9,8 @@ the same canonical kernel.
 
 ## Status
 
-- Current package version: `0.5.0`
-- Stage: advanced linear algebra over the canonical matrix stack kernel
+- Version: see `pubspec.yaml` and [CHANGELOG.md](CHANGELOG.md)
 - Runtime dependencies: **none** (pure Dart)
-- Test coverage: 340+ unit tests including numerical robustness validation
 
 ## Features
 
@@ -27,7 +25,7 @@ the same canonical kernel.
 ### Decompositions
 - LU with partial pivoting (`P`, `L`, `U` factors)
 - Thin QR (`Q`, `R` factors)
-- Eigenvalues (real spectrum, arbitrary NxN via QR iteration)
+- Eigenvalues (real spectrum; an error when the spectrum is complex)
 - Diagonalization (`P`, `D` such that A ≈ P·D·P⁻¹)
 
 ### Standard test matrices
@@ -38,6 +36,7 @@ the same canonical kernel.
 ### Evaluation engines
 - `Calculatrix.evaluateInfix('2 + 3 * 4')` — algebraic with PEMDAS
 - `Calculatrix.evaluateRpn(['3', '4', '+'])` — RPN token evaluation
+- `CalculatrixCommandRegistry.standard` — the documented RPN vocabulary
 - `CalculatrixMachine` — mutable stack machine with typed commands
 - `CalculatrixSession` — interactive calculator with infix/RPN modes and memory
 
@@ -99,7 +98,7 @@ The barrel export `package:calculatrix/calculatrix.dart` provides:
 
 ## Roadmap
 
-See [docs/roadmap.md](https://github.com/ccisnedev/calculatrix/blob/main/docs/roadmap.md).
+See [docs/mission.md](https://github.com/ccisnedev/calculatrix/blob/main/docs/mission.md) and [docs/roadmap.md](https://github.com/ccisnedev/calculatrix/blob/main/docs/roadmap.md).
 
 ## License
 

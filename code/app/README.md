@@ -1,6 +1,7 @@
 # calculatrix_app
 
-Flutter consumer shell for Calculatrix.
+Flutter calculator app for Calculatrix (Android, Windows, web). Its version is
+in `pubspec.yaml`; each package versions independently.
 
 This app depends on the shared core package in `../core` and is responsible for
 UI, interaction flows, matrix entry, display policy, and platform packaging.
@@ -20,7 +21,7 @@ Run widget and unit tests:
 flutter test
 ```
 
-Run integration tests on the verified Windows target:
+Run integration tests on Windows:
 
 ```text
 flutter test integration_test/calculator_test.dart -d windows
@@ -43,3 +44,11 @@ Run the web shell locally:
 ```text
 flutter run -d chrome
 ```
+
+## Releases
+
+Publishing a GitHub Release tagged `vX.Y.Z` (matching the public version in
+`pubspec.yaml`) builds and attaches the Windows installer and the Android
+`.aab` (`.github/workflows/windows-release.yml`, `android-release.yml`). A
+push to `main` publishes the web build (`pages-release.yml`). See
+`docs/release-checklist.md` and `docs/android-release-signing.md`.
