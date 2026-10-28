@@ -4,139 +4,57 @@
 
 ## Context
 
-Calculatrix is a multi-target repository with one semantic core and multiple
-consumer shells:
+Calculatrix is a monorepo with several publishable packages:
 
-- `code/core`: published Dart package (`calculatrix`)
-- `code/cli`: internal CLI consumer (`calculatrix_cli`)
-- `code/app`: internal Flutter consumer (`calculatrix_app`)
+- `code/core`: the engine, published Dart package (`calculatrix`)
+- `code/cli`: the command line `cx` (`calculatrix_cli`)
+- `code/app`: the Flutter calculator (`calculatrix_app`)
 
-The core package is the reusable computation engine and the semantic source of
-truth for matrix operations, infix evaluation, RPN behavior, numeric policy,
-and public error taxonomy.
-
-The repository currently has divergent component versions. That is not
-necessarily wrong, but without an explicit policy it creates ambiguity about:
-
-- which version is authoritative for release communication,
-- when all targets must move together,
-- how app and CLI versions relate to the core package,
-- where changes should be recorded for users versus package consumers.
-
-We need a versioning policy that matches good monorepo practice while keeping
-the published core package usable on its own.
+More will follow (editor tooling, agent integrations, engine bindings in
+other languages). Each one is released on its own schedule, through its own
+channels, to its own users. We need a policy that says how each package is
+versioned, how releases are tagged, and where changes are recorded.
 
 ## Decision
 
-### 1. The core version is the authoritative product version
+### 1. Each publishable package has its own version
 
-`calculatrix` in `code/core` is the canonical semantic version for the project.
+Every package versions itself under SemVer, independently of the others.
 
-- Public compatibility decisions are anchored to the core package.
-- Until the first public `1.0.0` product release, coordinated stage milestones
-  use the pre-`1.0.0` line: each stage closes on a stable `0.N.0` release.
-- Before `1.0.0`, incompatible architectural resets may advance to the next
-  stable `0.N.0` stage release instead of introducing artificial `1.x`, `2.x`,
-  or `3.x` lines.
-- After the first public `1.0.0`, breaking API or semantic changes in the core
-  require a SemVer-major bump.
-- Backward-compatible feature additions in the core require a SemVer-minor bump.
-- Backward-compatible fixes in the core require a SemVer-patch bump.
-- Until `1.0.0`, the repository may rewrite internal prerelease history,
-  documentation, and local tags to keep the `0.x` line coherent.
+- A change bumps only the packages it changes. No package bumps to keep
+  numbers cosmetically aligned with another.
+- Before a package reaches `1.0.0`, a breaking change may advance its minor
+  version (`0.N.0`) instead of its major one.
+- After a package reaches `1.0.0`, a breaking change of its contract requires
+  a major bump, a backward-compatible feature a minor bump, and a
+  backward-compatible fix a patch bump.
+- The Flutter app keeps an independent build suffix `+N` for store
+  distribution; its visible version is `X.Y.Z`.
+- Roadmap stages are not tied to version numbers.
 
-When the repository communicates a coordinated release, the release number is
-the core version.
+### 2. One shared version only for the same package in several languages
 
-### 2. App and CLI follow the core on coordinated releases
+When the same package is implemented in several languages (for example the
+engine bindings for different host languages), all implementations of that
+package carry the same version, so a version number names one contract.
 
-For repository releases that ship the whole product experience together, the
-CLI and app should align their visible version with the core version.
+### 3. Dependencies declare the versions they support
 
-- `code/cli/pubspec.yaml` should use the same `X.Y.Z` as the core for a
-  coordinated release.
-- `code/app/pubspec.yaml` should use the same visible `X.Y.Z`, while keeping an
-  independent Flutter build suffix `+N`.
-
-Example for the current pre-`1.0.0` line:
-
-- Core: `0.4.0`
-- CLI: `0.4.0`
-- App: `0.4.0+8`
-
-This preserves a single external release number while still allowing platform
-build iteration for the app.
-
-### 3. Shell-only changes do not force a core version bump
-
-Changes limited to the app or CLI do not require bumping the published core
-package if the core package API and semantics are unchanged.
-
-Examples:
-
-- App-only layout polish
-- Accessibility fixes in the Flutter shell
-- CLI help text or argument UX improvements
-- Packaging/build metadata changes
-
-In those cases:
-
-- the affected shell may bump independently if needed,
-- the root changelog must record the release scope clearly,
-- the core version must not change just to keep numbers cosmetically aligned.
-
-### 4. Coordinated stage completions should use synchronized visible versions
-
-When a roadmap stage is treated as a repository-wide release milestone, all
-three components should be brought to the same visible version before release
-completion.
-
-Before the first public `1.0.0`, this means each completed stage lands on a
-stable `0.N.0` release with synchronized visible versions across core, CLI,
-and app.
-
-### 5. Changelog ownership is split by audience
-
-Calculatrix will maintain two changelog layers:
-
-- Repository changelog at the repo root for the whole product release history
-- Package changelog in `code/core/CHANGELOG.md` for the published Dart package
-
-The repository changelog is for users of the complete system.
-
-- It records coordinated releases and important shell-only releases.
-- Entries should be grouped by component when helpful: Core, App, CLI, Docs, QA.
-
-The core package changelog is for package consumers.
-
-- It records only changes relevant to `package:calculatrix` users.
-- App-only and CLI-only changes should not be added there unless they affect the
-  public package contract.
-
-### 6. Dependency intent must remain explicit
-
-The CLI and app must declare their dependency on the core in a way that makes
-the supported relationship visible.
+A package that depends on another declares the compatible range.
 
 - During local monorepo development, `path: ../core` remains acceptable.
-- At release time, the coordinated version in each shell must match the core
-  version it is intended to ship with.
-- If the repository later publishes the CLI or app independently, they should
-  also declare an explicit compatible core range.
+- At release time, the released package must state which versions of its
+  dependencies it was built and tested with.
 
-### 7. Release notes should describe scope precisely
+### 4. Changelog ownership is split by audience
 
-Each release entry should make clear whether it is:
+- `code/core/CHANGELOG.md` records changes relevant to `package:calculatrix`
+  users.
+- The root `CHANGELOG.md` records releases of the CLI and the app, grouped by
+  package.
+- Each release entry names the package and version it belongs to.
 
-- a core release,
-- a coordinated product release,
-- an app-only release,
-- or a CLI-only release.
-
-Release communication must avoid implying a new core semantic contract when the
-change only affects a consumer shell.
-
-### 8. Git tags mark every public release, including `0.x`
+### 5. Git tags mark every public release
 
 *Amended 2026-09-23.* The original rule kept the `0.x` line tag-free until
 `v1.0.0`. Public distribution made that rule obsolete: the Android and Windows
@@ -144,59 +62,46 @@ release workflows run on `release: published` and name their artifacts from
 the release tag, and `v0.7.1` was already tagged and published on GitHub.
 
 - Every release published to a public channel (GitHub Releases, Google Play,
-  Microsoft Store, `winget`, the web deployment) gets a git tag `vX.Y.Z` on
-  the exact revision that was built.
+  Microsoft Store, `winget`, the web deployment) gets a git tag on the exact
+  revision that was built.
 - The tag uses the visible version `X.Y.Z`. The Flutter build suffix `+N`
   stays in `pubspec.yaml` and in the store metadata, not in the tag.
-- Tags of published releases are immutable: never move or delete them, even
-  before `1.0.0`. A fix ships as the next patch version.
+- Tags of published releases are immutable: never move or delete them. A fix
+  ships as the next patch version.
 - Internal milestones that are not published may stay untagged.
-- History rewriting allowed by section 1 stops at the most recent published
-  tag.
 
-*Amended 2026-09-29, from `docs/runbook-cli-stage-0.md` ("Publishing
-(dogfood)", constraint 1).* The `cx` CLI (`code/cli`) is versioned and
-released independently of core and the app (see section 3): it gets its own
-prefix, `cli-vX.Y.Z`, rather than `vX.Y.Z`.
+*Amended 2026-09-29.* Several packages are released from this one repository
+and share its tag namespace, so each package has its own tag prefix:
 
-- A CLI release is tagged `cli-vX.Y.Z`, using the version from
-  `code/cli/pubspec.yaml`, on the exact revision `.github/workflows/cli-release.yml`
-  built it from.
-- `vX.Y.Z` remains reserved for app releases (Android, Windows, the web
-  deployment). The two prefixes exist because both kinds of release live in
-  this one repository and share its tag namespace: without a prefix,
-  `GET /repos/{owner}/{repo}/releases/latest` would resolve to whichever kind
-  happens to be newest, which is exactly the ambiguity `cx upgrade` and the
-  `install.ps1`/`install.sh` installers avoid by listing releases and
-  filtering by tag prefix instead of ever calling that endpoint.
+- `vX.Y.Z` is reserved for app releases (Android, Windows, the web
+  deployment).
+- `cli-vX.Y.Z` marks a CLI release, using the version from
+  `code/cli/pubspec.yaml`, on the exact revision
+  `.github/workflows/cli-release.yml` built it from.
+- Without a prefix, `GET /repos/{owner}/{repo}/releases/latest` would resolve
+  to whichever kind happens to be newest, which is exactly the ambiguity
+  `cx upgrade` and the `install.ps1`/`install.sh` installers avoid by listing
+  releases and filtering by tag prefix instead of ever calling that endpoint.
 - A `cli-v*` release is never marked "latest" on GitHub (`gh release edit
   --latest=false`), since GitHub tracks only one latest release per
   repository and that designation is meant for the app.
-- Everything else in this section applies unchanged: `cli-v*` tags are
-  immutable once published, and a fix ships as the next patch version.
+- A new package released from this repository gets its own prefix before its
+  first release.
 
 ## Consequences
 
-- The project gets one authoritative release number without forcing fake core
-  bumps for shell-only changes.
-- Coordinated milestones remain easy to communicate because app, CLI, and core
-  can share the same visible version when released together.
-- The pre-`1.0.0` line stays clean: stage closures advance through `0.N.0`
-  instead of implying already-public major lines.
-- The Flutter app keeps a proper independent build suffix for store/distribution
-  needs.
-- The root changelog and core changelog serve different audiences cleanly.
-- Future automation can validate that stage-closing releases keep app/CLI/core
-  versions synchronized when required.
-- Release discipline becomes stricter: every release must declare its scope,
-  update the appropriate changelog(s), and tag the published revision.
+- Each package moves at its own pace; a CLI fix does not force a core or app
+  release.
+- A version number always identifies one package's contract, and only the
+  implementations of the same package in several languages share one.
+- Users find a package's history in the changelog that serves them.
+- Every published revision is tagged under its package's prefix, and tags
+  never move.
 
 ## Follow-up Guidance
 
 - Keep `code/core/CHANGELOG.md` in sync with package-facing releases.
-- Keep the root `CHANGELOG.md` in sync with coordinated repository releases.
-- Use `docs/release-checklist.md` for release execution and automation targets.
-- Tag every publicly released revision as `vX.Y.Z` and never move a published
-  tag (section 8).
-- If the repository adopts CI release automation, encode this ADR's rules in the
-  workflow rather than relying on convention alone.
+- Keep the root `CHANGELOG.md` in sync with CLI and app releases.
+- Use `docs/release-checklist.md` for release execution.
+- If the repository adopts more CI release automation, encode this ADR's rules
+  in the workflow rather than relying on convention alone.

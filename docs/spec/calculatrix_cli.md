@@ -1,381 +1,329 @@
 # Calculatrix CLI Specification
 
-Status: Reviewed, 2026-09-24. Every decision is closed (section 14). Nothing
-here is implemented yet.
-Program: `cx`. No `calculatrix` executable and no alias of any kind
-(issue #22, 2026-09-29, section 14 R25).
-Package: `calculatrix_cli` (`code/cli`)
-Core dependency: `calculatrix` (`code/core`)
-Framework: `modular_cli_sdk` 0.6.0 on `cli_router` 0.2.0, with the standard
-plugins of the SDK (both releases to be built, section 9)
-Plan: `docs/runbook-cli-stage-0.md`
-
-This document replaces the draft of 2026-09-23. That draft routed the shortcut
-through a fallback and parsed booleans with a list of names; both ideas are
-dropped (section 12 records why).
+Status: Describes cx 0.16.3.
+Program: `cx` (`code/cli`, package `calculatrix_cli`), on `modular_cli_sdk`
+^0.11.0 and `cli_router` ^0.2.1.
+Core: `calculatrix` (`code/core`). The language itself (literals, words,
+infix grammar, error ids) is specified in `docs/spec/calculatrix_core.md`;
+numeric semantics (exactness, `power`, limits) in
+`docs/spec/calculatrix_mathematics.md`. This document covers only what `cx`
+adds: routes, argument grammar, output, exit codes and the installed tool.
 
 ## 1. Purpose
 
-The CLI takes one input, a program as a string, and runs it. The program is
-either RPN or infix, and the user always says which. It is the same language
-the app runs with its keypad and the future REPL will run interactively.
+`cx` takes one input, a program as a string, and runs it. The program is RPN
+or infix, and the user always says which. It is the same language the app
+runs from its keypad.
 
-The CLI has three parts:
+`cx` has three parts:
 
-1. **Evaluation** (`cx eval ...`): runs programs. It is the domain of the app.
-2. **Encyclopedia** (`cx commands ...`): finds commands and explains what each
-   one does (section 7).
-3. **Maintenance** (`cx version`, `cx upgrade`, ...): keeps the installed CLI
-   healthy. It is not about math.
-
-Plus one shortcut, `cx <program>`, so that the most common use is short.
+1. **Evaluation**: `cx eval rpn`, `cx eval infix`, and the shortcut
+   `cx <program>` for RPN.
+2. **Encyclopedia**: `cx commands list | show | search` find a word and
+   explain it (section 7).
+3. **Maintenance**: `cx version`, `cx doctor`, `cx upgrade`, `cx uninstall`
+   keep the installed CLI healthy.
 
 ## 2. Principles
 
 1. **One input.** A program string. Everything else is infrastructure.
-2. **Declared, not guessed.** Every route, every option and every positional is
-   declared in one place, with its type and its cardinality. The parser reads
-   the declaration before it reads the arguments. There is no fallback, no
-   second attempt after a failure, and no reinterpretation of a value.
-3. **Explicit over default.** A declaration field that changes behavior
-   (required, repeatable, must exist) is always written. A default value
-   exists only when it is strictly needed, and then it is declared with its
-   justification (section 8.4).
+2. **Declared, not guessed.** Every route, option and positional is declared
+   once, with its type and cardinality. The parser reads the declaration
+   before the arguments. There is no fallback, no second attempt after a
+   failure, and no reinterpretation of a value.
+3. **Explicit over default.** `cx` declares no default except the digit limit
+   (section 6), which `--help` shows.
 4. **One form.** Each thing is written one way. Where a standard exists
-   (POSIX for the order of arguments, `sysexits` for exit codes), the CLI
-   follows it.
-5. **Reject what is ambiguous.** When an invocation could mean two things, the
-   CLI rejects it and says why, with the correct form in the message.
-6. **Start strict.** A form that is rejected today can become valid later
-   without breaking anyone. The reverse is a breaking change. So every form
-   not listed here is an error.
-7. **The core owns the language.** The CLI parses arguments, reads the program
-   source, calls core, and formats output. Command names, aliases, search
-   terms and documentation live in the core registry, shared with the app.
-8. **Modules by domain.** Each module groups one domain. The global module
-   (the SDK module registered with the empty name) holds only maintenance.
+   (POSIX/GNU for argument order, `sysexits` for exit codes), `cx` follows it.
+5. **Reject what is ambiguous.** When an invocation could mean two things, it
+   is rejected, and the message gives the correct form.
+6. **Start strict.** A form rejected today can become valid later without
+   breaking anyone; the reverse is a breaking change. Every form not listed
+   here is an error.
+7. **The core owns the language.** The CLI parses arguments, reads the
+   program, calls core and formats output. Names, aliases, search terms and
+   documentation of words live in the core registry, shared with the app.
 
-## 3. Modules and routes
+## 3. Routes
 
-| Module | Domain | Routes |
-|---|---|---|
-| global (`''`) | maintenance of the installed CLI | `cx`, `cx help`; `cx version`, `cx doctor`, `cx upgrade`, `cx uninstall` come from the standard plugins of the SDK (8.7) |
-| `eval` | evaluation of programs | `cx eval rpn`, `cx eval infix` |
-| `commands` | encyclopedia of the language | `cx commands list`, `cx commands show`, `cx commands search` |
-| shortcut | alias of `cx eval rpn` | `cx <program>` |
+| Route | Kind | Contract | What it does |
+|---|---|---|---|
+| `cx` | query | globals | Banner (below). Never reads stdin. |
+| `cx <program>` | query | one operand; `--max-digits`; `--json`, `-q` | Shortcut: same as `cx eval rpn <program>` (G3, G4). |
+| `cx eval rpn [<program>]` | query | `--file`, `--stdin`, `--max-digits`; exactly one source (G1) | Runs an RPN program on an empty stack and prints the stack it leaves. |
+| `cx eval infix [<expression>]` | query | same as `eval rpn` | Evaluates an infix expression; always leaves one value. |
+| `cx commands list` | query | `--category <name>` | Lists the registry, grouped by category. |
+| `cx commands show <name>` | query | one operand | The entry of one word, by name or alias. |
+| `cx commands search <text>` | query | one operand | Finds words (section 7). |
+| `cx version` | query | globals | Prints `cx: <version>`. |
+| `cx doctor` | query | globals | Checks the installation; changes nothing. |
+| `cx upgrade` | command | `--plan` or `--apply` [`--autoapprove`] | Installs the newest `cli-v*` release. |
+| `cx uninstall` | command | `--plan` or `--apply` [`--autoapprove`] | Removes the CLI. |
+| `cx help [<topic>]`, `--help`, `-h` | query | | Help (section 8.6). |
 
-There is no `cx install`. The first installation is done by the release
-script (`install.ps1`, `install.sh`), because `cx` does not exist yet at that
-point. Once installed, `upgrade`, `uninstall` and `doctor` cover the life of
-the installation.
+`version`, `doctor`, `upgrade` and `uninstall` come from the standard plugins
+of `modular_cli_sdk` (section 8.7). There is no `cx install`: the release's
+install scripts (`install.ps1`, `install.sh`) do the first installation,
+because `cx` does not exist yet at that point.
 
-### Why `eval` is its own module
+**Queries and commands.** A query changes nothing. `upgrade` and `uninstall`
+change the installation, so they are commands: `--plan` shows the steps and
+stops; `--apply` shows them, asks for approval, then performs them;
+`--autoapprove` skips the prompt (for agents and CI). Neither `--plan` nor
+`--apply` is a default: `cx upgrade` alone is `validation-failed`, 7, with a
+message explaining both.
 
-The previous draft put `eval` in the global module, with `--infix` as a switch.
-This draft moves it to a module and turns the mode into a route:
+**Banner.** Bare `cx` prints the logo (glow `#2EF2C3`, square box-drawing
+brackets), the version and tagline, the overview, a `Commands:` block listing
+only the routes the CLI registers, each with a runnable example, and a
+`Quickstart:` line. Colour is used only when stdout is a terminal that
+supports ANSI escapes and `NO_COLOR` is unset (any value, even empty,
+disables it). The glow is 24-bit when `COLORTERM` is `truecolor` or `24bit`,
+otherwise ANSI 96 (bright cyan). With `--json` the banner is
+`{"name": "cx", "tagline": "...", "version": "..."}`.
 
-- **Maintenance and domain do not mix.** `version` and `eval` have nothing in
-  common besides living in the same binary.
-- **The mode is a route, not a flag.** `cx eval rpn` and `cx eval infix` are two
-  commands with two contracts. A boolean `--infix` would make one contract
-  mean two languages, and would need a value that defaults to RPN.
-- **Room to grow.** A future mode is a new route in the same module, not a new
-  switch that interacts with the old ones.
+**Overview.** One text, defined once in code (`overview.dart`), shown by the
+banner, the epilog of `cx --help` and both install scripts, so they cannot
+disagree. It presents RPN, infix, matrices and exact/approximate values with
+equal weight, says that one program can leave several results, and mentions
+no feature that does not exist yet (no symbolic form). Every example in it is
+run by a test.
+
+**`cx doctor`.** Runs every check contributed to the extension point
+`doctor.checks`:
+
+| Check | From | ok | warning | error |
+|---|---|---|---|---|
+| `path` | `cx` itself | `cx` found on `PATH` | | not found |
+| `release` | `InstallationPlugin` | up to date | a newer `cli-v*` release exists, or the lookup failed (reason printed) | |
+
+A warning never fails the command, and a failed lookup is reported, never
+skipped. Exit 0 when no check is an error. Otherwise exit 78, with the error
+`doctor-check-failed` carrying every result: in JSON,
+`{"error": {"id": "doctor-check-failed", "message": "1 check(s) failed: path", "exitCode": 78, "checks": [...]}}`.
+Success in JSON is `{"checks": [{"name": "path", "status": "ok", "detail": "..."}, ...]}`.
+
+**Releases.** `upgrade` and `doctor` look up releases in
+`ccisnedev/calculatrix`, considering only tags with the prefix `cli-v` and
+never `releases/latest`, because the app's `vX.Y.Z` releases live in the
+same repository (tag rules: `docs/adr/0002-versioning-and-changelog-policy.md`,
+section 5). Assets: `cx-windows-x64.zip`, `cx-linux-x64.tar.gz`.
 
 ## 4. Invocation grammar
 
-Every invocation has the POSIX order: the route, then the options, then the
-operands.
-
 ```text
-cx                                           banner
-cx <program>                                 shortcut: RPN, one operand, --json and --quiet only
-cx eval rpn [options] <program>              RPN program, inline
-cx eval rpn [options] --file <path>          RPN program from a file
-<source> | cx eval rpn [options] --stdin     RPN program from stdin
-cx eval infix [options] <expression>         same three sources, infix
+cx                                         banner
+cx [options] <program>                     shortcut: RPN, one operand
+cx eval rpn [options] <program>            RPN program, inline
+cx eval rpn [options] --file <path>        RPN program from a file
+<source> | cx eval rpn [options] --stdin   RPN program from stdin
+cx eval infix [options] <expression>       the same three sources, infix
 cx commands list [--category <name>]
 cx commands show <name>
 cx commands search <text>
 cx version | doctor | help [<topic>]
-cx upgrade --plan | --apply
-cx uninstall --plan | --apply
+cx upgrade --plan | --apply [--autoapprove]
+cx uninstall --plan | --apply [--autoapprove]
 ```
 
 Options of `eval rpn` and `eval infix`:
 
-| Option | Kind | Required | Repeatable | Meaning |
-|---|---|---|---|---|
-| `-f, --file <path>` | value: path, must exist | no | no | read the program from a file |
-| `--stdin` | flag | no | no | read the program from stdin |
-
-Global options, declared by the SDK on every route except the shortcut:
-
 | Option | Kind | Meaning |
 |---|---|---|
-| `--json` | flag | output as JSON (section 6) |
-| `-q, --quiet` | flag | suppress progress messages; never the result, never errors. In `cx`, only `upgrade` and `uninstall` emit progress messages, so on the other routes it has no visible effect |
-| `-h, --help` | flag | help, provided by the SDK (section 8.6) |
+| `-f, --file <path>` | value: path, must exist | read the program from a file |
+| `--stdin` | flag | read the program from stdin |
+| `--max-digits <n>` | value: integer, at least 1 | digit limit of exact numbers (section 6); default 10000 |
+
+Global options, on every route including the shortcut:
+
+| Option | Meaning |
+|---|---|
+| `--json` | output as JSON (section 6) |
+| `-q, --quiet` | suppress progress messages, never results or errors; only `upgrade` and `uninstall` emit any |
+| `-h, --help` | help (section 8.6) |
 
 ### Rules
 
 - **G1. Exactly one program source.** `eval rpn` and `eval infix` take the
-  program from exactly one of: the inline operand, `--file`, `--stdin`. The
-  contract declares it as a constraint (`ExactlyOne`, section 8.3), so it is
-  checked before the query runs.
-  - None: rejected, 7, "no program: pass it inline, with --file, or with
-    --stdin".
-  - Two or more: rejected, 7, naming the sources found.
-- **G2. Stdin is read only when asked.** Without `--stdin`, the CLI never reads
-  stdin, whether or not it is a terminal. There is no check for "data waiting"
-  on stdin: that check can block forever when a parent process leaves stdin
-  open and never writes to it, and it would make the result depend on how the
-  CLI was launched. `'1 2 +' | cx` shows the banner.
+  program from exactly one of: the inline operand, `--file`, `--stdin`. None,
+  or two or more, is `validation-failed`, 7.
+- **G2. Stdin is read only when asked.** Without `--stdin`, `cx` never reads
+  stdin, terminal or not. There is no "data waiting" check: it can block
+  forever when a parent leaves stdin open, and the result would depend on
+  how `cx` was launched. `'1 2 +' | cx` shows the banner.
 - **G3. The shortcut is a declared root route.** `cx <program>` is the route
-  `<program>` at the root of the trie (section 8.1). It is resolved in the
-  same single pass as every other route, with one rule: at each position a
-  literal segment wins over a parameter. So `cx version` is always the route,
-  and `cx commands shwo power` is an error of the `commands` module, never a
-  program.
-- **G4. The shortcut takes exactly one operand and only the global output options.** It is RPN only, from the inline operand only. `--json` and `--quiet`/`-q` are accepted before or after the program, as in `cx eval rpn`. Any other option is rejected, 7, with a message that names the full spelling: `cx '1 2 +' --file p.txt` gives "--file is not accepted by the shortcut; use: cx eval rpn '1 2 +' --file p.txt". `cx 1 2 +` (unquoted, three operands) is rejected as before (D62).
-- **G5. Reserved words.** The literal children of the root are reserved:
-  `eval`, `commands`, `version`, `upgrade`, `uninstall`, `doctor`, `help`. No
-  RPN command, alias or search term may use one of them. The router exposes
-  the set as `reservedWords`, and a CLI test checks it against the core
-  registry. The set includes the routes that plugins register (8.7), since
-  they are resolved at build time. Adding a root route or a plugin that
-  registers one is a breaking change of the CLI, because a word that used to
-  be a program becomes a route.
-- **G6. POSIX order: route, options, operands.** The route is written in full
-  before any option. After the route come the options, and after the options
-  the operands (POSIX Utility Syntax Guidelines, guideline 9). Global options
-  follow the same rule.
-  - `cx eval rpn --json '1 2 +'` and `cx version --json` are valid.
-  - `cx --json version` is rejected, 7: "options go after the route:
-    `cx version --json`".
-  - `cx eval rpn '1 2 +' --json` is rejected, 7: "options go before the
-    program: `cx eval rpn --json '1 2 +'`".
-  - `cx eval rpn -f p.rpn --json` is valid: both are options.
-  - An option written before the route word that declares it is always
-    rejected: `cx -f prog.rpn eval rpn` is `misplacedOption`, 7.
-
-  **Amended 2026-09-29 (User):** GNU order by default through `cli_router`
-  0.2.1; strict POSIX with `POSIXLY_CORRECT`. `cx` follows GNU `getopt`
-  order by default, like `macss`, `inquiry` and `skillwire`: an option may
-  follow an operand, and `cli_router` moves it in front of the operand
-  before the strict grammar above runs, so `cx --json version` and
-  `cx eval rpn '1 2 +' --json` are now valid, identical to
-  `cx version --json` and `cx eval rpn --json '1 2 +'` (exit code, stdout,
-  stderr). `POSIXLY_CORRECT`, read from the real process environment
-  (`cx` no longer forces it), restores the strict order documented above:
-  with it set, both examples go back to `misplacedOption`, 7. Permutation
-  never crosses a route boundary, so `cx -f prog.rpn eval rpn` stays
-  `misplacedOption`, 7 either way. The strict-order text above is kept as
-  the grammar `POSIXLY_CORRECT` selects, not as the default.
-- **G7. A flag is present or absent.** A flag never takes a value: `--json` is
-  the only form. `--json=true` is rejected, 7: "`--json` takes no value".
-  There is no negation: `--no-json` is an unknown option. Absent always means
-  no.
+  `<program>` at the root, resolved in the same single pass as every route.
+  At each position a literal route word wins over a parameter, so
+  `cx version` is always the route and `cx commands shwo power` is an error
+  of the `commands` module, never a program.
+- **G4. The shortcut takes one operand.** RPN only, inline only. It accepts
+  `--max-digits` and the global options (`--json`, `-q`), before or after
+  the program. `--file` and `--stdin` are `unknown-option`, 7, with the full
+  spelling: `cx '1 2 +' --file p.txt` gives "--file is not accepted by the
+  shortcut; use: cx eval rpn '1 2 +' --file p.txt". More than one operand
+  (an unquoted program) is `extra-argument`, 64: "cx received 3 arguments;
+  quote the program as one argument: cx '1 2 +'" (section 9 explains why),
+  also with `--json` (the same message in the error object) and with `-q`.
+- **G5. Reserved words.** The root route words `eval`, `commands`,
+  `version`, `doctor`, `upgrade`, `uninstall`, `help` are never programs, so
+  no RPN word, alias or search term may be one of them. Adding a root route
+  is a breaking change of the CLI: a word that used to be a program becomes
+  a route.
+- **G6. Order: route, then options and operands.** The route words come
+  first and are never preceded or interrupted by an option:
+  `cx --json version`, `cx -q upgrade --plan` and `cx eval -f p.rpn rpn` are
+  `misplaced-option`, 7. After the route, `cx` follows GNU `getopt` order by
+  default: an option may follow an operand, and is moved in front of it, so
+  `cx eval rpn '1 2 +' --json` is identical to `cx eval rpn --json '1 2 +'`.
+  With `POSIXLY_CORRECT` set (any value, read from the real environment),
+  strict POSIX order applies: an option after an operand is
+  `misplaced-option`, 7. The shortcut's route is empty, so `cx --json '1 2 +'`
+  is valid in both modes.
+- **G7. A flag is present or absent.** `--json=true` is `unexpected-value`,
+  7. There is no negation: `--no-json` is an unknown option. Absent always
+  means no.
 - **G8. A value option requires its value.** The forms are `-f p.rpn`,
-  `--file p.rpn` and `--file=p.rpn`. `cx eval rpn -f` is rejected, 7: "missing
-  value for -f (--file)". The next token is taken as the value only if it does
-  not look like an option; a value that starts with `-` is written
-  `--file=-x.rpn`.
-- **G9. Short options stand alone.** A short option is one letter after one
-  `-`, as its own token. `-qh` is rejected, 7: "short options stand alone:
-  `-q -h`". `-fp.rpn` is rejected, 7: "the value goes apart: `-f p.rpn`".
-- **G10. `--` ends the options.** It goes between the options and the
-  operands; everything after it is an operand, including `--help`:
-  `cx eval rpn --json -- '-x'`. `--` is grammar, not an option, so the
-  shortcut accepts it: `cx -- '-x'`.
-  When a token rejected by G9 looks like an expression (after its `-` it
-  has a digit, an operator, a bracket, `~` or a space), the message says so
-  and gives the command with the value last, after `--`, and the other
-  arguments (such as `--json`) before it, keeping the id and exit 7:
-  `cx eval infix '-sqrt(-1)'` reports "-sqrt(-1) starts with "-", so it was
-  read as options; to pass it as a value, end the options with --: cx eval
-  infix -- '-sqrt(-1)'" (issue #66). `cx --help` says the same.
-- **G11. Negative numbers are operands.** A token looks like an option only if
-  it is `-` followed by a letter, `--` followed by a letter, or exactly `--`.
-  So `-1 2 +`, `->ARRY` and `-[...]` are operands (`cli_router` 0.1.1 already
-  does this).
-- **G12. A program has tokens.** A program with no tokens (empty, or only
-  whitespace) is rejected, 7: "the program is empty". It applies to the three
-  sources: `cx ''`, an empty file, an empty stdin.
+  `--file p.rpn` and `--file=p.rpn`. `cx eval rpn -f` is `missing-value`, 7.
+  The next token is taken as the value only if it does not look like an
+  option; a value starting with `-` is written `--file=-x.rpn`. A repeated
+  option is `repeated-option`, 7.
+- **G9. Short options stand alone.** `-qh` is `invalid-short-option`, 7:
+  "short options stand alone: -q -h". `-fp.rpn` too: "the value goes apart:
+  -f p.rpn".
+- **G10. `--` ends the options.** Everything after it is an operand,
+  including `--help`: `cx eval rpn --json -- '-x'`, `cx -- '-1 2 +'`. When
+  an argument rejected as an option looks like a value (after its `-` it has
+  a digit, an operator, a bracket, `~`, a space, or it is a registry word or
+  constant such as `-e`), the message says so and gives the command with the
+  value last, after `--`: `cx eval infix '-sqrt(-1)'` reports "-sqrt(-1)
+  starts with "-", so it was read as options; to pass it as a value, end the
+  options with --: cx eval infix -- '-sqrt(-1)'". The id and exit code stay
+  those of the SDK. `--` inside a program is an error of core that names the
+  form to type (`cx '1 -- 2'`).
+- **G11. Negative numbers are operands.** A token looks like an option only
+  if it is `-` followed by a letter, `--` followed by a letter, or exactly
+  `--`. So `cx '-1 2 +'` and `cx eval infix '-(2+3)'` need no `--`.
+- **G12. A program has tokens.** An empty or blank program is
+  `validation-failed`, 7, "the program is empty", from any source: `cx ''`,
+  an empty file, an empty stdin.
 
-### Not supported, on purpose
+### Not supported
 
 - **Detecting infix vs RPN.** `2 -3` is two stack entries in RPN and `-1` in
   infix. The mode is always a route.
-- **Joining unquoted operands** (G4).
 - **A stack that persists between invocations** (`cx push 3`, then `cx +`).
-  That is hidden state on disk. The live stack belongs to the REPL.
-- **`--trace` and `--show-rpn`.** Not in this stage; recorded in the roadmap
-  for their own design. Today they are unknown options (7).
+  That would be hidden state on disk.
+- **`--trace`, `--show-rpn`.** Not designed yet (`docs/roadmap.md`); today
+  they are unknown options, 7.
 
-## 5. Route catalog
+## 5. Output streams
 
-| Route | Kind | Contract | What it does |
-|---|---|---|---|
-| `cx` | query | globals only | Logo, version, the list of routes. Never reads stdin. **Amended 2026-09-29 (User, issue #26):** the logo is the branded mark (glow dot `#2EF2C3`, square box-drawing brackets, 9 columns by 4 rows), colored only when stdout is a terminal that supports ANSI escapes and `NO_COLOR` is unset; the route list shows only routes the CLI actually registers, so `doctor`, `upgrade`, `uninstall` and `version` appear once `InstallationPlugin`/`DoctorPlugin`/`VersionPlugin` register them (8.7), not before. |
-| `cx <program>` | query | one operand; `--max-digits`; no globals | Same as `cx eval rpn <program>`. |
-| `cx eval rpn [<program>]` | query | `--file`, `--stdin`, `--max-digits`; `ExactlyOne(program, file, stdin)` | Runs an RPN program on an empty stack and prints the stack. |
-| `cx eval infix [<expression>]` | query | `--file`, `--stdin`, `--max-digits`; `ExactlyOne(expression, file, stdin)` | Evaluates an infix expression and prints the result. |
-| `cx commands list` | query | `--category <name>` (value: enumeration from the registry, optional) | Lists the commands by category. |
-| `cx commands show <name>` | query | one operand | The entry of one command, by name or alias. |
-| `cx commands search <text>` | query | one operand | Finds commands by name, alias, HP reference, search terms or description. |
-| `cx version` | query | globals only | Prints the CLI version. From `VersionPlugin` (8.7). |
-| `cx doctor` | query | globals only | Runs the checks contributed by the plugins (below). Changes nothing. From `DoctorPlugin` (8.7). |
-| `cx upgrade` | command | `--plan` or `--apply` (SDK) | Installs the newest `cli-vX.Y.Z` release. From `InstallationPlugin` (8.7). |
-| `cx uninstall` | command | `--plan` or `--apply` (SDK) | Removes the CLI. From `InstallationPlugin` (8.7). |
-| `cx help [<topic>]` | query | SDK | Provided by the SDK. |
-
-**Queries and commands.** A query changes nothing. `upgrade` and `uninstall`
-change the installation, so they are SDK commands: each step is previewed,
-`--plan` shows the steps and stops, `--apply` performs them. Neither flag is a
-default: `cx upgrade` alone is rejected, 7. `--apply` goes through the normal
-approval prompt unless `--autoapprove` is given, exactly as in `macss` and
-`inquiry` (`modular_cli_sdk` 0.8.0 `InstallationPlugin`; runbook D26, amended
-2026-09-28). Both commands come from `InstallationPlugin`,
-a standard plugin of the SDK shared with `macss` and `docmd`; `cx` registers
-it with its repository (`ccisnedev/calculatrix`), tag prefix (`cli-v`),
-executable and asset names, with no alias (8.7, R25).
-
-**`cx doctor`.** `DoctorPlugin` runs every check contributed to the
-extension point `doctor.checks`. In `cx`, all of them come from
-`InstallationPlugin`. Each check ends in one of three states:
-
-| Check | ok | warning | error |
-|---|---|---|---|
-| binary on `PATH` | found | | not found |
-| newer release | up to date | a newer `cli-v*` release exists: "run `cx upgrade --apply`" | |
-| release lookup | | the lookup failed (no network, rate limit): the reason is printed | |
-
-A warning never fails the command; it is information for a person. A failed
-lookup is always reported, never skipped. Exit code: `0` when no check is an
-error, `78` otherwise (section 6). The release lookup is the same code
-`upgrade` uses, inside `InstallationPlugin`. JSON when no check is an error:
-`{"checks": [{"name": "path", "status": "ok", "detail": "..."}]}`. When a
-check is an error, the output is the single error shape of section 6 with
-the id `doctor-check-failed`, exit code `78` and every check result under
-`checks`:
-`{"error": {"id": "doctor-check-failed", "message": "1 check failed: path", "exitCode": 78, "checks": [...]}}`.
+The result goes to stdout; every error goes to stderr, in text and in JSON.
+Text output ends with a newline. JSON results are pretty-printed; JSON errors
+are one compact line.
 
 ## 6. Output and errors
 
-**Text (default).** HP 50g style: one line per level, level 1 at the bottom,
-spaces inside matrices (runbook D12, D13). A value is exact or approximate as
-a whole (runbook-trust.md D49). An exact value prints in full, never rounded:
-an integer as an integer, a rational with a finite decimal expansion of at
-most 20 digits after the point as a decimal, any other rational as a
-fraction (`0.1 0.2 +` prints `0.3`, `1 3 /` prints `1/3`; D54). An
-approximate value goes through the display formatter of core, the same one
-the app uses: at most 12 significant digits, trailing zeros removed (runbook
-D45), with the mark `~` once in front of the value: `[[1 2] [3 4]] approx -1 ^`
-prints `~[[-2 1] [1.5 -0.5]]`. The stored value is unchanged, and JSON keeps
-the full double. `~` before a literal makes it approximate (D56), and in RPN
-and inside a matrix literal an integer fraction `p/q` is one exact literal
-(`1/3`, `[[1/3 2]]`; D59), so every text output can be typed back. Infix
-keeps `/` as division.
+**Text (default).** HP 50g style: one line per level, `level: value`, level 1
+at the bottom; matrices with spaces, `[[0 -1] [1 0]]`. `eval rpn` and the
+shortcut print every level the program leaves, with no limit; an empty stack
+(`cx '1 drop'`) prints an empty line and exits 0. `eval infix` always prints
+one level.
 
-`eval rpn` and the shortcut print the whole stack the program leaves, every
-level, with no limit (runbook D47). A program that leaves the stack empty
-(`1 drop`) prints an empty line and exits 0. `eval infix` always leaves one
-value.
+A value is exact or approximate as a whole
+(`docs/spec/calculatrix_mathematics.md`, section "Exactness"):
+
+- An exact value prints in full, never rounded: an integer as an integer, a
+  rational with at most 20 digits after the point as a decimal, any other
+  rational as a fraction (`0.1 0.2 +` prints `0.3`, `1 3 /` prints `1/3`,
+  `1 1073741824 /` prints `1/1073741824`).
+- An approximate value goes through the display formatter of core, the one
+  the app uses: at most 12 significant digits, trailing zeros removed, with
+  the mark `~` once in front of the whole value: `~1.41421356237`,
+  `~[[-2 1] [1.5 -0.5]]`. The stored value is unchanged; JSON keeps the full
+  double.
+
+Every text output can be typed back as a literal (`~`, `p/q`; see
+`docs/spec/calculatrix_core.md`, section "Literals").
 
 ```text
-$ cx '5 [[0 -1] [1 0]]'
-2: 5
-1: [[0 -1] [1 0]]
+$ cx '2 sqrt 1 3 /'
+2: ~1.41421356237
+1: 1/3
 ```
 
-**JSON (`--json`).** Built into the SDK: it serializes the route's
-`Output.toJson()`. For `eval`:
+**JSON (`--json`).**
 
 ```json
-{"stack": [{"level": 2, "exact": true, "value": "5"},
-           {"level": 1, "exact": false, "value": [[0.5, -1], [1, 0]]}]}
+{"stack": [{"level": 2, "exact": false, "value": 1.4142135623730951},
+           {"level": 1, "exact": true, "value": "1/3"}]}
 ```
 
-- The stack is an array with one object per level, each naming its level,
-  in the order the text prints it: the highest level first, level 1 last.
-  An empty stack is `{"stack": []}`. `eval infix` gives one object, level 1.
-- Each level says whether its value is exact (`"exact": true`) or
-  approximate (runbook-trust.md D54).
+- One object per level, in the text order: highest level first, level 1
+  last. An empty stack is `{"stack": []}`.
+- `exact` says whether the value is exact.
 - A 1x1 matrix is a single number. Any other matrix is an array of rows,
-  never flattened: the column vector `0 1 2 vector` is `[["0"], ["1"]]`.
-- An exact number is a string in the text form above (`"3/5"`,
-  `"12157665459056928801"`), because a JSON number cannot hold it. An
+  never flattened: `0 1 2 vector` is `[["0"], ["1"]]`.
+- An exact number is a string in its text form (`"3/5"`,
+  `"12157665459056928801"`), since a JSON number cannot hold it. An
   approximate number is a JSON number with the full double. `Infinity` and
   `NaN` never appear: a non-finite value is the error `non-finite`.
 
-**Exit codes.** Eight values, never mixed:
+**Exit codes.**
 
-| Code | Name in the SDK | Meaning | Examples |
+| Code | SDK name | Meaning | Examples |
 |---|---|---|---|
-| `0` | `ExitCode.ok` | success | |
-| `1` | `ExitCode.genericError` | a step of `upgrade --apply` or `uninstall --apply` failed | download failed, access denied |
-| `2` | `ExitCode.apiError` | the release lookup of `upgrade` failed (`release-lookup-failed`, amended 2026-09-29 to match `InstallationPlugin`) | no network, GitHub API error |
-| `4` | `ExitCode.notFound` | the newest `cli-v*` release has no asset for this platform (`asset-not-found`) | a release published without the Linux archive |
-| `64` | `ExitCode.invalidUsage` | the invocation does not name a route (`EX_USAGE`) | unknown command, incomplete route, missing or extra operand |
-| `7` | `ExitCode.validationFailed` | the route is right, an option or a value is wrong (SDK convention) | unknown or misplaced option, missing value, repeated option, two program sources, empty program, file not found, `upgrade` without `--plan` or `--apply` |
-| `65` | `ExitCode.dataError` (new) | the program ran and failed (`EX_DATAERR`) | unknown RPN word, stack underflow, dimension mismatch, infix syntax error |
-| `78` | `ExitCode.configError` (new) | `doctor` found an error in the installation (`EX_CONFIG`) | `cx` is not found on `PATH` |
+| `0` | `ok` | success | |
+| `1` | `genericError` | a step of `upgrade --apply` or `uninstall --apply` failed (`step-failed`) | download failed, access denied |
+| `2` | `apiError` | the release lookup failed (`release-lookup-failed`) | no network, GitHub API error |
+| `4` | `notFound` | the newest `cli-v*` release has no asset for this platform (`asset-not-found`) | |
+| `7` | `validationFailed` | the route is right, an option or value is wrong | unknown, misplaced or repeated option, missing value, two program sources, empty program, file not found, `upgrade` without `--plan`/`--apply` |
+| `64` | `invalidUsage` | the invocation names no route (`EX_USAGE`) | `incomplete-command`, `missing-argument`, `extra-argument` |
+| `65` | `dataError` | the program ran and failed (`EX_DATAERR`) | every error of core: `unknown-word`, `stack-underflow`, `syntax-error`, `limit-exceeded`, ... |
+| `78` | `configError` | the installation is wrong (`EX_CONFIG`) | `doctor-check-failed`, `platform-not-supported` |
 
-A failed step carries one of the ids `release-lookup-failed`,
-`download-failed`, `file-access-denied`. The run stops at that step and
-reports the steps already done; it neither rolls back nor retries (runbook
-D34).
+`64`, `65` and `78` come from `sysexits.h`; `7` is the SDK's convention. A
+failed `--apply` stops at the failed step and reports the steps already done;
+it neither rolls back nor retries. A refused approval is `approval-refused`.
 
-`64`, `65` and `78` come from `sysexits.h` (BSD). It is a convention, not a
-POSIX standard; it is used because the SDK already emits `64`. `7` is the
-existing SDK convention and stays, because changing it would affect every
-consumer.
+**Errors in text.** `Error: <message> [<id>]`, then one `  key: value` line
+per detail, then the usage of the route when one was resolved, or the line
+`Run "cx --help" to see every command.`
 
-**One JSON error shape (runbook D36).** With `--json`, every error, whether
-from the router, the SDK, a plugin or the core, is one object under `error`
-with the same three fields always present:
+**Errors in JSON.** Every error, from the router, the SDK, a plugin or core,
+has one shape:
 
 ```json
-{"error": {"id": "stack-underflow", "message": "+ needs 2 arguments, the stack has 1",
-           "exitCode": 65, "token": "+", "position": 3}}
+{"error": {"id": "stack-underflow", "message": "...", "exitCode": 65,
+           "details": {"token": "+", "position": 3}}}
 {"error": {"id": "unknown-option", "message": "unknown option '--bogus'",
-           "exitCode": 7, "contract": {"...": "..."}}}
+           "exitCode": 7, "contract": {"route": "eval rpn [<program>]", "...": "..."}}}
 ```
 
-- `id` is always kebab-case. Usage errors use the SDK's fixed table, one id
-  per router rejection kind (`unknown-command`, `unknown-option`,
-  `missing-argument`, ...).
-- `exitCode` repeats the process exit code.
-- Other fields appear only when they apply: `token` and `position` for domain
-  errors, `contract` and `details` for usage errors, `checks` for
-  `doctor-check-failed` (section 5). There is no
-  `isRetryable`.
+- `id` (kebab-case), `message` and `exitCode` (the process exit code) are
+  always present. There is no `isRetryable`.
+- Other fields appear only when they apply: `details` (core errors:
+  `token`, `position` as the 1-based character offset, `suggestions`,
+  `name`, `routeSuggestion`, `limit`, `estimated`; validation errors:
+  `parameter`), `contract` for usage errors on a resolved route, `checks`
+  for `doctor-check-failed`.
 
-**Domain errors** share exit code `65` and carry a structured id, so scripts
-branch on the id and not on the code. `position` is the 1-based character
-offset of the token in the program.
+**Core errors.** All exit 65 and carry the id of core, so scripts branch on
+the id, not the code. The ids and their meaning belong to core
+(`docs/spec/calculatrix_core.md`, section "Errors"; `power`'s errors
+in `docs/spec/calculatrix_mathematics.md`, section "power"). The CLI only
+renders them, adding two things: the route suggestion of the shortcut
+(section 7) and the hint of `limit-exceeded` below.
 
-Ids: `unknown-word`, `stack-underflow`, `type-mismatch`, `dimension-mismatch`,
-`singular-matrix`, `non-finite`, `log-undefined`, `ambiguous-power`,
-`syntax-error` (infix, and a sign before the mark `~` in RPN: `-~0.1`),
-`limit-exceeded`, `complex-result`. `no-convergence`, `unsupported-matrix-function`
-and `matrix-out-of-precision-range` are revoked (runbook D35, D37, D38,
-2026-09-28); see spec section 14, R22 to R24. The ids belong to the core; the CLI only renders
-them. The semantics of `power`, the source of `log-undefined` and
-`ambiguous-power`, are in the runbook (D25).
-
-**Size limit.** An exact result with more digits than the limit (counted on
-each numerator or denominator) is `limit-exceeded`, raised before the
-computation starts when the size can be estimated (`a^n`, and the
-Hadamard bound for `inverse`, `determinant`, `rref`, `rank`, `cofactors`,
-`adjugate` and `lu`, a norm bound on the characteristic polynomial for
-`eigenvalues`), never an approximate result instead
-(runbook-trust.md D55). `details` carry `limit`
-and `estimated`, and the message gives the next step: the same program with
-`approx` before the failing word, or `~` before a failing literal, and
-`--max-digits`. The default limit is 10000 digits; `--max-digits <n>` on
-`eval rpn`, `eval infix` and the shortcut sets it, and must be at least 1.
+**Size limit.** An exact result whose numerator or denominator would have
+more digits than the limit is `limit-exceeded`, raised before the
+computation when the size can be estimated, never an approximate result
+instead (estimates: `docs/spec/calculatrix_mathematics.md`, section
+"Exactness"). `details` carry `limit` and `estimated`, and the message gives
+the next step: the same command with `approx` before the failing word, or
+`~` before a failing literal, and `--max-digits`. The default limit is 10000
+digits; `--max-digits <n>` on `eval rpn`, `eval infix` and the shortcut sets
+it and must be at least 1.
 
 ```text
 $ cx '3 1000000 ^'
@@ -386,702 +334,228 @@ Error: 3^1000000 has about 477122 digits, over the limit of 10000; for an approx
   estimated: 477122
 ```
 
-**Complex results.** A real matrix whose eigenvalues include a complex
-pair has no column of eigenvalues to print yet, so `eigenvalues` and
-`diagonalize` raise `complex-result` instead of a wrong or partial value,
-exact or approximate input alike (runbook-trust.md D60; complex vectors
-are issue #64).
-
-```text
-$ cx '[[0 -1] [1 0]] eigenvalues'
-Error: The eigenvalues of this matrix are complex, and cx has no complex columns yet. [complex-result]
-  token: eigenvalues
-  position: 16
-```
-
 ## 7. The encyclopedia: `cx commands`
 
-This is the piece that lets people find a command and understand it. Its
-content is not in the CLI: every command in the **core registry** carries its
-own documentation, and the CLI and the app only render it. In the app, the same
-entry opens from a long press on a key.
+Every word of the core registry carries its own documentation; the CLI and
+the app only render it (registry rules: `docs/spec/calculatrix_core.md`,
+section "Command registry"). `cx commands list` is the authoritative list of
+words; no document keeps a copy.
 
-### Entry of a command
+`cx commands show <name>` prints, for one word: name and aliases, category,
+definition (`primitive`, or the RPN program of a defined word: `inverse` is
+`-1 power`), search terms, HP 50g reference, stack effect, preconditions,
+description, examples and errors. A test of core runs every example, so an
+entry cannot drift from what the word does.
 
-| Field | Example for `append-cols` |
-|---|---|
-| Name and aliases | `append-cols` (no aliases); a name is a word, a symbol or short form is an alias (runbook D41) |
-| Definition | primitive; a defined word shows its RPN program, for example `inverse` is `-1 power` (runbook D43) |
-| Search terms | `hcat`, `horzcat`, `concatenate`, `column` |
-| HP 50g reference | none; closest `COL+`. Informative only, never a word of the language (runbook D42) |
-| Category | matrix |
-| Stack effect | `A B → [A B]` |
-| Preconditions | A and B have the same number of rows |
-| Description | Places the columns of B to the right of A. |
-| Examples | `0 1 2 vector -1 0 2 vector append-cols` gives `[[0 -1] [1 0]]` |
-| Errors | `dimension-mismatch` when the row counts differ |
-| See also | `append-rows`, `vector`, `transpose` |
-
-Its pair, `append-rows`, places the rows of B below A and needs the same
-number of columns; its search terms are `vcat`, `vertcat`, `concatenate`,
-`row`. The names say which side grows: `append-cols` adds columns,
-`append-rows` adds rows (runbook D17).
-
-**Aliases and search terms are different things.** An alias is a word of the
-language: `^` runs `power`. A search term only finds the entry: `hcat` is not
-a word of the language, so `cx '... hcat'` fails with `unknown-word`, and the
-error suggests `append-cols`.
-
-**Examples are executable.** A core test runs every example and compares its
-result, so an entry cannot drift from what the command does.
-
-**Defined words.** An entry is primitive or defined by an RPN program over
-other words (runbook D43): `inverse` is `-1 power` and `sqrt` is `0.5 power`,
-because in Calculatrix everything is a matrix. A defined word gives the same
-result as its definition, bit for bit (runbook D44), and an error inside it
-names the word the user wrote: `[[1 2] [2 4]] inverse` is `singular-matrix`
-with `token: inverse`.
-
-**The HP 50g is inspiration, not adoption** (runbook D42). The goal is its
-level of reliability and usability, then more; never compatibility. HP names
-such as `->ARRY` are not words of the language; the HP reference of an entry
-only helps `cx commands search` find it.
-
-### Finding a command
-
-- `cx commands search <text>` matches name, aliases, HP reference, search terms and
-  description: `search column` finds `append-cols` and `vector`.
-- `cx commands show <alias>` resolves the alias: `show ^` shows `power`, and
-  `show √` shows `sqrt` with its definition.
-- `cx commands list --category matrix` lists one category. The categories are
-  an enumeration taken from the registry, so an unknown category is error 7
-  with the valid ones in the message.
+- `show` resolves aliases: `show ^` shows `power`, `show √` shows `sqrt`.
+- `search <text>` matches name, aliases, HP reference, search terms and
+  description, one line per word, or `No matches.` (exit 0):
+  `search column` finds `vector`, `append-cols`, ...; `search hcat` finds
+  `append-cols`.
+- `list --category <name>` lists one category. The categories are an
+  enumeration taken from the registry; an unknown one is `validation-failed`,
+  7, naming the valid ones.
 - `--json` returns the same entries for agents and scripts.
 
-### "Did you mean"
+**Aliases and search terms differ.** An alias is a word of the language: `^`
+runs `power`. A search term only finds the entry: `hcat` is not a word, so
+`cx hcat` fails with `unknown-word` and suggests `append-cols`.
 
-When a word is unknown, the error names the closest candidates. Two
-vocabularies, two owners:
+**"Did you mean".** Two vocabularies, two owners:
 
-- **RPN words**, from the core registry (the app uses it too, so it cannot
-  depend on a CLI package). Candidates are ranked by edit distance to names
-  and aliases, and an exact match on a search term is a candidate too:
-  `append-col` suggests `append-cols`, and `hcat` suggests `append-cols`.
-- **Routes**, from the SDK catalog, through a public `suggest(word)`:
-  `cx commands shwo power` suggests `show`.
+- **Words**, from the core registry (shared with the app): `cx hcat`
+  suggests `append-cols` (`details.suggestions`).
+- **Routes**, from the SDK catalog: `cx commands shwo power` is
+  `incomplete-command`, 64, suggesting `show`.
 
 A typo at the root is a program, because of the shortcut: `cx verison` runs
-the RPN program `verison` and fails with `unknown-word`. The CLI adds the
-route vocabulary to that error, so it suggests `cx version`. This is the one
-cost of the shortcut (section 11, risk 1).
+the program `verison` and fails with `unknown-word`, 65. Only on the
+shortcut, the CLI adds the closest route, as a separate suggestion: "Did you
+mean the command 'cx version'?" (`details.routeSuggestion`). A route is
+suggested only when the whole route is close to the typo, never a bare
+fragment of a multi-word route. This is the one cost of the shortcut.
 
-## 8. Declarative model
+## 8. Implementation on `modular_cli_sdk`
 
-This section is the contract between the CLI and the packages it builds on.
-All of it is a capability of `cli_router` or `modular_cli_sdk`; the CLI only
-declares.
+All of this is a capability of `cli_router` or `modular_cli_sdk`; `cx` only
+declares (`code/cli/lib/src/cli_builder.dart`).
 
-### 8.1 Resolution: a trie, one pass
+### 8.1 Resolution
 
-Each route inserts its segments into a trie. A node has literal children (by
-text), at most one parameter (`<name>`, or `[<name>]` as the last segment) and
-at most one final wildcard `*`. Mounting a module grafts its trie under its
-literal prefix.
+Routes form a trie. At each node an operand not after `--` takes the literal
+child with that text if there is one; otherwise it binds the node's
+parameter; otherwise the invocation is rejected. The decision is local: a
+later failure never moves the invocation to another branch. Declaration
+errors (duplicate routes, an optional segment not last, a positional with no
+segment) fail when the CLI is built, never at run time.
 
-When the parser reads an operand in a node:
+### 8.2 Options
 
-1. If the operand is not after `--` and the node has a literal child with that
-   text, it takes the literal.
-2. Otherwise, if the node has a parameter, it binds the operand to it.
-3. Otherwise, if the node has a wildcard, the operand goes to `rest`.
-4. Otherwise, the node rejects the invocation (8.5).
+The router knows each option's shape (flag or value, abbreviation,
+required, repeatable); the SDK knows its type (`string`, `flag`, `integer`,
+`path`, `enumeration`), and each type converts text or fails with 7. Every
+field that changes behavior is written in the declaration. The option
+errors are `unknown-option`, `misplaced-option`, `missing-value`,
+`unexpected-value`, `invalid-short-option` and `repeated-option` (7); the
+route errors are `incomplete-command`, `missing-argument` and
+`extra-argument` (64). There is no `unknown-command` in `cx`: an unknown root
+word is a program (G3). An unknown help topic is not a program:
+`cx help nope` is `unknown-help-topic`, 64, with a "did you mean" when a
+command is close.
 
-The decision is local: it does not depend on what comes later, and a later
-failure never moves the invocation to another branch. This is the rule HTTP
-routers use for static and dynamic segments. It is not a fallback: the
-shortcut is a registered route with its own node, and the rule applies to
-every route alike (`commands show <name>` too).
+### 8.3 Contracts
 
-Declaration errors fail when the CLI is built, never at run time:
-
-- two routes with the same pattern;
-- two parameters with different names at the same position;
-- `[<name>]` or `*` anywhere but last;
-- a literal that looks like an option;
-- a positional in the contract with no matching segment in the pattern, or
-  the reverse;
-- one option name or abbreviation with two different shapes in the same scope;
-- an abbreviation that is not exactly one letter.
-
-### 8.2 Options: a typed schema, parsed without loss
-
-The router knows the **shape** of each option; the SDK knows its **type**.
-
-```dart
-// cli_router 0.2.0
-final class OptionSpec {
-  const OptionSpec.flag(this.name, {required this.abbr, required this.repeatable})
-      : takesValue = false, required = false;
-  const OptionSpec.value(this.name,
-      {required this.abbr, required this.required, required this.repeatable})
-      : takesValue = true;
-  final String name;        // long name, no dashes
-  final String? abbr;       // one letter, or null (written, not omitted)
-  final bool takesValue;    // fixed by the constructor
-  final bool required;      // flags are never required
-  final bool repeatable;
-}
-```
-
-Every field that changes behavior is a required named parameter. The fields a
-kind fixes (a flag takes no value and is never required) are set by its
-constructor, so they cannot be contradicted. There is no `negatable`: a flag
-has no negation (G7).
-
-The parse result keeps every occurrence as it was written:
-
-```dart
-final class ParsedOption {
-  final OptionSpec spec;
-  final String written;   // '--file' or '-f'
-  final int index;        // position in argv
-  final String? value;    // null for a flag; '' when written as --file=
-  final bool attached;    // the value came with '='
-}
-```
-
-Grammar, all in `cli_router`:
-
-| Form | Result |
-|---|---|
-| `--x v`, `--x=v`, `-x v` with `x` a value option | value `v` |
-| `--x=` with `x` a value option | value `''`; the SDK type decides if it is valid |
-| value option at the end, or followed by something that looks like an option | `missingValue` (7) |
-| `--x` or `-x` with `x` a flag | present |
-| `--x=v` with `x` a flag | `unexpectedValue` (7) |
-| `-abc`, or `-fvalue` | `invalidShortOption` (7) |
-| second occurrence of a non-repeatable option, by any of its names | `repeatedOption` (7) |
-| option not in scope | `unknownOption` (7) |
-| option in scope but not accepted by the resolved route | `unknownOption` (7), naming the route |
-| option before the route is complete, or after an operand | `misplacedOption` (7) |
-| required option absent | `missingRequiredOption` (7) |
-
-`--no-x` has no special meaning: it is the option named `no-x`, which is
-`unknownOption` unless a route declares that exact name.
-
-**Scope.** At a node, the options in scope are the globals plus the options of
-the routes whose literal segments are all consumed at that node.
-
-**Detecting a misplaced option (G6) in one pass:**
-
-- An option read at a node, followed by an operand that is a literal child of
-  that node, is `misplacedOption`: `cx --json version`. The check is local:
-  the node knows its literal children.
-- An option read after an operand is `misplacedOption`:
-  `cx eval rpn '1 2 +' --json`.
-- An option not in scope at a node that has literal children, when the option
-  is declared by a route under that node, is `misplacedOption`, naming the
-  route: `cx eval -f p.rpn rpn`.
-
-The lexical test for "looks like an option" is one predicate, in the router
-(G11). The SDK stops using its own `startsWith('-')` checks.
-
-### 8.3 Contracts: path apart from arguments
-
-The pattern says where a route is. The contract says what it accepts. Each
-positional in the contract names a segment of the pattern, and the build fails
-if they do not match.
-
-```dart
-// modular_cli_sdk 0.6.0
-final cli = ModularCli(name: 'cx', description: 'Calculatrix command line');
-
-cli.module('', (m) {
-  m.query('', BannerQuery.new, contract: CliContract.none);
-});
-
-// Standard plugins of the SDK (8.7). Each one is registered explicitly.
-cli.plugin(VersionPlugin(version: cxVersion));      // version
-cli.plugin(DoctorPlugin());                         // doctor, doctor.checks
-cli.plugin(InstallationPlugin(                      // upgrade, uninstall,
-  repository: 'ccisnedev/calculatrix',              // and its doctor checks
-  tagPrefix: 'cli-v',
-  executable: 'cx',                                 // no alias (R25)
-  assets: CxAssets.byPlatform,
-));
-
-cli.module('eval', (m) {
-  m.query('rpn [<program>]', EvalRpnQuery.new, contract: EvalContracts.rpn);
-  m.query('infix [<expression>]', EvalInfixQuery.new, contract: EvalContracts.infix);
-});
-
-cli.module('commands', (m) {
-  m.query('list', ListCommandsQuery.new, contract: CommandsContracts.list);
-  m.query('show <name>', ShowCommandQuery.new, contract: CommandsContracts.show);
-  m.query('search <text>', SearchCommandsQuery.new, contract: CommandsContracts.search);
-});
-
-// The shortcut: a root route that runs the target's query with a narrower
-// contract. No options, and the global options are not accepted either.
-cli.shortcut('<program>', target: 'eval rpn', globals: false);
-
-abstract final class EvalContracts {
-  static const file = CliParam.path('file',
-      abbr: 'f', mustExist: true, required: false, repeatable: false);
-  static const stdin = CliParam.flag('stdin', abbr: null, repeatable: false);
-
-  static const rpn = CliContract(
-    options: [file, stdin],
-    positionals: [CliPositional.string('program')],
-    constraints: [ExactlyOne(['program', 'file', 'stdin'])],
-  );
-  static const infix = CliContract(
-    options: [file, stdin],
-    positionals: [CliPositional.string('expression')],
-    constraints: [ExactlyOne(['expression', 'file', 'stdin'])],
-  );
-}
-```
-
-The empty-program rule (G12) is not a contract field: it applies to the
-program text after it is read from any of the three sources, so the eval
-queries check it in `validate()` and return error 7.
-
-Cardinality of positionals comes from the pattern:
-
-| Segment | Operands |
-|---|---|
-| `<name>` | exactly one |
-| `[<name>]` (last only) | zero or one |
-| `*` (last only) | zero or more, in `rest` |
-| none | zero; any extra operand is `extraArgument` (64) |
-
-Value types live in the SDK: `string`, `flag`, `integer`, `number`,
-`enumeration`, `path`. Each converts text to a value or fails with 7; none
-turns an unexpected value into another one. Constraints between fields
-(`ExactlyOne`, `MutuallyExclusive`) are declared in the contract and checked
-before the query runs.
-
-`params: null` (no contract) disappears. A route with nothing to accept
-declares `CliContract.none`, because without a schema the router cannot parse
-without guessing.
+A route's pattern says where it is; its contract says what it accepts. The
+cardinality of positionals comes from the pattern: `<name>` exactly one,
+`[<name>]` (last only) zero or one, none: any operand is `extra-argument`,
+64. Constraints between fields (`ExactlyOne(program, file, stdin)`) are
+checked before the query runs. The empty-program rule (G12) applies to the
+text after it is read, so the eval queries check it.
 
 ### 8.4 Defaults
 
-The router applies no defaults. The SDK accepts one only as a declared object
-with a value and a reason, shown in the help:
-
-```dart
-CliParam.integer('precision', ...,
-    defaultValue: DeclaredDefault(12, reason: 'HP 50g STD display digits'));
-```
-
-The CLI of `cx` declares no defaults. Every option in section 4 is either
-present or absent, and absent has a single meaning.
+The router applies no defaults. `cx` relies on one: the digit limit when
+`--max-digits` is absent (10000, shown by `--help`).
 
 ### 8.5 Rejections
 
-`onNotFound` becomes `onReject(CliRejection)`. A rejection carries its kind,
-its message, the route if one was resolved, the literal segments consumed and
-the options parsed so far. The error belongs to the node that was reached; a
-consumed literal never returns to the root.
+A rejection belongs to the node that was reached; a consumed route word never
+returns to the root. `cx version junk` is `extra-argument`; `cx commands
+show` is `missing-argument`; `cx eval` is `incomplete-command`, listing `rpn`
+and `infix`.
 
-Kinds that exit `64` (the invocation does not name a route):
-
-| Situation | Kind |
-|---|---|
-| root, the word is no route and the root has no parameter | `unknownCommand` |
-| terminal node, an operand is left over | `extraArgument` |
-| non-terminal node, the operand fits no child | `incomplete` |
-| end of argv at a node that needs a parameter | `missingArgument` |
-| end of argv at a node with only literal children | `incomplete` |
-
-Kinds that exit `7` (the route is right, an option is wrong): `unknownOption`,
-`misplacedOption`, `missingValue`, `unexpectedValue`, `invalidShortOption`,
-`repeatedOption`, `missingRequiredOption` (section 8.2).
-
-Examples: `cx version junk` is `extraArgument`; `cx commands show` is
-`missingArgument`; `cx commands shwo power` is `incomplete` in `commands`,
-with the suggestion `show`; `cx eval` is `incomplete`, listing `rpn` and
-`infix`.
+`cx` rewrites three SDK messages to make them actionable, keeping the id and
+the exit code: the unquoted program (G4), the option the shortcut does not
+take (G4, also changing `misplaced-option` to `unknown-option`), and the
+value that starts with `-` (G10).
 
 ### 8.6 Help
 
-Help is provided by the SDK: `--help`, `-h` and the route `cx help [<topic>]`.
-`cx` adds no rule of its own. The one change the SDK needs is a defect fix:
-today the SDK rewrites argv before routing and does not honor `--`, so
-`cx eval rpn -- --help` shows help instead of evaluating the program `--help`.
-In 0.6.0 the SDK decides help after the router resolves the invocation, and
-`--` is honored.
+`cx --help`, `cx -h` and `cx help` print the catalog of routes, the global
+options, then the overview (section 3) and two hints: every route takes its
+own `--help`, and a program starting with `-` goes after `--`.
+`cx <route> --help` and `cx help <module>` print the usage of that route or
+module, exit 0; `cx help <topic>` with no such route or module is
+`unknown-help-topic`, 64. Help is decided after resolution, so `--` is honored:
+`cx eval rpn -- --help` evaluates the program `--help`.
 
-**Precedence of help.** When `-h` or `--help` is among the options read
-before `--`, help wins over the rejections `incomplete`, `missingArgument`
-and `missingRequiredOption`, and over the contract constraints
-(`ExactlyOne`): `cx eval --help` shows the help of the `eval` module and
-`cx eval rpn --help` the help of the route, both with exit 0. Help loses to
-`unknownCommand`, `extraArgument` and every option error of 8.2, because
+**Precedence.** When `-h` or `--help` is read before `--`, help wins over
+`incomplete-command`, `missing-argument`, `missing-required-option` and the
+contract constraints: `cx eval --help` and `cx eval rpn --help` exit 0. Help
+loses to `unknown-command`, `extra-argument` and every option error, because
 then the invocation is malformed: `cx eval rpn --bogus --help` is
-`unknownOption`, 7. The router makes this possible because a rejection
-carries the literals consumed and the options parsed so far (8.5).
-
-Help is part of the SDK core, not a plugin: it depends on the
-parser (`-h`, `--`), and every CLI has it.
+`unknown-option`, 7.
 
 ### 8.7 Plugins
 
-`modular_cli_sdk` 0.6.0 gets a plugin system modeled on the one of
-`modular_api` (`lib/src/core/plugin.dart`), reduced to what a CLI needs today.
+A plugin is active only when `cx` registers it; the SDK adds none by itself.
+Plugin routes live at the root, go through the same resolution, contracts and
+rejections, and are reserved words (G5). Plugins that `cx` registers:
 
-```dart
-// modular_cli_sdk 0.6.0
-final class CliPluginManifest {
-  const CliPluginManifest({
-    required this.id,              // 'modular_cli.version'
-    required this.displayName,
-    required this.version,
-    required this.hostApiVersion,  // range, '>=0.1.0 <0.2.0'
-    required this.requires,        // ids of other plugins; const [] if none
-  });
-  ...
-}
+| Plugin | Routes | Notes |
+|---|---|---|
+| `VersionPlugin` | `version` | version `0.16.3`, the same constant `ModularCli` gets |
+| `DoctorPlugin` | `doctor` | declares `doctor.checks` |
+| `BinaryOnPathDoctorPlugin` (`cx`'s own) | | contributes the `path` check |
+| `InstallationPlugin` | `upgrade`, `uninstall` | repository `ccisnedev/calculatrix`, tag prefix `cli-v`, executable `cx`, assets per platform; contributes the `release` check |
 
-abstract interface class CliPlugin {
-  CliPluginManifest get manifest;
-  void setup(CliPluginHost host);
-}
+## 9. Rejected designs
 
-abstract interface class CliPluginHost {
-  CliHostMetadata metadata();                         // name, version of the CLI
-  void registerQuery(String route, QueryFactory build, {required CliContract contract});
-  void registerCommand(String route, CommandFactory build, {required CliContract contract});
-  void declareExtensionPoint(CliExtensionPoint point);
-  void contribute(CliExtensionContribution contribution);
-  List<T> contributions<T>(String extensionPointId);
-}
-```
+- **Unquoted programs.** A program is always one quoted argument; operands
+  are never joined. Joining would need no quotes in PowerShell, but other
+  shells change the words before `cx` sees them, so a join would silently run
+  a program the user did not type. What `cx` receives (Windows 11, `cx`
+  0.15.0; zsh as documented, not run):
 
-Rules:
+  | Typed | bash (Git Bash) | zsh | PowerShell | cmd.exe |
+  |---|---|---|---|---|
+  | `cx 5 7 power` | 3 arguments, 64 | same | same | same |
+  | `cx 2 3 *` | `*` is a glob: file names, or `*` when none match; 64 | `*` is a glob; with no match zsh stops and `cx` does not run | 3 arguments, 64 | 3 arguments, 64 |
+  | `cx [[1 2] [3 4]] inverse` | 5 arguments, 64 | `[[1` is a glob with no match: `cx` does not run | 5 arguments, 64 | 5 arguments, 64 |
+  | `cx 2 3 ^` | 3 arguments, 64 | with `EXTENDED_GLOB`, `^` is a glob operator | 3 arguments, 64 | `^` is cmd's escape: `cx` gets `2 3`, 64 |
+  | `cx '5 7 power'` | 1 argument, `78125` | same | same | no single quotes in cmd: 3 arguments, 64; `cx "5 7 power"` works (inside double quotes `^` is literal) |
 
-1. **Explicit registration.** A plugin is active only if the CLI calls
-   `cli.plugin(...)`. No plugin is added by the SDK on its own, including the
-   standard ones. This departs from `modular_api`, where health is always on,
-   on purpose: every route of the CLI is visible in its declaration.
-2. **Routes of a plugin live in the global module.** They go through the same
-   trie, contracts and rejections as any route (8.1 to 8.5), and they count
-   as reserved words (G5).
-3. **Build-time failures.** The CLI does not build when: two plugins share an
-   id; a plugin registers a route that already exists; a plugin requires an
-   id that is not registered; `hostApiVersion` does not include the SDK's
-   plugin API version; a contribution names an extension point nobody
-   declared. There is no fallback for any of them.
-4. **Order.** Plugins are set up in dependency order (`requires`), then in
-   registration order. A cycle is a build-time failure.
-5. **Minimal host.** No middlewares, capabilities, validations or shutdown
-   hooks, which `modular_api` has. Each one can be added later without
-   breaking a plugin (principle 6).
+  One quoted argument is the only form that works in every shell.
+- **A `batch` route.** Several results in one call are already one program
+  that leaves several values: `cx '2 sqrt 1 3 /'`. Labels and isolated
+  evaluation (HP `->TAG`, `IFERR`) need name literals and program values
+  (issue #79).
+- **A `calculatrix` executable, or an alias or shim.** The executable is
+  `cx` (`cx.exe`), with nothing in between. A `.cmd`/`.bat` shim runs
+  through cmd.exe, which consumes `^` while parsing the command line, so
+  `cx eval infix 2^0.5` would lose the `^` before any executable starts. The
+  contract is that `cx` receives exactly the argv the calling shell
+  produced.
+- **Fallback re-dispatch** (route `cx <program>` from the not-found path by
+  running again with `eval rpn` in front). It retries after a failure and
+  captured `cx commands show` and `cx --json version` as programs (G3).
+- **Auto-detecting infix.** `2 -3` has two readings.
+- **Reading stdin when it is not a terminal.** The result would depend on
+  how the process was launched, and the check can block (G2).
+- **`--flag=true`, `--no-flag`, clusters (`-qh`), attached short values
+  (`-fp.rpn`).** With no defaults, absent already means no; each extra form
+  adds error cases. Any of them can be added later without breaking anyone.
+- **`cx install`.** Installation happens before `cx` exists.
+- **Aliases `hcat`, `vcat`.** They are search terms: they find
+  `append-cols`/`append-rows` without adding words to the language.
 
-The standard plugins live inside the SDK, as the official plugins of
-`modular_api` live in `official_plugins.dart`:
+## 10. Behavior table
 
-| Plugin | Id | Routes | Extension points | Configuration (all required) |
-|---|---|---|---|---|
-| `VersionPlugin` | `modular_cli.version` | `version` (query) | | `version` |
-| `DoctorPlugin` | `modular_cli.doctor` | `doctor` (query) | declares `doctor.checks` | none |
-| `InstallationPlugin` | `modular_cli.installation` | `upgrade`, `uninstall` (commands) | contributes the checks of section 5 to `doctor.checks` | `repository`, `tagPrefix`, `executable`, `assets`; no `alias` (R25) |
-
-`InstallationPlugin` requires `modular_cli.doctor`: a CLI that registers it
-without `DoctorPlugin` does not build. A CLI can contribute its own checks to
-`doctor.checks` from a plugin of its own. A check is a declared object with a
-name and a function that returns ok, warning or error with a detail; the
-states and the exit code are those of section 5.
-
-There is no install plugin: installation happens before the CLI exists
-(section 3).
-
-## 9. Upstream work
-
-The design needs two releases, both breaking.
-
-1. **`cli_router` 0.2.0.**
-   - Trie resolution (8.1); `[<name>]` segments; `reservedWords`.
-   - `OptionSpec`, `OptionSchema` and lossless `ParsedOption` (8.2), with the
-     POSIX order (G6), flags without values (G7), short options that stand
-     alone (G9) and the single "looks like an option" predicate (G11).
-   - `onReject` with `CliRejection` (8.5).
-   - `resolve(argv)` as a pure function for tests.
-   - `CliRequest.flags` (the lossy map) is removed, not deprecated.
-2. **`modular_cli_sdk` 0.6.0** on `cli_router ^0.2.0`.
-   - `CliContract` with typed positionals and constraints (8.3); every
-     `CliParam` field that changes behavior becomes required; `CliParam.flag`
-     has no `negatable` and accepts no value.
-   - `DeclaredDefault` (8.4).
-   - `shortcut`.
-   - Help decided after resolution, honoring `--` (8.6).
-   - `suggest(word)`.
-   - `ExitCode.dataError = 65` and `ExitCode.configError = 78`.
-   - The global options stay: `--json`, `-q/--quiet`, `-h/--help`.
-   - The plugin system and the three standard plugins (8.7):
-     `VersionPlugin`, `DoctorPlugin` and `InstallationPlugin`. The SDK gains
-     a dependency on HTTP (GitHub Releases) and on the file system, used only
-     by `InstallationPlugin`.
-
-There is no separate installer package: `modular_cli_installer`, planned in
-runbook D20, is replaced by the standard plugins (runbook D33).
-
-There is no opt-in "permissive" mode: that would be a default with guessed
-behavior. The current pins keep consumers on 0.1.x and 0.5.x until each one
-migrates.
-
-### Migration of the known consumers
-
-Checked read-only on 2026-09-24. The seven suites pass today against the
-current packages.
-
-| Consumer | Change needed |
-|---|---|
-| `macss/modular_cli_sdk` | Its own tests: null contracts, help preprocessing, `negatable`. |
-| `macss/macss/code/cli` | Bump pins; contracts are already lists. Replace its own `version`, `upgrade`, `uninstall` and `doctor` with the standard plugins; its own checks become contributions to `doctor.checks`; exit code of `doctor` becomes 78. |
-| `macss/docmd/code/cli` | Bump pins; check the `''` route with `--json`. Same adoption as `macss`; `doctor` stops skipping the release check when offline. |
-| `macss/skillwire/code/cli` | Bump pins. |
-| `macss/skillwire/code/datajack` | Bump pins. |
-| `silicon-brained-machines/inquiry/code/cli` | Bump pins; check the `''` route with `--json`. |
-| `ccisne-dev/linkedin_cli/code/cli` | Declare contracts for its 17 routes (it has none today); it has an option literally named `no-open`, which exact lookup keeps working. |
-
-Across the seven there is no use of `--flag value` with booleans, `--no-x` as
-negation, clusters, repeated options or `--`. Two rules can still break a
-consumer: the POSIX order (an option written after an operand, or before the
-route) and extra operands that used to be ignored. The procedure for each
-release: run every suite, fix every failure by moving the option or removing
-the operand, and update the README examples, which must follow G6.
-
-## 10. Core fixes before the CLI reuses core
-
-Found while testing on 2026-09-23 and 2026-09-24. They are core bugs, not CLI
-design, and go in one issue in `calculatrix`:
-
-1. **Display of large exponents.** `MatrixDisplayFormatter` trims trailing
-   zeros from the exponent too: `1e20` prints as `1.00000000000e+2`
-   (`matrix_display_formatter.dart:68`).
-2. **Infix accepts invalid syntax.** `1 2 +` gives 3, `1()` gives 1, `√9+7`
-   gives 4 (`calculatrix.dart:219`). `eval infix` must reject all three with
-   `syntax-error`.
-3. **Unknown words go to infix.** The old command mode hands an unknown token
-   to the infix evaluator, so `2 -3` gives -1 (`calculatrix_cli.dart:151`,
-   `:320-321`). In the new CLI, RPN never calls infix.
-4. **Non-finite numbers crash.** `1e999` and `NaN` end with exit 255. They
-   must be the domain error `non-finite` (65).
-
-## 11. Risks
-
-1. **A typo at the root is a program.** `cx verison` runs the program
-   `verison`. This is inherent to the shortcut. Mitigation: the error suggests
-   `cx version` (section 7). If this is not acceptable, the fix is to remove
-   the `shortcut` line; nothing else in the design changes.
-2. **Adding a root route breaks programs.** Any new root word (`cx config`)
-   stops being evaluable. `reservedWords` makes it visible in a test, and it
-   is released as a breaking change of the CLI.
-3. **The POSIX order surprises people used to GNU tools.** Users of `git` or
-   `npm`, and agents, tend to write an option at the end:
-   `cx eval rpn '1 2 +' --json`. The error gives the correct form, so the
-   surprise happens once. The same rule applies to the seven consumers
-   (section 9).
-4. **`--flag value` changes meaning** in every consumer: after 0.2.0, `value`
-   is an operand. The survey found no use, but the `cli_router` README shows
-   the old form and must be rewritten.
-5. **`Matrix.log()` precision.** `power` with a non-integer or a matrix
-   exponent relies on the principal matrix logarithm (runbook D25). Its
-   precision on general matrices is not measured yet; the tests of step S4
-   use the D25 table as cases.
-6. **Size.** `cli_router` rewrites its dispatch and its flag parser; the SDK
-   drops its help preprocessing and null contracts. The work also removes
-   three different "is this an option" tests and the lossy flag map, which
-   affect all seven consumers, not only `cx`.
-
-## 12. Rejected designs
-
-- **Fallback re-dispatch.** Route `cx <program>` from the not-found path by
-  running the SDK again with `eval` in front. Rejected: it retries after a
-  failure, and it captured `cx commands show`, `cx --json version` and
-  `cx commands shwo power` as programs.
-- **A list of boolean names per route.** Tell the parser which options take no
-  value. Rejected as too little: the list was known only after the route was
-  matched, and it said nothing about required or repeated options.
-- **A boolean given a non-boolean value becomes true.** Rejected: it turns a
-  value the user did not expect into another value.
-- **`--flag=true`, `--flag=false` and `--no-flag`.** Rejected: with no defaults,
-  absent already means no, so they are other ways to write nothing (G7). They
-  can be added later without breaking anyone.
-- **Clusters (`-qh`) and attached short values (`-fp.rpn`).** Rejected: POSIX
-  says clusters should be accepted, but `cx` has two short flags and no
-  consumer uses them; each form adds error cases (G9). Can be added later.
-- **Free order after the route (GNU).** Rejected: two forms for the same
-  invocation. POSIX order is a standard and has one form. **Amended
-  2026-09-29 (User): GNU order by default through `cli_router` 0.2.1;
-  strict POSIX with `POSIXLY_CORRECT`.** No longer rejected: it is now the
-  default (G6, amended), because the two forms are collapsed into one
-  before the strict grammar runs, so there is only one form again, just a
-  larger one; `POSIXLY_CORRECT` still gives the narrower, single-form POSIX
-  grammar this bullet originally argued for.
-- **Operands before options.** Rejected: it is neither POSIX nor GNU, and `--`
-  could not be combined with options.
-- **Stdin read when it is not a terminal.** Rejected: the result would depend
-  on how the process was launched, and the check can block (G2).
-- **`cx install`.** Rejected: installation happens before `cx` exists; after
-  it, nothing is left to install.
-- **`upgrade` and `uninstall` as queries.** Rejected: a query changes nothing,
-  by the SDK's own contract. As commands they get `--plan` and `--apply`.
-- **Aliases `hcat` and `vcat`.** Rejected: they are search terms instead, so
-  they find the entry without adding words to the language.
-- **Auto-detecting infix.** Rejected: `2 -3` has two readings.
-- **Joining unquoted operands.** Rejected: shell globbing changes the program
-  before the CLI sees it.
-
-## 13. Behavior table
-
-Expected results of this design. Each row becomes a test of the CLI or of the
-packages. The rows marked with a dagger (†) show a defect of the current
-packages, measured on 2026-09-23 with `cli_router` 0.1.1 and
-`modular_cli_sdk` 0.5.0.
+Each row is checked against `cx` 0.16.3; most are tests in `code/cli/test`.
 
 | Invocation | Result and exit code |
 |---|---|
 | `cx` | banner, 0 |
 | `'1 2 +' \| cx` | banner, 0; stdin is not read (G2) |
-| `cx '-1 2 +'`, `cx '-1'` | evaluated, 0 |
-| `cx ''`, `cx '   '` | 7, the program is empty (G12) |
-| `cx [[0 -1] [1 0]] det` unquoted | `extraArgument`, 64: quote the program (G4) |
-| `cx -1 2 +` unquoted | `extraArgument`, 64 (G4) |
-| `cx '1 2 +' --json` | same as `cx eval rpn '1 2 +' --json`, 0 (G4, D63) |
-| `cx '1 2 +' --file p.txt` | 7, `unknown-option`: --file is not accepted by the shortcut; use: cx eval rpn '1 2 +' --file p.txt (G4, D63) |
-| `cx -- '-x'` | program `-x` (G10) |
-| `cx version`, `cx help`, `cx --help` | the route or the help, never a program (G3) |
-| `cx version --json` | version as JSON, 0 |
-| `cx --json version` | version as JSON, 0 (GNU order, G6 amended 2026-09-29); `misplacedOption`, 7 with `POSIXLY_CORRECT` |
-| `cx version junk` † | `extraArgument`, 64; today `junk` is ignored |
-| `cx verison` | program `verison`, `unknown-word`, 65, suggests `cx version` |
-| `cx eval rpn '1 2 +'` | prints `1: 3`, 0 |
-| `cx eval rpn --json '1 2 +'` | `{"stack": [{"level": 1, "exact": true, "value": "3"}]}`, 0 (D47, trust D54) |
-| `cx eval rpn '1 2 +' --json` | `{"stack": [{"level": 1, "exact": true, "value": "3"}]}`, 0 (GNU order, G6 amended 2026-09-29); `misplacedOption`, 7 with `POSIXLY_CORRECT` |
-| `cx eval rpn -f prog.rpn` | program from the file, 0 |
+| `cx '1 2 +'`, `cx '-1 2 +'` | `1: 3`, `1: 1`, 0 |
+| `cx ''`, `cx '   '` | `validation-failed`, 7: the program is empty (G12) |
+| `cx 1 2 +` unquoted | `extra-argument`, 64, with the quoting hint (G4) |
+| `cx '[[1 2]'` | `syntax-error`, 65 |
+| `cx --json 1 2 +`, `cx -q 1 2 +` | `extra-argument`, 64, with the quoting hint (G4) |
+| `cx eval rpn` | `validation-failed`, 7: give one of `<program>`, `--file`, `--stdin` |
+| `cx help nope` | `unknown-help-topic`, 64 |
+| `cx '1 2 +' --json`, `cx --json '1 2 +'`, `cx -q '1 2 +'` | accepted, 0 (G4) |
+| `cx '1 2 +' --file p.txt` | `unknown-option`, 7, with the full spelling (G4) |
+| `cx -- '-1 2 +'` | `1: 1`, 0 (G10) |
+| `cx -e` | `unknown-option`, 7, with the `--` hint (G10) |
+| `cx version` | `cx: 0.16.3`, 0 |
+| `cx version --json` | `{"name": "cx", "version": "0.16.3"}`, 0 |
+| `cx --json version` | `misplaced-option`, 7 (G6) |
+| `cx version junk` | `extra-argument`, 64 |
+| `cx verison` | `unknown-word`, 65, suggests `cx version` |
+| `cx install` | `unknown-word`, 65 |
+| `cx eval rpn '1 2 +' --json` | JSON stack, 0; `misplaced-option`, 7 with `POSIXLY_CORRECT` (G6) |
 | `cx eval rpn -f prog.rpn --json` | program from the file, JSON, 0 |
-| `cx eval rpn -f nope.rpn` | 7, file not found |
-| `cx eval rpn -f empty.rpn` | 7, the program is empty (G12) |
-| `cx eval rpn -f` † | `missingValue`, 7; today the path is `"true"` |
-| `cx eval rpn -fprog.rpn` | `invalidShortOption`, 7: `-f prog.rpn` (G9) |
+| `cx -f prog.rpn eval rpn` | `misplaced-option`, 7 (G6) |
+| `cx eval rpn -f nope.rpn` | `validation-failed`, 7, `parameter: file` |
+| `cx eval rpn -f` | `missing-value`, 7 (G8) |
 | `cx eval rpn --file=-x.rpn` | program from the file `-x.rpn` (G8) |
-| `cx eval rpn --no-file x` † | `unknownOption`, 7; today it is `file=false` |
-| `cx eval rpn -f a.rpn -f b.rpn` † | `repeatedOption`, 7; today the last one wins |
-| `cx eval rpn -f prog.rpn '1 2 +'` | 7, two sources (G1) |
-| `'1 2 +' \| cx eval rpn --stdin` | program from stdin, 0 |
-| `'' \| cx eval rpn --stdin` | 7, the program is empty (G12) |
-| `'9' \| cx eval rpn '1 2 +'` | prints `1: 3`, 0; stdin is not read (G2) |
-| `cx eval rpn --stdin '1 2 +'` | 7, two sources (G1) |
-| `cx eval rpn` | 7, no program (G1) |
-| `cx eval rpn --stdin=true` | `unexpectedValue`, 7 (G7) |
-| `cx eval rpn --stdin true` | 7, two sources: `true` is the program (G7) |
-| `cx -f prog.rpn eval rpn` | `misplacedOption`, 7 (G6; unchanged by the 2026-09-29 amendment: permutation never crosses a route boundary) |
-| `cx eval rpn -q -h` | help, 0 |
-| `cx eval rpn -qh` | `invalidShortOption`, 7: `-q -h` (G9) |
-| `cx eval rpn --trace '1 2 +'` | `unknownOption`, 7 (not in this stage) |
-| `cx eval rpn '1 +'` | `stack-underflow`, 65 |
-| `cx '5 [[0 -1] [1 0]]'` | prints `2: 5` then `1: [[0 -1] [1 0]]`, 0 (D47) |
-| `cx eval rpn --json '5 7 9'` | `{"stack": [{"level": 3, "exact": true, "value": "5"}, {"level": 2, "exact": true, "value": "7"}, {"level": 1, "exact": true, "value": "9"}]}`, 0 (D47, trust D54) |
-| `cx eval rpn '1 drop'` | prints an empty line, 0; with `--json`, `{"stack": []}` (D47) |
-| `cx eval rpn '2 3 /'` | prints `1: 2/3`, 0; `--json` gives `"2/3"` (trust D50, D54) |
-| `cx eval rpn '~2 3 /'` | prints `1: ~0.666666666667`, 0; `--json` keeps `0.6666666666666666` (D45, trust D54) |
-| `cx '0.1 0.2 +'` | prints `1: 0.3`, 0 (trust D50, D54) |
-| `cx '3 40 ^'` | prints `1: 12157665459056928801`, 0 (trust D54) |
-| `cx '1 1073741824 /'` | prints `1: 1/1073741824`, 0: more than 20 decimal places (trust D54) |
-| `cx '~0.1 0.2 +'` | prints `1: ~0.3`, 0: approximation is contagious (trust D51, D56) |
-| `cx '1 3 / approx exact'` | prints `1: 1/3`, 0 (trust D52) |
-| `cx '-~0.1'` | `syntax-error`, 65; the message shows `~-0.1` (trust D56) |
-| `cx '3 1000000 ^'` | `limit-exceeded`, 65, `limit: 10000`, `estimated: 477122`; suggests `cx '3 1000000 approx ^'` (trust D55) |
-| `cx --max-digits 20000 '3 30000 ^'` | prints all 14314 digits, 0; over the default limit without the option (trust D55) |
+| `cx eval rpn -f a.rpn -f b.rpn` | `repeated-option`, 7 |
+| `cx eval rpn -fprog.rpn`, `cx eval rpn -qh` | `invalid-short-option`, 7 (G9) |
+| `cx eval rpn --stdin=true` | `unexpected-value`, 7 (G7) |
+| `cx eval rpn --no-file x` | `unknown-option`, 7 (G7) |
+| `cx eval rpn` | `validation-failed`, 7: no program (G1) |
+| `cx eval rpn -f prog.rpn '1 2 +'`, `cx eval rpn --stdin true` | `validation-failed`, 7: two sources (G1) |
+| `'1 2 +' \| cx eval rpn --stdin` | `1: 3`, 0 |
+| `'9' \| cx eval rpn '1 2 +'` | `1: 3`, 0; stdin is not read (G2) |
 | `cx eval rpn --max-digits 0 '1'` | `validation-failed`, 7 |
-| `cx '~1e300 1e300 *'` | `non-finite`, 65, `token: *`, `position: 14` (section 6) |
-| `cx '9 sqrt'`, `cx '9 √'`, `cx '9 SQRT'` | prints `1: 3`, 0 (D41) |
-| `cx '2 3 pwr'`, `cx '2 3 power'` | prints `1: 8`, 0 |
-| `cx '2 3 add'` | prints `1: 5`, 0: `add` is a name, `+` its alias (D41) |
-| `cx '[[1 2] [3 4]] inverse'` | prints `1: [[-2 1] [1.5 -0.5]]`, 0: exact (D43, D45, trust D53) |
-| `cx '~[[1 2] [3 4]] inverse'` | prints `1: ~[[-2 1] [1.5 -0.5]]`, 0 (trust D51) |
-| `cx '[[1 2 3] [4 5 6] [7 8 10]] 3 / determinant'` | prints `1: -1/9`, 0 (trust D53) |
-| `cx --max-digits 50 '[[1e30 1] [1 1e30]] determinant'` | `limit-exceeded`, 65, `estimated: 61` from the Hadamard bound; suggests `cx '[[1e30 1] [1 1e30]] approx determinant'` (trust D55) |
-| `cx '[[1 2] [2 4]] inverse'` | `singular-matrix`, 65, `token: inverse` (D43) |
-| `cx '9 4 / sqrt'` | prints `1: 1.5`, 0: exact (trust D53) |
-| `cx '2 sqrt'` | prints `1: ~1.41421356237`, 0: irrational, so approximate (trust D53) |
-| `cx '27 8 / 2 3 / ^'` | prints `1: 2.25`, 0: exact (trust D53) |
-| `cx '[[5 4] [4 5]] sqrt'` | prints `1: [[2 1] [1 2]]`, 0: exact (trust D53) |
-| `cx '[[2 1] [1 2]] eigenvalues'` | prints `1: [[3] [1]]`, 0: exact (trust D53) |
-| `cx '[[1 2] [3 4]] eigenvalues'` | prints `1: ~[[5.37228132327] [-0.372281323269]]`, 0: irrational, so approximate (trust D53) |
-| `cx '[[0 -1] [1 0]] eigenvalues'` | `complex-result`, 65, `token: eigenvalues`: complex eigenvalues are deferred (trust D53, D60) |
-| `cx '[[3 4]] frobenius-norm'` | prints `1: 5`, 0: exact (trust D53) |
-| `cx --max-digits 50 '[[1e30 1] [1 1e30]] eigenvalues'` | `limit-exceeded`, 65, `estimated: 62` from the norm bound; suggests `cx '[[1e30 1] [1 1e30]] approx eigenvalues'` (trust D55) |
-| `cx '-4 sqrt'` | the same result as `cx '-4 0.5 ^'`, bit for bit (D44) |
-| `cx '1 2 2 ->ARRY'` | `unknown-word`, 65 (D42) |
-| `cx eval infix '-1+2'` | prints `1: 1`, 0 |
-| `cx eval infix '1 2 +'` | `syntax-error`, 65 (section 10, fix 2) |
-| `cx eval` | `incomplete`, 64, lists `rpn` and `infix` |
-| `cx eval --help` | help of the `eval` module, 0 |
-| `cx eval rpn -- --help` † | program `--help`, `unknown-word`, 65; today help ignores `--` |
-| `cx commands` | `incomplete`, 64 |
-| `cx commands show` | `missingArgument`, 64 |
-| `cx commands show power` | the entry, 0 |
+| `cx eval rpn --trace '1 2 +'` | `unknown-option`, 7 |
+| `cx eval rpn '1 drop'` | empty line, 0; `{"stack": []}` with `--json` |
+| `cx '3 1000000 ^'` | `limit-exceeded`, 65, with `limit`, `estimated` and the hint |
+| `cx --max-digits 20000 '3 30000 ^'` | all 14314 digits, 0 |
+| `cx eval infix '1 2 +'` | `syntax-error`, 65 |
+| `cx eval infix '-sqrt(-1)'` | `invalid-short-option`, 7, with the `--` hint (G10) |
+| `cx eval` | `incomplete-command`, 64, lists `rpn` and `infix` |
+| `cx eval --help`, `cx eval rpn -q -h` | help, 0 (8.6) |
+| `cx eval rpn -- --help` | program `--help`: `unknown-word`, 65 (8.6) |
+| `cx eval rpn --bogus --help` | `unknown-option`, 7 (8.6) |
+| `cx commands show` | `missing-argument`, 64 |
 | `cx commands show ^` | the entry of `power`, 0 |
-| `cx commands show inverse` | the entry, with the definition `-1 power`, 0 |
-| `cx commands search ->arry` | the entry of `vector`, by its HP reference, 0 |
-| `cx commands search hcat` | the entry of `append-cols`, 0 |
-| `cx commands shwo power` | `incomplete`, 64, suggests `show` |
-| `cx commands list --category nope` | 7, lists the valid categories |
-| `cx --json=garbage version` † | 7; today it exits 0 |
-| `cx upgrade` | 7, needs `--plan` or `--apply` |
-| `cx upgrade --plan` | the steps, nothing changes, 0 |
-| `cx uninstall --apply` | removes the CLI, 0 |
+| `cx commands search hcat` | `append-cols`, 0 |
+| `cx commands shwo power` | `incomplete-command`, 64, suggests `show` |
+| `cx commands list --category nope` | `validation-failed`, 7, lists the categories |
+| `cx --json=garbage version` | `unexpected-value`, 7 |
+| `cx upgrade` | `validation-failed`, 7: needs `--plan` or `--apply` |
+| `cx upgrade --plan`, `cx uninstall --plan` | the steps, nothing changes, 0 |
 | `cx upgrade --apply`, no network | `release-lookup-failed`, 2; nothing changed |
-| `cx eval rpn --help` | help of the route, 0 (8.6) |
-| `cx commands show --help` | help of the route, 0 (8.6) |
-| `cx eval rpn --bogus --help` | `unknownOption`, 7 (8.6) |
-| `cx doctor`, all checks ok | 0 |
-| `cx doctor`, newer release or no network | warning printed, 0 |
-| `cx doctor`, `cx` not found on `PATH` | error printed, 78 |
-| `cx install` | program `install`, `unknown-word`, 65 |
-| `cx 2 3 *` in Git Bash | the shell expands `*`; the CLI sees several operands and rejects them, 64 (G4) |
-
-## 14. Decisions of the review of 2026-09-24
-
-Every question of the draft is closed. The user decided each one; the runbook
-records the ones that affect the whole stage (D25 to D45).
-
-| # | Topic | Decision |
-|---|---|---|
-| R1 | `upgrade`, `uninstall` | SDK commands with `--plan` / `--apply`, no default; `--apply` goes through the normal approval prompt unless `--autoapprove` is given (runbook D26, amended 2026-09-28); they come from `InstallationPlugin` (R18). Corrects runbook D3 and D15. |
-| R2 | Stdin | Read only with `--stdin`; `'1 2 +' \| cx` shows the banner (G2). |
-| R3 | Shortcut options | Only the global output options `--json` and `--quiet`/`-q` (G4, D63). |
-| R4 | Empty program | Error 7 from any source (G12). |
-| R5 | Order | POSIX: route, options, operands (G6). |
-| R6 | Flags | Presence only; no `=value`, no negation (G7). Can be extended later. |
-| R7 | Short options | Stand alone; no clusters, no attached values (G9). Can be extended later. |
-| R8 | Help | Provided by the SDK; only the `--` defect is fixed (8.6). |
-| R9 | Domain exit code | `65` (`EX_DATAERR`), `ExitCode.dataError` in the SDK. |
-| R10 | `--quiet` | Stays a global of the SDK: suppresses progress messages, never results or errors. |
-| R11 | `cx install` | Does not exist. The release script installs. |
-| R12 | Aliases of `append-cols`, `append-rows` | None. `hcat`, `vcat` and related words are search terms. |
-| R13 | `power` | `B^Y = exp(Y · log B)`, with the full table in runbook D25. |
-| R14 | `--trace`, `--show-rpn` | Not in this stage; in the roadmap. |
-| R15 | `CliRequest.flags` | Removed in `cli_router` 0.2.0. |
-| R16 | JSON of `eval` | `{"stack": [...]}`, level 1 last, 1x1 as a number, other matrices as rows. Amended by runbook D47: one `{"level", "value"}` object per level. |
-| R17 | `doctor` | Local checks plus the newer-release check; states ok, warning, error; a failed lookup is a warning, never skipped; exit 78 on any error, with the error `doctor-check-failed` carrying every check result (section 5). |
-| R18 | Standard routes | `version`, `doctor`, `upgrade` and `uninstall` come from standard plugins inside `modular_cli_sdk` (8.7), registered explicitly; `doctor` gathers checks through the extension point `doctor.checks`. There is no `modular_cli_installer` package. |
-| R19 | `power`, closing the table | Order of checks by kinds; `i [[1 0] [0 2]] ^` is `ambiguous-power`; a non-square exponent is `dimension-mismatch` with any base (runbook D34). |
-| R20 | Help precedence | Wins over an incomplete route, a missing argument or option, and the constraints; loses to malformed invocations (8.6). |
-| R21 | Failure of `--apply` | Exit `1` with a structured id; stop at the failed step, no rollback, no retry (section 6). |
-| R22 | `no-convergence` | **Revoked 2026-09-28**, with runbook D35: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. The cyclic Jacobi sweep, the only iterative method left after runbook D37, raises `no-convergence` (65) when it does not reach its tolerance within its cap; it never returns the unconverged value (runbook D35). |
-| R23 | `unsupported-matrix-function` | **Revoked 2026-09-28**, with runbook D37: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. `exp`, `log`, `sqrt` and a non-integer real power accept a scalar, the complex form, a diagonal matrix, a symmetric matrix larger than 2x2 (Jacobi) or any 2x2 matrix (closed form, symmetric ones included); any other matrix raises `unsupported-matrix-function` (65), never an approximation (runbook D37). |
-| R24 | `matrix-out-of-precision-range` | **Revoked 2026-09-28**, with runbook D38: came from an automated review round on PR #7, not a user need, and removed capability that main had; kept for history. `exp`, `log`, `sqrt` and a non-integer real power accept only matrices whose nonzero entries and nonzero eigenvalues have magnitudes between `1e-150` and `1e150`; outside that range, or when a nonzero eigenvalue or a nonzero entry of the result falls outside it (`exp(-1000)`, `exp(710)`), they raise `matrix-out-of-precision-range` (65). Inside it the normwise relative error is at most `1e4 * max(1, kappa) * u`, with `kappa` the relative condition number of the function at the matrix and `u = 2^-53` (about `1e-12` for a well conditioned matrix); a zero result and `sqrt` of a singular matrix get the absolute bounds of runbook D38. The range applies to the argument and the final result only, never to an intermediate value; an eigenvalue within the forward error bound of the solver that computed it is numerically zero (`sqrt` takes it as zero, `log` and a non-integer power of a non-scalar matrix raise `log-undefined`; a scalar zero keeps its own rule, `0^0.5` is `0`); when the solver cannot certify an eigenvalue (for example after underflow in the 2x2 closed form) the operation raises `matrix-out-of-precision-range`; the bounds of the range of the result are widened by a relative `8 * 2^-52 * ln(1e150)`, about `6.1e-13`, while the range of the argument stays strict (runbook D38). |
-| R25 | Executable name (issue #22) | The built executable is named `cx`; there is no `calculatrix` executable and no alias of any kind, replacing R11's context and the "alias `cx`" doctor check of section 5 and R17 (a future `InstallationPlugin` registration, section 8.7, names only `executable: 'cx'`, with no `alias`). Help, usage, banner and error messages name the program `cx`. Typed unquoted in cmd.exe, `cx eval infix 2^0.5` still loses the `^`: cmd.exe consumes it as its own escape character while parsing the command line, before any executable starts, so no alias or executable can recover it; the achievable contract is that `cx` receives exactly the argv the calling shell produced. Replaces runbook D1. |
-| R26 | Command names (2026-09-29) | A name is a lowercase word or hyphenated words (`sqrt`, `inverse`, `append-cols`); symbols and short forms are aliases (`+`, `^`, `√`, `pwr`, `inv`) (runbook D41). |
-| R27 | The HP 50g (2026-09-29) | Inspiration, not adoption: parity is the level of reliability and usability, never compatibility; HP names are not words or aliases, only an informative reference that search matches (runbook D42). |
-| R28 | Defined words (2026-09-29) | An entry is primitive or an RPN program over other words; `inverse` is `-1 power`, `sqrt` is `0.5 power`; errors name the user's word; recursive definitions are rejected when the registry is built (runbook D43). |
-| R29 | One implementation per concept (2026-09-29) | `power` uses the exact algorithm for `-1` and `1/2`; a defined word and its definition are bitwise identical, checked by a core test (runbook D44). |
-| R30 | Display (2026-09-29) | CLI text output uses the core display formatter, 12 significant digits; JSON keeps the full double (runbook D45). |
-| R31 | Core vocabulary and index base (2026-09-30) | The rest of the core vocabulary is named in the runbook table "Command names"; `duplicate`, `over`, `swap` and `rotate` are defined words over `pick` and `roll`; every index (stack level, row, column) is 1-based (runbook D46). |
-| R32 | Output of `eval rpn` (2026-09-30) | Prints every level of the final stack, level 1 at the bottom; an empty stack prints nothing and exits 0; `--json` lists each level with its number (runbook D47). |
+| `cx doctor`, all ok / newer release or lookup failed / `cx` not on `PATH` | 0 / warning, 0 / `doctor-check-failed`, 78 |

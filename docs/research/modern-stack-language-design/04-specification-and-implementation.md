@@ -22,7 +22,7 @@ On 2026-10-03 a Sonnet subagent ran web searches and page fetches and read the c
 
 ### Stage 1 - Problem Framing
 
-The question splits into five sub-questions: architecture, specification, conformance suites, tooling, and limits plus phasing. Boundaries: a calculator-scale language with stack-based syntax and nested blocks (`if...end`, `<< >>`, `for...next`), not a general-purpose language. Repository observations that frame the problem: `RpnEngine` (231 lines) holds a stack of `Matrix` with `push/pop/pick/roll/drop` and `restore(snapshot)` [@repo_rpn_engine]; `CalculatrixMachine.execute` rolls the stack back if a command fails, and `dup/swap/over/rot` are already RPN definitions (macros) over `pick/roll` [@repo_machine]; `ExactArithmetic` already enforces a digit limit (D55) [@repo_exact]. Per-command atomicity and a number-size limit therefore already exist.
+The question splits into five sub-questions: architecture, specification, conformance suites, tooling, and limits plus phasing. Boundaries: a calculator-scale language with stack-based syntax and nested blocks (`if...end`, `<< >>`, `for...next`), not a general-purpose language. Repository observations that frame the problem: `RpnEngine` (231 lines) holds a stack of `Matrix` with `push/pop/pick/roll/drop` and `restore(snapshot)` [@repo_rpn_engine]; `CalculatrixMachine.execute` rolls the stack back if a command fails, and `dup/swap/over/rot` are already RPN definitions (macros) over `pick/roll` [@repo_machine]; `ExactArithmetic` already enforces a digit limit [@repo_exact]. Per-command atomicity and a number-size limit therefore already exist.
 
 ### Stage 2 - Source Discovery
 
@@ -99,7 +99,7 @@ Principle from CEL and Lua [@celspec; @lua54]. All limits configurable by flag w
 | Steps (tokens executed, including loop bodies and calls) | 1 000 000 | `limit-steps` |
 | Call depth | 200 | `limit-call-depth` |
 | Data stack depth | 10 000 | `limit-stack-depth` |
-| Number size (digits; D55 already exists) | the D55 value [@repo_exact] | `limit-digits` |
+| Number size (digits; already exists) | the existing value [@repo_exact] | `limit-digits` |
 | Wall-clock time | 10 s (optional, non-deterministic) | `limit-time` |
 | Program size / block nesting | 1 MB / 100 | `limit-source` |
 
