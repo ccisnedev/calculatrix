@@ -1,24 +1,24 @@
-// Tests for issue #37 (runbook step S4c): vector, rows, append-cols and
+// Tests for vector, rows, append-cols and
 // append-rows.
 //
-// AC1: the four words are registry entries with the spec section 7 fields,
+// - the four words are registry entries with every documented field,
 // category `matrix`, no aliases, the documented search terms and HP 50g
 // references; using a search term in a program raises unknown-word.
-// AC2: vector's success and error cases, including the "0 vector" decision.
-// AC3: rows' success cases (the round-trip test lives in
+// - vector's success and error cases, including the "0 vector" decision.
+// - rows' success cases (the round-trip test lives in
 // calculatrix_machine_test.dart, since it needs typed commands: "drop" is
 // not a registered RPN word yet).
-// AC4: append-cols' success and dimension-mismatch cases.
-// AC5: append-rows' success and dimension-mismatch cases.
-// AC6: Matrix.appendRows/appendColumns are the single implementation behind
+// - append-cols' success and dimension-mismatch cases.
+// - append-rows' success and dimension-mismatch cases.
+// - Matrix.appendRows/appendColumns are the single implementation behind
 // appendRow/appendColumn and the new words alike.
-// AC7: errors raised by the new words carry the user's own token.
+// - errors raised by the new words carry the user's own token.
 
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('AC1: registry entries (issue #37)', () {
+  group('registry entries', () {
     test('vector, rows, append-cols and append-rows are matrix-category '
         'entries with no aliases', () {
       for (final String name in <String>[
@@ -105,7 +105,7 @@ void main() {
     });
   });
 
-  group('AC2: vector', () {
+  group('vector', () {
     test('0 1 2 vector gives the 2x1 column [[0] [1]]', () {
       expect(
         Calculatrix.evaluateRpn(<String>['0', '1', '2', 'vector']),
@@ -195,23 +195,20 @@ void main() {
       );
     });
 
-    test(
-      '1 2 3 vector names the real need, 3 values short by 1, not the '
-      'engine pop\'s own generic "needs 1 value, found 0" (issue #51, AC5 '
-      'regression: the count says 3, only 2 data values remain)',
-      () {
-        expect(
-          () => Calculatrix.evaluateRpn(<String>['1', '2', '3', 'vector']),
-          throwsA(
-            isA<CalculatrixError>().having(
-              (CalculatrixError error) => error.message,
-              'message',
-              'vector needs 3 values on the stack, found 2.',
-            ),
+    test('1 2 3 vector names the real need, 3 values short by 1, not the '
+        'engine pop\'s own generic "needs 1 value, found 0" (the count says 3, '
+        'only 2 data values remain)', () {
+      expect(
+        () => Calculatrix.evaluateRpn(<String>['1', '2', '3', 'vector']),
+        throwsA(
+          isA<CalculatrixError>().having(
+            (CalculatrixError error) => error.message,
+            'message',
+            'vector needs 3 values on the stack, found 2.',
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
 
     test('an operand that is not a scalar is type-mismatch', () {
       expect(
@@ -227,7 +224,7 @@ void main() {
     });
   });
 
-  group('AC3: rows', () {
+  group('rows', () {
     test('[[1 2] [3 4]] rows leaves two 1x2 rows and the count 2', () {
       expect(
         Calculatrix.evaluateRpnStack(<String>['[[1 2] [3 4]]', 'rows']),
@@ -264,8 +261,8 @@ void main() {
     });
   });
 
-  group('AC4: append-cols', () {
-    test('the spec example: two column vectors side by side', () {
+  group('append-cols', () {
+    test('two column vectors side by side', () {
       expect(
         Calculatrix.evaluateRpn(<String>[
           '0',
@@ -317,7 +314,7 @@ void main() {
     });
   });
 
-  group('AC5: append-rows', () {
+  group('append-rows', () {
     test('a 1x2 and a 2x2 matrix append to a 3x2 matrix', () {
       expect(
         Calculatrix.evaluateRpn(<String>[
@@ -351,7 +348,7 @@ void main() {
     });
   });
 
-  group('AC6: one implementation per concept (D44)', () {
+  group('one implementation per concept', () {
     test('Matrix.appendRow and Matrix.appendRows agree for a single row', () {
       final Matrix base = Matrix(<List<double>>[
         <double>[1, 2],
@@ -447,7 +444,7 @@ void main() {
     });
   });
 
-  group('AC7: errors carry the user\'s own token', () {
+  group('errors carry the user\'s own token', () {
     test('a dimension-mismatch from append-cols reports "append-cols"', () {
       try {
         Calculatrix.evaluateRpn(<String>[
@@ -493,12 +490,11 @@ void main() {
     });
   });
 
-  group('typed commands through the machine (issue #37)', () {
-    test('rows then append-rows round-trips a matrix through the engine '
-        '(issue #37, AC3)', () {
+  group('typed commands through the machine', () {
+    test('rows then append-rows round-trips a matrix through the engine', () {
       // "drop" is not a registered RPN word yet, so the round trip is
-      // driven through typed commands directly, exactly the pattern the
-      // issue calls for.
+      // driven through typed commands directly, exactly the pattern for
+      // words that need typed commands.
       final CalculatrixMachine machine = CalculatrixMachine();
       final Matrix original = Matrix(<List<double>>[
         <double>[1, 2],
@@ -527,31 +523,28 @@ void main() {
       expect(machine.depth, 1);
       expect(machine.top, original);
     });
-    test(
-      'builds a column vector through a typed VectorCommand (issue #37, AC2)',
-      () {
-        final CalculatrixMachine machine = CalculatrixMachine();
+    test('builds a column vector through a typed VectorCommand', () {
+      final CalculatrixMachine machine = CalculatrixMachine();
 
-        machine.executeAll(<CalculatrixCommand>[
-          const PushScalarCommand(1),
-          const PushScalarCommand(2),
-          const PushScalarCommand(3),
-          const PushScalarCommand(3),
-          const VectorCommand(),
-        ]);
+      machine.executeAll(<CalculatrixCommand>[
+        const PushScalarCommand(1),
+        const PushScalarCommand(2),
+        const PushScalarCommand(3),
+        const PushScalarCommand(3),
+        const VectorCommand(),
+      ]);
 
-        expect(
-          machine.top,
-          Matrix(<List<double>>[
-            <double>[1],
-            <double>[2],
-            <double>[3],
-          ]),
-        );
-      },
-    );
+      expect(
+        machine.top,
+        Matrix(<List<double>>[
+          <double>[1],
+          <double>[2],
+          <double>[3],
+        ]),
+      );
+    });
     test('appends any matching matrix through AppendColsCommand and '
-        'AppendRowsCommand (issue #37, AC4, AC5)', () {
+        'AppendRowsCommand', () {
       final CalculatrixMachine machine = CalculatrixMachine();
 
       machine.executeAll(<CalculatrixCommand>[
@@ -604,7 +597,7 @@ void main() {
       );
     });
     test('AppendRowsCommand restores both operands when column counts differ '
-        '(issue #37, AC5)', () {
+        '', () {
       final CalculatrixMachine machine = CalculatrixMachine();
       final Matrix a = Matrix(<List<double>>[
         <double>[1, 2],
@@ -623,7 +616,7 @@ void main() {
       expect(machine.stackSnapshot, orderedEquals(<Matrix>[a, b]));
     });
     test('AppendColsCommand restores both operands when row counts differ '
-        '(issue #37, AC4)', () {
+        '', () {
       final CalculatrixMachine machine = CalculatrixMachine();
       final Matrix a = Matrix(<List<double>>[
         <double>[1],
@@ -643,7 +636,7 @@ void main() {
       expect(machine.stackSnapshot, orderedEquals(<Matrix>[a, b]));
     });
     test('VectorCommand restores every popped operand when the count exceeds '
-        'the stack (issue #37, AC2)', () {
+        'the stack', () {
       final CalculatrixMachine machine = CalculatrixMachine();
 
       machine.execute(const PushScalarCommand(1));

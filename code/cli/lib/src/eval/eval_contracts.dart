@@ -1,10 +1,35 @@
 import 'package:calculatrix/calculatrix.dart';
 import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 
-/// The options and constraints shared by `cx eval rpn` and `cx eval infix`
-/// (spec section 4 and section 5): exactly one program source, from an
-/// inline positional, `--file`/`-f`, or `--stdin` (G1), and the digit
-/// limit of exact results, `--max-digits` (runbook D55).
+/// Exactly one program source: the positional [name], `--file` or `--stdin`.
+/// The SDK's `ExactlyOne` words every field as an option (`--program`), which
+/// does not exist; this names the positional as `<name>`.
+class ExactlyOneSource extends CliConstraint {
+  const ExactlyOneSource(this.name);
+
+  final String name;
+
+  List<String> get _fields => [name, 'file', 'stdin'];
+
+  @override
+  String? check(Set<String> present) {
+    final given = _fields.where(present.contains).toList();
+    if (given.length == 1) return null;
+    String label(String f) => f == name ? '<$name>' : '--$f';
+    final choices = '<$name>, --file or --stdin';
+    return given.isEmpty
+        ? 'Give exactly one program source: $choices'
+        : 'Give exactly one program source: $choices, '
+              'got ${given.map(label).join(', ')}';
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {'kind': 'exactlyOne', 'fields': _fields};
+}
+
+/// The options and constraints shared by `cx eval rpn` and `cx eval infix`: exactly one program source, from an
+/// inline positional, `--file`/`-f`, or `--stdin`, and the digit
+/// limit of exact results, `--max-digits`.
 abstract final class EvalContracts {
   static final CliParam file = CliParam.path(
     'file',
@@ -23,7 +48,7 @@ abstract final class EvalContracts {
     description: 'Read the program from standard input.',
   );
 
-  /// The digit limit of runbook D55: the most digits an exact numerator or
+  /// The digit limit: the most digits an exact numerator or
   /// denominator may have. Shared with the `cx <program>` shortcut.
   static final CliParam maxDigits = CliParam.integer(
     'max-digits',
@@ -41,7 +66,7 @@ abstract final class EvalContracts {
     options: [file, stdin, maxDigits],
     positionals: [CliPositional.string('program', required: false)],
     constraints: const [
-      ExactlyOne(['program', 'file', 'stdin']),
+      ExactlyOneSource('program'),
     ],
   );
 
@@ -50,7 +75,7 @@ abstract final class EvalContracts {
     options: [file, stdin, maxDigits],
     positionals: [CliPositional.string('expression', required: false)],
     constraints: const [
-      ExactlyOne(['expression', 'file', 'stdin']),
+      ExactlyOneSource('expression'),
     ],
   );
 }

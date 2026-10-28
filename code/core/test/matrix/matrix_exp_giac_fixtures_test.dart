@@ -1,4 +1,4 @@
-// Acceptance test for issue #13's A+ fix: Matrix.exp() must match Giac (the
+// Matrix.exp() must match Giac (the
 // black-box reference for calculatrix) to a relative Frobenius error of
 // 1e-12 or better, on a fixed catalog of fixtures.
 //
@@ -13,7 +13,7 @@
 // need Giac or WSL installed.
 //
 // The catalog is every case from the exploration catalog (scratchpad
-// cases.py) except two matrices filed as separate GitHub issues (a
+// cases.py) except two matrices left out as known open problems (a
 // nonFinite case whose true result is representable, and a subnormal-range
 // case at the double precision limit), plus four new cases added for this
 // fix: x10-scaled versions of the I+N, diag(I+N,2) and Jordan 5I+N cases
@@ -31,8 +31,7 @@ import 'package:test/test.dart';
 void main() {
   final File fixtureFile = File('test/fixtures/matrix_exp_giac_reference.json');
 
-  group('Matrix.exp - matches Giac to 1e-12 relative Frobenius error '
-      '(issue #13, A+ acceptance criterion)', () {
+  group('Matrix.exp - matches Giac to 1e-12 relative Frobenius error', () {
     test('fixture file exists and has at least 18 cases', () {
       expect(
         fixtureFile.existsSync(),

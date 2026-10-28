@@ -1,22 +1,22 @@
-// Tests for issue #35 (runbook D43, D44, step S4b): `inverse` and `sqrt`
+// Tests for `inverse` and `sqrt`
 // as defined words over an exact `power`.
 //
-// AC1: `power` at exponent -1 is the matrix inverse and at 0.5 the
+// - `power` at exponent -1 is the matrix inverse and at 0.5 the
 // principal square root (scalar and matrix cases), not the general
-// exp(y * log B) route (D44).
-// AC3: a defined word's compiled result is bitwise identical to typing its
+// exp(y * log B) route.
+// - a defined word's compiled result is bitwise identical to typing its
 // own definition, checked with exact `==` (never `almostEquals`), on the
-// entry's own registered examples and on the applicable rows of the D25
-// table (docs/runbook-cli-stage-0.md, "Semantics of power").
-// AC4: an error raised while executing a defined word's expansion reports
+// entry's own registered examples and on the applicable cases of the power
+// dispatch (scalar, complex, square, singular and non-square bases).
+// - an error raised while executing a defined word's expansion reports
 // the token the user actually typed (e.g. "inverse" or "inv"), not a
 // token from inside its definition (e.g. "power" or "-1").
-// AC5: CalculatrixCommandRegistry's construction rejects a defined entry
+// - CalculatrixCommandRegistry's construction rejects a defined entry
 // whose definition uses an unresolved word, and rejects a definition that
 // reaches itself, directly or through other defined words.
-// AC6: a matrix with no real logarithm at exponent 0.5, or through sqrt,
-// is log-undefined, not the CLI's generic fallback error id.
-// AC7: D25 row 5's non-diagonalizable example, `[[1 1] [0 1]] 0.5 power`,
+// - a matrix with a negative eigenvalue at exponent 0.5, or through sqrt,
+// is complex-result: its principal square root is complex.
+// - the non-diagonalizable example, `[[1 1] [0 1]] 0.5 power`,
 // is exact, and bitwise identical to sqrt of the same base.
 
 import 'package:calculatrix/calculatrix.dart';
@@ -35,7 +35,7 @@ int _expectedRpnPosition(List<String> tokens, int index) {
 }
 
 void main() {
-  group('AC1: -1 and 0.5 power are exact (issue #35)', () {
+  group('-1 and 0.5 power are exact', () {
     test('[[1 2] [3 4]] -1 power is the inverse, bit for bit', () {
       final Matrix base = Matrix(<List<double>>[
         <double>[1, 2],
@@ -125,8 +125,9 @@ void main() {
       );
     });
 
-    // D25 row 7 comes before row 4 for a scalar: 0 -1 power is non-finite.
-    test('0 -1 power and 0 inverse raise non-finite (D25 row 7)', () {
+    // A zero scalar is checked before the integer-exponent rule: 0 -1 power is
+    // non-finite.
+    test('0 -1 power and 0 inverse raise non-finite', () {
       for (final List<String> tokens in <List<String>>[
         <String>['0', '-1', 'power'],
         <String>['0', 'inverse'],
@@ -144,7 +145,7 @@ void main() {
       }
     });
 
-    // -I is the complex -1 (D25), whose principal square root is i, as
+    // -I is the complex -1, whose principal square root is i, as
     // for the scalar -1.
     test('[[-1 0] [0 -1]] 0.5 power is exactly i, [[0 -1] [1 0]]', () {
       final Matrix minusIdentity = Matrix(<List<double>>[
@@ -172,15 +173,14 @@ void main() {
     });
   });
 
-  group('AC7: D25 row 5, non-diagonalizable base at exponent 0.5', () {
+  group('non-diagonalizable base at exponent 0.5', () {
     // Newton's iteration for the principal square root of a non-diagonal,
     // non-diagonalizable Jordan block does not land on an exactly
-    // representable double the way a diagonal square root does, so this compares against the runbook's
-    // expected value (docs/runbook-cli-stage-0.md, D25 row 5) within a
-    // tight tolerance rather than with exact `==`. The "same bits" half of
-    // issue #35 AC7 (below) is what is checked exactly: 0.5 power and sqrt
+    // representable double the way a diagonal square root does, so this compares against the expected
+    // value within a tight tolerance rather than with exact `==`. The "same bits" half
+    // (below) is what is checked exactly: 0.5 power and sqrt
     // must still agree with each other bit for bit, whatever those bits
-    // are, since 0.5 power literally calls sqrt() (D44).
+    // are, since 0.5 power literally calls sqrt().
     test('[[1 1] [0 1]] 0.5 power is [[1 0.5] [0 1]]', () {
       final Matrix base = Matrix(<List<double>>[
         <double>[1, 1],
@@ -211,10 +211,9 @@ void main() {
     });
   });
 
-  group('AC6: sqrt / 0.5 power over a matrix with no real logarithm is '
-      'log-undefined (docs/runbook-cli-stage-0.md, "Deferred: a matrix with '
-      'no real logarithm")', () {
-    test('[[-1 0] [0 2]] sqrt raises log-undefined', () {
+  group('sqrt / 0.5 power over a matrix with a negative eigenvalue is '
+      'complex-result', () {
+    test('[[-1 0] [0 2]] sqrt raises complex-result', () {
       final Matrix base = Matrix(<List<double>>[
         <double>[-1, 0],
         <double>[0, 2],
@@ -226,14 +225,13 @@ void main() {
           isA<MatrixDomainError>().having(
             (MatrixDomainError error) => error.errorId,
             'errorId',
-            CalculatrixErrorId.logUndefined,
+            CalculatrixErrorId.complexResult,
           ),
         ),
       );
     });
 
-    test('[[-1 0] [0 2]] 0.5 power raises log-undefined, not the generic '
-        'error it raised before issue #35', () {
+    test('[[-1 0] [0 2]] 0.5 power raises complex-result, like sqrt', () {
       final Matrix base = Matrix(<List<double>>[
         <double>[-1, 0],
         <double>[0, 2],
@@ -245,14 +243,14 @@ void main() {
           isA<MatrixDomainError>().having(
             (MatrixDomainError error) => error.errorId,
             'errorId',
-            CalculatrixErrorId.logUndefined,
+            CalculatrixErrorId.complexResult,
           ),
         ),
       );
     });
 
     test(
-      'the same case through the sqrt RPN word also raises log-undefined',
+      'the same case through the sqrt RPN word also raises complex-result',
       () {
         expect(
           () => Calculatrix.evaluateRpn(<String>['[[-1 0] [0 2]]', 'sqrt']),
@@ -260,7 +258,7 @@ void main() {
             isA<MatrixDomainError>().having(
               (MatrixDomainError error) => error.errorId,
               'errorId',
-              CalculatrixErrorId.logUndefined,
+              CalculatrixErrorId.complexResult,
             ),
           ),
         );
@@ -268,8 +266,8 @@ void main() {
     );
   });
 
-  group('AC3: a defined word compiles bitwise identical to typing its own '
-      'definition (issue #35)', () {
+  group('a defined word compiles bitwise identical to typing its own '
+      'definition', () {
     test('every defined entry, on its own registered examples, matches its '
         'expansion exactly', () {
       const Set<String> definedNames = <String>{
@@ -292,7 +290,7 @@ void main() {
           // Every example above ends with the word itself: replacing
           // that last token with the tokenized definition reproduces,
           // by hand, exactly what _compileWord already does inside the
-          // compiler for that same word (issue #35, AC3).
+          // compiler for that same word.
           final List<String> expandedTokens = <String>[
             ...tokens.sublist(0, tokens.length - 1),
             ...Calculatrix.tokenizeRpnLine(entry.definition!),
@@ -300,7 +298,7 @@ void main() {
 
           // evaluateRpnStack (not evaluateRpn) because a stack word's own
           // example, such as "over"'s, legitimately leaves more than one
-          // value on the stack (issue #39).
+          // value on the stack.
           final List<Matrix> viaWord = Calculatrix.evaluateRpnStack(tokens);
           final List<Matrix> viaDefinition = Calculatrix.evaluateRpnStack(
             expandedTokens,
@@ -317,34 +315,35 @@ void main() {
       }
     });
 
-    // Every row of the D25 table that applies to -1 or 0.5 (rows 1, 4, 5,
-    // 7, 8 and 9): the defined word and its definition give the same bits,
+    // Every case of the power dispatch that applies to -1 or 0.5 (scalar,
+    // complex, square, zero, singular and non-square bases): the defined word and its definition give the same bits,
     // or the same error id.
-    const List<(String, String, String)> d25Cases = <(String, String, String)>[
-      ('row 1', '-4', 'sqrt'),
-      ('row 1', '4', 'sqrt'),
-      ('row 1', '2', 'sqrt'),
-      ('row 1', '2', 'inverse'),
-      ('row 1', '-4', 'inverse'),
-      ('row 3', '[[-1 0] [0 -1]]', 'sqrt'),
-      ('row 3', '[[3 -4] [4 3]]', 'sqrt'),
-      ('row 3', '[[3 -4] [4 3]]', 'inverse'),
-      ('row 4', '[[1 1] [0 1]]', 'inverse'),
-      ('row 4', '[[1 2] [3 4]]', 'inverse'),
-      ('row 4', '[[1 2] [2 4]]', 'inverse'),
-      ('row 5', '[[2 0] [0 3]]', 'sqrt'),
-      ('row 5', '[[1 1] [0 1]]', 'sqrt'),
-      ('row 5', '[[0 0] [0 4]]', 'sqrt'),
-      ('row 5', '[[-1 0] [0 2]]', 'sqrt'),
-      ('row 7', '0', 'sqrt'),
-      ('row 7', '0', 'inverse'),
-      ('row 8', '[[0 0] [0 0]]', 'sqrt'),
-      ('row 8', '[[0 0] [0 0]]', 'inverse'),
-      ('row 9', '[[1 2]]', 'sqrt'),
-      ('row 9', '[[1 2]]', 'inverse'),
-    ];
-    for (final (String row, String base, String word) in d25Cases) {
-      test('D25 $row: $base $word is bitwise identical to its definition', () {
+    const List<(String, String, String)> dispatchCases =
+        <(String, String, String)>[
+          ('scalar', '-4', 'sqrt'),
+          ('scalar', '4', 'sqrt'),
+          ('scalar', '2', 'sqrt'),
+          ('scalar', '2', 'inverse'),
+          ('scalar', '-4', 'inverse'),
+          ('complex', '[[-1 0] [0 -1]]', 'sqrt'),
+          ('complex', '[[3 -4] [4 3]]', 'sqrt'),
+          ('complex', '[[3 -4] [4 3]]', 'inverse'),
+          ('inverse', '[[1 1] [0 1]]', 'inverse'),
+          ('inverse', '[[1 2] [3 4]]', 'inverse'),
+          ('inverse', '[[1 2] [2 4]]', 'inverse'),
+          ('square root', '[[2 0] [0 3]]', 'sqrt'),
+          ('square root', '[[1 1] [0 1]]', 'sqrt'),
+          ('square root', '[[0 0] [0 4]]', 'sqrt'),
+          ('square root', '[[-1 0] [0 2]]', 'sqrt'),
+          ('zero', '0', 'sqrt'),
+          ('zero', '0', 'inverse'),
+          ('singular', '[[0 0] [0 0]]', 'sqrt'),
+          ('singular', '[[0 0] [0 0]]', 'inverse'),
+          ('non-square', '[[1 2]]', 'sqrt'),
+          ('non-square', '[[1 2]]', 'inverse'),
+        ];
+    for (final (String row, String base, String word) in dispatchCases) {
+      test('$row: $base $word is bitwise identical to its definition', () {
         final String definition = CalculatrixCommandRegistry.standard
             .lookup(word)!
             .definition!;
@@ -367,10 +366,10 @@ void main() {
     }
   });
 
-  group('AC4 (issue #39): duplicate/over/swap/rotate agree with '
+  group('duplicate/over/swap/rotate agree with '
       '1 pick/2 pick/2 roll/3 roll at stack depths 0 to 3', () {
-    // Correction to the issue text: a defined word is an RPN program with
-    // no implementation of its own (D44). duplicate/over/swap/rotate are
+    // A defined word is an RPN program with
+    // no implementation of its own. duplicate/over/swap/rotate are
     // pure definitions ("1 pick", "2 pick", "2 roll", "3 roll"), so this
     // compares the word against the same tokens its own definition names,
     // typed out by hand, rather than against any engine-level shortcut.
@@ -415,7 +414,7 @@ void main() {
     });
   });
 
-  group('AC4: an error raised inside a defined word\'s expansion carries the '
+  group('an error raised inside a defined word\'s expansion carries the '
       'token the user actually wrote', () {
     test('singular base, inverse: token is "inverse", not "power" or "-1"', () {
       final List<String> tokens = <String>['[[1 2] [2 4]]', 'inverse'];
@@ -441,20 +440,20 @@ void main() {
       }
     });
 
-    test('no real logarithm, sqrt: token is "sqrt", not "power" or "0.5"', () {
+    test('complex root, sqrt: token is "sqrt", not "power" or "0.5"', () {
       final List<String> tokens = <String>['[[-1 0] [0 2]]', 'sqrt'];
       try {
         Calculatrix.evaluateRpn(tokens);
         fail('expected MatrixDomainError');
       } on MatrixDomainError catch (error) {
-        expect(error.errorId, CalculatrixErrorId.logUndefined);
+        expect(error.errorId, CalculatrixErrorId.complexResult);
         expect(error.token, 'sqrt');
         expect(error.position, _expectedRpnPosition(tokens, 1));
       }
     });
   });
 
-  group('AC5: registry construction validates a defined entry (issue #35)', () {
+  group('registry construction validates a defined entry', () {
     test('rejects a definition that uses an unknown word', () {
       expect(
         () => CalculatrixCommandRegistry(<CalculatrixCommandEntry>[

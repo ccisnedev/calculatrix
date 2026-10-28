@@ -10,16 +10,15 @@
 # here as its source of truth.
 #
 # Modeled on ccisnedev/inquiry's code/site/install.sh, adapted for
-# calculatrix (runbook docs/runbook-cli-stage-0.md, "Publishing (dogfood)"):
+# calculatrix:
 #   - this repository also publishes app releases tagged vX.Y.Z, so this
 #     script lists releases and picks the newest cli-v* one instead of
 #     calling GET /releases/latest, which would resolve to whichever kind of
-#     release happens to be newest (constraint 3 in the runbook, D31);
+#     release happens to be newest;
 #   - no `iq`-style alias is created: unlike inquiry, which symlinks a
 #     second, shorter name alongside its own, the only symlink this script
 #     creates keeps the same name, `cx`, and exists only to put the real
-#     binary on the XDG-standard ~/.local/bin (issue #22, D40: no alias of
-#     any kind);
+#     binary on the XDG-standard ~/.local/bin (no alias of any kind);
 #   - there is no host/skill deployment step: calculatrix has none;
 #   - the collision check below is calculatrix-specific: inquiry's script
 #     has none.
@@ -72,7 +71,7 @@ fi
 
 # Two calls, not one: GET /releases returns every release in this repository
 # (app releases tagged vX.Y.Z included), so this script never calls
-# /releases/latest (constraint 3 in the runbook, D31). The first call only
+# /releases/latest (this repository also hosts app releases). The first call only
 # needs the tag names, so it is picked with sort -V rather than trusting the
 # list's order. The second call, GET /releases/tags/<tag>, returns exactly
 # one release object, which can be grepped the same simple way inquiry's

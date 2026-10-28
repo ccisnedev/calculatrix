@@ -1,8 +1,7 @@
 # calculatrix_cli
 
 The `cx` command-line interface for Calculatrix, built on `modular_cli_sdk`.
-See `docs/spec/calculatrix_cli.md` for the full grammar and behavior, and
-`docs/runbook-cli-stage-0.md` for how the CLI is being built in stages.
+See `docs/spec/calculatrix_cli.md` for the full grammar and behavior.
 
 The executable is named `cx`. There is no `calculatrix` executable and no
 alias of any kind: `cx` is what you run, directly (issue #22).

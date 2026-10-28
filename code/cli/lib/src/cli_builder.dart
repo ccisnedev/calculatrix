@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io' as io;
 
 import 'package:modular_cli_sdk/modular_cli_sdk.dart';
@@ -22,9 +23,8 @@ import 'shortcut/unquoted_program_error.dart';
 import 'stdin_reader.dart';
 
 /// The text `cx --help`, `cx -h` and `cx help` print after the global
-/// options (issue #56, `modular_cli_sdk` 0.10.0 `helpEpilog`): the overview
-/// the banner and the install scripts also show (runbook-agent-usability.md
-/// D64), then two hints. It used to be the root route's description, which
+/// options (`modular_cli_sdk` `helpEpilog`): the overview
+/// the banner and the install scripts also show, then two hints. It used to be the root route's description, which
 /// the catalog prints as one cell of its table: the table broke, and every
 /// command was listed twice.
 final String _helpEpilog = <String>[
@@ -34,10 +34,10 @@ final String _helpEpilog = <String>[
       "cx -- '-1 2 +'.",
 ].join('\n');
 
-/// `cx <program>`'s own contract (spec section 4, G4): one required
-/// positional and `--max-digits` (runbook D55), plus the global output
+/// `cx <program>`'s own contract: one required
+/// positional and `--max-digits`, plus the global output
 /// options `--json` and `--quiet`/`-q` (`globals: true` where this is
-/// registered, runbook D63). Not [EvalContracts.rpn],
+/// registered). Not [EvalContracts.rpn],
 /// which declares `--file`/`--stdin` and an optional `program`: those
 /// belong to the full `eval rpn` route, never to this shorter spelling of
 /// it.
@@ -47,18 +47,17 @@ final CliContract _programShortcutContract = CliContract(
 );
 
 /// `cx`'s own version, reported by `cx version`, `cx doctor` and
-/// `cx upgrade` (spec section 8.7: `VersionPlugin` and `ModularCli` are
-/// required to agree). ADR 0002 section 2 lets a shell version
-/// independently of the core package; this is not the core's version.
-const cxVersion = '0.16.2';
+/// `cx upgrade` (`VersionPlugin` and `ModularCli` must agree). A shell
+/// versions independently of the core package; this is not the core's version.
+const cxVersion = '0.16.3';
 
 /// `owner/repo` on GitHub `cx upgrade`, `cx uninstall` and `cx doctor` look
-/// releases up in (runbook D26, D31; spec 8.3, 8.7). The same repository
+/// releases up in. The same repository
 /// also hosts the app's own `vX.Y.Z` releases, which is why [cxTagPrefix]
 /// exists: without it, a release lookup here could not tell the two apart.
 const cxRepository = 'ccisnedev/calculatrix';
 
-/// The prefix this CLI's own release tags carry. Runbook D31/issue #25: the
+/// The prefix this CLI's own release tags carry: the
 /// app already tags its releases `vX.Y.Z`, so `cx`'s own tags are
 /// `cli-vX.Y.Z`, and the release lookup only ever considers tags starting
 /// with this prefix, never `GET .../releases/latest` (which would be
@@ -66,7 +65,7 @@ const cxRepository = 'ccisnedev/calculatrix';
 const cxTagPrefix = 'cli-v';
 
 /// [Platform.operatingSystem] -> release asset name, matching what
-/// `.github/workflows/cli-release.yml` (runbook S3) builds and uploads for
+/// `.github/workflows/cli-release.yml` builds and uploads for
 /// each platform `cx` ships a compiled binary for.
 const cxAssets = {
   'windows': 'cx-windows-x64.zip',
@@ -75,15 +74,14 @@ const cxAssets = {
 
 /// How tolerant a "did you mean" suggestion is, for both `ModularCli`'s own
 /// route vocabulary and [tightenRouteSuggestion]'s re-check of the whole
-/// route it points to (issue #51, AC6): the two must agree, or tightening
+/// route it points to: the two must agree, or tightening
 /// could reject at a stricter distance than the SDK used to find the word
 /// in the first place.
 const _suggestionDistance = 2;
 
-/// Builds the `cx` CLI (spec section 4; runbook stages S2 and S3): the bare
-/// banner, `eval rpn`, `eval infix`, the `cx <program>` RPN shortcut (G3),
-/// and the standard plugins `version`, `doctor`, `upgrade` and `uninstall`
-/// (spec 8.7; runbook D26, D31, D33).
+/// Builds the `cx` CLI: the bare
+/// banner, `eval rpn`, `eval infix`, the `cx <program>` RPN shortcut,
+/// and the standard plugins `version`, `doctor`, `upgrade` and `uninstall`.
 ///
 /// [readStdin] is the injection seam a test needs for standard input: the
 /// real process's standard input has no clean fake, so production code
@@ -95,8 +93,7 @@ const _suggestionDistance = 2;
 /// a test can supply a fake, exactly as `modular_cli_sdk`'s own test suite
 /// does (`test/plugins/installation_doubles.dart`).
 ///
-/// User decision (2026-09-29, issue #22): the executable is named `cx`,
-/// with no alias of any kind. A `.cmd`/`.bat` alias shim runs through
+/// The executable is named `cx`, with no alias of any kind. A `.cmd`/`.bat` alias shim runs through
 /// cmd.exe, which consumes `^` while parsing the command line before the
 /// shim body ever runs, so it silently mangled `cx eval infix '2^0.5'`.
 /// Naming the program itself `cx` means the shell that invokes it passes
@@ -118,7 +115,7 @@ ModularCli buildCalculatrixCli({
     '',
     // The version and the registered-command names are read off [cli]
     // itself at call time, once every module below has been registered
-    // (issue #26 scope 4 and 5): this is the CLI's own record of what it
+    // itself: this is the CLI's own record of what it
     // serves, not a separate list to keep in sync by hand.
     (req) => BannerQuery(
       BannerInput.fromCliRequest(req),
@@ -198,14 +195,14 @@ ModularCli buildCalculatrixCli({
 
   // Not `cli.shortcut('<program>', target: 'eval rpn', ...)`: a shortcut
   // dispatches through the exact same body as its target, with no seam to
-  // add a route suggestion to this path alone (issue #41, AC6; see
+  // add a route suggestion to this path alone (see
   // ProgramShortcutQuery). `eval rpn` above stays the one and only
   // registration of its own body.
   //
   // `cli.suggest(word)` alone can name a bare fragment of a multi-word
   // route (`show`, from `commands show`) as if it were a command by
   // itself; `tightenRouteSuggestion` re-checks the whole route it came
-  // from before trusting it (issue #51, AC6).
+  // from before trusting it.
   cli.query<EvalRpnInput, EvalOutput>(
     '<program>',
     (req) => ProgramShortcutQuery(
@@ -228,9 +225,9 @@ ModularCli buildCalculatrixCli({
 /// Runs the `cx` CLI exactly as [buildCalculatrixCli] plus [ModularCli.run]
 /// would, except for two cases where `modular_cli_sdk` itself can only
 /// report a generic, SDK-worded message: an unquoted program typed as
-/// several shell words (`cx 5 7 power`, issue #51 acceptance 4, reported
+/// several shell words (`cx 5 7 power`, reported
 /// as `extra-argument`), and a value that starts with "-" read as short
-/// options (`cx eval infix '-(2+3)'`, issue #66, reported as
+/// options (`cx eval infix '-(2+3)'`, reported as
 /// `invalid-short-option`). Those messages are rewritten into something
 /// actionable ("quote the program as one argument", "end the options with
 /// --") before they ever reach [stderr]; the id and the process exit code
@@ -257,8 +254,11 @@ Future<int> runCalculatrixCli(
   final io.IOSink realOut = stdout ?? io.stdout;
   final io.IOSink realErr = stderr ?? io.stderr;
 
+  final int? helpExit = _rejectUnknownHelpTopic(cli, args, realErr);
+  if (helpExit != null) return helpExit;
+
   // Only an invocation that could possibly be an unquoted program, or
-  // carries a value that would be read as options (issue #66), is worth
+  // carries a value that would be read as options, is worth
   // the extra buffering at all: everything else is written straight to
   // the real stream, exactly as a plain `cli.run` call would.
   if (!looksLikeUnquotedProgram(args) &&
@@ -283,4 +283,46 @@ Future<int> runCalculatrixCli(
     ),
   );
   return exitCode;
+}
+
+/// `cx help <topic>` where no command or module is named `<topic>` is a
+/// usage error, not the root help: writes it to [err] and returns the usage
+/// exit code, or returns null when [args] is not an unknown help topic.
+int? _rejectUnknownHelpTopic(ModularCli cli, List<String> args, io.IOSink err) {
+  if (args.length < 2 || args.first != 'help') return null;
+  final List<String> topic = args
+      .skip(1)
+      .takeWhile((String a) => !a.startsWith('-'))
+      .toList();
+  if (topic.isEmpty) return null;
+  final String name = topic.join(' ');
+  cli.buildPlugins();
+  final List<CommandContract> commands = cli.catalog.commands;
+  if (name == 'help' ||
+      commands.any((c) => c.name == name || c.name.startsWith('$name '))) {
+    return null;
+  }
+
+  final String? near = tightenRouteSuggestion(
+    topic.first,
+    cli.suggest(topic.first),
+    commands,
+    maxDistance: _suggestionDistance,
+  );
+  final String hint = near == null ? '' : ". Did you mean 'cx help $near'?";
+  final String message = "unknown help topic '$name'$hint";
+  if (args.contains('--json')) {
+    err.writeln(
+      jsonEncode({
+        'error': {
+          'id': 'unknown-help-topic',
+          'message': message,
+          'exitCode': ExitCode.invalidUsage,
+        },
+      }),
+    );
+  } else {
+    err.writeln('Error: $message [unknown-help-topic]');
+  }
+  return ExitCode.invalidUsage;
 }

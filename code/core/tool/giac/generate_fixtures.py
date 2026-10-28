@@ -5,9 +5,9 @@ This script shells out to Giac (via WSL) and writes 30-digit decimal
 reference values as JSON. It has two modes, selected by an optional
 command-line argument:
 
-    python generate_fixtures.py          # exp(A) fixtures (default, issue #13)
+    python generate_fixtures.py          # exp(A) fixtures (default)
     python generate_fixtures.py exp      # same as above, explicit
-    python generate_fixtures.py sqrt     # sqrt(A) fixtures (issue #19)
+    python generate_fixtures.py sqrt     # sqrt(A) fixtures
 
 Giac is the black-box reference, not Julia or numpy.
 
@@ -59,8 +59,7 @@ PI4 = math.pi / 4
 #                      approximate eigenvalues and lose digits.
 #
 # The first 13 cases are every case in the exploration catalog
-# (scratchpad cases.py) except the two out-of-scope cases filed as separate
-# issues (the nonFinite-despite-representable case, and the subnormal-range
+# (scratchpad cases.py) except the two out-of-scope cases (the nonFinite-despite-representable case, and the subnormal-range
 # case). The last 4 are new: x10-scaled versions of the I+N, diag(I+N,2)
 # and Jordan 5I+N cases (to test scaling-and-squaring / exact-nilpotent
 # accuracy at larger magnitude), plus a 4x4 with two independent
@@ -136,7 +135,7 @@ CASES: list[tuple[str, str, str, list[list[float]]]] = [
         "[[401,400,0],[-400,-399,0],[0,0,2]]",
         [[401, 400, 0], [-400, -399, 0], [0, 0, 2]],
     ),
-    # --- New cases for the A+ acceptance catalog (not in cases.py) ---
+    # --- New cases for the acceptance catalog (not in cases.py) ---
     (
         "I+N scaled x10: 10*[[401 400][-400 -399]]",
         "direct",
@@ -168,12 +167,12 @@ CASES: list[tuple[str, str, str, list[list[float]]]] = [
     ),
 ]
 
-# Excluded from cases.py (filed as separate GitHub issues instead):
+# Excluded from cases.py (known open problems):
 #   "[[710 -pi/4][pi/4 710]]"  -> nonFinite raised though representable
 #   "[[-746 1000][0 -746]]"    -> subnormal result, ~1.6e-3 relative error
 
 
-# --- sqrt mode (issue #19: Matrix.sqrt() on singular matrices) ---
+# --- sqrt mode (Matrix.sqrt() on singular matrices) ---
 #
 # Each case: (name, giac_matrix_expr, matrix_as_doubles, issue_giac_expr)
 SQRT_CASES: list[tuple[str, str, list[list[float]], str]] = [

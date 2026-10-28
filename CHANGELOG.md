@@ -187,6 +187,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - `cx` 0.16.2. Uses `modular_cli_sdk` 0.11.0: an error that names no
 	command (`cx -pi`, `cx --file p.txt`) ends with one line, `Run "cx
 	--help" to see every command.`, instead of the whole catalog.
+- `cx` 0.16.3. Fixes:
+	- A program with a syntax error, such as `cx '[[1 2]'`, is a `syntax-error`
+		(exit 65) instead of a crash with a stack trace.
+	- `cx --json 1 2 +` and `cx -q 1 2 +` give the same quoting hint as
+		`cx 1 2 +` (in JSON form under `--json`).
+	- `cx eval rpn` and `cx eval infix` with no program name the sources that
+		exist: `<program>`, `--file` or `--stdin`.
+	- `cx help nope` is an error (`unknown-help-topic`, exit 64) with a "did you
+		mean", not the root help.
+	- The banner shows the quickstart matrix as `[[0 -1] [1 0]]` and the
+		`upgrade` and `uninstall` examples with `--plan`, which run.
+	- `scripts/check-caret.ps1` expects the current output `1: ~1.41421356237`.
 
 ### Benchmark
 

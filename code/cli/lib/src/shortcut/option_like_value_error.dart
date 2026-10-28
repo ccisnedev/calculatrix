@@ -17,8 +17,8 @@ const Set<String> _declaredShortOptions = <String>{'-q', '-h', '-f'};
 
 /// Whether [arg], an argument starting with `-` and a letter, looks like a
 /// value rather than options: its text after the dash has an expression
-/// character (issue #66) or is a registry word, alias or constant, in any
-/// case (issue #82).
+/// character or is a registry word, alias or constant, in any
+/// case.
 bool _looksLikeValue(String arg) {
   final String name = arg.substring(1);
   return _expressionCharacter.hasMatch(name) ||
@@ -26,8 +26,7 @@ bool _looksLikeValue(String arg) {
 }
 
 /// The index in [args] of the argument `modular_cli_sdk` rejects as
-/// `invalid-short-option`, when that argument looks like a value (issues
-/// #66 and #82). -1 when there is none.
+/// `invalid-short-option`, when that argument looks like a value. -1 when there is none.
 ///
 /// The SDK reads only `-` followed by a letter as an option (`-(2+3)` and
 /// `-2 3 +` are values already), accepts a lone short option such as `-q`,
@@ -47,7 +46,7 @@ int _invalidShortOptionIndex(List<String> args) {
 }
 
 /// The index in [args] of the first one-letter option that is not declared
-/// by `cx` (`-e`, `-i`), when it looks like a value (issue #82). -1 when
+/// by `cx` (`-e`, `-i`), when it looks like a value. -1 when
 /// there is none.
 int _unknownOptionIndex(List<String> args) {
   for (int index = 0; index < args.length; index++) {
@@ -65,7 +64,7 @@ int _unknownOptionIndex(List<String> args) {
 }
 
 /// The index in [args] of the first argument that the SDK rejects and that
-/// looks like a value (issues #66 and #82), or -1.
+/// looks like a value, or -1.
 int optionLikeValueIndex(List<String> args) {
   final int invalid = _invalidShortOptionIndex(args);
   final int unknown = _unknownOptionIndex(args);
@@ -81,7 +80,7 @@ const String _unknownOption = 'unknown-option';
 final RegExp _errorLinePattern = RegExp(r'^Error: .* \[([\w-]+)\]$');
 
 /// Rewrites `modular_cli_sdk`'s `invalid-short-option` message when the
-/// rejected argument looks like an expression (issue #66), so it says what
+/// rejected argument looks like an expression, so it says what
 /// happened and how to pass the value: POSIX `--` ends the options, and
 /// everything after it is a value even when it starts with `-`.
 ///

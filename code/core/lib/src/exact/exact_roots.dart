@@ -4,10 +4,10 @@ import 'exact_arithmetic.dart';
 import 'exact_linear_algebra.dart';
 import 'rational.dart';
 
-/// The exact roots of runbook D53 for step T4: non-integer powers (and so
+/// The exact roots: non-integer powers (and so
 /// `sqrt`, which is `0.5 power`), `frobenius-norm` and the trivial cases of
 /// `exp` and `ln`, on exact values only. The caller dispatches here when
-/// every operand is exact (runbook D51).
+/// every operand is exact.
 ///
 /// Each word returns an exact value only when its result is rational and
 /// checked exactly; otherwise it returns what the approximate method of
@@ -21,7 +21,7 @@ extension ExactRoots on ExactArithmetic {
   /// matrix have closed forms: their result is rational exactly when the
   /// q-th roots involved are, so the exact path decides alone. Any other
   /// matrix is computed approximately, converted entry by entry to the
-  /// simplest rational (runbook D52) and kept exact only when X^q = B^p
+  /// simplest rational and kept exact only when X^q = B^p
   /// holds exactly.
   Matrix fractionalPower(Matrix base, Rational exponent) {
     assert(!exponent.isInteger);

@@ -1,5 +1,5 @@
-// Tests for Matrix.log()'s 2x2 closed form (issue #5, D25 power table row
-// 5): `log A = c1*A + c0*I`, derived from Sylvester's formula for a
+// Tests for Matrix.log()'s 2x2 closed form (a non-integer power of
+// a square base): `log A = c1*A + c0*I`, derived from Sylvester's formula for a
 // function of a 2x2 matrix. This is what makes a defective 2x2 base (a
 // repeated eigenvalue with only one independent eigenvector, so
 // diagonalization's eigenvector matrix P is singular) still have a
@@ -12,7 +12,7 @@ import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Matrix.log 2x2 closed form (issue #5)', () {
+  group('Matrix.log 2x2 closed form', () {
     test('defective (Jordan block) base has a well-defined log', () {
       // [[1, 1], [0, 1]] has the repeated eigenvalue 1 with only one
       // independent eigenvector, so diagonalization's P is singular; the
@@ -50,7 +50,7 @@ void main() {
       expect(result.exp().almostEquals(base, absoluteTolerance: 1e-6), isTrue);
     });
 
-    test('raising a defective base to a non-integer power works (row 5)', () {
+    test('raising a defective base to a non-integer power works', () {
       // [[1, 1], [0, 1]] 0.5 ^ : previously routed through diagonalization
       // and failed with a singular P; the power dispatch calls log()
       // internally for a non-integer scalar exponent.
@@ -69,9 +69,8 @@ void main() {
       // [[0, -2], [1, 0]]: eigenvalues are +-i*sqrt(2), a genuine complex
       // pair not in complex form (aI + bJ). Its real part is 0, not on
       // the closed negative real axis, so the principal branch of the
-      // matrix logarithm is still well-defined and real-valued (issue #5
-      // review round 1, finding 4: this used to be rejected as
-      // log-undefined outright).
+      // matrix logarithm is still well-defined and real-valued (it is not
+      // rejected as log-undefined).
       final Matrix base = Matrix(<List<double>>[
         <double>[0, -2],
         <double>[1, 0],
@@ -95,8 +94,7 @@ void main() {
     });
 
     test('raising a complex-conjugate-eigenvalue base to a non-integer power '
-        'matches the closed-form principal log (issue #5 review round 1, '
-        'finding 4)', () {
+        'matches the closed-form principal log', () {
       // [[1, -2], [0.5, 1]]: eigenvalues 1+-i, complex conjugate pair.
       // Expected value derived from the closed form c1 = arg(lambda)/b,
       // c0 = ln|lambda| - a*c1 for eigenvalues a +- bi, b > 0.
@@ -160,7 +158,7 @@ void main() {
     );
   });
 
-  group('Matrix.log domain errors carry log-undefined (issue #5)', () {
+  group('Matrix.log domain errors carry log-undefined', () {
     test('log of scalar zero carries the log-undefined error id', () {
       expect(
         () => Matrix.scalar(0).log(),

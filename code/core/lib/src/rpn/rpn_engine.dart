@@ -8,18 +8,18 @@ enum RpnBinaryOperator { add, subtract, multiply, divide }
 
 enum RpnUnaryOperator { sqrt, percent }
 
-/// The RPN stack (runbook D49): every value on it is either exact or
+/// The RPN stack: every value on it is either exact or
 /// approximate, as a whole.
 ///
 /// [pop] and [peek] hand out approximate values, so a command written for
 /// `double` matrices sees approximate operands whatever the stack holds and
-/// its result is approximate (runbook D53: until a word becomes exact, it
+/// its result is approximate (until a word becomes exact, it
 /// converts its exact operands, marked, never silently). A command that
 /// keeps exactness reads its operands with [popAny] instead.
 class RpnEngine {
   RpnEngine({this.exact = const ExactArithmetic()});
 
-  /// The exact operations, with the digit limit of runbook D55.
+  /// The exact operations, with the digit limit of an exact number.
   final ExactArithmetic exact;
 
   final List<Matrix> _stack = <Matrix>[];
@@ -57,9 +57,9 @@ class RpnEngine {
   // itself implements. dup, swap, over and rot are not engine methods:
   // they are pure RPN definitions (1 pick, 2 roll, 2 pick, 3 roll) that
   // compile down to these same primitives, so there is exactly one
-  // implementation of "read/move the nth value from the top" (D44) and a
-  // defined word never duplicates engine logic of its own (issue #39).
-  // They move values as they are, so exactness is kept (runbook D53).
+  // implementation of "read/move the nth value from the top" and a
+  // defined word never duplicates engine logic of its own.
+  // They move values as they are, so exactness is kept.
   Matrix drop() {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError(
@@ -122,8 +122,7 @@ class RpnEngine {
     return _stack.removeLast();
   }
 
-  /// Exact when both operands are exact, approximate otherwise (runbook
-  /// D51).
+  /// Exact when both operands are exact, approximate otherwise.
   Matrix applyBinary(RpnBinaryOperator operatorType) {
     if (_stack.length < 2) {
       throw RpnStackUnderflowError(
@@ -174,7 +173,7 @@ class RpnEngine {
   }
 
   /// Both keep exactness: `sqrt` is exact when the root is rational, as
-  /// `0.5 power` is (runbook D53).
+  /// `0.5 power` is.
   Matrix applyUnary(RpnUnaryOperator operatorType) {
     if (_stack.isEmpty) {
       throw RpnStackUnderflowError(
@@ -210,8 +209,7 @@ class RpnEngine {
   // regardless of how deep the stack is. An index that is well-formed but
   // reaches past the current depth (including the empty-stack case, where
   // every index from 1 up is out of reach) is a stack-underflow: there
-  // simply are not enough values yet, the same condition drop reports
-  // (AC4, issue #39).
+  // simply are not enough values yet, the same condition drop reports.
   void _requireValidRange(int indexFromTop) {
     if (indexFromTop < 1) {
       throw RpnStackRangeError(

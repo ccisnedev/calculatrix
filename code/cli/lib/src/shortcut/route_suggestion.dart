@@ -2,7 +2,7 @@ import 'package:calculatrix/calculatrix.dart' show restrictedEditDistance;
 import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 
 /// Tightens `ModularCli.suggest`'s own route "did you mean" so it never
-/// names something that is not itself a real command (issue #51, AC6).
+/// names something that is not itself a real command.
 ///
 /// `CommandCatalog.suggest` (inside `modular_cli_sdk`) scores every single
 /// *word* that appears anywhere across the catalog's route names, so a
@@ -16,7 +16,7 @@ import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 /// nothing. `modular_cli_sdk` has no seam to score whole routes instead of
 /// single words, and does not say which full route a suggested word came
 /// from, so this is not something calculatrix can fix by patching the SDK
-/// (tracked as `modular_cli_sdk#46`); instead, this re-derives the full
+/// (an SDK limitation); instead, this re-derives the full
 /// route from [commands] and re-checks that full route, not the bare word,
 /// against [word] before trusting it at all.
 ///

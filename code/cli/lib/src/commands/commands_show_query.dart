@@ -5,7 +5,7 @@ import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 import '../eval/eval_support.dart';
 import 'commands_support.dart';
 
-/// `cx commands show <name>` (spec section 7; issue #41, AC1).
+/// `cx commands show <name>`.
 class ShowInput extends Input {
   ShowInput({required this.name});
 
@@ -47,12 +47,12 @@ class ShowQuery implements Query<ShowInput, ShowOutput> {
     final CalculatrixCommandEntry? entry = CalculatrixCommandRegistry.standard
         .lookup(input.name);
     if (entry == null) {
-      // A search term (never a word of the language, spec section 7) or
+      // A search term (never a word of the language) or
       // any other unresolvable spelling is unknown-word here exactly as it
-      // would be in an RPN program (AC1: "show hcat" is unknown-word
+      // would be in an RPN program ("show hcat" is unknown-word
       // suggesting "append-cols"), reusing the same core message and the
       // same JSON shape `toCommandException` already gives `eval`'s own
-      // unknown-word error (issue #41, AC5).
+      // unknown-word error.
       throw toCommandException(
         UnknownWordError(
           input.name,

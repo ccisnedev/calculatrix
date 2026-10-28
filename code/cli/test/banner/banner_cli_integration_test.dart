@@ -1,6 +1,6 @@
-// Integration coverage for issue #26, tying the pure banner renderer back
-// to the real CLI: the quickstart guard (scope 3) and the command-list
-// guard (scope 4), both run against `buildCalculatrixCli()` so the banner
+// Integration coverage tying the pure banner renderer back
+// to the real CLI: the quickstart guard and the command-list
+// guard, both run against `buildCalculatrixCli()` so the banner
 // and the CLI cannot silently drift apart, the same discipline `macss`
 // applies to its own `quickstartCommand`
 // (`code/cli/lib/modules/global/commands/tui.dart`).
@@ -21,7 +21,7 @@ const _indent = '    ';
 const _nameColumnWidth = 17;
 
 void main() {
-  group('banner quickstart (issue #26 scope 3)', () {
+  group('banner quickstart', () {
     test("the quickstart command evaluates through the CLI and prints "
         "1: [[-1 0] [0 -1]] (i^2 = -1)", () async {
       final out = MemorySink();
@@ -45,7 +45,7 @@ void main() {
     });
   });
 
-  group('banner command list (issue #26 scope 4)', () {
+  group('banner command list', () {
     test('every command word the banner lists is a route the CLI actually '
         'registers', () async {
       final out = MemorySink();
@@ -72,9 +72,8 @@ void main() {
       }
     });
 
-    test('S3 routes (doctor, upgrade, uninstall, version) are not listed until '
-        'the CLI actually registers them (issue #26 scope 4, does not depend '
-        'on #25)', () async {
+    test('routes (doctor, upgrade, uninstall, version) are not listed until '
+        'the CLI actually registers them', () async {
       final out = MemorySink();
       final err = MemorySink();
       final cli = buildCalculatrixCli();

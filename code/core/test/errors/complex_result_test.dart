@@ -1,6 +1,5 @@
-// complex-result (runbook-trust.md D60): a real matrix whose eigenvalues
-// include a complex pair has no column of eigenvalues to return yet (issue
-// #64), so `eigenvalues` and `diagonalize` raise their own id instead of a
+// complex-result: a real matrix whose eigenvalues
+// include a complex pair has no column of eigenvalues to return yet, so `eigenvalues` and `diagonalize` raise their own id instead of a
 // generic error, exact or approximate.
 
 import 'package:calculatrix/calculatrix.dart';
@@ -23,7 +22,7 @@ Matcher _complexResult(String token) => throwsA(
 );
 
 void main() {
-  group('complex-result (D60)', () {
+  group('complex-result', () {
     for (final String program in <String>[
       // The rotation of trap 8, exact and approximate.
       '[[0 -1] [1 0]] eigenvalues',

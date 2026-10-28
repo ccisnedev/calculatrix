@@ -1,5 +1,5 @@
 // Infix has no notion of a function call or a bare name: it only accepts
-// numbers, matrix literals, the five RPN operator symbols and parentheses.
+// numbers, matrix literals, the constants, the operators and parentheses.
 // A name typed into infix (a call-like "sqrt(7)", or a bare "e") used to
 // surface as an opaque "Unexpected token" pointing at just its first
 // character. These tests cover the friendlier, actionable error instead:
@@ -22,7 +22,7 @@ void main() {
         expect(
           error.message,
           contains(
-            'infix accepts numbers, matrix literals, + - * / ^ and parentheses',
+            'infix accepts numbers, matrix literals, the constants pi (π) e i, + - * / ^ √ % and parentheses',
           ),
         );
         expect(error.message, contains('"sqrt" is an RPN word'));
@@ -78,7 +78,7 @@ void main() {
         expect(
           error.message,
           contains(
-            'infix accepts numbers, matrix literals, + - * / ^ and parentheses',
+            'infix accepts numbers, matrix literals, the constants pi (π) e i, + - * / ^ √ % and parentheses',
           ),
         );
         expect(error.message, contains('"x" is a name, not a number'));
@@ -98,7 +98,7 @@ void main() {
     });
 
     test('a registry word with a hyphen is recognized as the whole word, '
-        'not just the run of letters before the hyphen (issue #51, AC2)', () {
+        'not just the run of letters before the hyphen', () {
       try {
         Calculatrix.evaluateInfix('frobenius-norm(7)');
         fail('expected ExpressionSyntaxError');
@@ -110,8 +110,8 @@ void main() {
     });
 
     test('a call whose argument is not a plain number gives a generic, '
-        'non-runnable description instead of a failing command (issue #51, '
-        'AC2: "sqrt(1+2)" used to suggest "cx eval rpn \\"1+2 sqrt\\"", '
+        'non-runnable description instead of a failing command '
+        '("sqrt(1+2)" must not suggest "cx eval rpn \\"1+2 sqrt\\"", '
         'which fails as unknown-word)', () {
       try {
         Calculatrix.evaluateInfix('sqrt(1+2)');
@@ -127,8 +127,8 @@ void main() {
     });
 
     test('a space before the call parenthesis is not call-like, so it also '
-        'gets the generic form instead of a failing command (issue #51, AC2: '
-        '"sqrt (7)" used to suggest "cx eval rpn \\"sqrt\\"", which '
+        'gets the generic form instead of a failing command '
+        '("sqrt (7)" must not suggest "cx eval rpn \\"sqrt\\"", which '
         'underflows)', () {
       try {
         Calculatrix.evaluateInfix('sqrt (7)');
@@ -143,30 +143,20 @@ void main() {
       }
     });
 
-    test(
-      'a truncated call never crashes, for a range of truncation points '
-      '(issue #51, AC1: "sqrt(" used to throw an unhandled RangeError '
-      'instead of a normal syntax error)',
-      () {
-        for (final expression in <String>[
-          'sqrt',
-          'sqrt(',
-          'sqrt( ',
-          '(',
-          'e(',
-        ]) {
-          try {
-            Calculatrix.evaluateInfix(expression);
-            fail('expected ExpressionSyntaxError for "$expression"');
-          } on ExpressionSyntaxError catch (error) {
-            expect(
-              error.errorId,
-              CalculatrixErrorId.syntaxError,
-              reason: 'for "$expression"',
-            );
-          }
+    test('a truncated call never crashes, for a range of truncation points '
+        '("sqrt(" is a normal syntax error, not an unhandled RangeError)', () {
+      for (final expression in <String>['sqrt', 'sqrt(', 'sqrt( ', '(', 'e(']) {
+        try {
+          Calculatrix.evaluateInfix(expression);
+          fail('expected ExpressionSyntaxError for "$expression"');
+        } on ExpressionSyntaxError catch (error) {
+          expect(
+            error.errorId,
+            CalculatrixErrorId.syntaxError,
+            reason: 'for "$expression"',
+          );
         }
-      },
-    );
+      }
+    });
   });
 }

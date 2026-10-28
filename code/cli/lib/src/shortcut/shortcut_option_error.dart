@@ -2,8 +2,7 @@ import 'dart:convert';
 
 import 'unquoted_program_error.dart' show reservedTopLevelWords;
 
-/// The options `cx eval rpn` has and the `cx <program>` shortcut does not
-/// (spec G4, runbook D63). The global output options `--json` and
+/// The options `cx eval rpn` has and the `cx <program>` shortcut does not. The global output options `--json` and
 /// `--quiet`/`-q` are not here: the shortcut accepts them.
 const Set<String> _evalOnlyOptions = <String>{'--file', '-f', '--stdin'};
 
@@ -12,7 +11,7 @@ const Set<String> _evalOnlyOptions = <String>{'--file', '-f', '--stdin'};
 const Set<String> _optionsWithValue = <String>{'--max-digits'};
 
 /// The first argument of [args] that is an option the shortcut rejects, or
-/// null when [args] is not a shortcut invocation or has none (issue #68).
+/// null when [args] is not a shortcut invocation or has none.
 ///
 /// An invocation is the shortcut when its first argument that is neither an
 /// option nor the value of one is not a command word (`eval`, `commands`,
@@ -63,8 +62,7 @@ String _message(List<String> args, String option) =>
 
 /// Rewrites the rejection of an option the shortcut does not take
 /// (`cx '1 2 +' --file p.txt`) into `unknown-option`, exit 7, with a
-/// message that gives the full spelling on `cx eval rpn` (spec G4, runbook
-/// D63). The SDK reports it as `misplaced-option` ("options go before the
+/// message that gives the full spelling on `cx eval rpn`. The SDK reports it as `misplaced-option` ("options go before the
 /// program ... belongs to one of eval rpn, eval infix"), which sends the
 /// reader to the wrong place.
 ///

@@ -2,23 +2,23 @@ import '../errors/errors.dart';
 import '../matrix/matrix.dart';
 import 'rational.dart';
 
-/// The exact operations of runbook D53 for step T2: `+ - * /`, `negate`,
+/// The exact operations `+ - * /`, `negate`,
 /// `percent` and integer powers, on exact matrices only. The caller
 /// dispatches here when every operand is exact and takes the approximate
-/// route otherwise (runbook D51).
+/// route otherwise.
 ///
 /// Shapes follow the approximate operators of [Matrix] exactly, with the
 /// same error ids, so a program fails the same way whichever kind of value
 /// it carries.
 ///
-/// Every result is held to [maxDigits] digits per numerator or denominator
-/// (runbook D55). An elementary operation on operands within the limit
+/// Every result is held to [maxDigits] digits per numerator or denominator.
+/// An elementary operation on operands within the limit
 /// computes at most about twice the limit, so it is checked on its result;
 /// a power can grow without bound, so it is estimated before computing.
 final class ExactArithmetic {
   const ExactArithmetic({this.maxDigits = defaultMaxDigits});
 
-  /// The default digit limit of runbook D55.
+  /// The default digit limit of an exact number.
   static const int defaultMaxDigits = 10000;
 
   /// The digit limit per numerator or denominator.
@@ -72,7 +72,7 @@ final class ExactArithmetic {
 
   /// [value] itself when it is approximate or every entry is within the
   /// limit; `limit-exceeded` otherwise. For values that enter the exact
-  /// world from outside an operation, such as `exact` (runbook D52).
+  /// world from outside an operation, such as `exact`.
   Matrix check(Matrix value) {
     if (value.isExact) {
       for (final List<Rational> row in value.exactRows) {

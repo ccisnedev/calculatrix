@@ -23,8 +23,8 @@ final List<RegExp> _forbiddenPatterns = <RegExp>[
 
 /// Every string a user (human or agent) can read out of a registry entry,
 /// through `cx commands show|search|list`, their `--json` output, error
-/// messages or the app's long-press help: every field named in issue #43's
-/// acceptance criteria, plus the RPN program text of each example.
+/// messages or the app's long-press help: every field of an entry,
+/// plus the RPN program text of each example.
 Iterable<String> _userFacingStrings(CalculatrixCommandEntry entry) {
   return <String>[
     entry.name,
@@ -51,45 +51,33 @@ Iterable<String> _matches(String text) {
 
 void main() {
   group('CalculatrixCommandRegistry.standard user-facing text', () {
-    test(
-      'no entry field carries a development meta reference (issue #43)',
-      () {
-        final List<String> violations = <String>[];
+    test('no entry field carries a development meta reference', () {
+      final List<String> violations = <String>[];
 
-        for (final CalculatrixCommandEntry entry
-            in CalculatrixCommandRegistry.standard.entries) {
-          for (final String text in _userFacingStrings(entry)) {
-            for (final String pattern in _matches(text)) {
-              violations.add(
-                'entry "${entry.name}": "$text" matches /$pattern/',
-              );
-            }
+      for (final CalculatrixCommandEntry entry
+          in CalculatrixCommandRegistry.standard.entries) {
+        for (final String text in _userFacingStrings(entry)) {
+          for (final String pattern in _matches(text)) {
+            violations.add('entry "${entry.name}": "$text" matches /$pattern/');
           }
         }
+      }
 
-        expect(
-          violations,
-          isEmpty,
-          reason: violations.join('\n'),
-        );
-      },
-    );
+      expect(violations, isEmpty, reason: violations.join('\n'));
+    });
 
-    test(
-      'a bare matrix letter such as the diagonal D or the upper-triangular '
-      'R is not flagged',
-      () {
-        final CalculatrixCommandEntry diagonalize = CalculatrixCommandRegistry
-            .standard
-            .lookup('diagonalize')!;
-        final CalculatrixCommandEntry qr = CalculatrixCommandRegistry.standard
-            .lookup('qr')!;
+    test('a bare matrix letter such as the diagonal D or the upper-triangular '
+        'R is not flagged', () {
+      final CalculatrixCommandEntry diagonalize = CalculatrixCommandRegistry
+          .standard
+          .lookup('diagonalize')!;
+      final CalculatrixCommandEntry qr = CalculatrixCommandRegistry.standard
+          .lookup('qr')!;
 
-        expect(diagonalize.description, contains('D'));
-        expect(_matches(diagonalize.description), isEmpty);
-        expect(qr.description, contains('R'));
-        expect(_matches(qr.description), isEmpty);
-      },
-    );
+      expect(diagonalize.description, contains('D'));
+      expect(_matches(diagonalize.description), isEmpty);
+      expect(qr.description, contains('R'));
+      expect(_matches(qr.description), isEmpty);
+    });
   });
 }

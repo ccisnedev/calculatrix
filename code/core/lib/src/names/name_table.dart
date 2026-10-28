@@ -4,8 +4,7 @@ import '../exact/rational.dart';
 import '../matrix/matrix.dart';
 
 /// One binding of the [CalculatrixNameTable]: a name, its aliases, the
-/// value it stands for, and whether the binding is read-only (issue #70,
-/// runbook-agent-usability.md D66).
+/// value it stands for, and whether the binding is read-only.
 final class CalculatrixNameBinding {
   const CalculatrixNameBinding({
     required this.name,
@@ -30,13 +29,13 @@ final class CalculatrixNameBinding {
   Iterable<String> get words => <String>[name, ...aliases];
 }
 
-/// The name table of core (issue #70, runbook-agent-usability.md D66): maps
+/// The name table of core: maps
 /// a name, case-insensitively like the words of the registry, to a
 /// [CalculatrixNameBinding]. RPN and infix resolve names through it.
 ///
 /// [standard] holds exactly the system constants `pi` (alias `π`), `e` and
 /// `i`, all read-only. There is no way to add a binding at run time:
-/// variables and programs belong to issue #79.
+/// variables and programs are not supported yet.
 final class CalculatrixNameTable {
   CalculatrixNameTable._(Iterable<CalculatrixNameBinding> bindings)
     : bindings = List<CalculatrixNameBinding>.unmodifiable(bindings),

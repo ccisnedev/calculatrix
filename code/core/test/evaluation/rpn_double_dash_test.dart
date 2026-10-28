@@ -1,4 +1,4 @@
-// Issue #73 (runbook-agent-usability.md D68, step U4b): the token `--`
+// The token `--`
 // inside an RPN program raises `unknown-word`, with no suggestions and a
 // message that names the exact form to type: `--` ends the options and goes
 // before the quoted program.
@@ -15,7 +15,7 @@ UnknownWordError _rpnError(String program) {
 }
 
 void main() {
-  group('-- inside an RPN program (#73 b)', () {
+  group('-- inside an RPN program', () {
     test('[[1 2] [0 1]] -- -3 ^ gives the program without the token', () {
       final error = _rpnError('[[1 2] [0 1]] -- -3 ^');
       expect(error.errorId, CalculatrixErrorId.unknownWord);

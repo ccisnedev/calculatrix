@@ -1,17 +1,17 @@
-// Tests for issue #5's remaining bugs (spec section 1):
-//   bug 2: infix accepts invalid syntax ("1 2 +", "1()", "root9+7" all
-//   silently evaluated instead of raising syntax-error).
-//   bug 3 (RPN half): an unrecognized RPN word must raise unknown-word,
-//   never silently fall back to the infix evaluator (the CLI half of bug 3
-//   is covered by code/cli/test/calculatrix_cli_test.dart).
-//   bug 4: non-finite numeric literals (1e999, NaN) must raise a
-//   non-finite domain error instead of crashing downstream.
+// Infix syntax validation and token validation:
+//   - infix rejects invalid syntax ("1 2 +", "1()", "root9+7") with
+//     syntax-error instead of silently evaluating it.
+//   - an unrecognized RPN word must raise unknown-word, never silently fall
+//     back to the infix evaluator (the CLI side is covered by
+//     code/cli/test/calculatrix_cli_test.dart).
+//   - non-finite numeric literals (1e999, NaN) must raise a non-finite
+//     domain error instead of crashing downstream.
 
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Infix syntax validation (issue #5 bug 2)', () {
+  group('Infix syntax validation', () {
     test('two operands with no operator between them is a syntax error', () {
       // "1 2 +" must not silently evaluate to 3.
       expect(
@@ -77,7 +77,7 @@ void main() {
   });
 
   group('A postfix operator after a bare function argument is not a syntax '
-      'error (issue #5 review round 1, finding 5)', () {
+      'error', () {
     // Unlike a further binary operator or function (ambiguous about how
     // much of the expression the bare function's argument covers), a
     // postfix operator such as "%" applies unambiguously to whatever
@@ -118,23 +118,20 @@ void main() {
     });
   });
 
-  group('Non-finite literals are rejected (issue #5 bug 4)', () {
-    test(
-      'an approximate infix literal that overflows to infinity is '
-      'non-finite',
-      () {
-        expect(
-          () => Calculatrix.evaluateInfix('~1e999'),
-          throwsA(
-            isA<MatrixDomainError>().having(
-              (MatrixDomainError error) => error.errorId,
-              'errorId',
-              CalculatrixErrorId.nonFinite,
-            ),
+  group('Non-finite literals are rejected', () {
+    test('an approximate infix literal that overflows to infinity is '
+        'non-finite', () {
+      expect(
+        () => Calculatrix.evaluateInfix('~1e999'),
+        throwsA(
+          isA<MatrixDomainError>().having(
+            (MatrixDomainError error) => error.errorId,
+            'errorId',
+            CalculatrixErrorId.nonFinite,
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
 
     test('an RPN NaN literal is non-finite', () {
       // NaN and Infinity are literals that always fail, so this is where
@@ -154,7 +151,7 @@ void main() {
     test('an infix NaN literal is non-finite, not syntax-error', () {
       // The infix tokenizer does not scan a letter-led token as a number
       // through the ordinary digit-led numeric scan, but "NaN" is still a
-      // recognized (non-finite) numeric literal (issue #5 bug 4): it must
+      // recognized (non-finite) numeric literal: it must
       // reach the same non-finite guard as every other non-finite literal,
       // not raise syntax-error.
       expect(
@@ -169,52 +166,55 @@ void main() {
       );
     });
 
-    test('an approximate RPN literal that overflows to infinity is non-finite', () {
-      expect(
-        () => Calculatrix.evaluateRpn(<String>['~1e999']),
-        throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
-            'errorId',
-            CalculatrixErrorId.nonFinite,
+    test(
+      'an approximate RPN literal that overflows to infinity is non-finite',
+      () {
+        expect(
+          () => Calculatrix.evaluateRpn(<String>['~1e999']),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.nonFinite,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
-    test('an approximate matrix literal with a non-finite entry is non-finite', () {
+    test(
+      'an approximate matrix literal with a non-finite entry is non-finite',
+      () {
+        expect(
+          () => Calculatrix.evaluateInfix('[[1, ~1e999]]'),
+          throwsA(
+            isA<MatrixDomainError>().having(
+              (MatrixDomainError error) => error.errorId,
+              'errorId',
+              CalculatrixErrorId.nonFinite,
+            ),
+          ),
+        );
+      },
+    );
+  });
+
+  group('RPN never falls back to infix for an unknown word', () {
+    test('an unrecognized RPN token raises unknown-word', () {
       expect(
-        () => Calculatrix.evaluateInfix('[[1, ~1e999]]'),
+        () => Calculatrix.evaluateRpn(<String>['banana']),
         throwsA(
-          isA<MatrixDomainError>().having(
-            (MatrixDomainError error) => error.errorId,
+          isA<UnknownWordError>().having(
+            (UnknownWordError error) => error.errorId,
             'errorId',
-            CalculatrixErrorId.nonFinite,
+            CalculatrixErrorId.unknownWord,
           ),
         ),
       );
     });
   });
 
-  group(
-    'RPN never falls back to infix for an unknown word (issue #5 bug 3)',
-    () {
-      test('an unrecognized RPN token raises unknown-word', () {
-        expect(
-          () => Calculatrix.evaluateRpn(<String>['banana']),
-          throwsA(
-            isA<UnknownWordError>().having(
-              (UnknownWordError error) => error.errorId,
-              'errorId',
-              CalculatrixErrorId.unknownWord,
-            ),
-          ),
-        );
-      });
-    },
-  );
-
-  group('The ^ operator (issue #5)', () {
+  group('The ^ operator', () {
     test('binds tighter than * and is right associative', () {
       // 2 ^ 3 ^ 2 == 2 ^ (3 ^ 2) == 2 ^ 9 == 512, not (2 ^ 3) ^ 2 == 64.
       final Matrix result = Calculatrix.evaluateInfix('2 ^ 3 ^ 2');
@@ -249,9 +249,9 @@ void main() {
   });
 
   group('An empty matrix literal is dimension-mismatch, not syntax-error '
-      '(issue #5 spec section 6)', () {
+      '', () {
     test('RPN "[]" carries dimension-mismatch', () {
-      // syntax-error is infix only (spec section 6): "[]" is well-formed
+      // syntax-error is infix only: "[]" is well-formed
       // syntax that names an impossible shape, in both notations, so RPN
       // must report dimension-mismatch here too, not syntax-error.
       expect(

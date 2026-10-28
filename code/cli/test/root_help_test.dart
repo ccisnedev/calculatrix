@@ -1,11 +1,9 @@
-// Coverage for issues #51 (acceptance 1) and #56: `cx --help`, `cx -h` and
-// `cx help` print the same catalog, under `Usage: cx <command> [options]`
-// (`modular_cli_sdk` 0.9.0). Issue #51 put the tagline, the command rows
-// and the hints into the root route's description; issue #56 found that
-// this broke the catalog table and listed every command twice. The root row
-// now says only "Show the banner.", and the overview (runbook-agent-
-// usability.md D64) and the hints are the help epilog (`modular_cli_sdk`
-// 0.10.0), printed once after the global options.
+// Coverage for `cx --help`, `cx -h` and `cx help`: they print the same
+// catalog, under `Usage: cx <command> [options]`. The root row says only
+// "Show the banner."; the overview and the hints are the help epilog
+// (`modular_cli_sdk`), printed once after the global options. Putting them
+// in the root route's description would break the catalog table and list
+// every command twice.
 import 'dart:convert';
 
 import 'package:calculatrix_cli/calculatrix_cli.dart';
@@ -23,8 +21,8 @@ Future<String> _help(List<String> args) async {
 }
 
 void main() {
-  group('root help (issues #51, #56)', () {
-    test('the root row says only "Show the banner." (issue #56)', () async {
+  group('root help', () {
+    test('the root row says only "Show the banner."', () async {
       final help = await _help(['--help']);
       expect(
         help,
@@ -34,7 +32,7 @@ void main() {
       );
     });
 
-    test('each command appears once in cx --help (issue #56)', () async {
+    test('each command appears once in cx --help', () async {
       final help = await _help(['--help']);
       for (final cmd in bannerCommands) {
         final rows = RegExp(
@@ -46,7 +44,7 @@ void main() {
     });
 
     test('the help ends with the overview and two hints, after the global '
-        'options (issue #56, runbook-agent-usability.md D64)', () async {
+        'options', () async {
       final help = await _help(['--help']);
       final epilog = <String>[
         ...cxOverviewLines,
@@ -58,14 +56,14 @@ void main() {
       expect(help.indexOf('Global options:'), lessThan(help.indexOf(epilog)));
     });
 
-    test('help --json carries the same epilog (issue #56)', () async {
+    test('help --json carries the same epilog', () async {
       final json =
           jsonDecode(await _help(['help', '--json'])) as Map<String, dynamic>;
       expect(json['epilog'], startsWith(cxOverviewLines.first));
       expect(json['epilog'], endsWith("cx -- '-1 2 +'."));
     });
 
-    test('the examples of the hints run (issue #56)', () async {
+    test('the examples of the hints run', () async {
       for (final args in <List<String>>[
         ['--', '-1 2 +'],
         ['eval', 'rpn', '--help'],
@@ -80,7 +78,7 @@ void main() {
     });
 
     test('every command the banner prints has its row in cx --help, so the '
-        'banner and the catalog cannot disagree (issue #56)', () async {
+        'banner and the catalog cannot disagree', () async {
       final banner = await _help([]);
       final help = await _help(['--help']);
       final shown = bannerCommands
@@ -99,17 +97,15 @@ void main() {
     });
 
     test('every command the banner may list has its own example, none left '
-        'to fall back to a bare name/description row (issue #51 acceptance '
-        '1: commands list, doctor, upgrade, uninstall and version used to '
-        'have none)', () {
+        'to fall back to a bare name/description row', () {
       for (final cmd in bannerCommands) {
         expect(cmd.example, isNotNull, reason: '"${cmd.name}" has no example');
       }
     });
 
     test('every command row keeps at least a 2-space gap between every '
-        'column (name, description, example), the same as the banner '
-        '(issue #51 acceptance 7)', () async {
+        'column (name, description, example), the same as the banner',
+        () async {
       var sawRowWithExample = false;
       for (final cmd in bannerCommands) {
         final line = bannerCommandRow(cmd);
@@ -122,8 +118,8 @@ void main() {
         );
 
         // The last "cx ", not the first: a description can itself contain
-        // "cx" followed by padding spaces ("remove cx", issue #51 AC1,
-        // once "uninstall" got its own example), and only the example
+        // "cx" followed by padding spaces ("remove cx", since
+        // "uninstall" has its own example), and only the example
         // column, always the final thing on the line, is what this gap
         // check cares about.
         final exampleStart = line.lastIndexOf('cx ');

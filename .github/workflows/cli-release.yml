@@ -1,14 +1,12 @@
 # CLI release workflow, modeled on ccisnedev/inquiry's release.yml (4-job
 # pattern: check-version -> create-release -> build (matrix) -> publish-release).
 #
-# Adapted for calculatrix (runbook docs/runbook-cli-stage-0.md, "Publishing
-# (dogfood)", D19, D31):
+# Adapted for calculatrix:
 #   - the tag prefix is `cli-v`, not `v`, since `vX.Y.Z` already names app
-#     releases in this repository (constraint 1 in the runbook);
+#     releases in this repository;
 #   - the version comes from code/cli/pubspec.yaml, not code/core's;
 #   - assets are named cx-windows-x64.zip / cx-linux-x64.tar.gz and the
-#     binary inside each is cx.exe / cx with no alias of any kind (issue
-#     #22, D40): there is nothing to copy alongside it, since cx has no
+#     binary inside each is cx.exe / cx with no alias of any kind: there is nothing to copy alongside it, since cx has no
 #     assets/ directory the way inquiry does;
 #   - `dart analyze` and `dart test` run for both code/core and code/cli,
 #     since the CLI depends on core as a path dependency.
@@ -23,9 +21,7 @@
 # zip, then re-run dart-lang/setup-dart. Applied only on Windows.
 #
 # This workflow never creates a release when merged as-is: it only fires on
-# a push to main that changes code/cli/pubspec.yaml. Merging the PR that
-# bumps code/cli/pubspec.yaml's version to 0.8.0 will trigger the first
-# `cli-v0.8.0` release the next time it runs on main.
+# a push to main that changes code/cli/pubspec.yaml's version.
 
 name: CLI Release
 
@@ -208,7 +204,7 @@ jobs:
         run: |
           TAG="cli-v${{ needs.check-version.outputs.version }}"
           # --latest=false: this repository also ships app releases tagged
-          # vX.Y.Z (constraint 3 in the runbook). GitHub tracks a single
+          # vX.Y.Z. GitHub tracks a single
           # "Latest" release per repository; letting a cli-v* release claim
           # it would make releases/latest resolve to the CLI instead of the
           # app, which is exactly the ambiguity install.ps1/install.sh and

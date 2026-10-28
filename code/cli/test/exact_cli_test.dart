@@ -1,7 +1,6 @@
-// Exact numbers through `cx` (runbook-trust.md, steps T2 to T5): the
-// output of D54, the approximate mark as input (D56), fraction literals
-// (D59), contagion (D51), the exact linear algebra words, roots and
-// eigenvalues (D53) and the size limit with --max-digits (D55).
+// Exact numbers through `cx`: the text and JSON output, the approximate
+// mark as input, fraction literals, contagion, the exact linear algebra
+// words, roots and eigenvalues, and the size limit with --max-digits.
 import 'dart:convert';
 
 import 'package:calculatrix_cli/calculatrix_cli.dart';
@@ -28,7 +27,7 @@ void main() {
       (jsonDecode(out.output + err.output) as Map)['error']
           as Map<String, dynamic>;
 
-  group('text output (D54)', () {
+  group('text output', () {
     for (final (String program, String expected) in [
       ('0.1 0.2 +', '1: 0.3\n'),
       ('1 3 /', '1: 1/3\n'),
@@ -88,7 +87,7 @@ void main() {
     });
   });
 
-  group('JSON output (D54)', () {
+  group('JSON output', () {
     test(
       'each level says whether it is exact; exact numbers are strings',
       () async {
@@ -124,7 +123,7 @@ void main() {
     });
   });
 
-  group('the approximate mark as input (D56)', () {
+  group('the approximate mark as input', () {
     test("cx '-~0.1' is syntax-error and shows ~-0.1", () async {
       final code = await run(['eval', 'rpn', '--json', '-~0.1']);
       expect(code, ExitCode.dataError);
@@ -142,7 +141,7 @@ void main() {
     });
   });
 
-  group('fraction literals (D59)', () {
+  group('fraction literals', () {
     for (final (String program, String expected) in [
       ('1/3 3 *', '1: 1\n'),
       ('-5/3 1/3 +', '1: -4/3\n'),
@@ -190,7 +189,7 @@ void main() {
     });
   });
 
-  group('size limit (D55)', () {
+  group('size limit', () {
     test(
       'a power over the limit is limit-exceeded, 65, with the next step',
       () async {
@@ -282,7 +281,7 @@ void main() {
       );
     });
 
-    test('complex eigenvalues are complex-result (D60)', () async {
+    test('complex eigenvalues are complex-result', () async {
       final code = await run([
         'eval',
         'rpn',

@@ -4,9 +4,9 @@ import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 import 'eval_support.dart';
 
 /// The result of `eval rpn` or `eval infix`: the stack the program leaves,
-/// bottom to top (spec section 6, runbook D47). `eval rpn` keeps every
+/// bottom to top. `eval rpn` keeps every
 /// level; `eval infix` always leaves exactly one. Each level says whether
-/// its value is exact (runbook D54).
+/// its value is exact.
 class EvalOutput extends Output {
   EvalOutput(this.stack);
 

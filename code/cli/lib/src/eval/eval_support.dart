@@ -8,9 +8,9 @@ import '../stdin_reader.dart';
 /// Resolves the program text from whichever single source is present.
 ///
 /// By the time this runs, the SDK has already enforced `ExactlyOne(program,
-/// file, stdin)` (G1), so at most one of [inline]/[filePath]/[readStdin] is
+/// file, stdin)`, so at most one of [inline]/[filePath]/[readStdin] is
 /// meaningfully set. This still rejects a blank result from any of the
-/// three sources (G12): "the program is empty" is a fact about the text
+/// three sources: "the program is empty" is a fact about the text
 /// that arrived, not about which source it arrived from.
 String resolveProgramSource({
   required String? inline,
@@ -38,23 +38,21 @@ String resolveProgramSource({
   return raw;
 }
 
-/// Maps a core [CalculatrixError] onto the CLI's own JSON error envelope
-/// (spec section 6, D36): kebab-case id, `exitCode` 65 (`dataError`), and
+/// Maps a core [CalculatrixError] onto the CLI's own JSON error envelope: kebab-case id, `exitCode` 65 (`dataError`), and
 /// the offending token/position when the evaluator knew them.
 ///
-/// A `limit-exceeded` error (runbook D55) carries `details.limit` and
+/// A `limit-exceeded` error carries `details.limit` and
 /// `details.estimated`, and its message gains the next step: the same
 /// program with the operand marked approximate, built by [approximateHint]
 /// when the caller knows the program, and how to raise the limit.
 ///
-/// `error.suggestions` (spec section 7, "Did you mean"; issue #41, AC5),
-/// when not empty, rides along as `details.suggestions`: the core's own
+/// `error.suggestions` when not empty, rides along as `details.suggestions`: the core's own
 /// "did you mean" candidates for an unknown RPN word, already in
 /// `error.message` too. Kept apart from the route-level suggestion the
-/// `<program>` shortcut adds on top of this same exception (AC6, "RPN and
-/// route suggestions are listed apart").
+/// `<program>` shortcut adds on top of this same exception (RPN and
+/// route suggestions are listed apart).
 ///
-/// `error.name` (issue #51, AC2: the registry word an infix name error
+/// `error.name` (the registry word an infix name error
 /// resolved to, e.g. "sqrt" for "sqrt(7)") rides along the same way, as
 /// `details.name`: a caller parsing the JSON envelope has no other way to
 /// recover it, since `error.message` is prose built for a human, not a
@@ -94,10 +92,10 @@ String _limitMessage(LimitExceededError error, String? hint) {
 }
 
 /// The program of an RPN `limit-exceeded` [error] rewritten to compute
-/// approximately (runbook D55), as a `cx` command line, or null when the
+/// approximately, as a `cx` command line, or null when the
 /// error does not say where it happened. A literal over the limit gets
-/// the mark `~` (runbook D56); a word gets `approx` right before it, which
-/// makes its top operand approximate and, by contagion (runbook D51), its
+/// the mark `~`; a word gets `approx` right before it, which
+/// makes its top operand approximate and, by contagion, its
 /// result.
 String? rpnApproximateHint(List<String> tokens, CalculatrixError error) {
   final String line = tokens.join(' ');
@@ -116,7 +114,7 @@ String? rpnApproximateHint(List<String> tokens, CalculatrixError error) {
 }
 
 /// The infix expression of a `limit-exceeded` [error] with its literal
-/// marked `~` (runbook D56), as a `cx eval infix` command line, or null
+/// marked `~`, as a `cx eval infix` command line, or null
 /// when the error is not about a literal: in infix, which operand to mark
 /// depends on the expression.
 String? infixApproximateHint(String expression, CalculatrixError error) {
@@ -139,11 +137,10 @@ String? _commandLine(String command, String program) =>
     ? null
     : "$command '$program'";
 
-/// One stack value as the JSON `"value"` of a level wants it (spec section
-/// 6, runbook D54): a 1x1 matrix is a bare number, any other matrix is an
+/// One stack value as the JSON `"value"` of a level wants it: a 1x1 matrix is a bare number, any other matrix is an
 /// array of rows, never flattened. An exact number is a string in its text
 /// form (`"1/3"`, `"12157665459056928801"`), since a JSON number cannot
-/// hold it; an approximate number keeps the full double (runbook D45).
+/// hold it; an approximate number keeps the full double.
 Object matrixToJsonValue(Matrix matrix) {
   Object entry(int row, int column) => matrix.isExact
       ? matrix.exactAt(row, column).toDisplayString()
@@ -158,9 +155,9 @@ Object matrixToJsonValue(Matrix matrix) {
   ];
 }
 
-/// One stack value as an HP 50g-style stack line wants it (spec section 6,
-/// runbook D54): `1: 3`, `1: [[0 -1] [1 0]]`, `1: 1/3`. The text comes from
-/// the display formatter of core, the one the app uses (runbook D45): an
+/// One stack value as an HP 50g-style stack line wants it:
+/// `1: 3`, `1: [[0 -1] [1 0]]`, `1: 1/3`. The text comes from
+/// the display formatter of core, the one the app uses: an
 /// exact number prints in full, and an approximate value carries the mark
 /// `~` once, in front of the whole value: `1: ~0.333333333333`,
 /// `1: ~[[1 1.41421356237]]`.

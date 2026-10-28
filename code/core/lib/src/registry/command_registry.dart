@@ -7,18 +7,15 @@ import '../machine/commands.dart';
 import '../matrix/matrix.dart';
 import '../names/name_table.dart';
 
-/// Categories of the core command registry (spec section 7): a closed,
+/// Categories of the core command registry: a closed,
 /// machine-checkable set, so a caller such as `cx commands list --category`
-/// (deferred to a follow-up PR) can validate its argument against the
-/// registry itself instead of an arbitrary string (spec section 7,
-/// "the categories are an enumeration taken from the registry").
+/// can validate its argument against the registry itself instead of an
+/// arbitrary string.
 ///
-/// `stack`, `construction`, `structure` and `linearAlgebra` follow the
-/// grouping the runbook itself uses for the rest of the core vocabulary
-/// (D46, "stack, construction, structure and linear algebra words"); the
-/// S4c structure words (`vector`, `rows`, `append-cols`, `append-rows`)
-/// registered earlier keep their existing `matrix` category, unchanged,
-/// since D46 does not ask for them to be recategorized.
+/// `stack`, `construction`, `structure` and `linearAlgebra` group the rest
+/// of the core vocabulary (stack, construction, structure and linear
+/// algebra words); the structure words `vector`, `rows`, `append-cols` and
+/// `append-rows` keep their `matrix` category.
 enum CalculatrixCommandCategory {
   arithmetic,
   matrix,
@@ -30,14 +27,13 @@ enum CalculatrixCommandCategory {
 }
 
 /// The value [literal] spells, as `cx` itself reads it: `5` and
-/// `[[1/2 0] [0 1/4]]` are exact, `~4` is approximate (runbook D49, D50,
-/// D56). Examples state their expected values this way so the exactness
-/// `cx commands show` prints is the exactness the program gives (issue #66).
+/// `[[1/2 0] [0 1/4]]` are exact, `~4` is approximate. Examples state their expected values this way so the exactness
+/// `cx commands show` prints is the exactness the program gives.
 Matrix _value(String literal) =>
     Literals.parse(literal, maxDigits: ExactArithmetic.defaultMaxDigits)!;
 
 /// The value of a system constant, read from the name table: the one
-/// source of the value (issue #70, runbook-agent-usability.md D66).
+/// source of the value.
 Matrix _constant(String name) =>
     CalculatrixNameTable.standard.lookup(name)!.value;
 
@@ -46,17 +42,17 @@ Matrix _constant(String name) =>
 CalculatrixCommand Function() _pushConstant(String name) =>
     () => PushMatrixCommand(_constant(name));
 
-/// One example RPN program from a registry entry's documentation (spec
-/// section 7, "Examples"). Executable, not prose: a core test runs every
+/// One example RPN program from a registry entry's documentation.
+/// Executable, not prose: a core test runs every
 /// registered example and compares its result, so an entry's documentation
-/// cannot drift from what the command actually does (issue #32, AC6).
+/// cannot drift from what the command actually does.
 final class CalculatrixCommandExample {
   /// An example whose program leaves a single value on the stack.
   CalculatrixCommandExample(this.program, Matrix expected)
     : expectedStack = <Matrix>[expected];
 
   /// An example whose program leaves several values on the stack, bottom to
-  /// top (e.g. `rows`, issue #37, AC3: `[[1 2] [3 4]] rows` leaves three
+  /// top (e.g. `rows`: `[[1 2] [3 4]] rows` leaves three
   /// values, not one).
   CalculatrixCommandExample.stack(this.program, this.expectedStack);
 
@@ -73,12 +69,12 @@ final class CalculatrixCommandExample {
   Matrix get expected => expectedStack.single;
 }
 
-/// One entry of the core command registry (spec section 7): the fields the
-/// encyclopedia (`cx commands`, deferred to a follow-up PR) and the app's
+/// One entry of the core command registry: the fields the
+/// encyclopedia (`cx commands`) and the app's
 /// long-press help need to find a word, resolve its aliases, and document
 /// what it does, plus how to build the [CalculatrixCommand] the RPN
 /// compiler executes for it. Living in core, not the CLI, because the app
-/// needs the very same vocabulary (issue #32 problem statement).
+/// needs the very same vocabulary.
 final class CalculatrixCommandEntry {
   CalculatrixCommandEntry({
     required this.name,
@@ -106,37 +102,34 @@ final class CalculatrixCommandEntry {
   final String name;
 
   /// Other words of the language that resolve to the same entry, e.g.
-  /// "pwr" and "^" for "power" (runbook D14, D18). Unlike [searchTerms], an
+  /// "pwr" and "^" for "power". Unlike [searchTerms], an
   /// alias is itself a word of the language: it can appear in an RPN
-  /// program (spec section 7, "Aliases and search terms are different
-  /// things").
+  /// program.
   final List<String> aliases;
 
-  /// Terms that find this entry in `cx commands search` (deferred to a
-  /// follow-up PR), but are never words of the language: using one in a
-  /// program raises `unknown-word` (spec section 7, runbook D29).
+  /// Terms that find this entry in `cx commands search`, but are never words of the language: using one in a
+  /// program raises `unknown-word`.
   final List<String> searchTerms;
 
   /// The closest HP 50g command name, or null when there is none. Purely
-  /// informative (runbook D42, "the HP 50g is inspiration, not adoption"):
+  /// informative (the HP 50g is inspiration, not adoption):
   /// never resolved by [CalculatrixCommandRegistry.lookup], so an HP-only
   /// spelling such as "->ARRY" is never a name or alias of any entry.
   final String? hp50gReference;
 
   /// The RPN program over other words of the registry that defines this
-  /// entry, or null when the entry is primitive (spec section 7,
-  /// "Definition"; runbook D43), e.g. `inverse` is defined as `-1 power`.
+  /// entry, or null when the entry is primitive, e.g. `inverse` is defined as `-1 power`.
   /// [CalculatrixCommandRegistry] validates, at construction, that every
   /// non-literal word a definition uses resolves in the registry and that
   /// no definition reaches itself, directly or through other defined
-  /// words (issue #35, AC5).
+  /// words.
   final String? definition;
 
   /// Whether this entry builds a core command directly rather than being
-  /// defined by an RPN program (runbook D43).
+  /// defined by an RPN program.
   bool get isPrimitive => definition == null;
 
-  /// The registry category this entry belongs to (spec section 7).
+  /// The registry category this entry belongs to.
   final CalculatrixCommandCategory category;
 
   /// How the entry reads and leaves the stack, HP style, e.g. "B Y -> B^Y".
@@ -151,7 +144,7 @@ final class CalculatrixCommandEntry {
   /// against it before expanding a defined word's program, instead of
   /// letting an inner primitive's own (possibly inflated, for a defined
   /// word that pushes a literal before calling it) pop count leak into the
-  /// user-facing error (issue #51, AC5).
+  /// user-facing error.
   final int? arity;
 
   /// What must hold of the operands for the command to succeed, beyond
@@ -161,10 +154,10 @@ final class CalculatrixCommandEntry {
   /// A short prose description of what the command does.
   final String description;
 
-  /// Executable examples (spec section 7, AC6).
+  /// Executable examples.
   final List<CalculatrixCommandExample> examples;
 
-  /// The domain error ids (spec section 6) this command can raise.
+  /// The domain error ids this command can raise.
   final List<CalculatrixErrorId> errors;
 
   /// Names of related entries, for cross-referencing in the encyclopedia.
@@ -184,21 +177,37 @@ final class CalculatrixCommandEntry {
   /// by [CalculatrixCommandRegistry] to build and validate its lookup
   /// table, so the casing rule (case-insensitive) lives in one place.
   Iterable<String> get words => <String>[name, ...aliases];
+
+  /// Whether `text` finds this entry in `cx commands search`: a
+  /// case-insensitive substring of its name, an alias, its HP reference, a
+  /// search term or its description, where "->" and "→" are the same arrow.
+  bool matchesSearch(String text) {
+    final String needle = _searchForm(text);
+    return <String?>[
+      name,
+      ...aliases,
+      hp50gReference,
+      ...searchTerms,
+      description,
+    ].any(
+      (String? field) => field != null && _searchForm(field).contains(needle),
+    );
+  }
+
+  static String _searchForm(String text) =>
+      text.toLowerCase().replaceAll('→', '->');
 }
 
-/// The core command registry (spec section 7): resolves the word of an RPN
+/// The core command registry: resolves the word of an RPN
 /// program to the [CalculatrixCommandEntry] that documents it and builds
 /// the [CalculatrixCommand] to execute, case-insensitively by name or
-/// alias. Search terms are deliberately not resolved here (spec section 7,
-/// "Aliases and search terms are different things"; issue #32, AC4):
+/// alias. Search terms are deliberately not resolved here:
 /// `cx commands search` is the only thing that reads them.
 final class CalculatrixCommandRegistry {
   /// Builds a registry from `entries`, rejecting at construction two
-  /// entries that share a name or alias, case-insensitively (issue #32,
-  /// AC5), and, once every word is known, rejecting a defined entry
-  /// (runbook D43) whose definition uses a word outside the registry, or
-  /// that reaches itself, directly or through other defined words (issue
-  /// #35, AC5). A silent shadowing here would make `_compileWord`
+  /// entries that share a name or alias, case-insensitively, and, once every word is known, rejecting a defined entry
+  /// whose definition uses a word outside the registry, or
+  /// that reaches itself, directly or through other defined words. A silent shadowing here would make `_compileWord`
   /// non-deterministic about which entry's command actually runs for a
   /// given word; an unresolved or cyclic definition would instead fail
   /// only much later, the first time some RPN program happened to expand
@@ -305,12 +314,18 @@ final class CalculatrixCommandRegistry {
   final Map<String, CalculatrixCommandEntry> _byWord;
 
   /// Resolves `word` to its entry by name or alias, case-insensitively, or
-  /// null when `word` is not in the registry. Never resolves a search term
-  /// (issue #32, AC4).
+  /// null when `word` is not in the registry. Never resolves a search term.
   CalculatrixCommandEntry? lookup(String word) => _byWord[word.toLowerCase()];
 
-  /// "Did you mean" candidates for `word` (spec section 7, "Did you
-  /// mean"): the names of entries whose name or alias is closest to
+  /// The entries `text` finds, in registration order; see
+  /// [CalculatrixCommandEntry.matchesSearch].
+  List<CalculatrixCommandEntry> search(String text) =>
+      <CalculatrixCommandEntry>[
+        for (final CalculatrixCommandEntry entry in entries)
+          if (entry.matchesSearch(text)) entry,
+      ];
+
+  /// "Did you mean" candidates for `word`: the names of entries whose name or alias is closest to
   /// `word`, by restricted edit distance (Damerau-OSA: insertion,
   /// deletion, substitution and adjacent transposition), within
   /// `maxDistance`. An exact match on a search term is a candidate too,
@@ -318,8 +333,7 @@ final class CalculatrixCommandRegistry {
   /// precisely even though it is never itself a word of the language
   /// (`hcat` suggests `append-cols`).
   ///
-  /// Independent of the CLI and of `modular_cli_sdk` on purpose (issue
-  /// #41): the app's own RPN evaluator needs the very same suggestions
+  /// Independent of the CLI and of `modular_cli_sdk` on purpose: the app's own RPN evaluator needs the very same suggestions
   /// without depending on a CLI package, so this cannot reuse
   /// `CommandCatalog.suggest`, and is instead its own small
   /// reimplementation of the same edit distance.
@@ -327,7 +341,7 @@ final class CalculatrixCommandRegistry {
   /// Two entries equally close by raw edit distance are not necessarily
   /// equally good guesses: "pow" sits exactly 2 edits from "power" (insert
   /// "e" and "r"), but also from "rows" and from "rotate"'s alias "rot",
-  /// which share almost none of its letters (issue #51, AC6). Once every
+  /// which share almost none of its letters. Once every
   /// candidate within `maxDistance` is found, only the closest tier (the
   /// minimum distance actually reached) is kept, and, within that tier, a
   /// candidate reached through a word that shares a prefix with the
@@ -444,14 +458,11 @@ final class CalculatrixCommandRegistry {
         .toList();
   }
 
-  /// The registry of every word `_compileWord` recognizes today (issue
-  /// #32): the operators the RPN compiler used to resolve through its own
+  /// The registry of every word `_compileWord` recognizes today: the operators the RPN compiler used to resolve through its own
   /// hardcoded switch, with no new math. Names are words of the language
-  /// and their historical symbols are aliases (runbook D41); `inverse` and
-  /// `sqrt` are defined words (`-1 power` and `0.5 power`, runbook D43,
-  /// D44, issue #35), so `power` is the one implementation both of them
-  /// share for an exact exponent. Follow-up PRs add `vector`, `rows`,
-  /// `append-rows`, `append-cols` and the rest of spec section 7.
+  /// and their historical symbols are aliases; `inverse` and
+  /// `sqrt` are defined words (`-1 power` and `0.5 power`), so `power` is the one implementation both of
+  /// them share for an exact exponent.
   static final CalculatrixCommandRegistry
   standard = CalculatrixCommandRegistry(<CalculatrixCommandEntry>[
     CalculatrixCommandEntry(
@@ -548,7 +559,7 @@ final class CalculatrixCommandRegistry {
       description:
           'The principal square root of X (0.5 power); '
           'a negative scalar gives the imaginary unit scaled accordingly.',
-      // 0.5 power: runbook D43, D44.
+      // Defined as 0.5 power.
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('9 sqrt', _value('3')),
         CalculatrixCommandExample('9 √', _value('3')),
@@ -556,6 +567,7 @@ final class CalculatrixCommandRegistry {
       errors: const <CalculatrixErrorId>[
         CalculatrixErrorId.dimensionMismatch,
         CalculatrixErrorId.logUndefined,
+        CalculatrixErrorId.complexResult,
       ],
       seeAlso: const <String>['power', 'inverse'],
     ),
@@ -572,7 +584,7 @@ final class CalculatrixCommandRegistry {
       description:
           'The inverse of A (-1 power): A times its '
           'inverse gives the identity.',
-      // -1 power: runbook D43, D44.
+      // Defined as -1 power.
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[2 0] [0 4]] inverse',
@@ -611,8 +623,6 @@ final class CalculatrixCommandRegistry {
       category: CalculatrixCommandCategory.arithmetic,
       stackEffect: 'B Y -> B^Y',
       arity: 2,
-      // The full case table for squareness and size matching lives in
-      // runbook D25.
       preconditions:
           'B and Y are square (a scalar is square); when neither is a '
           'scalar they have the same size',
@@ -623,8 +633,8 @@ final class CalculatrixCommandRegistry {
           'computed as exp(Y . log B). Exponents -1 and 0.5 use the '
           'inverse and square-root algorithms; inverse and sqrt are '
           'defined in terms of this word.',
-      // runbook D25 (the exp/log identity); runbook D44 (the -1 and 0.5
-      // shortcuts); runbook-agent-usability.md D68 (exactness examples).
+      // Examples cover the exp/log identity, the -1 and 0.5 shortcuts and
+      // the exact and approximate results.
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample('2 3 pwr', _value('8')),
         CalculatrixCommandExample('2 3 POWER', _value('8')),
@@ -641,6 +651,8 @@ final class CalculatrixCommandRegistry {
         CalculatrixErrorId.ambiguousPower,
         CalculatrixErrorId.nonFinite,
         CalculatrixErrorId.singularMatrix,
+        CalculatrixErrorId.complexResult,
+        CalculatrixErrorId.notDiagonalizable,
       ],
       seeAlso: const <String>['sqrt', 'inverse'],
       build: () => const PowerCommand(),
@@ -710,8 +722,7 @@ final class CalculatrixCommandRegistry {
           'Places the columns of B to the right of A: a '
           'generalization of the single-column append to any matrix B of '
           'matching row count.',
-      // Shares its implementation with the single-column append; runbook
-      // D44.
+      // Shares its implementation with the single-column append.
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '0 1 2 vector -1 0 2 vector append-cols',
@@ -737,7 +748,7 @@ final class CalculatrixCommandRegistry {
           'Places the rows of B below A: a generalization '
           'of the single-row append to any matrix B of matching column '
           'count.',
-      // Shares its implementation with the single-row append; runbook D44.
+      // Shares its implementation with the single-row append.
       examples: <CalculatrixCommandExample>[
         CalculatrixCommandExample(
           '[[1 2]] [[3 4] [5 6]] append-rows',
@@ -748,10 +759,10 @@ final class CalculatrixCommandRegistry {
       seeAlso: const <String>['append-cols', 'vector', 'rows'],
       build: () => const AppendRowsCommand(),
     ),
-    // The rest of the core vocabulary (issue #39, S4d): stack, construction,
-    // structure and linear algebra words, plus exp and ln (runbook D46).
+    // The rest of the core vocabulary: stack, construction,
+    // structure and linear algebra words, plus exp and ln.
     // Every index below is 1-based; the words themselves convert to the
-    // 0-based indices the underlying Matrix methods take (D46, AC2).
+    // 0-based indices the underlying Matrix methods take.
     CalculatrixCommandEntry(
       name: 'exp',
       hp50gReference: 'EXP',
@@ -787,6 +798,7 @@ final class CalculatrixCommandRegistry {
         CalculatrixErrorId.stackUnderflow,
         CalculatrixErrorId.dimensionMismatch,
         CalculatrixErrorId.logUndefined,
+        CalculatrixErrorId.notDiagonalizable,
       ],
       seeAlso: const <String>['exp', 'power'],
       build: () => const LnCommand(),
@@ -1026,7 +1038,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'CON',
       category: CalculatrixCommandCategory.construction,
       stackEffect: 'r c -> [r x c zero matrix]',
-      // No declared arity (issue #51, AC8): ZerosCommand pops and validates
+      // No declared arity: ZerosCommand pops and validates
       // c before it ever pops r, so with only one value on the stack a
       // negative or non-integer c must still report its own type-mismatch,
       // the way it did before the arity precheck existed. A fixed arity
@@ -1052,8 +1064,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'CON',
       category: CalculatrixCommandCategory.construction,
       stackEffect: 'r c -> [r x c matrix of ones]',
-      // No declared arity: see the same note on 'zeros' above (issue #51,
-      // AC8).
+      // No declared arity: see the same note on 'zeros' above.
       preconditions: 'r and c are positive integer scalars',
       description:
           'Builds the r x c matrix of ones (HP 50g CON with 1). "0 3 '
@@ -1116,8 +1127,7 @@ final class CalculatrixCommandRegistry {
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i -> A (row i removed)',
       // No declared arity: DeleteRowWordCommand pops and validates i
-      // before it ever pops A, so the same note on 'zeros' above applies
-      // (issue #51, AC8).
+      // before it ever pops A, so the same note on 'zeros' above applies.
       preconditions: 'i is a 1-based row index of A',
       description: 'Removes row i of A (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1139,8 +1149,7 @@ final class CalculatrixCommandRegistry {
       hp50gReference: 'COL-',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j -> A (column j removed)',
-      // No declared arity: see the note on 'delete-row' above (issue #51,
-      // AC8).
+      // No declared arity: see the note on 'delete-row' above.
       preconditions: 'j is a 1-based column index of A',
       description: 'Removes column j of A (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1161,8 +1170,7 @@ final class CalculatrixCommandRegistry {
       name: 'duplicate-row',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A i -> A (row i duplicated)',
-      // No declared arity: see the note on 'delete-row' above (issue #51,
-      // AC8).
+      // No declared arity: see the note on 'delete-row' above.
       preconditions: 'i is a 1-based row index of A',
       description: 'Inserts a copy of row i right after it (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1183,8 +1191,7 @@ final class CalculatrixCommandRegistry {
       name: 'duplicate-col',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j -> A (column j duplicated)',
-      // No declared arity: see the note on 'delete-row' above (issue #51,
-      // AC8).
+      // No declared arity: see the note on 'delete-row' above.
       preconditions: 'j is a 1-based column index of A',
       description: 'Inserts a copy of column j right after it (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1207,7 +1214,7 @@ final class CalculatrixCommandRegistry {
       stackEffect: 'A i k -> A (row i moved to position k)',
       // No declared arity: MoveRowWordCommand pops and validates k, then
       // pops and validates i, before it ever pops A; same note on
-      // 'delete-row' above (issue #51, AC8).
+      // 'delete-row' above.
       preconditions: 'i and k are 1-based row indices of A',
       description: 'Moves row i to position k (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1228,8 +1235,7 @@ final class CalculatrixCommandRegistry {
       name: 'move-col',
       category: CalculatrixCommandCategory.structure,
       stackEffect: 'A j k -> A (column j moved to position k)',
-      // No declared arity: see the note on 'move-row' above (issue #51,
-      // AC8).
+      // No declared arity: see the note on 'move-row' above.
       preconditions: 'j and k are 1-based column indices of A',
       description: 'Moves column j to position k (1-based).',
       examples: <CalculatrixCommandExample>[
@@ -1371,6 +1377,7 @@ final class CalculatrixCommandRegistry {
         CalculatrixErrorId.stackUnderflow,
         CalculatrixErrorId.dimensionMismatch,
         CalculatrixErrorId.complexResult,
+        CalculatrixErrorId.notDiagonalizable,
       ],
       seeAlso: const <String>['eigenvalues'],
       build: () => const DiagonalizationCommand(),
@@ -1607,14 +1614,13 @@ class _CommandSuggestionCandidate {
 /// difference never matters for the short, mostly-distinct command words
 /// this compares.
 ///
-/// A local, dependency-free reimplementation (issue #41, spec section 7,
-/// "Did you mean"): core cannot depend on `modular_cli_sdk`, whose
+/// A local, dependency-free reimplementation : core cannot depend on `modular_cli_sdk`, whose
 /// `CommandCatalog` has the same algorithm for route suggestions.
 ///
 /// Public (not `_`-prefixed) so `calculatrix_cli` can reuse this one
 /// implementation instead of writing its own copy when it needs to score
 /// whether a whole route name, not just one word of it, is genuinely close
-/// to a typo (issue #51, AC6): the dependency runs the other way from the
+/// to a typo: the dependency runs the other way from the
 /// one the comment above rules out, since the CLI package already depends
 /// on this one.
 int restrictedEditDistance(String a, String b) {

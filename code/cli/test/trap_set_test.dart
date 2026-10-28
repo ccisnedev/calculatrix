@@ -1,7 +1,7 @@
-// The trap set of the benchmark through `cx` (issue #54, acceptance 2;
-// runbook-trust.md T6). Each trap of `benchmark/trap-set.json` must give
+// The trap set of the benchmark through `cx`.
+// Each trap of `benchmark/trap-set.json` must give
 // its exact value, or its own error id when `cx` has no correct value to
-// give (D60), in RPN and, where the trap has one, in infix.
+// give, in RPN and, where the trap has one, in infix.
 import 'dart:convert';
 import 'dart:io';
 

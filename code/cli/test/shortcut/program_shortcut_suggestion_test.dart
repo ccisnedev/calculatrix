@@ -1,10 +1,10 @@
-// Tests for issue #41, AC6: "did you mean" for routes. A typo at the root
+// "Did you mean" for routes. A typo at the root
 // (`cx <program>`) runs as an RPN program through the shortcut, so it is
 // unknown-word, the same as any other unrecognized word; ProgramShortcutQuery
 // additionally tries the typo against the route vocabulary
 // (`ModularCli.suggest`) and, when it finds a close route, adds that as a
 // second, separate suggestion. `eval rpn` itself never gains this: only the
-// shortcut has the ambiguity the spec calls out (section 11, risk 1).
+// shortcut has the ambiguity a typo at the root is a program, because of the shortcut.
 import 'dart:convert';
 
 import 'package:calculatrix_cli/calculatrix_cli.dart';
@@ -28,10 +28,10 @@ void main() {
   }
 
   test(
-    'cx verison is unknown-word and suggests the route "version" (AC6)',
+    'cx verison is unknown-word and suggests the route "version"',
     () async {
       // Not `cx --json verison`: the shortcut takes no options, not even
-      // the global ones (G4), so `--json` is never available here; the
+      // the global ones, so `--json` is never available here; the
       // error envelope is always rendered as text, and always to stderr
       // (`_renderRecordedError` writes only to `err`, never `out`).
       final code = await run(['verison']);
@@ -43,7 +43,7 @@ void main() {
   );
 
   test('cx eval rpn verison is unknown-word with no route suggestion '
-      '(only the shortcut has the ambiguity, AC6)', () async {
+      '(only the shortcut has the ambiguity)', () async {
     final code = await run(['eval', 'rpn', '--json', 'verison']);
     expect(code, ExitCode.dataError);
     final decoded = jsonDecode(err.output) as Map<String, dynamic>;
@@ -57,7 +57,7 @@ void main() {
     );
   });
 
-  test('cx commands shwo power uses the SDK route suggestion (AC6)', () async {
+  test('cx commands shwo power uses the SDK route suggestion', () async {
     final code = await run(['commands', 'shwo', 'power']);
     expect(code, isNot(ExitCode.ok));
     final combined = out.output + err.output;
@@ -68,7 +68,7 @@ void main() {
     'cx pow is unknown-word and suggests only the word "power"; it does '
     'not also suggest the invalid command "cx show", a bare fragment of '
     'the real route "commands show" that ModularCli.suggest used to '
-    'return for this typo (issue #51, AC6)',
+    'return for this typo',
     () async {
       final code = await run(['pow']);
       expect(code, ExitCode.dataError);

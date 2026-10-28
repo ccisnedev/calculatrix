@@ -1,32 +1,31 @@
-// Tests for issue #39 (runbook step S4d, D46): the rest of the core RPN
+// Tests for the rest of the core RPN
 // vocabulary (stack words, constructors, structure edits, linear algebra,
 // exp and ln), registered with 1-based indices.
 //
-// AC1: every new row of the runbook table "Command names" is a registry
-// entry with the spec section 7 fields; aliases are exactly the table's
-// (dup, rot, neg, det, norm, eig, adj); an HP-only spelling is unknown-word.
-// AC2: every index is 1-based (stack levels and row/column indices), with
-// the literal examples from the issue.
-// AC3: counts and indices come from the stack, above their operands; a
+// - every new word is a registry entry with every documented
+// field; aliases are exactly these (dup, rot, neg, det, norm, eig, adj); an HP-only spelling is unknown-word.
+// - every index is 1-based (stack levels and row/column indices), with
+// literal examples.
+// - counts and indices come from the stack, above their operands; a
 // malformed or negative index/size is type-mismatch; an index of 0 is
 // type-mismatch; a size of 0 is dimension-mismatch; an out-of-range
 // row/column index is dimension-mismatch; pick/roll beyond the stack depth
 // is stack-underflow; every error carries the user's token.
-// AC4: the stack words, and the "one implementation per concept" equivalence
+// - the stack words, and the "one implementation per concept" equivalence
 // of the four defined words with pick/roll, at stack depths 0 to 3.
-// AC5: linear algebra, exp and ln give the same bits as their Matrix
+// - linear algebra, exp and ln give the same bits as their Matrix
 // methods; multi-result words push in the table's order.
-// AC6: the constructors.
-// AC7: AppendRowCommand and AppendColumnCommand are not registered.
-// AC8: covered by command_registry_test.dart (every example runs, infix is
-// unchanged) and by the extension of defined_words_test.dart for the four
-// new defined words; here, the CHANGELOG is not something a test can check.
+// - the constructors.
+// - AppendRowCommand and AppendColumnCommand are not registered.
+// - every example runs and infix is unchanged: covered by
+// command_registry_test.dart, and the four new defined words by
+// defined_words_test.dart.
 
 import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('AC1: registry entries (issue #39)', () {
+  group('registry entries', () {
     const List<String> newWords = <String>[
       'exp',
       'ln',
@@ -64,8 +63,8 @@ void main() {
       'qr',
     ];
 
-    test('every new word of the runbook table is registered with the spec '
-        'section 7 fields', () {
+    test('every new word is registered with every '
+        'documented field', () {
       for (final String name in newWords) {
         final CalculatrixCommandEntry? entry = CalculatrixCommandRegistry
             .standard
@@ -85,25 +84,27 @@ void main() {
       }
     });
 
-    test('duplicate, over, swap and rotate are defined words over pick/roll '
-        '(runbook D46)', () {
-      expect(
-        CalculatrixCommandRegistry.standard.lookup('duplicate')!.definition,
-        '1 pick',
-      );
-      expect(
-        CalculatrixCommandRegistry.standard.lookup('over')!.definition,
-        '2 pick',
-      );
-      expect(
-        CalculatrixCommandRegistry.standard.lookup('swap')!.definition,
-        '2 roll',
-      );
-      expect(
-        CalculatrixCommandRegistry.standard.lookup('rotate')!.definition,
-        '3 roll',
-      );
-    });
+    test(
+      'duplicate, over, swap and rotate are defined words over pick/roll',
+      () {
+        expect(
+          CalculatrixCommandRegistry.standard.lookup('duplicate')!.definition,
+          '1 pick',
+        );
+        expect(
+          CalculatrixCommandRegistry.standard.lookup('over')!.definition,
+          '2 pick',
+        );
+        expect(
+          CalculatrixCommandRegistry.standard.lookup('swap')!.definition,
+          '2 roll',
+        );
+        expect(
+          CalculatrixCommandRegistry.standard.lookup('rotate')!.definition,
+          '3 roll',
+        );
+      },
+    );
 
     test('every other new word is primitive', () {
       const Set<String> defined = <String>{
@@ -169,15 +170,15 @@ void main() {
       });
     });
 
-    // "DUP" is deliberately left out of this list: the runbook table gives
-    // `duplicate` the alias `dup` (D41), and lookup is case-insensitive, so
+    // "DUP" is deliberately left out of this list: `duplicate` has the
+    // alias `dup`, and lookup is case-insensitive, so
     // "DUP" legitimately resolves through that alias, exactly like "PWR"
     // resolves to `power` (the alias-equals-HP-reference carve-out already
-    // covered by command_registry_test.dart's D42 test). "TRN" and "FNORM"
+    // covered by command_registry_test.dart). "TRN" and "FNORM"
     // are genuinely HP-only: transpose has no alias, and frobenius-norm's
     // only alias is "norm", not "fnorm".
     test('a genuinely HP-only spelling (TRN, FNORM) is unknown-word, never a '
-        'word (D42)', () {
+        'word', () {
       for (final String hpOnly in <String>['TRN', 'FNORM']) {
         expect(
           CalculatrixCommandRegistry.standard.lookup(hpOnly),
@@ -199,7 +200,7 @@ void main() {
     });
   });
 
-  group('AC7: the old typed-only append commands are not registered', () {
+  group('the old typed-only append commands are not registered', () {
     test('append-row and append-column are never registry words', () {
       expect(CalculatrixCommandRegistry.standard.lookup('append-row'), isNull);
       expect(
@@ -209,7 +210,7 @@ void main() {
     });
   });
 
-  group('AC2: 1-based indices, the issue\'s literal examples', () {
+  group('1-based indices, literal examples', () {
     test('[[1 2] [3 4]] 1 delete-row gives [[3 4]]', () {
       expect(
         Calculatrix.evaluateRpn(<String>['[[1 2] [3 4]]', '1', 'delete-row']),
@@ -261,7 +262,7 @@ void main() {
     });
   });
 
-  group('AC3: arguments from the stack, error ids', () {
+  group('arguments from the stack, error ids', () {
     test('1 2 3 3 pick leaves 1 2 3 1', () {
       expect(
         Calculatrix.evaluateRpnStack(<String>['1', '2', '3', '3', 'pick']),
@@ -420,7 +421,7 @@ void main() {
     });
   });
 
-  group('AC4: stack words', () {
+  group('stack words', () {
     test('drop removes the top', () {
       expect(
         Calculatrix.evaluateRpnStack(<String>['1', '2', 'drop']),
@@ -455,15 +456,15 @@ void main() {
       );
     });
 
-    // AC4's "one implementation per concept" equivalence at stack depths 0
+    // The "one implementation per concept" equivalence at stack depths 0
     // to 3, comparing duplicate/over/swap/rotate directly against
     // "1 pick"/"2 pick"/"2 roll"/"3 roll", plus the session's dup/over/
     // swap/rot actions, lives in defined_words_test.dart and
     // calculatrix_session_test.dart alongside the rest of their own
-    // defined-word and session-action coverage (issue #39).
+    // defined-word and session-action coverage.
   });
 
-  group('AC5: linear algebra, exp, ln give the same bits as their Matrix '
+  group('linear algebra, exp, ln give the same bits as their Matrix '
       'method', () {
     test('transpose, determinant, trace, rank, frobenius-norm, '
         'spectral-norm, eigenvalues, cofactors, adjugate, rref', () {
@@ -630,7 +631,7 @@ void main() {
     });
   });
 
-  group('AC6: constructors', () {
+  group('constructors', () {
     test('2 3 zeros gives the 2x3 zero matrix', () {
       expect(
         Calculatrix.evaluateRpn(<String>['2', '3', 'zeros']),
@@ -656,31 +657,33 @@ void main() {
     });
   });
 
-  group('typed commands through the machine (issue #39)', () {
-    test('PickWordCommand and PickCommand(n) agree, sharing RpnEngine.pick '
-        '(D44)', () {
-      final CalculatrixMachine viaWord = CalculatrixMachine();
-      viaWord.executeAll(<CalculatrixCommand>[
-        const PushScalarCommand(1),
-        const PushScalarCommand(2),
-        const PushScalarCommand(3),
-        const PushScalarCommand(2),
-        const PickWordCommand(),
-      ]);
+  group('typed commands through the machine', () {
+    test(
+      'PickWordCommand and PickCommand(n) agree, sharing RpnEngine.pick',
+      () {
+        final CalculatrixMachine viaWord = CalculatrixMachine();
+        viaWord.executeAll(<CalculatrixCommand>[
+          const PushScalarCommand(1),
+          const PushScalarCommand(2),
+          const PushScalarCommand(3),
+          const PushScalarCommand(2),
+          const PickWordCommand(),
+        ]);
 
-      final CalculatrixMachine viaTyped = CalculatrixMachine();
-      viaTyped.executeAll(<CalculatrixCommand>[
-        const PushScalarCommand(1),
-        const PushScalarCommand(2),
-        const PushScalarCommand(3),
-        const PickCommand(2),
-      ]);
+        final CalculatrixMachine viaTyped = CalculatrixMachine();
+        viaTyped.executeAll(<CalculatrixCommand>[
+          const PushScalarCommand(1),
+          const PushScalarCommand(2),
+          const PushScalarCommand(3),
+          const PickCommand(2),
+        ]);
 
-      expect(viaWord.stackSnapshot, viaTyped.stackSnapshot);
-    });
+        expect(viaWord.stackSnapshot, viaTyped.stackSnapshot);
+      },
+    );
 
     test('MoveRowWordCommand and MoveRowCommand(from, to) agree, sharing '
-        'Matrix.moveRow (D44)', () {
+        'Matrix.moveRow', () {
       final Matrix a = Matrix(<List<double>>[
         <double>[1, 2],
         <double>[3, 4],
@@ -703,8 +706,7 @@ void main() {
       expect(viaWord.stackSnapshot, viaTyped.stackSnapshot);
     });
 
-    test('ZerosCommand and PushZerosCommand agree, sharing Matrix.zeros '
-        '(D44)', () {
+    test('ZerosCommand and PushZerosCommand agree, sharing Matrix.zeros', () {
       final CalculatrixMachine viaWord = CalculatrixMachine();
       viaWord.executeAll(<CalculatrixCommand>[
         const PushScalarCommand(2),

@@ -4,7 +4,7 @@ import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 
 import 'commands_support.dart';
 
-/// `cx commands search <text>` (spec section 7; issue #41, AC2).
+/// `cx commands search <text>`.
 class SearchInput extends Input {
   SearchInput({required this.text});
 
@@ -32,7 +32,7 @@ class SearchOutput extends Output {
       ? 'No matches.'
       : matches.map(commandEntrySummaryText).join('\n');
 
-  // No match is an empty list, exit 0 (AC2): there is nothing wrong with
+  // No match is an empty list, exit 0: there is nothing wrong with
   // the invocation or the registry, the text just named nothing.
   @override
   int get exitCode => ExitCode.ok;

@@ -3,22 +3,19 @@ import 'package:modular_cli_sdk/modular_cli_sdk.dart';
 import '../eval/eval_output.dart';
 import '../eval/eval_rpn_query.dart';
 
-/// Wraps [EvalRpnQuery] for the `<program>` root shortcut (spec section 7,
-/// "Did you mean"; issue #41, AC6): the one behavior difference between
-/// `cx <program>` and `cx eval rpn <program>` (spec section 11, risk 1,
-/// "the one cost of the shortcut").
+/// Wraps [EvalRpnQuery] for the `<program>` root shortcut : the one behavior difference between
+/// `cx <program>` and `cx eval rpn <program>`.
 ///
 /// Both raise the very same core `unknown-word`, with the core's own
-/// RPN-word suggestions (issue #41, AC5) already attached by
+/// RPN-word suggestions already attached by
 /// `toCommandException` regardless of which route is taken. Only here,
 /// because a typo at the root is indistinguishable from an RPN program
 /// until it fails ("a typo at the root is a program, because of the
 /// shortcut"), does the CLI also try `routeSuggest` (`ModularCli.suggest`)
 /// against the offending token and, when it finds a route close enough,
 /// add that as a second, separate suggestion: `cx verison` still fails
-/// with `unknown-word`, but also suggests `cx version` (AC6, "RPN and
-/// route suggestions are listed apart", so the two are never merged into
-/// one list).
+/// with `unknown-word`, but also suggests `cx version` (RPN and route suggestions
+/// are listed apart, so the two are never merged into one list).
 ///
 /// A hand-rolled wrapper, not `ModularCli.shortcut`, because a shortcut
 /// dispatches through the exact same body closure as its target route

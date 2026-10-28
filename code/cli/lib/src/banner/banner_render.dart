@@ -1,4 +1,4 @@
-/// Pure rendering of the branded `cx` banner (issue #26): the
+/// Pure rendering of the branded `cx` banner: the
 /// `[[0 -1][1 0]]` logo (the imaginary unit as a 2x2 rotation matrix,
 /// `code/design/logo.svg`), name and version, tagline, the command list and
 /// a quickstart line.
@@ -13,25 +13,22 @@ library;
 import 'overview.dart';
 
 /// The tagline printed next to the logo, and returned as `tagline` in JSON
-/// mode: a single source of truth for both (issue #26 scope 6).
+/// mode: a single source of truth for both.
 const String bannerTagline =
     'Calculatrix: matrix-first RPN and infix calculator';
 
 /// The command the banner tells a new user to run, and the exact stack line
-/// it must print (issue #26 scope 3). A constant so the banner and the test
+/// it must print. A constant so the banner and the test
 /// that runs it through the CLI cannot disagree, the same discipline
 /// `macss`'s `quickstartCommand` follows
 /// (`code/cli/lib/modules/global/commands/tui.dart`).
 ///
-/// `i` (the imaginary unit) as the 2x2 rotation matrix `[[0,-1],[1,0]]`,
-/// squared, is minus the identity (i^2 = -1). When a later stage adds
-/// space-separated matrix literals (D6, D13) this may switch to
-/// `[[0 -1][1 0]]`.
-const String bannerQuickstartCommand = "cx '[[0,-1],[1,0]] 2 ^'";
+/// `i` (the imaginary unit) as the 2x2 rotation matrix `[[0 -1] [1 0]]`,
+/// squared, is minus the identity (i^2 = -1).
+const String bannerQuickstartCommand = "cx '[[0 -1] [1 0]] 2 ^'";
 
 /// One row of the "Commands:" section: a name, what it does, and, for the
-/// two commands already shipped, the exact invocation from the issue's
-/// design.
+/// two commands already shipped, the exact invocation.
 class BannerCommand {
   const BannerCommand(this.name, this.description, [this.example]);
 
@@ -45,10 +42,8 @@ class BannerCommand {
 /// Every command the banner may list, in the order the design fixes.
 ///
 /// Not every one is printed on every build: [renderBanner] keeps only the
-/// entries named in `registeredCommands` (issue #26 scope 4), so `doctor`,
-/// `upgrade`, `uninstall` and `version`, registered only once #25's
-/// `InstallationPlugin`/`VersionPlugin`/`DoctorPlugin` wiring lands, appear
-/// only once the CLI actually serves them. This PR does not depend on #25.
+/// entries named in `registeredCommands`, so `doctor`, `upgrade`,
+/// `uninstall` and `version` appear only when the CLI actually serves them.
 const List<BannerCommand> bannerCommands = [
   BannerCommand('eval rpn', 'evaluate an RPN program', "cx eval rpn '1 2 +'"),
   BannerCommand(
@@ -60,16 +55,16 @@ const List<BannerCommand> bannerCommands = [
   BannerCommand('commands search', 'search the registry', 'cx commands search column'),
   BannerCommand('commands list', 'list the registry by category', 'cx commands list'),
   BannerCommand('doctor', 'verify local installation', 'cx doctor'),
-  BannerCommand('upgrade', 'update to latest version', 'cx upgrade'),
-  BannerCommand('uninstall', 'remove cx', 'cx uninstall'),
+  BannerCommand('upgrade', 'update to latest version', 'cx upgrade --plan'),
+  BannerCommand('uninstall', 'remove cx', 'cx uninstall --plan'),
   BannerCommand('version', 'print version', 'cx version'),
 ];
 
 // 17, not 13: wide enough for "commands search" (15 characters), the
-// longest name the banner lists since issue #41 added the `commands`
-// module's rows, plus a 2-character gap before the description column so
+// longest name the banner lists (the `commands`
+// module's rows), plus a 2-character gap before the description column so
 // a name never runs into its own description with only a single
-// separating space (issue #51, AC7).
+// separating space.
 const int _nameColumnWidth = 17;
 
 // Wide enough for the longest description that is ever paired with an
@@ -77,7 +72,7 @@ const int _nameColumnWidth = 17;
 // two columns after the longest description instead of running straight
 // into it with only one separating space (a fixed width shorter than
 // that longest description, as this used to be, silently dropped that
-// gap entirely for just that one row; issue #51, AC7).
+// gap entirely for just that one row).
 final int _descriptionColumnWidth = _widestDescriptionWithExample() + 2;
 
 int _widestDescriptionWithExample() {
@@ -97,14 +92,14 @@ const String _white = '\x1B[97m';
 const String _cyan = '\x1B[36m';
 
 /// `#2EF2C3`, the icon's glow color (`code/design/logo.svg`), as a 24-bit
-/// ANSI foreground escape (User decision, 2026-09-29, issue #26), used when
+/// ANSI foreground escape used when
 /// the terminal advertises truecolor.
 const String _glowTrueColor = '\x1B[38;2;46;242;195m';
 
 /// The nearest 16-color fallback for [_glowTrueColor]: bright cyan (ANSI 96).
 const String _glowFallback = '\x1B[96m';
 
-/// Renders the `cx` banner (issue #26): the logo, name and version, the
+/// Renders the `cx` banner: the logo, name and version, the
 /// tagline, the "Commands:" list (only entries in [registeredCommands]) and
 /// the quickstart line. Pure: the same arguments always give the same text.
 ///
@@ -124,8 +119,8 @@ String renderBanner({
 
   final versionSuffix = version == null ? '' : ' v$version';
   // 9 columns by 4 rows: a terminal cell is roughly twice as tall as it is
-  // wide, so this reads as square, and the brackets span the whole matrix
-  // (User, 2026-09-29). The frame is box-drawing (`┌─ │ └─`), not the
+  // wide, so this reads as square, and the brackets span the whole matrix.
+  // The frame is box-drawing (`┌─ │ └─`), not the
   // U+23A1..U+23A6 bracket pieces, because the legacy Windows console's
   // fonts cannot draw those; `│` joins `┌` and `└` where ASCII `|` does
   // not.
@@ -142,7 +137,7 @@ String renderBanner({
       .map((cmd) => _commandRow(cmd, c))
       .join('\n');
 
-  // The overview of D64: each line indented two spaces, its label (up to
+  // The overview: each line indented two spaces, its label (up to
   // the first colon) dimmed, the rest uncolored.
   final overview = cxOverviewLines
       .map((line) {
@@ -186,8 +181,8 @@ String _commandRow(BannerCommand cmd, String Function(String, String) c) {
 
 /// [cmd]'s row exactly as the banner lists it, but with no color: the same
 /// name, description and example columns the banner computes, so any other
-/// text that wants to list `cx`'s commands (the root route's own help text,
-/// issue #51 acceptance 1) can share this instead of drifting into its own,
+/// text that wants to list `cx`'s commands (the root route's own help text)
+/// can share this instead of drifting into its own,
 /// separately maintained copy.
 String bannerCommandRow(BannerCommand cmd) =>
     _commandRow(cmd, (String code, String text) => text);

@@ -229,7 +229,7 @@ class CalculatrixSession {
     }
   }
 
-  // The sign goes after the approximate mark (`~-0.5`, runbook D56) and
+  // The sign goes after the approximate mark (`~-0.5`) and
   // inside a leading parenthesized fraction (`(-1/3)×3`), since infix reads
   // neither `-~0.5` nor `-(1/3)`.
   String _toggledInfixDraft(String draft) {
@@ -371,7 +371,7 @@ class CalculatrixSession {
   // dup, swap, over and rot have no command class of their own: each runs
   // as the registry word it names (duplicate, swap, over, rotate),
   // compiled and executed through Calculatrix.executeWordOn exactly as
-  // typing that word in an RPN program would be (D44, issue #39).
+  // typing that word in an RPN program would be.
   void dupRpn() {
     _runRpnAction(() => Calculatrix.executeWordOn(_machine, 'duplicate'));
   }
@@ -452,7 +452,7 @@ class CalculatrixSession {
 
     _lastOperator = _toDisplayOperator(tokens[operatorIndex]);
     // A unary minus is written back as "-", with a space before a marked
-    // literal: "-~3" would read as a misplaced mark (issue #66).
+    // literal: "-~3" would read as a misplaced mark.
     final List<String> operand = tokens.sublist(operatorIndex + 1);
     final StringBuffer text = StringBuffer();
     for (int index = 0; index < operand.length; index++) {
@@ -774,7 +774,7 @@ class CalculatrixSession {
   // tokenizer the core uses for RPN programs rather than a second one.
   //
   // Each token is read as an RPN program of one token, as cx reads it, so
-  // `1/3` is a fraction literal and `1.5/2` an unknown word (runbook D59),
+  // `1/3` is a fraction literal and `1.5/2` an unknown word,
   // never an infix expression.
   List<Matrix> _parseDraftTokens(String draft) {
     return Calculatrix.tokenizeRpnLine(draft)
@@ -1012,8 +1012,7 @@ class CalculatrixSession {
 
   // An infix seed reads back as the same value: an exact scalar in full
   // (a fraction in parentheses, so `2÷(1/3)` stays one division), an
-  // approximate one marked, with its whole double, as a matrix seed has
-  // (runbook D54, D56).
+  // approximate one marked, with its whole double, as a matrix seed does.
   String _expressionSeedFromValue(Matrix value) {
     if (!value.isScalar) {
       return _serializeMatrix(value);
@@ -1028,7 +1027,7 @@ class CalculatrixSession {
   }
 
   // The session's own unary and memory operations run the same commands
-  // as the RPN words, so they keep exactness the same way (runbook D51).
+  // as the RPN words, so they keep exactness the same way.
   Matrix _applyCommand(
     CalculatrixCommand command,
     Matrix value, [

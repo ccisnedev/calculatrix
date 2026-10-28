@@ -38,14 +38,14 @@ final class SvdDecomposition {
 }
 
 class Matrix {
-  /// An approximate matrix (runbook D49): entries are `double`.
+  /// An approximate matrix: entries are `double`.
   Matrix(List<List<double>> rows) : _rows = _normalize(rows), _exact = null {
     _validateRectangular(_rows);
   }
 
   Matrix._withExact(this._rows, this._exact);
 
-  /// An exact matrix (runbook D49): entries are reduced rationals. Its
+  /// An exact matrix: entries are reduced rationals. Its
   /// `double` view ([at], [rows], [scalarValue]) holds the nearest `double`
   /// of each entry, which is an infinity for an entry beyond the `double`
   /// range; [toApproximate] is the checked way to leave the exact domain.
@@ -229,7 +229,7 @@ class Matrix {
   // The exact entries, or null for an approximate matrix.
   final List<List<Rational>>? _exact;
 
-  /// Whether this value is exact (runbook D49). An exact value has exact
+  /// Whether this value is exact. An exact value has exact
   /// entries; an approximate one has `double` entries only.
   bool get isExact => _exact != null;
 
@@ -239,7 +239,7 @@ class Matrix {
   /// The exact entries, row by row. Only for an exact matrix.
   List<List<Rational>> get exactRows => _exact!;
 
-  /// This value as an approximate matrix (runbook D52, `approx`): itself
+  /// This value as an approximate matrix (`approx`): itself
   /// when already approximate, else each entry rounded to its nearest
   /// `double`. An entry too large for a finite `double` raises
   /// `non-finite`; an entry too small for one becomes 0.
@@ -260,7 +260,7 @@ class Matrix {
     return Matrix(_rows);
   }
 
-  /// This value as an exact matrix (runbook D52, `exact`): itself when
+  /// This value as an exact matrix (`exact`): itself when
   /// already exact, else each entry replaced by the simplest rational that
   /// rounds to the same `double`. A non-finite entry raises `non-finite`.
   Matrix toExact() {
@@ -290,7 +290,7 @@ class Matrix {
 
   // Rebuilds this matrix with the same kind of entries through [reshape],
   // which only moves entries around (transpose, delete, duplicate, move):
-  // an exact matrix stays exact (runbook D53), an approximate one stays
+  // an exact matrix stays exact, an approximate one stays
   // approximate.
   Matrix _restructure(List<List<E>> Function<E>(List<List<E>> rows) reshape) {
     final List<List<Rational>>? exact = _exact;
@@ -301,7 +301,7 @@ class Matrix {
   }
 
   // Joins this matrix with [other] through [join]: exact when both are
-  // exact, approximate otherwise (runbook D51).
+  // exact, approximate otherwise.
   Matrix _combine(
     Matrix other,
     List<List<E>> Function<E>(List<List<E>> a, List<List<E>> b) join,
@@ -621,8 +621,7 @@ class Matrix {
   }
 
   // A negative discriminant of a real 2x2 block means a complex pair of
-  // eigenvalues, and a column of complex values has no representation yet
-  // (runbook-trust.md D60; issue #64).
+  // eigenvalues, and a column of complex values has no representation yet.
   static const String _complexEigenvaluesMessage =
       'The eigenvalues of this matrix are complex, and cx has no complex '
       'columns yet.';
@@ -655,8 +654,17 @@ class Matrix {
 
   static const double _machineEpsilon = 2.220446049250313e-16;
 
+  // ln(1 + x), accurate for small x.
+  static double _log1p(double x) {
+    final double u = 1 + x;
+    if (u == 1) {
+      return x;
+    }
+    return math.log(u) * x / (u - 1);
+  }
+
   /// Runs [compute], which uses the eigenvalues only inside, and turns a
-  /// `complex-result` into the generic error it was before D60: the result
+  /// `complex-result` into the generic error it was before: the result
   /// of such a word is not a column of eigenvalues, and may well be real
   /// (a rotation has a real logarithm).
   static T _withoutComplexResult<T>(T Function() compute) {
@@ -817,6 +825,7 @@ class Matrix {
     final Matrix eigenvalueColumn = eigenvalues(
       absoluteTolerance: absoluteTolerance,
     );
+    _checkFiniteMatrix(eigenvalueColumn);
 
     final int n = rowCount;
     final List<double> lambdas = List<double>.generate(
@@ -836,116 +845,58 @@ class Matrix {
       growable: false,
     );
 
-    // Build P: for each eigenvalue, solve (A - λI)x = 0 via row reduction
+    // P: for each distinct eigenvalue of multiplicity m, a basis of the
+    // null space of A - λI. Eigenvalues are sorted, so equal ones are
+    // adjacent. Fewer than m independent eigenvectors means A is
+    // defective and has no diagonalization.
+    // Eigenvalues closer than 1e-10 relative to the largest are equal,
+    // and the rank of A - λI is taken on A - λI scaled by the same size.
+    double largest = 0;
+    for (final double value in lambdas) {
+      largest = math.max(largest, value.abs());
+    }
+    final double size = math.max(1, largest);
+    final double tolerance = math.max(absoluteTolerance, 1e-10);
     final List<List<double>> pColumns = <List<double>>[];
+    int k = 0;
+    while (k < n) {
+      int end = k + 1;
+      while (end < n && (lambdas[k] - lambdas[end]).abs() <= tolerance * size) {
+        end++;
+      }
+      final int multiplicity = end - k;
+      double lambda = 0;
+      for (int i = k; i < end; i++) {
+        lambda += lambdas[i];
+      }
+      lambda /= multiplicity;
 
-    for (int k = 0; k < n; k++) {
-      final double lambda = lambdas[k];
-
-      // Form A - λI
-      final List<List<double>> augmented = List<List<double>>.generate(
-        n,
-        (int r) => List<double>.generate(
+      final Matrix shifted = Matrix(
+        List<List<double>>.generate(
           n,
-          (int c) => _rows[r][c] - (r == c ? lambda : 0),
+          (int r) => List<double>.generate(
+            n,
+            (int c) => (_rows[r][c] - (r == c ? lambda : 0)) / size,
+            growable: false,
+          ),
           growable: false,
         ),
-        growable: false,
       );
-
-      // Gaussian elimination with partial pivoting (forward reduction)
-      final List<int> pivotColumns = <int>[];
-      int pivotRow = 0;
-      for (int col = 0; col < n && pivotRow < n; col++) {
-        // Find pivot
-        int maxRow = pivotRow;
-        double maxVal = augmented[pivotRow][col].abs();
-        for (int r = pivotRow + 1; r < n; r++) {
-          if (augmented[r][col].abs() > maxVal) {
-            maxVal = augmented[r][col].abs();
-            maxRow = r;
-          }
-        }
-
-        if (maxVal <= absoluteTolerance) {
-          continue;
-        }
-
-        // Swap rows
-        if (maxRow != pivotRow) {
-          final List<double> temp = augmented[pivotRow];
-          augmented[pivotRow] = augmented[maxRow];
-          augmented[maxRow] = temp;
-        }
-
-        pivotColumns.add(col);
-
-        // Scale pivot row
-        final double pivotVal = augmented[pivotRow][col];
-        for (int c = col; c < n; c++) {
-          augmented[pivotRow][c] /= pivotVal;
-        }
-
-        // Eliminate below and above
-        for (int r = 0; r < n; r++) {
-          if (r == pivotRow) continue;
-          final double factor = augmented[r][col];
-          if (factor.abs() <= absoluteTolerance) continue;
-          for (int c = col; c < n; c++) {
-            augmented[r][c] -= factor * augmented[pivotRow][c];
-          }
-        }
-
-        pivotRow++;
+      final List<List<double>> basis = _nullSpaceBasis(
+        shifted.rref(absoluteTolerance: tolerance).rows,
+        n,
+        tolerance,
+      );
+      if (basis.length < multiplicity) {
+        throw _notDiagonalizable();
       }
-
-      // Find a free variable column (not a pivot column)
-      // Build the null space vector
-      final List<double> eigenvector = List<double>.filled(n, 0);
-      final Set<int> pivotSet = pivotColumns.toSet();
-
-      // Find the first free column
-      int freeCol = -1;
-      for (int c = 0; c < n; c++) {
-        if (!pivotSet.contains(c)) {
-          freeCol = c;
-          break;
-        }
+      for (final List<double> vector in basis.take(multiplicity)) {
+        pColumns.add(<double>[
+          for (final double value in vector)
+            value.abs() <= absoluteTolerance ? 0 : value,
+        ]);
       }
-
-      if (freeCol == -1) {
-        // Numerically rank n: shouldn't happen for a true eigenvalue.
-        // Fall back to the last column direction.
-        eigenvector[n - 1] = 1;
-      } else {
-        eigenvector[freeCol] = 1;
-        // Back-substitute: for each pivot row i with pivot column p[i],
-        // x[p[i]] = -augmented[i][freeCol]
-        for (int i = 0; i < pivotColumns.length; i++) {
-          eigenvector[pivotColumns[i]] = -augmented[i][freeCol];
-        }
-      }
-
-      // Normalize the eigenvector
-      double norm = 0;
-      for (int i = 0; i < n; i++) {
-        norm += eigenvector[i] * eigenvector[i];
-      }
-      norm = math.sqrt(norm);
-      if (norm > absoluteTolerance) {
-        for (int i = 0; i < n; i++) {
-          eigenvector[i] /= norm;
-        }
-      }
-
-      // Clean near-zero entries
-      for (int i = 0; i < n; i++) {
-        if (eigenvector[i].abs() <= absoluteTolerance) {
-          eigenvector[i] = 0;
-        }
-      }
-
-      pColumns.add(eigenvector);
+      k = end;
     }
 
     // Build P matrix (columns are eigenvectors)
@@ -956,8 +907,42 @@ class Matrix {
       growable: false,
     );
 
-    return Diagonalization(p: Matrix(pRows), d: Matrix(dRows));
+    final Matrix p = Matrix(pRows);
+    // P has unit columns: an absolute tolerance suits its rank.
+    _checkFiniteMatrix(p);
+    if (p.rank(absoluteTolerance: tolerance).scalarValue.round() < n) {
+      throw _notDiagonalizable();
+    }
+    return Diagonalization(p: p, d: Matrix(dRows));
   }
+
+  // Whether a real eigenvalue is negative. A spectrum that cannot be
+  // computed in real numbers (a complex pair) answers false.
+  bool _hasNegativeRealEigenvalue(double absoluteTolerance) {
+    final Matrix values;
+    try {
+      values = eigenvalues(absoluteTolerance: absoluteTolerance);
+    } on MatrixDomainError {
+      return false;
+    }
+    for (int row = 0; row < values.rowCount; row++) {
+      if (values.at(row, 0) < -absoluteTolerance) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static MatrixDomainError _complexRoot(String what) => MatrixDomainError(
+    '$what of this matrix is complex: it has a negative real eigenvalue.',
+    errorId: CalculatrixErrorId.complexResult,
+  );
+
+  static MatrixDomainError _notDiagonalizable() => MatrixDomainError(
+    'This matrix is not diagonalizable: it has fewer independent '
+    'eigenvectors than its size.',
+    errorId: CalculatrixErrorId.notDiagonalizable,
+  );
 
   Matrix trace() {
     _requireSquare(operation: 'trace');
@@ -1623,11 +1608,15 @@ class Matrix {
       );
     }
 
-    // A complex matrix [[a -b] [b a]] (a+bi, runbook D25) has the complex
+    // A complex matrix [[a -b] [b a]] (a+bi) has the complex
     // principal square root, the same value the scalar branch above gives
     // for a negative scalar: [[-1 0] [0 -1]] is -1 and its root is i.
     if (_isComplexForm) {
       return _complexPrincipalSqrt(_rows[0][0], _rows[1][0]);
+    }
+
+    if (_hasNegativeRealEigenvalue(absoluteTolerance)) {
+      throw _complexRoot('The square root');
     }
 
     // Every tolerance-based decision below (the structural-singularity
@@ -1655,7 +1644,7 @@ class Matrix {
     // only one of them is visible from inside the Newton loop:
     //
     //   1. An intermediate iterate goes exactly singular and `_inverse`
-    //      throws mid-loop: this is the failure issue #19 described.
+    //      throws mid-loop: this is the failure that makes the plain iteration unusable.
     //   2. Subtler, and silent: along a genuinely zero eigenvalue
     //      direction, the Denman-Beavers iterate for that component
     //      halves every step (linear convergence, not Newton's usual
@@ -1722,7 +1711,7 @@ class Matrix {
   /// The Newton (Denman-Beavers averaging) iteration for the principal
   /// square root, Y(k+1) = (Y(k) + Y(k)⁻¹·A) / 2 starting from Y(0) = I,
   /// with scaling and squaring to keep the target's norm bounded. This is
-  /// the original algorithm, unmodified by issue #19: it inverts the
+  /// the original algorithm, with no fallback: it inverts the
   /// current iterate on every step, so it raises "undefined in the real
   /// domain" the moment that iterate itself goes exactly singular, and
   /// "did not converge" if it exhausts [maxIterations] without meeting
@@ -1781,13 +1770,14 @@ class Matrix {
     }
 
     throw MatrixDomainError(
-      'Square root did not converge for this matrix in the real domain.',
+      'Square root did not converge for this matrix in the real domain; '
+      'its principal square root may be complex.',
       errorId: CalculatrixErrorId.logUndefined,
     );
   }
 
   /// Computes the principal square root of a matrix whose Newton iterate
-  /// went singular mid-iteration (issue #19), by splitting off the part
+  /// went singular mid-iteration, by splitting off the part
   /// of the matrix that actually causes the singularity: its range
   /// (column space) and null space.
   ///
@@ -1811,7 +1801,7 @@ class Matrix {
   /// When rank(A) != rank(A²), the zero eigenvalue is not semisimple (a
   /// nilpotent Jordan block, for instance): range(A) and ker(A) overlap,
   /// there is no real principal square root, and this raises
-  /// MatrixDomainError, unchanged from before issue #19.
+  /// MatrixDomainError, as the plain iteration does.
   Matrix _sqrtViaRangeNullSplit({
     required double relativeTolerance,
     required double absoluteTolerance,
@@ -2046,7 +2036,7 @@ class Matrix {
   /// expm(θ·J) = [[cos(θ), -sin(θ)], [sin(θ), cos(θ)]] (rotation matrix).
   ///
   /// Throws [MatrixDomainError] with [CalculatrixErrorId.nonFinite] when the
-  /// true result overflows double precision (D25 row 13): squaring back up
+  /// true result overflows double precision (a large exponent): squaring back up
   /// an exponential whose true value is too large to represent yields an
   /// infinite or NaN entry, which is caught here instead of returned
   /// silently.
@@ -2415,27 +2405,17 @@ class Matrix {
     ];
   }
 
-  // The discriminant of the 2x2 characteristic polynomial, trace^2 -
-  // 4*determinant, snapped to exactly 0 within [absoluteTolerance] so a
-  // matrix with a genuinely repeated eigenvalue (or one that is repeated
-  // up to floating-point noise) is never misclassified as a complex pair
-  // by a discriminant that is negative only by rounding error. Shared by
-  // [_realEigenvalues2x2] and [_log2x2ComplexConjugateClosedForm] so both
-  // agree on exactly the same trace/determinant/discriminant.
-  double _trace2x2Discriminant(double absoluteTolerance) {
-    final double a = _rows[0][0];
-    final double b = _rows[0][1];
-    final double c = _rows[1][0];
-    final double d = _rows[1][1];
-    final double trace = a + d;
-    final double determinantValue = (a * d) - (b * c);
-
-    double discriminant = (trace * trace) - (4 * determinantValue);
-    if (discriminant.abs() <= absoluteTolerance) {
-      discriminant = 0;
-    }
-    return discriminant;
-  }
+  // The discriminant of the 2x2 characteristic polynomial, by
+  // [_discriminant2x2] (no cancellation, snapped to 0 within rounding).
+  // Shared by [_realEigenvalues2x2] and [_log2x2ComplexConjugateClosedForm]
+  // so both agree on the same value.
+  double _trace2x2Discriminant(double absoluteTolerance) => _discriminant2x2(
+    _rows[0][0],
+    _rows[0][1],
+    _rows[1][0],
+    _rows[1][1],
+    absoluteTolerance,
+  );
 
   /// Computes `log A` for a 2x2 matrix whose eigenvalues are a genuine
   /// complex-conjugate pair `a +/- bi` (`b > 0`), by the same Sylvester
@@ -2497,17 +2477,17 @@ class Matrix {
       c1 = 1 / lambda;
       c0 = math.log(lambda) - 1;
     } else {
-      final double logLambda1 = math.log(lambda1);
-      final double logLambda2 = math.log(lambda2);
-      c1 = (logLambda1 - logLambda2) / (lambda1 - lambda2);
-      c0 = logLambda1 - (c1 * lambda1);
+      // ln λ1 - ln λ2 as ln(1 + (λ1 - λ2)/λ2), which does not cancel
+      // when the eigenvalues are close.
+      final double difference = lambda1 - lambda2;
+      c1 = _log1p(difference / lambda2) / difference;
+      c0 = math.log(lambda1) - (c1 * lambda1);
     }
 
     return scale(c1) + Matrix.identity(rowCount).scale(c0);
   }
 
-  /// Computes `this ^ exponent` per the power dispatch table (issue #5,
-  /// spec section 3): `B^Y = exp(Y * log B)`, using the principal log/exp.
+  /// Computes `this ^ exponent` per the power dispatch table: `B^Y = exp(Y * log B)`, using the principal log/exp.
   Matrix power(Matrix exponent) {
     if (!isSquare) {
       throw MatrixShapeError(
@@ -2572,15 +2552,14 @@ class Matrix {
 
   Matrix _powerByScalarExponent(double y) {
     // Exponent exactly 0.5 uses the same principal-square-root algorithm
-    // as sqrt() itself, for both a scalar and a matrix base (runbook D44,
-    // issue #35, AC1, AC7): one implementation per concept, rather than a
+    // as sqrt() itself, for both a scalar and a matrix base: one implementation per concept, rather than a
     // second, less exact route to the same value through exp(0.5 * log
     // B). This also makes 0.5 power raise log-undefined exactly when
-    // sqrt() does (AC6), since it is now the very same call.
+    // sqrt() does, since it is now the very same call.
     if (y == 0.5) {
       return sqrt();
     }
-    // Exponent exactly -1 is the matrix inverse itself (runbook D44): the
+    // Exponent exactly -1 is the matrix inverse itself: the
     // same Gauss-Jordan elimination inverse() uses, not a product with the
     // identity. A scalar base keeps math.pow below, which is exact for it.
     if (y == -1 && !isScalar) {
@@ -2600,6 +2579,11 @@ class Matrix {
 
     if (integerExponent) {
       return _integerMatrixPower(y);
+    }
+    if (_hasNegativeRealEigenvalue(
+      CalculatrixNumericPolicy.defaultAbsoluteTolerance,
+    )) {
+      throw _complexRoot('A non-integer power');
     }
     final Matrix scaled = log().scale(y);
     return _checkFiniteMatrix(scaled.exp());
@@ -2776,7 +2760,7 @@ class Matrix {
     return SvdDecomposition(u: Matrix(uRows), s: Matrix(sRows), vT: vT);
   }
 
-  /// The transpose. Keeps exactness (runbook D53).
+  /// The transpose. Keeps exactness.
   Matrix transpose() {
     return _restructure(<E>(List<List<E>> rows) {
       return List<List<E>>.generate(
@@ -2792,12 +2776,12 @@ class Matrix {
   }
 
   /// Appends the rows of [rows] below this matrix's own rows. `rows` must
-  /// have the same number of columns as this matrix (issue #37, S4c).
-  /// Exact when both operands are exact (runbook D53).
+  /// have the same number of columns as this matrix.
+  /// Exact when both operands are exact.
   ///
   /// This is the single implementation behind [appendRow] (which further
   /// requires a single-row operand) and the `append-rows` registry word
-  /// (D44: one implementation per concept).
+  /// (one implementation per concept).
   Matrix appendRows(Matrix rows) {
     if (rows.columnCount != columnCount) {
       throw MatrixShapeError(
@@ -2816,12 +2800,11 @@ class Matrix {
   }
 
   /// Appends the columns of [columns] to the right of this matrix's own
-  /// columns. `columns` must have the same number of rows as this matrix
-  /// (issue #37, S4c). Exact when both operands are exact (runbook D53).
+  /// columns. `columns` must have the same number of rows as this matrix. Exact when both operands are exact.
   ///
   /// This is the single implementation behind [appendColumn] (which further
   /// requires a single-column operand) and the `append-cols` registry word
-  /// (D44: one implementation per concept).
+  /// (one implementation per concept).
   Matrix appendColumns(Matrix columns) {
     if (columns.rowCount != rowCount) {
       throw MatrixShapeError(

@@ -1,4 +1,4 @@
-// Differential test for issue #13 (acceptance 4): for matrices with
+// Differential test: for matrices with
 // infinity norm up to 10, where the pre-fix Taylor series (capped at 50
 // terms, no scaling) is already correct, the new scaling-and-squaring
 // implementation must give the same result to 1e-12 relative.
@@ -17,8 +17,7 @@ import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Matrix.exp - differential vs the pre-fix algorithm (issue #13, '
-      'acceptance 4)', () {
+  group('Matrix.exp - differential vs the pre-fix algorithm', () {
     final List<Matrix> corpus = _buildCorpus();
 
     test(
@@ -58,8 +57,8 @@ void main() {
       }
     });
 
-    test('block-diagonal [[400 400 0] [-400 -400 0] [0 0 1]] (issue #13, '
-        'review round 2), outside the norm-10 corpus, still matches the '
+    test('block-diagonal [[400 400 0] [-400 -400 0] [0 0 1]], '
+        'outside the norm-10 corpus, still matches the '
         'old truncated-series algorithm to 1e-15 relative (infinity norm): '
         'the upper block is exactly nilpotent (A^2 = 0 there), so the old '
         'series terminates after one term regardless of the lack of '
@@ -148,7 +147,7 @@ double _relativeInfinityNormError(Matrix actual, Matrix expected) {
   return diffNorm / referenceNorm;
 }
 
-// Verbatim copy of Matrix.exp() as it stood on main before issue #13's fix:
+// Verbatim copy of Matrix.exp() as it stood on main before the scaling-and-squaring fix:
 // a Taylor series with no scaling, capped at 50 terms. Correct for the small
 // norms this test restricts itself to; this is exactly what makes it a valid
 // reference here.

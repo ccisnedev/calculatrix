@@ -3,7 +3,7 @@ import 'package:test/test.dart';
 
 void main() {
   group('CalculatrixErrorId', () {
-    test('has the eleven kebab-case ids the spec requires', () {
+    test('has the twelve kebab-case ids it requires', () {
       expect(CalculatrixErrorId.unknownWord.id, 'unknown-word');
       expect(CalculatrixErrorId.stackUnderflow.id, 'stack-underflow');
       expect(CalculatrixErrorId.typeMismatch.id, 'type-mismatch');
@@ -15,7 +15,8 @@ void main() {
       expect(CalculatrixErrorId.syntaxError.id, 'syntax-error');
       expect(CalculatrixErrorId.limitExceeded.id, 'limit-exceeded');
       expect(CalculatrixErrorId.complexResult.id, 'complex-result');
-      expect(CalculatrixErrorId.values, hasLength(11));
+      expect(CalculatrixErrorId.notDiagonalizable.id, 'not-diagonalizable');
+      expect(CalculatrixErrorId.values, hasLength(12));
     });
   });
 

@@ -34,7 +34,7 @@ to give:
 - Trap 3: the matrix is singular, so `singular-matrix` is the answer.
 - Trap 8: the eigenvalues `i` and `-i` are complex, and `cx` has no column
   of complex values yet (issue #64). `cx` raises `complex-result`, its own
-  id, and never a wrong value (runbook-trust.md D60). An agent still has
+  id, and never a wrong value. An agent still has
   to answer `i, -i` to be graded correct.
 
 | # | `cx` 0.8.3 (before #54) | `cx` 0.14.0 |

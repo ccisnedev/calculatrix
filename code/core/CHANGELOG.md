@@ -361,6 +361,35 @@ and the package adheres to [Semantic Versioning](https://semver.org/).
   guards against a regression by scanning every entry's user-facing string
   fields for the same patterns (issue #43).
 
+## [0.8.0] - 2026-10-28
+
+### Added
+
+- Error id `not-diagonalizable`: `diagonalize` on a defective matrix
+  (`[[1 1] [0 1]]`) raises it instead of returning a singular P. `ln` and a
+  non-integer power of a matrix larger than 2x2 raise it through
+  `diagonalize`.
+- `CalculatrixCommandRegistry.search` and
+  `CalculatrixCommandEntry.matchesSearch`: case-insensitive search over name,
+  aliases, HP 50g reference, search terms and description, reading `->` and
+  `→` as the same arrow (`->arry` finds `→ARRY`).
+
+### Fixed
+
+- `diagonalize` with a repeated eigenvalue gives a basis of its eigenspace,
+  so P is invertible: `[[2 0] [0 2]] diagonalize` gives P = I, D = 2I, and
+  `[[2 0 0] [0 2 0] [0 0 3]] ln` is diag(ln 2, ln 2, ln 3).
+- The square root and a non-integer power of a matrix with a negative real
+  eigenvalue raise `complex-result` with a message saying the result is
+  complex, instead of `log-undefined` "did not converge"
+  (`[[-1 0] [0 2]] sqrt`). A negative scalar keeps its complex form.
+- The 2x2 `ln` uses the discriminant (a - d)^2 + 4bc, which does not cancel,
+  and computes ln l1 - ln l2 without cancellation for close eigenvalues.
+- The infix name error lists what infix accepts: numbers, matrix literals,
+  the constants pi (π) e i, `+ - * / ^ √ %` and parentheses.
+- An unbalanced matrix literal is `syntax-error` with the token and its
+  1-based position (`tokenizeRpnLine('[[1 2]')`).
+
 ## [0.7.0] - 2026-05-21
 
 ### Changed

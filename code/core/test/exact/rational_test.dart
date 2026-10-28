@@ -12,7 +12,7 @@ void main() {
       )!;
 
   group('Rational.tryParseDecimal', () {
-    test('reads decimals and exponents exactly (runbook D50)', () {
+    test('reads decimals and exponents exactly', () {
       expect(parse('0.1'), Rational(BigInt.one, BigInt.from(10)));
       expect(parse('1e-3').toDisplayString(), '0.001');
       expect(parse('-2.50e1').toDisplayString(), '-25');
@@ -36,7 +36,7 @@ void main() {
       }
     });
 
-    test('raises before building a number over the limit (runbook D55)', () {
+    test('raises before building a number over the limit', () {
       expect(() => parse('1e1000000000'), throwsStateError);
       expect(() => parse('1e-20000'), throwsStateError);
       expect(parse('1e9999').digits, 10000);
@@ -44,7 +44,7 @@ void main() {
     });
   });
 
-  group('Rational.toDisplayString (runbook D54)', () {
+  group('Rational.toDisplayString', () {
     test('integers, short decimals and fractions', () {
       expect(Rational.fromInt(-12).toDisplayString(), '-12');
       expect((Rational.one / Rational.fromInt(3)).toDisplayString(), '1/3');

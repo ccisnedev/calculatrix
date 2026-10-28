@@ -2,7 +2,7 @@ import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Matrix throw sites carry the dimension-mismatch id (issue #5)', () {
+  group('Matrix throw sites carry the dimension-mismatch id', () {
     test('operator * dimension mismatch', () {
       try {
         Matrix(<List<double>>[
@@ -171,33 +171,30 @@ void main() {
     });
   });
 
-  group(
-    'Matrix throw sites carry the non-finite / type-mismatch ids (issue #5)',
-    () {
-      test('division by a zero scalar is non-finite', () {
-        try {
-          Matrix.scalar(1) / Matrix.scalar(0);
-          fail('expected MatrixDomainError');
-        } on MatrixDomainError catch (error) {
-          expect(error.errorId, CalculatrixErrorId.nonFinite);
-        }
-      });
+  group('Matrix throw sites carry the non-finite / type-mismatch ids', () {
+    test('division by a zero scalar is non-finite', () {
+      try {
+        Matrix.scalar(1) / Matrix.scalar(0);
+        fail('expected MatrixDomainError');
+      } on MatrixDomainError catch (error) {
+        expect(error.errorId, CalculatrixErrorId.nonFinite);
+      }
+    });
 
-      test('division by a non-scalar denominator is a type mismatch', () {
-        try {
-          Matrix.scalar(1) /
-              Matrix(<List<double>>[
-                <double>[1, 2],
-              ]);
-          fail('expected UnsupportedCalculatrixOperationError');
-        } on UnsupportedCalculatrixOperationError catch (error) {
-          expect(error.errorId, CalculatrixErrorId.typeMismatch);
-        }
-      });
-    },
-  );
+    test('division by a non-scalar denominator is a type mismatch', () {
+      try {
+        Matrix.scalar(1) /
+            Matrix(<List<double>>[
+              <double>[1, 2],
+            ]);
+        fail('expected UnsupportedCalculatrixOperationError');
+      } on UnsupportedCalculatrixOperationError catch (error) {
+        expect(error.errorId, CalculatrixErrorId.typeMismatch);
+      }
+    });
+  });
 
-  group('Matrix throw sites carry the singular-matrix id (issue #5)', () {
+  group('Matrix throw sites carry the singular-matrix id', () {
     test('inverse of a singular matrix', () {
       try {
         Matrix(<List<double>>[
@@ -211,7 +208,7 @@ void main() {
     });
   });
 
-  group('RpnEngine throw sites carry the stack-underflow id (issue #5)', () {
+  group('RpnEngine throw sites carry the stack-underflow id', () {
     test('pick(1) on an empty stack', () {
       try {
         RpnEngine().pick(1);
@@ -306,7 +303,7 @@ void main() {
     });
   });
 
-  group('requireTopMatrix carries the stack-underflow id (issue #5)', () {
+  group('requireTopMatrix carries the stack-underflow id', () {
     test('empty machine stack', () {
       try {
         requireTopMatrix(CalculatrixMachine(), operation: 'transpose');

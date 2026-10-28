@@ -1,4 +1,4 @@
-// Tests for issue #51, AC6: `ModularCli.suggest` can return a bare word
+// `ModularCli.suggest` can return a bare word
 // that is only a fragment of a multi-word route (`show`, from the real
 // route `commands show`), not a command by itself. `tightenRouteSuggestion`
 // re-checks the whole route a fragment came from before trusting it, and
@@ -24,7 +24,7 @@ void main() {
     route('version'),
   ];
 
-  group('tightenRouteSuggestion (issue #51, AC6)', () {
+  group('tightenRouteSuggestion', () {
     test('no raw suggestion means no suggestion', () {
       expect(tightenRouteSuggestion('pow', null, commands), isNull);
     });

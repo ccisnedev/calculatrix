@@ -2,7 +2,7 @@ import 'package:calculatrix/calculatrix.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('CalculatrixCommandRegistry.suggest (issue #41, spec section 7)', () {
+  group('CalculatrixCommandRegistry.suggest', () {
     test('a typo one edit away from a name suggests that name', () {
       expect(
         CalculatrixCommandRegistry.standard.suggest('append-col'),
@@ -81,18 +81,16 @@ void main() {
     // both exactly as far from "pow" by raw edit distance as "power" is,
     // but sharing almost none of its letters. Tightening to the closest
     // tier, then to a prefix match within it when one exists, narrows this
-    // to "power" alone (issue #51, AC6).
+    // to "power" alone.
     test('a typo this close to its target names only that target, not '
         'other words that happen to share the same raw edit distance', () {
-      expect(CalculatrixCommandRegistry.standard.suggest('pow'), [
-        'power',
-      ]);
+      expect(CalculatrixCommandRegistry.standard.suggest('pow'), ['power']);
     });
 
     // "dupp" used to also suggest "drop", one edit further from "dupp"
     // than "duplicate" (via its alias "dup") already is. Tightening to
     // the closest tier alone removes it, with no need for the prefix
-    // tie-break (issue #51, AC6).
+    // tie-break.
     test('a typo one tier closer to its target drops a same-maxDistance '
         'word from a different tier entirely', () {
       expect(CalculatrixCommandRegistry.standard.suggest('dupp'), [
@@ -101,7 +99,7 @@ void main() {
     });
   });
 
-  group('UnknownWordError carries suggestions (issue #41)', () {
+  group('UnknownWordError carries suggestions', () {
     test('append-col fails with unknown-word, suggesting append-cols', () {
       expect(
         () => Calculatrix.evaluateRpn(<String>[

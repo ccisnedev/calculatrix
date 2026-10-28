@@ -25,7 +25,7 @@ jobs:
 
       - run: flutter test
 
-  # Core tests, with the differential tests against Giac (runbook D57).
+  # Core tests, with the differential tests against Giac.
   # Giac judges the exact results only; it is never shipped.
   # The job takes under a minute; the timeouts stop a stalled apt-get from
   # holding the runner for the default six hours.

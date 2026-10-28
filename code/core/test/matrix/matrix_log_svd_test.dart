@@ -50,10 +50,7 @@ void main() {
     });
 
     test('rejects log for scalar zero', () {
-      expect(
-        () => Matrix.scalar(0).log(),
-        throwsA(isA<MatrixDomainError>()),
-      );
+      expect(() => Matrix.scalar(0).log(), throwsA(isA<MatrixDomainError>()));
     });
   });
 
@@ -67,7 +64,10 @@ void main() {
       final SvdDecomposition svd = value.svd();
       final Matrix reconstructed = svd.u * svd.s * svd.vT;
 
-      expect(reconstructed.almostEquals(value, absoluteTolerance: 1e-8), isTrue);
+      expect(
+        reconstructed.almostEquals(value, absoluteTolerance: 1e-8),
+        isTrue,
+      );
     });
 
     test('svd reconstructs rectangular matrix', () {
@@ -79,7 +79,10 @@ void main() {
       final SvdDecomposition svd = value.svd();
       final Matrix reconstructed = svd.u * svd.s * svd.vT;
 
-      expect(reconstructed.almostEquals(value, absoluteTolerance: 1e-8), isTrue);
+      expect(
+        reconstructed.almostEquals(value, absoluteTolerance: 1e-8),
+        isTrue,
+      );
       expect(svd.u.rowCount, value.rowCount);
       expect(svd.vT.columnCount, value.columnCount);
     });
@@ -105,7 +108,10 @@ void main() {
       final SvdDecomposition svd = value.svd();
       final Matrix reconstructed = svd.u * svd.s * svd.vT;
 
-      expect(reconstructed.almostEquals(value, absoluteTolerance: 1e-10), isTrue);
+      expect(
+        reconstructed.almostEquals(value, absoluteTolerance: 1e-10),
+        isTrue,
+      );
       expect(svd.s.at(0, 0), closeTo(0, 1e-10));
       expect(svd.s.at(1, 1), closeTo(0, 1e-10));
     });

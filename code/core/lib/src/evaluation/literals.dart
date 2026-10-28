@@ -5,15 +5,15 @@ import '../names/name_table.dart';
 
 /// Numeric and matrix literals, shared by RPN and infix.
 ///
-/// A literal is exact (runbook D50): `0.1` is 1/10 and `1e400` is 10^400.
-/// A `~` in front of a literal, its sign included, makes it approximate
-/// (runbook D56): `~0.1`, `~-0.1`, `~[[1 2]]`. A `~` on one entry of a
-/// matrix literal makes the whole matrix approximate (runbook D49). A
-/// fraction of two integers, `1/3` or `-5/3`, is a literal too (runbook
-/// D59), so every exact value `cx` prints can be typed back, alone or as a
+/// A literal is exact: `0.1` is 1/10 and `1e400` is 10^400.
+/// A `~` in front of a literal, its sign included, makes it approximate:
+/// `~0.1`, `~-0.1`, `~[[1 2]]`. A `~` on one entry of a
+/// matrix literal makes the whole matrix approximate. A
+/// fraction of two integers, `1/3` or `-5/3`, is a literal too,
+/// so every exact value `cx` prints can be typed back, alone or as a
 /// matrix entry.
 abstract final class Literals {
-  /// The approximate mark of runbook D54 and D56.
+  /// The mark of an approximate literal.
   static const String approximateMark = '~';
 
   static final RegExp _number = RegExp(
@@ -44,7 +44,7 @@ abstract final class Literals {
 
   /// The text with the `~` placed before the sign, when [text] is a sign
   /// followed by a marked literal (`-~0.1` gives `~-0.1`), or null. The mark
-  /// belongs to the literal, so that form is a syntax error (runbook D56).
+  /// belongs to the literal, so that form is a syntax error.
   static String? misplacedMarkFix(String text) {
     if (text.length < 3 ||
         (text[0] != '-' && text[0] != '+') ||
@@ -62,7 +62,7 @@ abstract final class Literals {
   /// The value [text] spells, or null when it is not a literal.
   ///
   /// Throws `limit-exceeded` when an exact number would have more than
-  /// [maxDigits] digits (runbook D55), `non-finite` for `NaN`, `Infinity`
+  /// [maxDigits] digits, `non-finite` for `NaN`, `Infinity`
   /// and an approximate number out of the `double` range, and
   /// `syntax-error` for a misplaced `~` or a malformed matrix literal.
   static Matrix? parse(String text, {required int maxDigits}) {
@@ -146,7 +146,7 @@ abstract final class Literals {
     return _Entry.exact(value!);
   }
 
-  // A fraction `p/q` of two integers (runbook D59): exact, or the double
+  // A fraction `p/q` of two integers: exact, or the double
   // nearest to it when [marked], with no digit limit then, as for a marked
   // decimal. A zero denominator is `non-finite`, as the division `p q /`
   // is.
@@ -200,8 +200,8 @@ abstract final class Literals {
     final Object tree = _MatrixLiteralParser(body, token).parse();
     final List<List<String>> rows = _shape(tree as List<Object>, token);
 
-    // One `~`, outside or on any entry, makes the whole matrix approximate
-    // (runbook D56), so no entry is read as exact first.
+    // One `~`, outside or on any entry, makes the whole matrix approximate,
+    // so no entry is read as exact first.
     final bool marked =
         outerMark ||
         rows.any(
@@ -245,7 +245,7 @@ abstract final class Literals {
     if (tree.isEmpty) {
       // An empty matrix literal is well-formed syntax that names an
       // impossible shape, in both RPN and infix, so this is
-      // dimension-mismatch, not syntax-error (spec section 6).
+      // dimension-mismatch, not syntax-error.
       throw MatrixShapeError(
         'Matrix literal cannot be empty.',
         errorId: CalculatrixErrorId.dimensionMismatch,
@@ -297,7 +297,7 @@ final class _Entry {
 // Parses the bracket structure of a matrix literal into nested lists of
 // entry texts. Entries are separated by commas, whitespace or both, and
 // rows may touch with no separator at all, as in the HP 50g's own
-// `[[0 -1][1 0]]` (issue #29).
+// `[[0 -1][1 0]]`.
 final class _MatrixLiteralParser {
   _MatrixLiteralParser(this._source, this._token);
 
@@ -398,7 +398,7 @@ final class _MatrixLiteralParser {
 
   // A name of the name table inside the literal (`[[pi 0] [0 1]]`) is the
   // one cause of an invalid literal the message can name: entries must be
-  // numbers, and a constant is a name (runbook-agent-usability.md D67). A
+  // numbers, and a constant is a name. A
   // letter right after a digit or a dot is part of a number (`1e3`), not a
   // name.
   static final RegExp _nameInLiteral = RegExp(
