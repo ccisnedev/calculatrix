@@ -540,6 +540,7 @@ people and may change. Each id belongs to one phase:
 | run | `approximate_equality` | `equal` or `not_equal` with an approximate operand |
 | run | `dimension_mismatch` | incompatible or impossible shapes, an index out of range |
 | run | `singular_matrix` | inverting a singular matrix |
+| run | `rank_deficient` | `qr` on a matrix without full column rank |
 | run | `non_finite` | a result or literal that is not a finite number |
 | run | `log_undefined` | a logarithm, square root or fractional power with no principal value |
 | run | `ambiguous_power` | a power of matrices whose logarithm branch is not determined |

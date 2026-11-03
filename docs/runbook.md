@@ -70,7 +70,8 @@ match the roadmap. Then the language design continues.
   change history, so the language evolves in this repository.
   Spec 0.1 draft in `docs/spec/language.md`; L40–L56 settled while
   writing it.
-- [ ] **2.2b Mathematics independent of the implementation.**
+- [x] **2.2b Mathematics independent of the implementation.**
+  Rewritten for language 0.1; L57–L63 settled while writing it.
   `calculatrix_mathematics.md` defines what each word computes without
   naming core (it says "describes core 0.8.0" and cites `Matrix.exp`),
   with the vocabulary names of the spec, and fixes every result that

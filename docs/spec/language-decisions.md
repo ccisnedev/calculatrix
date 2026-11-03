@@ -524,6 +524,68 @@ them.
   `stack_effect`; a body accumulates through a variable. Infix always
   produces such bodies.
 
+### Mathematics independent of the engine
+
+- **L57. Approximate results agree within a tolerance, not bit for
+  bit.** The specification fixes the mathematical quantity each word
+  approximates, never the algorithm or the order of floating-point
+  operations. Exact results stay identical across engines (E2); an
+  approximate result only has to be close enough (L58). This settles
+  contract Q3: the text of an approximate value has to read back as
+  the same double in the engine that wrote it, not to be the same
+  text in every engine.
+
+- **L58. Close enough is measured on the whole matrix.** An
+  approximate result X is conforming when
+  ‖X − Y‖ ≤ 1e-10 · ‖Y‖ + 1e-12, with Y the true value and ‖·‖ the
+  infinity norm (the largest sum of absolute values in a row). A
+  decision taken with a tolerance (a pivot ≤ 1e-12, two eigenvalues
+  within 1e-10) is fixed only outside a band around its threshold;
+  inside the band either answer conforms, and the conformance suite
+  tests no case inside it.
+
+- **L59. The pivot of `lu` is the largest entry, the first on a
+  tie.** For exact and approximate values alike: the pivot of each
+  column is its entry of largest absolute value on or below the
+  diagonal, the uppermost when several tie. A column with no nonzero
+  candidate is left as it is, so a singular matrix has a
+  decomposition with a zero on the diagonal of U. Both paths give the
+  same P outside the band of L58. The first nonzero pivot (the
+  convention of exact algebra, P = I whenever possible) was weighed
+  and set aside: it would make `a lu` and `a approximate lu` differ in
+  structure, not only in rounding.
+
+- **L60. `qr` needs full column rank.** `qr` leaves the reduced Q
+  (m×n, orthonormal columns) and R (n×n, upper triangular, positive
+  diagonal), which are unique when A has full column rank. A matrix
+  without it is `rank_deficient`, a new error id.
+
+- **L61. The eigenvectors of `diagonalize` are not scaled.** D holds
+  the eigenvalues in descending order. For each eigenvalue λ, the
+  columns of P are the basis of the null space of A − λI read from
+  its reduced row echelon form: for each free column j, in increasing
+  order, the vector with 1 at j, minus the entries of column j at the
+  pivot columns, and 0 elsewhere. So `diagonalize` is exact when A is
+  exact and every eigenvalue is rational.
+
+- **L62. `limit_digits` applies to values, never to estimates.** A
+  value that reaches the stack (a literal or the result of a word)
+  with a numerator or denominator of more than `maxDigits` digits is
+  `limit_digits`. What a word computes inside does not count. An
+  engine may stop early only when it knows the result will exceed
+  the limit, never because an upper bound says it might.
+
+- **L63. Exact fractional powers come from a closed list of forms.**
+  For an exact B and an exact non-integer exponent p/q, the result is
+  exact when B is one of these forms and its rule gives a rational
+  result: a scalar (with its complex principal value when negative),
+  a diagonal matrix, a complex number with q = 2, or λI + N with N
+  nilpotent (the finite binomial series, λ^(p/q) rational). Any other
+  base gives the approximate result, even when a rational root
+  exists. Guessing a rational from the approximate result and
+  checking it was set aside: the guess depends on bits that L57 does
+  not fix.
+
 ### Scope of computation
 
 - **L26. Numeric and symbolic, matrices first.** The language computes
@@ -568,7 +630,10 @@ questions above settle:
 
 - Bindings are declared with `parameter` (L29) and used as bare words,
   not the `:price` push of E17; this settles Q2.
-- Value types become matrix, program, name; booleans carry a mark (L12).
+- One value type, the matrix; booleans carry a mark (L8, L12).
+- Approximate values agree within a tolerance (L57, L58); this
+  settles Q3.
+- A new error id, `rank_deficient` (L60).
 - E7 holds in full: with L10 every name is checked in `prepare`, and
   with L28 the arity of every function.
 - Host examples move from `:base :tax 1 + *` to RPN with `var` or to
