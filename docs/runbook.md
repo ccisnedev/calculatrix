@@ -78,7 +78,7 @@ match the roadmap. Then the language design continues.
   engines could otherwise compute differently, such as the pivoting of
   exact `lu`. Done when: an engine in another language can be built
   from the specs alone.
-- [ ] **2.3 Update the engine contract** (`engine-api-contract.md`) as
+- [x] **2.3 Update the engine contract** (`engine-api-contract.md`) as
   listed in "Impact on the engine contract".
 
 ## Working rules

@@ -625,18 +625,6 @@ computation); spec 0.1 does not depend on it.
 
 ## Impact on the engine contract
 
-Pending edits to `engine-api-contract.md`, to be made once the open
-questions above settle:
-
-- Bindings are declared with `parameter` (L29) and used as bare words,
-  not the `:price` push of E17; this settles Q2.
-- One value type, the matrix; booleans carry a mark (L8, L12).
-- Approximate values agree within a tolerance (L57, L58); this
-  settles Q3.
-- A new error id, `rank_deficient` (L60).
-- E7 holds in full: with L10 every name is checked in `prepare`, and
-  with L28 the arity of every function.
-- Host examples move from `:base :tax 1 + *` to RPN with `var` or to
-  infix.
-- A session is part of the contract (L30): the engine offers appending a
-  block to a program and running up to it; this settles Q5.
+Applied in `engine-api-contract.md` 0.2: `parameter` (L29) settles Q2,
+sessions (L30) settle Q5, a tolerance (L57, L58) settles Q3, one value
+type (L8), and every name and arity checked in `prepare` (L10, L28).

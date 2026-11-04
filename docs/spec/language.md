@@ -325,7 +325,8 @@ price 21 percent                        # the VAT of price
 A session is one program written in parts. The blocks of a document and
 the lines of a calculator are appended to one program: variables,
 functions and the stack carry on, and every rule above applies
-unchanged.
+unchanged. Each part has its own notation: an infix part is appended
+as its translation, so a document may mix RPN and infix blocks.
 
 - Running a block of a document runs the document from its start up to
   that block, and the block shows the stack as it is after it.
@@ -671,8 +672,9 @@ translates to
 
 ## 10. Prepare and run
 
-A program is checked before it runs. `prepare` reads the whole text and
-reports, with no code run:
+A program is checked before it runs. The host says which notation a
+text is written in, RPN or infix; the text itself never says it.
+`prepare` reads the whole text and reports, with no code run:
 
 - syntax errors, and in infix the translation;
 - every name: defined before use, never redefined, assigned only when
@@ -788,9 +790,7 @@ end
 - `break`, `return`, `times`, `each`.
 - The modulus of a complex number in `absolute_value`.
 - Symbolic computation, and the canonical form of symbolic results.
-- Whether the text of an approximate value is identical across engines
-  (the shortest round-trip double) or equal within a tolerance; until
-  it is decided, conformance compares approximate values within the
-  tolerance of `calculatrix_mathematics.md`.
+- A program as a library whose functions a host calls by name; a host
+  calls a function by appending a call to a session (section 4.7).
 - The document format (Markdown with blocks and `{{ }}`), which has its
   own specification.
