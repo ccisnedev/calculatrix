@@ -56,16 +56,29 @@ match the roadmap. Then the language design continues.
   upstream, open as macss-dev/cli_router#10.
 - [x] **1.7 CI runs the CLI.** `ci.yml` analyzes and tests `code/cli`
   on every pull request (#95).
-- [ ] **1.8 Merge.** One PR with phase 1 into main.
+- [x] **1.8 Merge.** One PR with phase 1 into main (#99); `cx` 0.16.3
+  released.
 
 ## Phase 2. Language specification
 
-- [ ] **2.1 Settle the open questions** of `language-decisions.md`, in
-  the order it states (O10, then O4, ...).
-- [ ] **2.2 Write the versioned specification** of the language from
+- [x] **2.1 Settle the open questions** of `language-decisions.md`, in
+  the order it states (O10, then O4, ...), so the language meets its
+  requirements (R1 documents, R2 no ambiguity). Settled as L28–L39;
+  O6 waits for the symbolic stage.
+- [x] **2.2 Write the versioned specification** of the language from
   the decisions: one document with a language version and its own
   change history, so the language evolves in this repository.
-- [ ] **2.3 Update the engine contract** (`engine-api-contract.md`) as
+  Spec 0.1 draft in `docs/spec/language.md`; L40–L56 settled while
+  writing it.
+- [x] **2.2b Mathematics independent of the implementation.**
+  Rewritten for language 0.1; L57–L63 settled while writing it.
+  `calculatrix_mathematics.md` defines what each word computes without
+  naming core (it says "describes core 0.8.0" and cites `Matrix.exp`),
+  with the vocabulary names of the spec, and fixes every result that
+  engines could otherwise compute differently, such as the pivoting of
+  exact `lu`. Done when: an engine in another language can be built
+  from the specs alone.
+- [x] **2.3 Update the engine contract** (`engine-api-contract.md`) as
   listed in "Impact on the engine contract".
 
 ## Working rules

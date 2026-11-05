@@ -318,8 +318,7 @@ renders them, adding two things: the route suggestion of the shortcut
 **Size limit.** An exact result whose numerator or denominator would have
 more digits than the limit is `limit-exceeded`, raised before the
 computation when the size can be estimated, never an approximate result
-instead (estimates: `docs/spec/calculatrix_mathematics.md`, section
-"Exactness"). `details` carry `limit` and `estimated`, and the message gives
+instead. `details` carry `limit` and `estimated`, and the message gives
 the next step: the same command with `approx` before the failing word, or
 `~` before a failing literal, and `--max-digits`. The default limit is 10000
 digits; `--max-digits <n>` on `eval rpn`, `eval infix` and the shortcut sets
