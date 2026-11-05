@@ -1,0 +1,262 @@
+[
+  {
+    "name": "function_square_plus_one",
+    "notation": "infix",
+    "source": [
+      "function f(x)",
+      "  x^2 + 1",
+      "end",
+      "f(3)"
+    ],
+    "rpn": "{ :x variable x 2 power 1 add } :f function 3 f",
+    "expect": {
+      "stack": [
+        "10"
+      ],
+      "steps": 9
+    }
+  },
+  {
+    "name": "function_square_plus_one_rpn",
+    "notation": "rpn",
+    "source": [
+      "{ :x variable x 2 power 1 add } :f function 3 f"
+    ],
+    "expect": {
+      "stack": [
+        "10"
+      ],
+      "steps": 9
+    }
+  },
+  {
+    "name": "recursion_factorial",
+    "notation": "infix",
+    "source": [
+      "function fact(n)",
+      "  if n <= 1",
+      "    1",
+      "  else",
+      "    n * fact(n - 1)",
+      "  end",
+      "end",
+      "fact(5)"
+    ],
+    "rpn": "{ :n variable n 1 less_equal { 1 } { n n 1 subtract fact multiply } ifelse } :fact function 5 fact",
+    "expect": {
+      "stack": [
+        "120"
+      ],
+      "steps": 53
+    }
+  },
+  {
+    "name": "inverse_by_adjugate",
+    "notation": "infix",
+    "source": [
+      "var a = [[1 2] [3 4]]",
+      "var b = (1/det(a))*adj(a)",
+      "a*b"
+    ],
+    "rpn": "[[1 2] [3 4]] :a variable 1 a determinant divide a adjugate multiply :b variable a b multiply",
+    "expect": {
+      "stack": [
+        "[[1 0] [0 1]]"
+      ]
+    }
+  },
+  {
+    "name": "several_results_lu",
+    "notation": "infix",
+    "source": [
+      "var a = [[4 3] [6 3]]",
+      "var p, l, u = lu(a)",
+      "p*a == l*u"
+    ],
+    "rpn": "[[4 3] [6 3]] :a variable a lu :u variable :l variable :p variable p a multiply l u multiply equal",
+    "expect": {
+      "stack": [
+        "true"
+      ]
+    }
+  },
+  {
+    "name": "parameter_and_percent",
+    "notation": "infix",
+    "source": [
+      "parameter price",
+      "price + percent(price, 21)"
+    ],
+    "bindings": {
+      "price": "200"
+    },
+    "rpn": ":price parameter price price 21 percent add",
+    "expect": {
+      "stack": [
+        "242"
+      ]
+    }
+  },
+  {
+    "name": "quadratic_rational_roots",
+    "notation": "infix",
+    "source": [
+      "parameter a",
+      "parameter b",
+      "parameter c",
+      "var d = b^2 - 4*a*c",
+      "var x1 = (-b + sqrt(d)) / (2*a)",
+      "var x2 = (-b - sqrt(d)) / (2*a)",
+      "x1",
+      "x2"
+    ],
+    "bindings": {
+      "a": "1",
+      "b": "-3",
+      "c": "2"
+    },
+    "rpn": ":a parameter :b parameter :c parameter b 2 power 4 a multiply c multiply subtract :d variable b negate d square_root add 2 a multiply divide :x1 variable b negate d square_root subtract 2 a multiply divide :x2 variable x1 x2",
+    "expect": {
+      "stack": [
+        "2",
+        "1"
+      ]
+    }
+  },
+  {
+    "name": "quadratic_complex_roots",
+    "notation": "infix",
+    "source": [
+      "parameter a",
+      "parameter b",
+      "parameter c",
+      "var d = b^2 - 4*a*c",
+      "var x1 = (-b + sqrt(d)) / (2*a)",
+      "var x2 = (-b - sqrt(d)) / (2*a)",
+      "x1",
+      "x2"
+    ],
+    "bindings": {
+      "a": "1",
+      "b": "0",
+      "c": "4"
+    },
+    "rpn": ":a parameter :b parameter :c parameter b 2 power 4 a multiply c multiply subtract :d variable b negate d square_root add 2 a multiply divide :x1 variable b negate d square_root subtract 2 a multiply divide :x2 variable x1 x2",
+    "expect": {
+      "stack": [
+        "[[0 -2] [2 0]]",
+        "[[0 2] [-2 0]]"
+      ]
+    }
+  },
+  {
+    "name": "quadratic_irrational_roots",
+    "notation": "infix",
+    "source": [
+      "parameter a",
+      "parameter b",
+      "parameter c",
+      "var d = b^2 - 4*a*c",
+      "var x1 = (-b + sqrt(d)) / (2*a)",
+      "var x2 = (-b - sqrt(d)) / (2*a)",
+      "x1",
+      "x2"
+    ],
+    "bindings": {
+      "a": "1",
+      "b": "0",
+      "c": "-2"
+    },
+    "rpn": ":a parameter :b parameter :c parameter b 2 power 4 a multiply c multiply subtract :d variable b negate d square_root add 2 a multiply divide :x1 variable b negate d square_root subtract 2 a multiply divide :x2 variable x1 x2",
+    "expect": {
+      "stack": [
+        "~1.4142135623730951",
+        "~-1.4142135623730951"
+      ]
+    }
+  },
+  {
+    "name": "newton_exact",
+    "notation": "infix",
+    "source": [
+      "parameter s",
+      "var x = s",
+      "var step = 1",
+      "while abs(step) > 1e-10",
+      "  step = (x^2 - s) / (2*x)",
+      "  x = x - step",
+      "end",
+      "x"
+    ],
+    "bindings": {
+      "s": "2"
+    },
+    "rpn": ":s parameter s :x variable 1 :step variable { step absolute_value 1e-10 greater } { x 2 power s subtract 2 x multiply divide :step assign x step subtract :x assign } while x",
+    "expect": {
+      "stack": [
+        "886731088897/627013566048"
+      ],
+      "steps": 101
+    }
+  },
+  {
+    "name": "newton_approximate",
+    "notation": "infix",
+    "source": [
+      "parameter s",
+      "var x = approximate(s)",
+      "var step = 1",
+      "while abs(step) > 1e-10",
+      "  step = (x^2 - s) / (2*x)",
+      "  x = x - step",
+      "end",
+      "x"
+    ],
+    "bindings": {
+      "s": "2"
+    },
+    "expect": {
+      "stack": [
+        "~1.4142135623730951"
+      ],
+      "steps": 102
+    }
+  },
+  {
+    "name": "catch_singular_matrix",
+    "notation": "infix",
+    "source": [
+      "var a = [[1 2] [2 4]]",
+      "try",
+      "  inv(a)",
+      "catch singular_matrix",
+      "  var r, c = size(a)",
+      "  zeros(r, c)",
+      "end"
+    ],
+    "rpn": "[[1 2] [2 4]] :a variable { a inverse } :singular_matrix { a size :c variable :r variable r c zeros } try",
+    "expect": {
+      "stack": [
+        "[[0 0] [0 0]]"
+      ]
+    }
+  },
+  {
+    "name": "for_sum_one_to_ten",
+    "notation": "infix",
+    "source": [
+      "var s = 0",
+      "for k in 1:10",
+      "  s = s + k",
+      "end",
+      "s"
+    ],
+    "rpn": "0 :s variable 1 10 { :k variable s k add :s assign } for s",
+    "expect": {
+      "stack": [
+        "55"
+      ],
+      "steps": 56
+    }
+  }
+]

@@ -562,6 +562,28 @@ A run reports one error: the first phase that fails (prepare, binding,
 run, limit), and within `prepare` the error that comes first in the
 text.
 
+**Where an error points.** Every error has a span: an offset and a
+length in the source the host passed, counted in Unicode code points
+from 0, with its line and column counted from 1.
+
+| Error | Span |
+|---|---|
+| `syntax_error` | the first token that cannot be read; when the text ends too soon, length 0 at its end |
+| `unknown_word`, `name_exists` | the name |
+| `not_assignable` | the name given to `assign` |
+| `stack_effect` | the word whose effect does not hold: `ifelse`, `try`, `function`, `while`, `for`, `if`, or the word whose count is not a literal |
+| `stack_underflow`, `parameter_in_function`, `unsupported_feature` | the word |
+| `binding_missing`, `binding_invalid` | the name in the declaration of the parameter |
+| `binding_unknown`, `limit_source` | none: the error is about no place in the text |
+| every error of phase `run`, and `limit_digits`, `limit_steps`, `limit_stack`, `limit_calls` | the word or literal that failed, inside a function body when it failed there |
+
+In infix the span points into the infix text, at what the word came
+from: the operator of an operation, the name of a call, the literal,
+the name of a variable or parameter, the keyword of a statement
+(`if`, `while`, `for`, `try`, `function`, `var`, `parameter`), and the
+`=` of an assignment. A call that leaves several values inside an
+expression points to the call.
+
 ## 9. Infix
 
 ### 9.1 Statements
@@ -687,7 +709,10 @@ runs the program, counting steps.
 
 ## 11. Examples
 
-Each example gives infix, its RPN translation, and the stack left.
+Each example gives infix, its RPN translation, and the stack left. An
+approximate value is shown as the shortest text that reads back as its
+doubles; another conforming engine may leave doubles that differ
+within the tolerance of `calculatrix_mathematics.md`, section 3.
 
 **A function.**
 
@@ -763,6 +788,57 @@ price + percent(price, 21)
 ```
 
 With `price` bound to `200`: `1: 242`.
+
+**The quadratic formula.**
+
+```
+parameter a
+parameter b
+parameter c
+var d = b^2 - 4*a*c
+var x1 = (-b + sqrt(d)) / (2*a)
+var x2 = (-b - sqrt(d)) / (2*a)
+x1
+x2
+```
+
+```
+:a parameter :b parameter :c parameter b 2 power 4 a multiply c multiply subtract :d variable b negate d square_root add 2 a multiply divide :x1 variable b negate d square_root subtract 2 a multiply divide :x2 variable x1 x2
+```
+
+| `a` | `b` | `c` | Stack |
+|---|---|---|---|
+| `1` | `-3` | `2` | `2: 2`, `1: 1` |
+| `1` | `0` | `4` | `2: [[0 -2] [2 0]]`, `1: [[0 2] [-2 0]]` (2i and −2i, exact) |
+| `1` | `0` | `-2` | `2: ~1.4142135623730951`, `1: ~-1.4142135623730951` |
+
+The same program gives exact, complex and approximate roots: the square
+root of the discriminant decides (`calculatrix_mathematics.md`).
+
+**Newton with a convergence test.** The square root of `s`, starting
+from `s`, until a step is smaller than 1e-10.
+
+```
+parameter s
+var x = s
+var step = 1
+while abs(step) > 1e-10
+  step = (x^2 - s) / (2*x)
+  x = x - step
+end
+x
+```
+
+```
+:s parameter s :x variable 1 :step variable { step absolute_value 1e-10 greater } { x 2 power s subtract 2 x multiply divide :step assign x step subtract :x assign } while x
+```
+
+With `s` bound to `2`, every value stays exact; the steps are 1/2,
+1/12, 1/408, 1/470832 and 1/627013566048, and the stack is
+`1: 886731088897/627013566048`. With `var x = approximate(s)` the same
+loop runs on doubles, takes the same five steps, and leaves
+`1: ~1.4142135623730951`. No step is close to 1e-10, so every engine
+stops at the same turn (`calculatrix_mathematics.md`, section 3.2).
 
 **Catching an error.**
 

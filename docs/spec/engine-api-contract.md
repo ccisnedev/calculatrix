@@ -189,12 +189,14 @@ possibly carrying a boolean mark (`language.md`, section 3).
 - **E23.** `phase` is one of `prepare`, `binding`, `run` or `limit`
   (`language.md`, section 8), plus `open` for `limit_unsupported`.
 - **E24.** `span` points into the source the host passed, in its own
-  notation: an infix error points into the infix text. For an error
+  notation, by the rules of `language.md`, section 8; it is absent for
+  an error that is about no place in the text. For an error
   inside a function, `span` points to the word that failed in the
   body, and `trace` lists the spans of the calls that led to it,
   innermost first.
-- **E25.** `stack` is the stack at the moment of the failure, in the
-  form of E20; for a `prepare` or `binding` error it is the stack the
+- **E25.** `stack` is the stack just before the word or literal that
+  failed, in the form of E20; for a `prepare` or `binding` error it is
+  the stack the
   run would have started with. A failed run never returns partial
   results.
 - **E26.** The ids of `language.md`, section 8, and of this contract
@@ -231,7 +233,8 @@ A session is one program written in parts (`language.md`, section 4.7).
   `Engine.info` reports both, the conformance suite version the engine
   passes, and the maximum of every limit (E32).
 - **E28.** A conforming engine passes 100% of the conformance suite for
-  its declared language version. The suite compares exact values by
+  its declared language version. The suite, in `conformance/`, follows
+  the format of `conformance.md`, and compares exact values by
   text, approximate values within the tolerance of
   `calculatrix_mathematics.md`, section 3, and errors by id, phase,
   span and stack. Partial engines declare which feature sets they

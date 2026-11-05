@@ -1,0 +1,227 @@
+[
+  {
+    "name": "stack_underflow_add",
+    "notation": "rpn",
+    "source": [
+      "1 add"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_underflow",
+        "phase": "prepare",
+        "span": {
+          "offset": 2,
+          "length": 3
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "unknown_word",
+    "notation": "rpn",
+    "source": [
+      "x"
+    ],
+    "expect": {
+      "error": {
+        "id": "unknown_word",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 1
+        }
+      }
+    }
+  },
+  {
+    "name": "name_exists_variable",
+    "notation": "rpn",
+    "source": [
+      "1 :x variable 2 :x variable"
+    ],
+    "expect": {
+      "error": {
+        "id": "name_exists",
+        "phase": "prepare",
+        "span": {
+          "offset": 16,
+          "length": 2
+        }
+      }
+    }
+  },
+  {
+    "name": "stack_effect_branches_differ",
+    "notation": "rpn",
+    "source": [
+      "true { 1 } { 2 3 } ifelse"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_effect",
+        "phase": "prepare",
+        "span": {
+          "offset": 19,
+          "length": 6
+        }
+      }
+    }
+  },
+  {
+    "name": "singular_matrix_inverse",
+    "notation": "rpn",
+    "source": [
+      "[[1 2] [2 4]] inverse"
+    ],
+    "expect": {
+      "error": {
+        "id": "singular_matrix",
+        "phase": "run",
+        "span": {
+          "offset": 14,
+          "length": 7
+        },
+        "stack": [
+          "[[1 2] [2 4]]"
+        ]
+      }
+    }
+  },
+  {
+    "name": "non_finite_divide_by_zero",
+    "notation": "rpn",
+    "source": [
+      "1 0 divide"
+    ],
+    "expect": {
+      "error": {
+        "id": "non_finite",
+        "phase": "run",
+        "span": {
+          "offset": 4,
+          "length": 6
+        },
+        "stack": [
+          "1",
+          "0"
+        ]
+      }
+    }
+  },
+  {
+    "name": "limit_steps",
+    "notation": "rpn",
+    "source": [
+      "1 2 add"
+    ],
+    "limits": {
+      "maxSteps": 2
+    },
+    "expect": {
+      "error": {
+        "id": "limit_steps",
+        "phase": "limit",
+        "span": {
+          "offset": 4,
+          "length": 3
+        },
+        "stack": [
+          "1",
+          "2"
+        ]
+      }
+    }
+  },
+  {
+    "name": "binding_missing",
+    "notation": "rpn",
+    "source": [
+      ":p parameter p"
+    ],
+    "expect": {
+      "error": {
+        "id": "binding_missing",
+        "phase": "binding",
+        "span": {
+          "offset": 0,
+          "length": 2
+        }
+      }
+    }
+  },
+  {
+    "name": "binding_unknown",
+    "notation": "rpn",
+    "source": [
+      "1"
+    ],
+    "bindings": {
+      "q": "1"
+    },
+    "expect": {
+      "error": {
+        "id": "binding_unknown",
+        "phase": "binding",
+        "span": null
+      }
+    }
+  },
+  {
+    "name": "binding_invalid",
+    "notation": "rpn",
+    "source": [
+      ":p parameter p"
+    ],
+    "bindings": {
+      "p": "{ 1 }"
+    },
+    "expect": {
+      "error": {
+        "id": "binding_invalid",
+        "phase": "binding",
+        "span": {
+          "offset": 0,
+          "length": 2
+        }
+      }
+    }
+  },
+  {
+    "name": "approximate_equality",
+    "notation": "rpn",
+    "source": [
+      "~1 1 equal"
+    ],
+    "expect": {
+      "error": {
+        "id": "approximate_equality",
+        "phase": "run",
+        "span": {
+          "offset": 5,
+          "length": 5
+        }
+      }
+    }
+  },
+  {
+    "name": "not_boolean_if",
+    "notation": "rpn",
+    "source": [
+      "1 { 2 drop } if"
+    ],
+    "expect": {
+      "error": {
+        "id": "not_boolean",
+        "phase": "run",
+        "span": {
+          "offset": 13,
+          "length": 2
+        },
+        "stack": [
+          "1"
+        ]
+      }
+    }
+  }
+]

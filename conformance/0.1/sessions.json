@@ -1,0 +1,83 @@
+[
+  {
+    "name": "calculator_failed_line",
+    "session": [
+      {
+        "notation": "rpn",
+        "source": [
+          "2 3"
+        ],
+        "expect": {
+          "stack": [
+            "2",
+            "3"
+          ]
+        }
+      },
+      {
+        "notation": "rpn",
+        "source": [
+          "drop drop drop"
+        ],
+        "expect": {
+          "error": {
+            "id": "stack_underflow",
+            "phase": "prepare",
+            "span": {
+              "offset": 10,
+              "length": 4
+            }
+          }
+        }
+      },
+      {
+        "notation": "rpn",
+        "source": [
+          "add"
+        ],
+        "expect": {
+          "stack": [
+            "5"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "document_mixed_notations",
+    "session": [
+      {
+        "notation": "infix",
+        "source": [
+          "var a = 2"
+        ],
+        "expect": {
+          "stack": []
+        }
+      },
+      {
+        "notation": "rpn",
+        "source": [
+          "a a multiply"
+        ],
+        "expect": {
+          "stack": [
+            "4"
+          ]
+        }
+      },
+      {
+        "notation": "infix",
+        "source": [
+          "a + 1"
+        ],
+        "expect": {
+          "stack": [
+            "4",
+            "3"
+          ]
+        }
+      }
+    ]
+  }
+]

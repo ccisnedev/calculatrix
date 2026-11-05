@@ -81,6 +81,19 @@ match the roadmap. Then the language design continues.
 - [x] **2.3 Update the engine contract** (`engine-api-contract.md`) as
   listed in "Impact on the engine contract".
 
+## Phase 3. Close roadmap stage 1
+
+- [x] **3.1 Worked programs.** The spec has the programs the roadmap
+  asks for: quadratic formula, factorial, Newton with a convergence
+  test, error trapping.
+- [x] **3.2 Conformance suite format.** How a case is written (source,
+  notation, bindings, limits, expected stack or error with id, phase
+  and span), how approximate values are compared, and where the suite
+  lives, independent of any engine. The first cases come from the
+  examples of the spec.
+- [ ] **3.3 Roadmap and issues.** "Where we are" in `roadmap.md`
+  reflects the spec; #86 says how `percent` was settled.
+
 ## Working rules
 
 - **Simplicity first.** Clear code and processes come from simple ones.
