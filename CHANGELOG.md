@@ -54,11 +54,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ### RPN
 
-- `ENTER` with an empty draft now duplicates the top of the stack, as `ENTER`
-	does on the HP 50g with an empty command line. It does nothing on an empty
-	stack.
-- `⌫` with no draft and an empty stack no longer shows `Error`. The `DROP`
-	command itself still fails on an empty stack.
 - Matrix literals accept rows with no whitespace between them,
 	`[[0 -1][1 0]]`, the logo's form and the HP 50g's own notation, in RPN
 	and infix. It means the same as `[[0 -1] [1 0]]` (issue #29). Shipped in
@@ -210,8 +205,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	tests, which the CLI release workflow runs before every release: the
 	trap set passes 8 of 8 through `cx` (acceptance 2 of #54).
 
+## [0.7.2] - 2026-11-05
+
+Android release for the closed test on Google Play, with the improvements the
+testers asked for on the keypad and the stack.
+
 ### App
 
+- `ENTER` with an empty draft duplicates the top of the stack, as `ENTER`
+	does on the HP 50g with an empty command line. It does nothing on an empty
+	stack.
+- `⌫` with no draft and an empty stack no longer shows `Error`. The `DROP`
+	command itself still fails on an empty stack.
+- New `SPC` key to type several RPN operands on one line: `ENTER`, or the
+	operation that follows, pushes each one left to right. An invalid operand
+	leaves the stack and the line untouched and shows its own error.
 - Exact values in the app (runbook-trust.md, step T5). The display, the
 	RPN stack and the memory status go through the core formatter, the one
 	`cx` uses: `1 ÷ 3` shows `1/3`, `× 3` gives back `1`, `0.1 + 0.2` shows
