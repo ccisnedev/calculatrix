@@ -91,8 +91,15 @@ match the roadmap. Then the language design continues.
   and span), how approximate values are compared, and where the suite
   lives, independent of any engine. The first cases come from the
   examples of the spec.
-- [ ] **3.3 Roadmap and issues.** "Where we are" in `roadmap.md`
+- [x] **3.3 Roadmap and issues.** "Where we are" in `roadmap.md`
   reflects the spec; #86 says how `percent` was settled.
+- [ ] **3.4 Clean-room prototype.** A throwaway interpreter in Python,
+  written from the specs and `conformance/` alone, without reading
+  `code/`, runs the conformance suite. It lives in `.dev/`, outside git.
+  Done when: the suite has run and every place where the spec was
+  ambiguous, contradictory or incomplete is listed with its section.
+- [ ] **3.5 Settle the findings** of 3.4 one by one: each one corrects
+  the spec, the suite or the prototype.
 
 ## Working rules
 

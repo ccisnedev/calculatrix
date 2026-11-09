@@ -24,9 +24,14 @@
             "id": "stack_underflow",
             "phase": "prepare",
             "span": {
+              "part": 1,
               "offset": 10,
               "length": 4
-            }
+            },
+            "stack": [
+              "2",
+              "3"
+            ]
           }
         }
       },
@@ -75,6 +80,49 @@
           "stack": [
             "4",
             "3"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "error_in_function_of_earlier_part",
+    "bindings": {},
+    "session": [
+      {
+        "notation": "rpn",
+        "source": [
+          "{ :x variable x inverse } :f function"
+        ],
+        "expect": {
+          "stack": []
+        }
+      },
+      {
+        "notation": "rpn",
+        "source": [
+          "[[1 2] [2 4]] f"
+        ],
+        "expect": {
+          "error": {
+            "id": "singular_matrix",
+            "phase": "run",
+            "span": {
+              "part": 0,
+              "offset": 16,
+              "length": 7
+            }
+          }
+        }
+      },
+      {
+        "notation": "rpn",
+        "source": [
+          "[[2 0] [0 4]] f"
+        ],
+        "expect": {
+          "stack": [
+            "[[1/2 0] [0 1/4]]"
           ]
         }
       }

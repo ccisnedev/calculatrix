@@ -100,7 +100,13 @@ One approximate operand makes the result approximate: `1 3 divide ~1
 multiply` is ~0.3333. The reverse never happens on its own.
 
 Words that move or build entries without computing keep exactness
-(stack, construction and structure words). A word that joins several
+(stack, construction and structure words).
+
+A result that counts or permutes is exact whatever its operand: `size`,
+`rank` and the P of `lu`. It is an integer by definition, never a
+measure, so `~[[1 2] [3 4]] rank` is `2` and `~[[1 2]] size` is `1 2`.
+On an approximate operand, `rank` and the pivots of `lu` are decisions
+of section 3.2; L and U stay approximate. A word that joins several
 values (`vector`, `append_rows`, `append_columns`) gives an exact result
 only when all of them are exact.
 
@@ -122,16 +128,19 @@ guess a value the input does not determine.
 
 ### 2.4 Digits
 
-An exact value has no fixed size. A value that reaches the stack, as a
-literal or as the result of a word, with a numerator or a denominator of
-more than `maxDigits` digits is `limit_digits` (the limit and its default
+An exact value has no fixed size. A value with a numerator or a
+denominator of more than `maxDigits` digits is `limit_digits`: a
+literal or a binding before the program runs, the result of a word when
+the word leaves it (the limit and its default
 are in `engine-api-contract.md`). What a word computes on the way does
 not count, only the value it leaves. An engine may stop a word early only
 when it knows that the result will exceed the limit, never because an
 upper bound says it might.
 
-The error is never replaced by an approximate result: `2 40000 power` is
-`limit_digits`, `2 approximate 40000 power` is approximate.
+The error is never replaced by an approximate result:
+`10001/10000 3000 power` is `limit_digits` (its numerator and
+denominator have 12 001 digits), while
+`10001/10000 approximate 3000 power` is ~1.3498385611954407.
 
 ## 3. Approximate results
 
@@ -317,6 +326,9 @@ logarithm of a rotation is real, so `natural_logarithm` and
 `power` is defined on matrices: B^Y = exp(Y · log B), with the
 principal logarithm and the exponential of section 5.6. In the table,
 "scalar" is a 1×1 matrix and "complex" a 2×2 matrix in complex form.
+An exponent is an integer by its value, exact or approximate: `~2` is
+the integer 2, so `-2 ~2 power` is ~4 by row 4. The test needs no
+tolerance, since a double either is an integer or is not.
 Complex matrices commute, so for them the order of the product
 Y · log B does not matter.
 
@@ -337,6 +349,7 @@ Y · log B does not matter.
 | 11 | n×n | m×m, n ≠ m, neither scalar | `dimension_mismatch` | `[[1 0] [0 1]] [[1 0 0] [0 1 0] [0 0 1]] power` |
 | 12 | scalar < 0 | square, neither complex nor scalar | `ambiguous_power`: log B is complex and does not commute with Y | `-2 [[1 0] [0 2]] power` |
 | 13 | approximate | any, result overflows | `non_finite`. An exact result never overflows: it is exact, or `limit_digits` | `~10 400 power` is `non_finite`; `10 400 power` is the exact 10^400 |
+| 14 | diagonal, not scalar, every entry ≥ 0 | non-integer scalar y > 0 | entry by entry, with 0^y = 0; no logarithm is needed | `[[0 0] [0 4]] 3/2 power` is [[0 0] [0 8]] |
 
 **Order of the checks.** The first rule that applies decides. The
 kinds of B and Y decide, never a numerical test of whether they
@@ -344,8 +357,10 @@ commute:
 
 1. Dimensions: B is square (row 9), Y is square (row 10), and when
    neither is a scalar both have the same size (row 11).
-2. Y is a scalar: rows 1, 4, 5, 7, 8 and 13. For a scalar base, row 7
+2. Y is a scalar: rows 1, 4, 14, 5, 7, 8 and 13. For a scalar base, row 7
    comes before row 4: `0 -1 power` and `0 inverse` are `non_finite`.
+   Row 14 comes before rows 5 and 8. Whether B is diagonal is read from
+   its entries (every entry off the diagonal is 0), with no tolerance.
 3. Y is not a scalar: B = 0 is `log_undefined` (row 8); B scalar > 0
    is row 2; B complex or scalar < 0, with Y complex, is row 3. Every
    other pair is `ambiguous_power` (rows 6 and 12): `i [[1 0] [0 2]]
@@ -371,7 +386,8 @@ is exact.
     rational parts: `-4 1/4 power` is [[1 -1] [1 1]], that is 1 + i.
   - B is in complex form, q = 2, and the principal value has rational
     parts.
-  - B is diagonal with entries d ≥ 0, and every d^(p/q) is rational.
+  - B is diagonal with entries d ≥ 0 (row 14 when p/q > 0), and every
+    d^(p/q) is rational.
   - B is λI + N with N nilpotent and λ > 0, and λ^(p/q) is rational:
     the value is the finite sum Σ C(p/q, k) · λ^(p/q − k) · N^k over
     k from 0 to n − 1, with C the binomial coefficient:

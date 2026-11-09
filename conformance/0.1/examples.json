@@ -258,5 +258,130 @@
       ],
       "steps": 56
     }
+  },
+  {
+    "name": "count_is_part_of_its_word",
+    "notation": "rpn",
+    "source": [
+      "1 2 3 3 vector"
+    ],
+    "expect": {
+      "stack": [
+        "[[1] [2] [3]]"
+      ],
+      "steps": 4
+    }
+  },
+  {
+    "name": "count_added_by_infix_vector",
+    "notation": "infix",
+    "source": [
+      "vector(1, 2, 3)"
+    ],
+    "rpn": "1 2 3 3 vector",
+    "expect": {
+      "stack": [
+        "[[1] [2] [3]]"
+      ],
+      "steps": 4
+    }
+  },
+  {
+    "name": "one_by_one_matrix_is_a_scalar",
+    "notation": "rpn",
+    "source": [
+      "true transpose [[5]]"
+    ],
+    "expect": {
+      "stack": [
+        "1",
+        "5"
+      ],
+      "steps": 3
+    }
+  },
+  {
+    "name": "counts_are_exact_on_approximate_operands",
+    "notation": "rpn",
+    "source": [
+      "~[[1 2] [3 4]] rank ~[[1 2]] size"
+    ],
+    "expect": {
+      "stack": [
+        "2",
+        "1",
+        "2"
+      ],
+      "steps": 4
+    }
+  },
+  {
+    "name": "digit_limit_never_falls_back_to_approximate",
+    "notation": "rpn",
+    "source": [
+      "10001/10000 approximate 3000 power"
+    ],
+    "expect": {
+      "stack": [
+        "~1.3498385611954407"
+      ],
+      "steps": 4
+    }
+  },
+  {
+    "name": "approximate_integer_exponent",
+    "notation": "rpn",
+    "source": [
+      "-2 ~2 power ~[[1 2]] size zeros"
+    ],
+    "expect": {
+      "stack": [
+        "~4",
+        "[[0 0]]"
+      ],
+      "steps": 6
+    }
+  },
+  {
+    "name": "recursion_inside_if",
+    "notation": "rpn",
+    "source": [
+      "0 :s variable",
+      "{ :n variable n 0 greater { s n add :s assign n 1 subtract countdown } if } :countdown function",
+      "3 countdown s"
+    ],
+    "expect": {
+      "stack": [
+        "6"
+      ]
+    }
+  },
+  {
+    "name": "boolean_binding",
+    "notation": "rpn",
+    "source": [
+      ":p parameter p { 1 } { 2 } ifelse"
+    ],
+    "bindings": {
+      "p": "true"
+    },
+    "expect": {
+      "stack": [
+        "1"
+      ]
+    }
+  },
+  {
+    "name": "power_of_diagonal_with_zero",
+    "notation": "rpn",
+    "source": [
+      "[[0 0] [0 4]] 3/2 power"
+    ],
+    "expect": {
+      "stack": [
+        "[[0 0] [0 8]]"
+      ],
+      "steps": 3
+    }
   }
 ]

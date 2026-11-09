@@ -54,7 +54,7 @@ count (`language.md`, section 6).
 |---|---|---|
 | `id` | yes | The error id. |
 | `phase` | yes | `prepare`, `binding`, `run` or `limit`. |
-| `span` | no | `{"offset", "length"}`, by the rules of `language.md`, section 8. `null` states that the error has no span. |
+| `span` | no | `{"offset", "length"}`, by the rules of `language.md`, section 8, plus `"part"` in a session (E39). `null` states that the error has no span. |
 | `stack` | no | The stack just before the word that failed (E25). |
 
 Line and column follow from the offset, so a case does not repeat them.

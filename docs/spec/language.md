@@ -117,7 +117,7 @@ constant `i` is `[[0 -1] [1 0]]`. What makes a result exact, and what
 each mathematical word computes, is defined in
 `calculatrix_mathematics.md`.
 
-**Booleans** are the matrices `[1]` and `[0]` carrying a boolean mark,
+**Booleans** are the scalars 1 and 0 carrying a boolean mark,
 written `true` and `false`.
 
 - Comparisons, `and`, `or`, `not`, `true` and `false` produce marked
@@ -125,18 +125,20 @@ written `true` and `false`.
 - Words that move or store a value without computing keep the mark:
   stack words, `variable`, `assign`, and reading a variable.
 - Every other word drops it: `true true +` is `2`, `true transpose` is
-  `[[1]]`.
+  `1`.
 - The mark does not affect equality: `true 1 ==` is `true`.
 - Every word that takes a condition (`if`, `ifelse`, `while`, `and`,
   `or`, `not`) accepts only a marked boolean; anything else is
   `not_boolean`.
 
-**Text.** Every value has one text that, read as a literal, gives the
-value back:
+**Text.** Every value has one text that, read as a literal (or as
+`true` or `false`), gives the value back:
 
 - an exact scalar is an integer or a fraction in lowest terms with the
   sign on the numerator: `-7`, `1/3`;
-- a matrix is its rows: `[[1 2] [3 4]]`;
+- a matrix is its rows: `[[1 2] [3 4]]`; a 1×1 matrix is always written
+  as a scalar, whatever word made it, so `[[5]]` reads as `5` and
+  `true transpose` is `1`;
 - an approximate value carries `~` once in front of it;
 - a boolean is `true` or `false`;
 
@@ -239,9 +241,19 @@ stack:
   3 fact                                # 6
   ```
 
-  In a recursive function the branch that does not recurse fixes the
-  effect, and the recursive branch is checked against it. A function
-  with no such branch has no effect to fix, and is `stack_effect`.
+  The effect of a recursive function is deduced without its recursive
+  calls, then the whole body is checked against it:
+  - the bodies of `if`, `while` and `for` have their effect fixed by
+    rule (section 4.4), so a recursive call inside them does not stop
+    the deduction: `{ :n var n 0 > { n 1 - f } if } :f function` takes
+    one value and leaves none;
+  - of the two programs of `ifelse` or `try`, the one with no recursive
+    call fixes the effect of both;
+  - a call of a function defined inside the body that calls the outer
+    function counts as a recursive call where it is written;
+  - a recursive call directly in the body, or in both programs of an
+    `ifelse` or a `try`, leaves nothing to fix the effect, and is
+    `stack_effect`.
 
 ### 4.4 Stack effects
 
@@ -262,10 +274,18 @@ whole program (section 10).
 
   `5 true { 1 + } if` and `0 1 10 { + } for` are `stack_effect`; a
   body accumulates through a variable: `s k + :s assign`.
-- A count is a literal of a positive integer (`0 pick` and
+- A count is an exact literal of a positive integer (`0 pick`, `~2 pick` and
   `2.5 vector` are `type_mismatch`, found by `prepare`). Only the
   counts of `vector`, `pick` and `roll` decide a stack effect; the
   sizes of `zeros` or `identity` may be computed (`n identity`).
+- An integer that gives structure (a count, an index, a size, a bound
+  of `for`) must be exact: the shape of a program never depends on
+  rounding. `~2 identity` is `type_mismatch`; `~[[1 2]] size zeros`
+  works, because `size` is exact (`calculatrix_mathematics.md`,
+  section 2.2).
+- A count is part of its word, as a name or a program written in place
+  is: it is never pushed, so it counts no step and no stack depth, and
+  never shows in the stack of an error. `1 2 3 3 vector` is 4 steps.
 
 ### 4.5 Control
 
@@ -290,13 +310,13 @@ s                                       # 55
   ends with the run, and the names outside it
   are visible and can be assigned. So after `c { 1 :x var } if`, `x`
   does not exist, whatever `c` was.
-- In `for`, `a` and `b` are integer scalars; anything else is
-  `type_mismatch`.
+- In `for`, `a` and `b` are exact integer scalars; anything else,
+  `~1` included, is `type_mismatch`.
 - In `try`, the id is a name literal of a run error (section 8):
   `:singular_matrix`. There is no way to catch any error: two ids take
   two nested `try`. A name that is no run error is `unknown_word`.
-  `limit_*` errors and errors of `prepare` and of binding are never
-  caught. What `A` assigned before failing stays assigned; only the
+  `try` catches only errors of phase `run`: an error of phase
+  `prepare`, `binding` or `limit` is never caught, whatever its id. What `A` assigned before failing stays assigned; only the
   stack is restored.
 
 ### 4.6 Parameters
@@ -308,16 +328,18 @@ A program declares each value it receives from its host:
 price 21 percent                        # the VAT of price
 ```
 
-- A parameter holds a matrix, is used as a bare word, and is visible
+- A parameter holds a value, is used as a bare word, and is visible
   from its declaration on. It cannot be assigned.
 - Parameters are declared at the top level of the program, outside any
   function or control body (`parameter_in_function`).
-- A value given by the host is the text of a matrix literal; anything
-  else (`true`, `{ 1 }`, `1/0`) is `binding_invalid`.
+- A value given by the host is the text of a matrix literal, or `true`
+  or `false`, which give the marked booleans. So every result can be
+  passed back as a value. Anything else (`{ 1 }`, `1/0`, `pi`) is
+  `binding_invalid`.
 - Before running, the values the host gives are checked against the
   declarations: a missing value is `binding_missing`, a value with no
   declaration is `binding_unknown`, and a text that is not a value
-  literal is `binding_invalid`. Values reach the program only this way,
+  text is `binding_invalid`. Values reach the program only this way,
   never by splicing text into it.
 
 ### 4.7 Sessions
@@ -333,6 +355,9 @@ as its translation, so a document may mix RPN and infix blocks.
 - In a calculator, each line is appended. `var` on an existing name is
   `name_exists`; `assign` changes it. A line that fails is not
   appended: the session stays as it was before it.
+- An error points to the word that failed, in whichever part it is
+  written, and says which part that is (`engine-api-contract.md`,
+  section 8).
 - Limits count per run. Running a block of a document counts the whole
   document up to it.
 - Nothing persists between sessions.
@@ -490,8 +515,8 @@ is the number 1000, and `-pi` is written `pi negate`.
 Every run counts steps, so a step limit stops at the same point on every
 engine:
 
-- pushing a literal (`3`, `[[1 2]]`): 1; a program or a name written
-  in place is part of its word and counts nothing;
+- pushing a literal (`3`, `[[1 2]]`): 1; a program, a name or a count
+  written in place is part of its word and counts nothing;
 - running a word of the vocabulary: 1, whatever work it does;
 - pushing a variable or parameter: 1;
 - calling a function: 1, plus the steps of its body;
@@ -499,7 +524,10 @@ engine:
   of a loop included. The index that `for` pushes is not written, so it
   counts nothing.
 
-A word that fails counts its step.
+A step is counted before it runs: a word or literal whose step would
+go over `maxSteps` does not run, and the error is `limit_steps`, with
+the stack just before it. So a word that fails has counted its step,
+and `1 0 divide` with `maxSteps` 2 is `limit_steps`, not `non_finite`.
 
 Infix counts on its translation: `a + b` is 3 steps.
 
@@ -507,20 +535,32 @@ Infix counts on its translation: `a + b` is 3 steps.
 
 A run has limits on digits of exact numbers, steps, stack depth, source
 length and call depth. Their defaults and maxima are part of the engine
-contract. Going over one is an error of phase `limit`
-(`limit_digits`, `limit_steps`, `limit_stack`, `limit_source`,
-`limit_calls`), which no `try` catches. The call depth counts calls of
-functions only, not runs of control bodies.
+contract. Going over one while running is an error of phase `limit`
+(`limit_digits`, `limit_steps`, `limit_stack`, `limit_calls`), which no
+`try` catches. A source longer than `maxSourceLength` and a literal with
+too many digits are found before running, in phase `prepare`; a binding
+with too many digits, in phase `binding` (section 8). The call depth is the number
+of function calls running at once; control bodies do not count. A call
+that would make it greater than `maxCallDepth` is `limit_calls`, at
+that call: with `maxCallDepth` 1, a function runs but cannot call
+another.
 
 ## 8. Errors
 
 Every error has an id. The id is the contract; the message is for
-people and may change. Each id belongs to one phase:
+people and may change. The phase says when the error was found:
 
-- **prepare**: found in the text, before anything runs;
-- **binding**: the host's values against the declared parameters;
+- **prepare**: in the text alone, before anything runs;
+- **binding**: in the host's values, checked against the declared
+  parameters before anything runs;
 - **run**: while running;
-- **limit**: a limit of the run.
+- **limit**: while running, over a limit.
+
+The table gives the phase where each id is found. An id of another
+phase that the text alone already shows is found by `prepare`, in phase
+`prepare`: `0 pick` is `type_mismatch`, `1/0` is `non_finite`, a
+literal with more digits than `maxDigits` is `limit_digits`. A binding
+with too many digits is `limit_digits` in phase `binding`.
 
 | Phase | Id | Raised for |
 |---|---|---|
@@ -528,14 +568,14 @@ people and may change. Each id belongs to one phase:
 | prepare | `unknown_word` | a token that is no literal, no word and no name in scope |
 | prepare | `name_exists` | defining a name that already exists |
 | prepare | `not_assignable` | `assign` on a parameter, a function or a constant |
-| prepare | `stack_effect` | an effect that does not hold: branches that differ, a function reaching below its arguments, a body that does not leave the stack as it found it, a call leaving several values inside an infix expression, a count of names that does not match, a count that is not a literal |
-| prepare | `stack_underflow` | a word with fewer values below it than it takes |
+| prepare | `stack_effect` | an effect that does not hold: branches that differ, a function reaching below its arguments, a body that does not leave the stack as it found it, a call leaving several values inside an infix expression, an infix call with more or fewer arguments than its word takes, a count of names that does not match, a count that is not a literal |
+| prepare | `stack_underflow` | a word outside any body with fewer values below it than it takes; inside a body it is `stack_effect`, even when the stack is empty (`true { drop } if`) |
 | prepare | `parameter_in_function` | `parameter` inside a function |
 | prepare | `unsupported_feature` | a feature of a newer language version than the engine's |
 | binding | `binding_missing` | a declared parameter with no value |
 | binding | `binding_unknown` | a value with no declared parameter |
 | binding | `binding_invalid` | a value text that is not a value literal |
-| run | `type_mismatch` | an operand of the wrong kind: a non-integer or non-positive index, a non-scalar divisor, a non-integer bound of `for` |
+| run | `type_mismatch` | an operand of the wrong kind: an index or a size that is not an exact positive integer, a non-scalar divisor, a bound of `for` that is not an exact integer |
 | run | `not_boolean` | a condition, `and`, `or` or `not` on a value that is not a marked boolean |
 | run | `not_ordered` | a comparison or `absolute_value` on a value that is not a real scalar |
 | run | `approximate_equality` | `equal` or `not_equal` with an approximate operand |
@@ -547,7 +587,8 @@ people and may change. Each id belongs to one phase:
 | run | `ambiguous_power` | a power of matrices whose logarithm branch is not determined |
 | run | `complex_result` | a real word whose result would be complex |
 | run | `not_diagonalizable` | `diagonalize`, or a word built on it, on a defective matrix |
-| limit | `limit_digits`, `limit_steps`, `limit_stack`, `limit_source`, `limit_calls` | a limit of the run |
+| prepare | `limit_source` | a source longer than `maxSourceLength` |
+| limit | `limit_digits`, `limit_steps`, `limit_stack`, `limit_calls` | a limit of the run |
 
 Since every word has a known effect, `prepare` follows the depth of the
 stack through the whole program, from the stack the program starts
@@ -555,12 +596,26 @@ with (empty, or the session's), and reports `stack_underflow` there.
 
 Every error in a literal is found by `prepare`, with the id of its
 cause: `1.5/2` and `0x10` are `syntax_error`, `[]` is
-`dimension_mismatch`, `1/0` and `~1e400` are `non_finite`. So no `try`
-catches them.
+`dimension_mismatch`, `1/0` and `~1e400` are `non_finite`, and a
+literal with more digits than `maxDigits` is `limit_digits`, even in a
+branch that never runs. So no `try` catches them. A binding with more
+digits than `maxDigits` is `limit_digits` too, found before the run
+starts, at the name in the declaration of the parameter.
 
-A run reports one error: the first phase that fails (prepare, binding,
-run, limit), and within `prepare` the error that comes first in the
-text.
+A run reports one error, the first one found. `prepare` looks for
+errors in a fixed order and stops at the first:
+
+1. the length of the source (`limit_source`);
+2. the reading of the whole text: the first token that cannot be read
+   is the `syntax_error`;
+3. the checks of the RPN program (for infix, of its translation), word
+   by word from left to right; a body is checked word by word before
+   the word that controls it.
+
+So `x [1 2` is `syntax_error`, `true { + y } if` is `stack_effect` at
+`+`, found before `y` is reached, and infix `foo(bar)`, which
+is `bar foo`, is `unknown_word` at `bar`. Then the bindings are checked
+in the order the parameters are declared, and then the program runs.
 
 **Where an error points.** Every error has a span: an offset and a
 length in the source the host passed, counted in Unicode code points
@@ -571,7 +626,8 @@ from 0, with its line and column counted from 1.
 | `syntax_error` | the first token that cannot be read; when the text ends too soon, length 0 at its end |
 | `unknown_word`, `name_exists` | the name |
 | `not_assignable` | the name given to `assign` |
-| `stack_effect` | the word whose effect does not hold: `ifelse`, `try`, `function`, `while`, `for`, `if`, or the word whose count is not a literal |
+| `type_mismatch` of a count | the count |
+| `stack_effect` | in a body that takes values from below where it starts, the word that takes them (`dup` in `{ dup * } :sq function`); in a body that leaves the wrong number of values, its control word (`ifelse`, `try`, `function`, `while`, `for`, `if`); the word whose count is not a literal; the name of an infix call |
 | `stack_underflow`, `parameter_in_function`, `unsupported_feature` | the word |
 | `binding_missing`, `binding_invalid` | the name in the declaration of the parameter |
 | `binding_unknown`, `limit_source` | none: the error is about no place in the text |
@@ -582,7 +638,8 @@ from: the operator of an operation, the name of a call, the literal,
 the name of a variable or parameter, the keyword of a statement
 (`if`, `while`, `for`, `try`, `function`, `var`, `parameter`), and the
 `=` of an assignment. A call that leaves several values inside an
-expression points to the call.
+expression points to the call, and so does an error of the count that
+`vector(...)` adds.
 
 ## 9. Infix
 
@@ -658,10 +715,18 @@ From the tightest to the loosest:
   message says `write √(9)`.
 - A call inside an expression must leave exactly one value: `x + lu(a)`
   is `stack_effect`, and the message suggests `var p, l, u = lu(a)`.
+- A call passes exactly as many arguments as its word takes, so it
+  never reaches into the stack below them: `add(1)` and `sqrt(4, 9)`
+  are `stack_effect`, at the name of the call.
 - `vector(x, y, z)` translates to `T(x) T(y) T(z) 3 vector`: the
-  translation adds the number of arguments.
+  translation adds the number of arguments, which is not an argument
+  itself.
 - Names (variables, parameters, constants, `true`, `false`) are bare
-  words: `pi`, `price`.
+  words: `pi`, `price`. A function, the user's included, is always
+  called with parentheses, even with no arguments: after
+  `function g() 5 end`, `g()` calls it, `g` alone is `syntax_error` and
+  the message says `write g()`; `pi()` is `syntax_error` and the
+  message says `write pi`.
 - Matrix literals hold numbers only, as in RPN.
 
 ### 9.3 Translation

@@ -223,5 +223,346 @@
         ]
       }
     }
+  },
+  {
+    "name": "call_too_few_arguments",
+    "notation": "infix",
+    "source": [
+      "add(1)"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_effect",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 3
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "call_too_many_arguments",
+    "notation": "infix",
+    "source": [
+      "sqrt(4, 9)"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_effect",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 4
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "limit_digits_power",
+    "notation": "rpn",
+    "source": [
+      "10001/10000 3000 power"
+    ],
+    "expect": {
+      "error": {
+        "id": "limit_digits",
+        "phase": "limit",
+        "span": {
+          "offset": 17,
+          "length": 5
+        },
+        "stack": [
+          "10001/10000",
+          "3000"
+        ]
+      }
+    }
+  },
+  {
+    "name": "approximate_size",
+    "notation": "rpn",
+    "source": [
+      "~2 identity"
+    ],
+    "expect": {
+      "error": {
+        "id": "type_mismatch",
+        "phase": "run",
+        "span": {
+          "offset": 3,
+          "length": 8
+        },
+        "stack": [
+          "~2"
+        ]
+      }
+    }
+  },
+  {
+    "name": "recursion_with_nothing_to_fix_the_effect",
+    "notation": "rpn",
+    "source": [
+      "{ :n variable n 1 subtract f } :f function"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_effect",
+        "phase": "prepare"
+      }
+    }
+  },
+  {
+    "name": "limit_calls_counts_active_calls",
+    "notation": "rpn",
+    "source": [
+      "{ :n variable n 0 greater { n 1 subtract g } if } :g function 1 g"
+    ],
+    "limits": {
+      "maxCallDepth": 1
+    },
+    "expect": {
+      "error": {
+        "id": "limit_calls",
+        "phase": "limit",
+        "span": {
+          "offset": 41,
+          "length": 1
+        }
+      }
+    }
+  },
+  {
+    "name": "limit_digits_literal_in_branch_never_run",
+    "notation": "rpn",
+    "source": [
+      "false { 123456 drop } if"
+    ],
+    "limits": {
+      "maxDigits": 5
+    },
+    "expect": {
+      "error": {
+        "id": "limit_digits",
+        "phase": "prepare",
+        "span": {
+          "offset": 8,
+          "length": 6
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "limit_digits_binding",
+    "notation": "rpn",
+    "source": [
+      ":p parameter p"
+    ],
+    "bindings": {
+      "p": "123456"
+    },
+    "limits": {
+      "maxDigits": 5
+    },
+    "expect": {
+      "error": {
+        "id": "limit_digits",
+        "phase": "binding",
+        "span": {
+          "offset": 0,
+          "length": 2
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "run_id_found_by_prepare",
+    "notation": "rpn",
+    "source": [
+      "1 2 0 pick"
+    ],
+    "expect": {
+      "error": {
+        "id": "type_mismatch",
+        "phase": "prepare",
+        "span": {
+          "offset": 4,
+          "length": 1
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "syntax_error_before_checks",
+    "notation": "rpn",
+    "source": [
+      "x [1 2"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 6,
+          "length": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "first_error_in_rpn_order",
+    "notation": "rpn",
+    "source": [
+      "true { + y } if"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_effect",
+        "phase": "prepare",
+        "span": {
+          "offset": 7,
+          "length": 1
+        }
+      }
+    }
+  },
+  {
+    "name": "first_error_in_translation_order",
+    "notation": "infix",
+    "source": [
+      "foo(bar)"
+    ],
+    "rpn": "bar foo",
+    "expect": {
+      "error": {
+        "id": "unknown_word",
+        "phase": "prepare",
+        "span": {
+          "offset": 4,
+          "length": 3
+        }
+      }
+    }
+  },
+  {
+    "name": "step_counted_before_the_word_runs",
+    "notation": "rpn",
+    "source": [
+      "1 0 divide"
+    ],
+    "limits": {
+      "maxSteps": 2
+    },
+    "expect": {
+      "error": {
+        "id": "limit_steps",
+        "phase": "limit",
+        "span": {
+          "offset": 4,
+          "length": 6
+        },
+        "stack": [
+          "1",
+          "0"
+        ]
+      }
+    }
+  },
+  {
+    "name": "function_reaching_below_its_arguments",
+    "notation": "rpn",
+    "source": [
+      "{ dup multiply } :sq function"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_effect",
+        "phase": "prepare",
+        "span": {
+          "offset": 2,
+          "length": 3
+        }
+      }
+    }
+  },
+  {
+    "name": "body_reaching_below_on_empty_stack",
+    "notation": "rpn",
+    "source": [
+      "true { drop } if"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_effect",
+        "phase": "prepare",
+        "span": {
+          "offset": 7,
+          "length": 4
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "not_boolean_while_condition",
+    "notation": "rpn",
+    "source": [
+      "{ 1 } { } while"
+    ],
+    "expect": {
+      "error": {
+        "id": "not_boolean",
+        "phase": "run",
+        "span": {
+          "offset": 10,
+          "length": 5
+        },
+        "stack": [
+          "1"
+        ]
+      }
+    }
+  },
+  {
+    "name": "infix_function_without_parentheses",
+    "notation": "infix",
+    "source": [
+      "function g()",
+      "  5",
+      "end",
+      "g"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 21,
+          "length": 1
+        }
+      }
+    }
+  },
+  {
+    "name": "infix_name_with_parentheses",
+    "notation": "infix",
+    "source": [
+      "pi()"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 2
+        }
+      }
+    }
   }
 ]
