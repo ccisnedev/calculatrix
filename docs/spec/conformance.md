@@ -78,6 +78,8 @@ session (`engine-api-contract.md`, section 8):
 ```
 
 Each part is appended in order and checked against its own `expect`.
+A session case may give `bindings` and `limits`, which apply to the
+whole session.
 
 ## 4. Comparing
 

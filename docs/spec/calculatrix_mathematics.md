@@ -121,7 +121,8 @@ only when all of them are exact.
   that rounds to the same double under `approximate`. The simplest is
   the one with the smallest denominator and, among those, the smallest
   absolute numerator. So `0.1 approximate exact` is 1/10. On an exact
-  value it changes nothing.
+  value it does not change the value; like every word that computes, it
+  drops the boolean mark: `true exact` is 1.
 
 No word turns an approximate value exact with a tolerance: it would
 guess a value the input does not determine.
@@ -148,6 +149,11 @@ An approximate value holds finite doubles only. After each word, an
 approximate result with an infinite or NaN entry is `non_finite`
 (`~1e308 ~1e308 add`). An exact result is never `non_finite`: it is
 exact, or `limit_digits`.
+
+An approximate value never holds a negative zero: an entry that would
+be −0.0, in the result of a word or in a literal such as `~-0.0`, is
++0.0. So `~0 negate` is `~0`, and its text reads back as the same
+doubles.
 
 ### 3.1 What an engine must give
 

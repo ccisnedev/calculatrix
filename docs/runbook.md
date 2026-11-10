@@ -93,13 +93,14 @@ match the roadmap. Then the language design continues.
   examples of the spec.
 - [x] **3.3 Roadmap and issues.** "Where we are" in `roadmap.md`
   reflects the spec; #86 says how `percent` was settled.
-- [ ] **3.4 Clean-room prototype.** A throwaway interpreter in Python,
+- [x] **3.4 Clean-room prototype.** A throwaway interpreter in Python,
   written from the specs and `conformance/` alone, without reading
   `code/`, runs the conformance suite. It lives in `.dev/`, outside git.
   Done when: the suite has run and every place where the spec was
   ambiguous, contradictory or incomplete is listed with its section.
-- [ ] **3.5 Settle the findings** of 3.4 one by one: each one corrects
-  the spec, the suite or the prototype.
+- [x] **3.5 Settle the findings** of 3.4 one by one: each one corrects
+  the spec, the suite or the prototype. Settled as L64–L96; the suite
+  grew to 86 cases, all passed by the prototype.
 
 ## Working rules
 

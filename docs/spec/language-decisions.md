@@ -733,6 +733,112 @@ engines differ. Each decision below closes one of those places.
   function with no arguments was set aside: it gives two ways to write
   one thing (R2).
 
+- **L82. In infix `/` is always division, after `~` too.** Infix
+  `~1/3` is `~1 3 divide`; fraction literals exist only in RPN and in
+  matrix literals. The value is the same as the RPN literal `~1/3`,
+  because a division of doubles is rounded to the nearest. Reading a
+  whole fraction after `~` was set aside: an exception to a rule that
+  has none.
+
+- **L83. Parentheses make an expression.** A call in parentheses must
+  leave one value, even on its own: `(lu(a))` is `stack_effect`.
+  Treating parentheses around a lone call as transparent was set
+  aside: a call of several values is written without them, and one
+  rule (parentheses group a value) is enough.
+
+- **L84. An infix span points to what is written.** A count of names
+  that does not match points to `var` or `=`; a `variable` added by
+  the translation for a function parameter or a `for` index points to
+  that name in the text. Pointing to the keyword of the statement
+  (`function`, `for`) was set aside: each added word comes from one
+  written name, and that name is the more precise place.
+
+- **L85. The reserved words are reserved in both notations.** The
+  keywords of infix cannot be defined as names in RPN either, so a
+  name defined in one notation can be used from the other in a
+  session. They are listed once, with the rules of names. Reserving
+  them only in infix was set aside: an RPN name such as `end` could
+  never be read from an infix part.
+
+- **L86. A count is read by its value.** Any exact literal whose
+  value is a positive integer is a count: `2`, `2.0`, `4/2`, `[[2]]`.
+  Accepting only digits was set aside: it adds a lexical rule for one
+  case, while every other literal is read by its value.
+
+- **L87. `vector` takes scalars.** An entry of `vector` that is not a
+  scalar is `type_mismatch`. Stacking matrices as rows was set aside:
+  `append_rows` already does it.
+
+- **L88. Only a variable can be assigned.** `assign` on a name that
+  does not exist is `unknown_word`; on any existing name that is not a
+  variable, vocabulary and reserved words included, it is
+  `not_assignable`. Calling a vocabulary word unknown was set aside:
+  the name exists.
+
+- **L89. Bindings are checked in the order of the declarations, as
+  exact texts.** Each declaration in order (missing, invalid, digits),
+  then the values with no declaration. A value is exactly a value
+  text, without trimming: it is what an engine writes (E13), and a
+  host that reads text from a person trims it itself. Trimming was set
+  aside: it makes a second valid form of every value.
+
+- **L90. A session is one program for its limits; a part is whole
+  for its counts.** `maxSourceLength` bounds the sum of the parts, as
+  steps count the whole session; measuring each part alone was set
+  aside, since splitting a program would escape the limit. A count is
+  written in the same part as its word: a value an earlier part
+  already left on the stack is never read again as a count.
+
+- **L91. `exact` drops the boolean mark.** `true exact` is 1: only
+  the words that move or store a value keep the mark, and that list
+  stays closed. Keeping the mark because `exact` changes nothing on an
+  exact value was set aside: it adds an exception for a use no program
+  needs.
+
+- **L92. `Program.rpn` has one rule for whitespace in both
+  notations.** For an RPN program, as for the translation of an infix
+  one, each run of whitespace inside a literal becomes one space:
+  `[[1   2]` and `[3 4]]` on two lines give `[[1 2] [3 4]]`, so the text
+  always fits on one line. Copying literals as written was set aside,
+  since the same value would print in two ways; rewriting each literal
+  as the text of its value was set aside too, since it drops the form
+  the author chose.
+
+- **L93. A `syntax_error` points to one token.** The span is the first
+  token that cannot stand where it is, whole: `2x`, the first `{` of a
+  misplaced program, a misplaced `:x`, the `√` of `√9`; a statement or
+  a text that ends too soon gives length 0 where it ends. Spanning the
+  whole construct that fails was set aside, since it would need a rule
+  for where each construct starts and ends; leaving the span free was
+  set aside, since engines would differ.
+
+- **L94. The lexical edges are closed by the rule they already
+  follow.** What is written wrong is `syntax_error`; what has the form
+  of a name and does not exist is `unknown_word`. So `{1}`, `[[1 2]]x`,
+  `[1,,2]`, `[1,2,]`, `[[1 2] 3]` and `:π` are `syntax_error`; `-pi` is
+  `unknown_word`, since a token starts as a number only with a digit,
+  `.` or `[`, alone or after a sign or `~`. `#` starts a comment even
+  right after a token. Carriage return is whitespace and a line ends at
+  a line feed, so a text with CR LF reads the same.
+
+- **L95. Only a visible name can clash.** A function, like a variable,
+  lives until the end of its scope, and defining a name is
+  `name_exists` only when a function or variable of that name is
+  visible there: defined earlier in the text, in the same scope or an
+  enclosing one. `true { { 1 } :g fn } if { 2 } :g fn g` gives `[2]`.
+  Making function names unique in the whole program was set aside: it
+  is an exception to the lexical scope that already holds for
+  variables.
+
+- **L96. No negative zero.** Every −0.0 in an approximate value, from a
+  word or a literal, is +0.0. So the text of every approximate value
+  reads back as the same doubles, and a word that depends on the sign
+  of a zero, such as the angle of `natural_logarithm`, gives the same
+  result in every engine. Writing −0.0 without its sign only in the
+  text was set aside, since the value would still differ inside a run;
+  reading `~-0.0` as −0.0 was set aside, since it makes an exception to
+  `~` approximating the exact value.
+
 ### Scope of computation
 
 - **L26. Numeric and symbolic, matrices first.** The language computes

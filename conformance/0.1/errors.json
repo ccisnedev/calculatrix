@@ -564,5 +564,393 @@
         }
       }
     }
+  },
+  {
+    "name": "parenthesized_call_is_an_expression",
+    "notation": "infix",
+    "source": [
+      "var a = [[4 3] [6 3]]",
+      "(lu(a))"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_effect",
+        "phase": "prepare",
+        "span": {
+          "offset": 23,
+          "length": 2
+        }
+      }
+    }
+  },
+  {
+    "name": "infix_name_count_mismatch",
+    "notation": "infix",
+    "source": [
+      "var x, y = 1"
+    ],
+    "expect": {
+      "error": {
+        "id": "stack_effect",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 3
+        }
+      }
+    }
+  },
+  {
+    "name": "limit_steps_on_function_parameter",
+    "notation": "infix",
+    "source": [
+      "function f(x)",
+      "  x",
+      "end",
+      "f(1)"
+    ],
+    "limits": {
+      "maxSteps": 3
+    },
+    "expect": {
+      "error": {
+        "id": "limit_steps",
+        "phase": "limit",
+        "span": {
+          "offset": 11,
+          "length": 1
+        }
+      }
+    }
+  },
+  {
+    "name": "reserved_word_in_rpn",
+    "notation": "rpn",
+    "source": [
+      "1 :end variable"
+    ],
+    "expect": {
+      "error": {
+        "id": "name_exists",
+        "phase": "prepare",
+        "span": {
+          "offset": 2,
+          "length": 4
+        }
+      }
+    }
+  },
+  {
+    "name": "vector_of_matrices",
+    "notation": "rpn",
+    "source": [
+      "[[1 2]] [[3 4]] 2 vector"
+    ],
+    "expect": {
+      "error": {
+        "id": "type_mismatch",
+        "phase": "run",
+        "span": {
+          "offset": 18,
+          "length": 6
+        },
+        "stack": [
+          "[[1 2]]",
+          "[[3 4]]"
+        ]
+      }
+    }
+  },
+  {
+    "name": "assign_to_vocabulary_word",
+    "notation": "rpn",
+    "source": [
+      "5 :add assign"
+    ],
+    "expect": {
+      "error": {
+        "id": "not_assignable",
+        "phase": "prepare",
+        "span": {
+          "offset": 2,
+          "length": 4
+        }
+      }
+    }
+  },
+  {
+    "name": "binding_missing_before_unknown",
+    "notation": "rpn",
+    "source": [
+      ":p parameter p"
+    ],
+    "bindings": {
+      "q": "1"
+    },
+    "expect": {
+      "error": {
+        "id": "binding_missing",
+        "phase": "binding",
+        "span": {
+          "offset": 0,
+          "length": 2
+        }
+      }
+    }
+  },
+  {
+    "name": "binding_with_space",
+    "notation": "rpn",
+    "source": [
+      ":p parameter p"
+    ],
+    "bindings": {
+      "p": " 2"
+    },
+    "expect": {
+      "error": {
+        "id": "binding_invalid",
+        "phase": "binding",
+        "span": {
+          "offset": 0,
+          "length": 2
+        }
+      }
+    }
+  },
+  {
+    "name": "syntax_error_at_first_misplaced_program",
+    "notation": "rpn",
+    "source": [
+      "true { 1 } { 2 } swap ifelse"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 5,
+          "length": 1
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "syntax_error_at_misplaced_name",
+    "notation": "rpn",
+    "source": [
+      ":x 5 swap var"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 2
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "syntax_error_at_end_of_cut_statement",
+    "notation": "infix",
+    "source": [
+      "a +",
+      "b"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 3,
+          "length": 0
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "syntax_error_at_square_root_sign",
+    "notation": "infix",
+    "source": [
+      "√9"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 1
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "syntax_error_on_whole_malformed_token",
+    "notation": "infix",
+    "source": [
+      "2x"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 2
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "braces_need_whitespace",
+    "notation": "rpn",
+    "source": [
+      "{1}"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 3
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "text_glued_after_matrix_literal",
+    "notation": "rpn",
+    "source": [
+      "[[1 2]]x"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 8
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "negated_name_is_a_name",
+    "notation": "rpn",
+    "source": [
+      "-pi"
+    ],
+    "expect": {
+      "error": {
+        "id": "unknown_word",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 3
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "double_comma_in_matrix_literal",
+    "notation": "rpn",
+    "source": [
+      "[1,,2]"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 6
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "trailing_comma_in_matrix_literal",
+    "notation": "rpn",
+    "source": [
+      "[1,2,]"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 6
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "entries_and_rows_mixed",
+    "notation": "rpn",
+    "source": [
+      "[[1 2] 3]"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 9
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "name_literal_outside_ascii",
+    "notation": "rpn",
+    "source": [
+      ":π variable"
+    ],
+    "expect": {
+      "error": {
+        "id": "syntax_error",
+        "phase": "prepare",
+        "span": {
+          "offset": 0,
+          "length": 2
+        },
+        "stack": []
+      }
+    }
+  },
+  {
+    "name": "visible_function_name_clashes",
+    "notation": "rpn",
+    "source": [
+      "{ 2 } :g fn true { { 1 } :g fn } if"
+    ],
+    "expect": {
+      "error": {
+        "id": "name_exists",
+        "phase": "prepare",
+        "span": {
+          "offset": 25,
+          "length": 2
+        },
+        "stack": []
+      }
+    }
   }
 ]

@@ -43,14 +43,19 @@ version.
 
 A program is a text in UTF-8.
 
-**Tokens.** In RPN, tokens are separated by whitespace (spaces, tabs,
-newlines); a newline is whitespace like any other. `{` and `}` are
-tokens and are separated from their neighbours by whitespace like any
-other token. A matrix literal is one token even when it contains
-whitespace.
+**Tokens.** In RPN, tokens are separated by whitespace: space, tab,
+line feed and carriage return. A line ends at a line feed, so a text
+with CR LF reads the same; a newline is whitespace like any other.
+`{` and `}` are tokens and are separated from their neighbours by
+whitespace like any other token; a token that contains `{` or `}` and
+is not exactly one of them, such as `{1}`, is `syntax_error`. A matrix
+literal is one token even when it contains whitespace, and ends at its
+last bracket: what follows it must be whitespace, a comment or the end
+of the text, so `[[1 2]]x` is `syntax_error`.
 
 **Comments.** `#` outside a matrix literal starts a comment that runs to
-the end of the line, in both notations.
+the end of the line, in both notations, even right after a token:
+`x#c` is `x`.
 
 **Case.** Names are case-sensitive: `A` and `a` are two names. Every word
 of the vocabulary is lowercase, so `PI` is `unknown_word`.
@@ -65,7 +70,10 @@ of the vocabulary is lowercase, so `PI` is `unknown_word`.
 A fraction `p/q` is one literal in RPN and inside matrix literals:
 `1/3`, `-5/3`; `p/0` is `non_finite`; `1.5/2`, `1/2/3` and `1/-2` are
 not literals. In infix a number has no sign (section 9.2) and `/` is
-always division, so `1/3` has the same value in both notations.
+always division, so `1/3` has the same value in both notations. Also
+after `~`: infix `~1/3` is `~1 3 divide`, 3 steps, with the same value
+as the RPN literal `~1/3`, since dividing two doubles gives the nearest
+double.
 `0x10`, `1_000`, `1e`, `NaN` and `Infinity` are not numbers.
 
 **Approximate mark.** `~` in front of a literal, before its sign, makes
@@ -84,10 +92,18 @@ range of a double is `non_finite`.
 - Entries are numbers or fractions only: no names, no expressions, no
   nesting deeper than two levels. A matrix holding variables is built
   with words (`vector`, `append_columns`, `append_rows`).
-- `[]` and ragged rows are `dimension_mismatch`; unbalanced brackets are
+- Between two entries there is at most one comma, and there is none
+  before the first entry or after the last: `[1,,2]` and `[1,2,]` are
   `syntax_error`.
+- A literal holds only entries or only rows: `[[1 2] 3]` is
+  `syntax_error`.
+- `[]` and ragged rows (`[[1 2] [3]]`) are `dimension_mismatch`;
+  unbalanced brackets are `syntax_error`.
 
-**Name literals.** `:` followed by a name: `:x`, `:vat_rate`.
+**Name literals.** `:` followed by a name: `:x`, `:vat_rate`. What
+follows `:` has the form of a user name (below); anything else, such as
+`:π` or `:1`, is `syntax_error`. `:pi` has that form, so it is
+`name_exists`.
 
 **Names.** A user name is a letter followed by letters, digits and `_`,
 in ASCII: `a`, `A2`, `vat_rate`. Words join with `_`, never `-`, since
@@ -157,7 +173,10 @@ stack. Level 1 is the top of the stack. Each token is:
 3. a user name in scope: a variable or parameter pushes its value, a
    function runs;
 4. anything else, which is `unknown_word`; a token that starts as a
-   number or a matrix literal but is malformed is `syntax_error`.
+   number or a matrix literal but is malformed is `syntax_error`. A
+   token starts as one when its first character is a digit, `.` or
+   `[`, or a sign or `~` followed by one of those: `1x` is
+   `syntax_error`, `-pi` is `unknown_word`.
 
 A program `{ ... }` or a name `:x` belongs to the word written after
 it; a program runs when that word runs it.
@@ -184,18 +203,28 @@ Three words create or change names, and each takes the name from a
   4.5). A program sees the names of the place where it is
   written, wherever it runs (a closure), and sees their current values:
   closures capture variables, not copies.
-- **Lifetime.** A variable lives until the end of its scope; since a
+- **Lifetime.** A variable or a function lives until the end of its
+  scope; since a
   program never leaves the place where it is written, nothing outlives
   its scope. Before its definition it
   does not exist: `x 1 :x var` is `unknown_word`.
 - **Every variable has a value.** `variable` always takes one, so a
   variable cannot be read before it is set.
 - **No shadowing, no redefinition.** Defining a name that already exists
-  is `name_exists`: a word of the vocabulary, a function, a parameter,
-  or a variable of the same scope or of an enclosing one.
-- **Assignment** changes a variable only. `assign` on a name never
-  defined is `unknown_word`; on a parameter, a function or a constant it
-  is `not_assignable`.
+  is `name_exists`: a word of the vocabulary, a parameter, or a
+  function or variable visible where the name is defined, that is,
+  defined earlier in the text in the same scope or in an enclosing one.
+  So `true { { 1 } :g fn } if { 2 } :g fn g` gives `[2]`, while
+  `{ 2 } :g fn true { { 1 } :g fn } if` is `name_exists`.
+- **Reserved words.** `if`, `else`, `end`, `while`, `for`, `in`, `try`,
+  `catch`, `function`, `var` and `parameter` are the keywords of infix
+  (section 9) and are reserved in both notations: defining one as a
+  name is `name_exists`, in RPN too (`1 :end var`). So every name works
+  in both notations, and a session can mix them.
+- **Assignment** changes a variable only. `assign` on a name that does
+  not exist is `unknown_word`; on any other name that is not a variable
+  (a word of the vocabulary, `true`, a reserved word, a constant, a
+  function, a parameter) it is `not_assignable`: `5 :add assign`.
 - **Same level as constants.** A user name is used as a bare word, like
   `pi`.
 
@@ -274,8 +303,9 @@ whole program (section 10).
 
   `5 true { 1 + } if` and `0 1 10 { + } for` are `stack_effect`; a
   body accumulates through a variable: `s k + :s assign`.
-- A count is an exact literal of a positive integer (`0 pick`, `~2 pick` and
-  `2.5 vector` are `type_mismatch`, found by `prepare`). Only the
+- A count is an exact literal whose value is a positive integer, in any
+  form (`2`, `2.0`, `4/2`, `[[2]]`); `0 pick`, `~2 pick` and
+  `2.5 vector` are `type_mismatch`, found by `prepare`. Only the
   counts of `vector`, `pick` and `roll` decide a stack effect; the
   sizes of `zeros` or `identity` may be computed (`n identity`).
 - An integer that gives structure (a count, an index, a size, a bound
@@ -339,7 +369,10 @@ price 21 percent                        # the VAT of price
 - Before running, the values the host gives are checked against the
   declarations: a missing value is `binding_missing`, a value with no
   declaration is `binding_unknown`, and a text that is not a value
-  text is `binding_invalid`. Values reach the program only this way,
+  text is `binding_invalid`. The declarations are checked in order,
+  each one for a missing value, then for an invalid one, then for too
+  many digits; then a value with no declaration. A value is exactly a
+  value text, with no space around it: `" 2"` is `binding_invalid`. Values reach the program only this way,
   never by splicing text into it.
 
 ### 4.7 Sessions
@@ -359,7 +392,11 @@ as its translation, so a document may mix RPN and infix blocks.
   written, and says which part that is (`engine-api-contract.md`,
   section 8).
 - Limits count per run. Running a block of a document counts the whole
-  document up to it.
+  document up to it, and `maxSourceLength` bounds the sum of the parts:
+  a part that would go over it is `limit_source` and is not appended.
+- A count is written in the same part as its word: after the part
+  `1 2 3 3`, whose last `3` is already on the stack, the part `vector`
+  is `stack_effect`.
 - Nothing persists between sessions.
 
 ## 5. Vocabulary
@@ -457,7 +494,7 @@ Stack words move matrices, keeping their exactness and boolean mark.
 
 | Name | Effect |
 |---|---|
-| `vector` | `x1 … xn n → [[x1] … [xn]]` |
+| `vector` | `x1 … xn n → [[x1] … [xn]]`; every x is a scalar, a matrix is `type_mismatch` (`append_rows` joins matrices) |
 | `zeros` | `r c → r×c zeros` |
 | `ones` | `r c → r×c ones` |
 | `identity` | `n → n×n identity` |
@@ -567,7 +604,7 @@ with too many digits is `limit_digits` in phase `binding`.
 | prepare | `syntax_error` | malformed text; in infix also `2x`, `%`, `:` outside `for`, `a < b < c`, `√9` |
 | prepare | `unknown_word` | a token that is no literal, no word and no name in scope |
 | prepare | `name_exists` | defining a name that already exists |
-| prepare | `not_assignable` | `assign` on a parameter, a function or a constant |
+| prepare | `not_assignable` | `assign` on a name that exists and is not a variable |
 | prepare | `stack_effect` | an effect that does not hold: branches that differ, a function reaching below its arguments, a body that does not leave the stack as it found it, a call leaving several values inside an infix expression, an infix call with more or fewer arguments than its word takes, a count of names that does not match, a count that is not a literal |
 | prepare | `stack_underflow` | a word outside any body with fewer values below it than it takes; inside a body it is `stack_effect`, even when the stack is empty (`true { drop } if`) |
 | prepare | `parameter_in_function` | `parameter` inside a function |
@@ -575,7 +612,7 @@ with too many digits is `limit_digits` in phase `binding`.
 | binding | `binding_missing` | a declared parameter with no value |
 | binding | `binding_unknown` | a value with no declared parameter |
 | binding | `binding_invalid` | a value text that is not a value literal |
-| run | `type_mismatch` | an operand of the wrong kind: an index or a size that is not an exact positive integer, a non-scalar divisor, a bound of `for` that is not an exact integer |
+| run | `type_mismatch` | an operand of the wrong kind: an index or a size that is not an exact positive integer, a non-scalar divisor or entry of `vector`, a bound of `for` that is not an exact integer |
 | run | `not_boolean` | a condition, `and`, `or` or `not` on a value that is not a marked boolean |
 | run | `not_ordered` | a comparison or `absolute_value` on a value that is not a real scalar |
 | run | `approximate_equality` | `equal` or `not_equal` with an approximate operand |
@@ -623,7 +660,7 @@ from 0, with its line and column counted from 1.
 
 | Error | Span |
 |---|---|
-| `syntax_error` | the first token that cannot be read; when the text ends too soon, length 0 at its end |
+| `syntax_error` | the first token that cannot stand where it is, whole: a malformed token (`2x`), the first token of a program or a `:name` not followed by the word that takes it (the first `{` in `true { 1 } { 2 } swap ifelse`, `:x` in `:x 5 swap var`), `√` in `√9`; when a statement or the text ends too soon, length 0 where it ends (at the newline in `a +` then `b`) |
 | `unknown_word`, `name_exists` | the name |
 | `not_assignable` | the name given to `assign` |
 | `type_mismatch` of a count | the count |
@@ -637,8 +674,12 @@ In infix the span points into the infix text, at what the word came
 from: the operator of an operation, the name of a call, the literal,
 the name of a variable or parameter, the keyword of a statement
 (`if`, `while`, `for`, `try`, `function`, `var`, `parameter`), and the
-`=` of an assignment. A call that leaves several values inside an
-expression points to the call, and so does an error of the count that
+`=` of an assignment. A count of names that does not match the values
+(`var x, y = 1`) points to `var` in a declaration and to `=` in an
+assignment. The `variable` that the translation adds for a parameter of
+a function or for the index of `for` points to that name as written:
+the `x` of `function f(x)`, the `k` of `for k in 1:3`. A call that
+leaves several values inside an expression points to the call, and so does an error of the count that
 `vector(...)` adds.
 
 ## 9. Infix
@@ -668,13 +709,13 @@ is open. Blocks close with `end`.
   the grammar says so, with no `:`.
 - An expression on its own is a statement and leaves its value on the
   stack. A call on its own may leave several values (`lu(a)` leaves
-  three); only inside an expression must it leave one.
+  three); only inside an expression must it leave one. Parentheses
+  always make an expression: `(lu(a))` and `var r, c = (size(a))` are
+  `stack_effect`, and the message says to drop the parentheses.
 - The condition of `if` and `while`, and the range of `for`, end at the
   end of their line or at `;`: `if a - b` then the body on the next
-  line, or `if a; -b; end` on one.
-- `if`, `else`, `end`, `while`, `for`, `in`, `try`, `catch`,
-  `function`, `var` and `parameter` are reserved: defining one as a
-  name is `name_exists`.
+  line, or `if a; b = -b; end` on one.
+- The keywords are the reserved words of section 4.2.
 - With several names before `=`, the names read in the order the word
   leaves its values, and their count must match what it leaves
   (`stack_effect` otherwise).

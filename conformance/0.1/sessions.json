@@ -127,5 +127,93 @@
         }
       }
     ]
+  },
+  {
+    "name": "count_in_an_earlier_part",
+    "bindings": {},
+    "session": [
+      {
+        "notation": "rpn",
+        "source": [
+          "1 2 3 3"
+        ],
+        "expect": {
+          "stack": [
+            "1",
+            "2",
+            "3",
+            "3"
+          ]
+        }
+      },
+      {
+        "notation": "rpn",
+        "source": [
+          "vector"
+        ],
+        "expect": {
+          "error": {
+            "id": "stack_effect",
+            "phase": "prepare",
+            "span": {
+              "part": 1,
+              "offset": 0,
+              "length": 6
+            },
+            "stack": [
+              "1",
+              "2",
+              "3",
+              "3"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "source_limit_counts_all_parts",
+    "bindings": {},
+    "limits": {
+      "maxSourceLength": 10
+    },
+    "session": [
+      {
+        "notation": "rpn",
+        "source": [
+          "1 2 add"
+        ],
+        "expect": {
+          "stack": [
+            "3"
+          ]
+        }
+      },
+      {
+        "notation": "rpn",
+        "source": [
+          "4 add"
+        ],
+        "expect": {
+          "error": {
+            "id": "limit_source",
+            "phase": "prepare",
+            "span": null
+          }
+        }
+      },
+      {
+        "notation": "rpn",
+        "source": [
+          "4"
+        ],
+        "expect": {
+          "stack": [
+            "3",
+            "4"
+          ]
+        }
+      }
+    ]
   }
 ]

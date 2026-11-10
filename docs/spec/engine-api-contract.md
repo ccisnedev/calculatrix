@@ -82,8 +82,9 @@ Session.append(source, notation)      -> Result  | Error
 - **E30. Translation is observable.** `Program.rpn` is the RPN text of
   the program: for an infix program its translation (`language.md`,
   section 9.3), byte for byte the same in every engine; for an RPN
-  program the source with comments dropped and tokens separated by one
-  space.
+  program the source with comments dropped, tokens separated by one
+  space, and each run of whitespace inside a literal replaced by one
+  space, as in the translation.
 - **E31. Definitions.** `Program.definitions` lists every function of
   the program with its name, its stack effect and the span of its
   definition, so a linter, a language server or an agent can work
@@ -102,7 +103,7 @@ Like `sqlite3_limit`: every limit has a default and its own error id.
 | `maxDigits`: digits of a numerator or denominator of any value | 10 000 | `limit_digits` |
 | `maxSteps`: steps of one run (`language.md`, section 6) | 1 000 000 | `limit_steps` |
 | `maxStackDepth`: values on the stack | 10 000 | `limit_stack` |
-| `maxSourceLength`: bytes of the source | 1 048 576 | `limit_source` |
+| `maxSourceLength`: bytes of the source; in a session, of all its parts | 1 048 576 | `limit_source` |
 | `maxCallDepth`: nested function calls | 1 000 | `limit_calls` |
 
 - **E11.** Limits are part of the run's identity (E1). Steps and digits
