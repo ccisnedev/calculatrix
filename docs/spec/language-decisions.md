@@ -586,6 +586,259 @@ them.
   checking it was set aside: the guess depends on bits that L57 does
   not fix.
 
+### Settled by the clean-room prototype
+
+An interpreter written from the specs alone found where they let two
+engines differ. Each decision below closes one of those places.
+
+- **L64. An infix call takes exactly its arguments.** A call passes as
+  many arguments as its word takes; more or fewer is `stack_effect` at
+  the name of the call. So `f(x)` uses only what the reader sees:
+  `add(1)` never adds the value below it. The count that `vector(...)`
+  adds is not an argument. Letting a call reach into the stack, since
+  an infix program means its translation, was set aside: it hides
+  inputs from the reader (R2). A new id for this error was set aside
+  too: `stack_effect` already names an effect that does not hold.
+
+- **L65. A count is part of its word.** The count of `vector`, `pick`
+  and `roll` is syntax, as a name before `variable` or a program
+  before `if`: it is never pushed, counts no step and never shows in
+  the stack of an error. `1 2 3 3 vector` is 4 steps, and so is
+  `vector(1, 2, 3)`, whose count is not in the text. Pushing it as any
+  other literal was set aside: a count must already be a literal
+  written just before its word, so treating it as a value adds a case
+  without adding anything a program can do.
+
+- **L66. A 1×1 matrix is written as a scalar.** A value has one text,
+  and a 1×1 matrix has the text of its scalar: `true transpose` is
+  `1`, not `[[1]]`. Writing `[[1]]` when a matrix word made the value
+  was set aside: the value would have to remember where it came from,
+  a second mark beside the boolean one that its text could not show.
+
+- **L67. Counts and permutations are exact.** `size`, `rank` and the
+  P of `lu` give exact values even on an approximate operand: they are
+  integers by definition, so `~[[1 2]] size zeros` works as
+  `[[1 2]] size zeros` does. Making them approximate by contagion was
+  set aside: an approximate size or rank means nothing, and every
+  program that sizes a matrix from another would then need sizes that
+  accept approximate values.
+
+- **L68. Structure needs exact integers; an exponent goes by its
+  value.** A count, an index, a size or a bound of `for` must be an
+  exact integer, so the shape of a program never depends on rounding:
+  `~2 identity` is `type_mismatch`, while `~0.1 ~0.2 + ~10 *`, which
+  is 3.0000000000000004, would otherwise fail where `~3` works. L67
+  keeps this from costing anything, since `size` and `rank` are exact.
+  The exponent of `power` is a quantity, not structure: an approximate
+  integer value takes the integer rows, so `-2 ~2 power` is ~4 and not
+  a complex form. Requiring exact integers there too was set aside,
+  since it turns `x ~2 power` into a complex form or `log_undefined`;
+  deciding everything by value was set aside for structure, as above.
+
+- **L69. A recursive function's effect is deduced without its
+  recursive calls.** The bodies of `if`, `while` and `for` have their
+  effect fixed by rule, so a recursive call inside them does not block
+  the deduction; in `ifelse` and `try` the program without a recursive
+  call fixes the effect of both; the whole body is then checked
+  against the result. Allowing recursion only in `ifelse` and `try`
+  was set aside: it rejects programs whose effect is known, such as
+  `n 0 > { n 1 - f } if`, only to make the rule shorter to state.
+
+- **L70. The call depth is the number of active calls.** A call that
+  would make more than `maxCallDepth` function calls run at once is
+  `limit_calls`. Counting only the nesting below the first call was set
+  aside: the limit should mean exactly its number.
+
+- **L71. Literals and bindings are checked for digits before the
+  run.** A literal with more than `maxDigits` digits is `limit_digits`
+  found by `prepare`, even in a branch that never runs, as every other
+  error of a literal; a binding is checked before the run starts.
+  Checking when the value is pushed was set aside: whether a program
+  fails would depend on which branches run, and a binding would go
+  unchecked until it is read.
+
+- **L72. The phase says when an error was found.** `prepare` when the
+  text alone shows it, `binding` when the host's values do, `run` and
+  `limit` while running. So `0 pick` is `type_mismatch` of phase
+  `prepare`, a literal over `maxDigits` is `limit_digits` of phase
+  `prepare`, and `limit_source` is of phase `prepare`. A host learns
+  from the phase whether the program text is wrong whatever the data,
+  and `try` catches exactly the errors of phase `run`. Giving each id
+  one fixed phase was set aside: `try` would then need an exception for
+  run ids that `prepare` finds.
+
+- **L73. `prepare` stops at the first error of a fixed order.** First
+  the source length, then the reading of the whole text, then the
+  checks of the RPN program word by word from left to right, a body
+  before its control word; for infix, the order of its translation.
+  Reporting the error with the smallest offset was set aside: it needs
+  every error found, and then rules for errors that follow from an
+  earlier one, such as an effect that cannot be known after an unknown
+  word.
+
+- **L74. A step is counted before it runs.** A word whose step would
+  go over `maxSteps` does not run, so the limit prevents work instead
+  of detecting it afterwards: `1 0 divide` with `maxSteps` 2 is
+  `limit_steps`. Counting after the word ran was set aside: a costly
+  word would run before the limit stopped it.
+
+- **L75. In a session, a span says which part it points into.** An
+  error in a function written in an earlier part points to the word
+  that failed there, and its span carries the number of that part;
+  `trace` shows the calls that led to it. Pointing always into the
+  part being appended was set aside: a document or a language server
+  would underline the call instead of the line that failed.
+
+- **L76. A session's errors before running show its stack.** The
+  stack of a `prepare` or `binding` error in a session is the stack
+  after the last part appended, the one the calculator shows and the
+  one `prepare` follows the depth from. The empty stack, read from
+  "the session runs from its start", was set aside: it matches nothing
+  the user sees.
+
+- **L77. A boolean can be a binding.** A binding is the text of a
+  matrix literal, `true` or `false`, so every result of a program can
+  be passed back to another, mark included. Keeping booleans out of
+  bindings was set aside: every host that chains programs would turn
+  `true` into `1`, and the program would lose the mark where an `if`
+  needs it.
+
+- **L78. A body that takes too much points to the word that takes.**
+  Inside a body, a word that takes values from below where the body
+  starts is `stack_effect` at that word: `{ dup * } :sq function` points
+  to `dup`, and `true { drop } if` is `stack_effect` at `drop` even on
+  an empty stack. A body that leaves the wrong number of values points
+  to its control word. Pointing always to the control word was set
+  aside: it hides which word reached too far.
+
+- **L79. A failed test shows the stack at the test.** When a control
+  word fails on a value it tests, the stack of the error is the one at
+  that test, with the tested value on top: `{ 1 } { } while` shows
+  `1`, as `1 { } if` does. The stack before the control word started
+  was set aside: it hides the value that failed and the turn it failed
+  on.
+
+- **L80. A diagonal base with entries ≥ 0 takes any positive power.**
+  For a non-integer y > 0, a diagonal B with every entry ≥ 0 is raised
+  entry by entry, with 0^y = 0: `[[0 0] [0 4]] 3/2 power` is
+  [[0 0] [0 8]], as `0 3/2 power` is 0. The value needs no logarithm,
+  and being diagonal is read from the entries without a tolerance.
+  Keeping `log_undefined` for every base with a 0 eigenvalue was set
+  aside: a scalar 0 would work while a diagonal with a 0 would not.
+
+- **L81. In infix, parentheses mark a call and only a call.** A
+  function is called with parentheses even with no arguments (`g()`),
+  and a name never takes them (`pi`, not `pi()`). So the text shows
+  what runs code and what reads a value. Allowing a bare call of a
+  function with no arguments was set aside: it gives two ways to write
+  one thing (R2).
+
+- **L82. In infix `/` is always division, after `~` too.** Infix
+  `~1/3` is `~1 3 divide`; fraction literals exist only in RPN and in
+  matrix literals. The value is the same as the RPN literal `~1/3`,
+  because a division of doubles is rounded to the nearest. Reading a
+  whole fraction after `~` was set aside: an exception to a rule that
+  has none.
+
+- **L83. Parentheses make an expression.** A call in parentheses must
+  leave one value, even on its own: `(lu(a))` is `stack_effect`.
+  Treating parentheses around a lone call as transparent was set
+  aside: a call of several values is written without them, and one
+  rule (parentheses group a value) is enough.
+
+- **L84. An infix span points to what is written.** A count of names
+  that does not match points to `var` or `=`; a `variable` added by
+  the translation for a function parameter or a `for` index points to
+  that name in the text. Pointing to the keyword of the statement
+  (`function`, `for`) was set aside: each added word comes from one
+  written name, and that name is the more precise place.
+
+- **L85. The reserved words are reserved in both notations.** The
+  keywords of infix cannot be defined as names in RPN either, so a
+  name defined in one notation can be used from the other in a
+  session. They are listed once, with the rules of names. Reserving
+  them only in infix was set aside: an RPN name such as `end` could
+  never be read from an infix part.
+
+- **L86. A count is read by its value.** Any exact literal whose
+  value is a positive integer is a count: `2`, `2.0`, `4/2`, `[[2]]`.
+  Accepting only digits was set aside: it adds a lexical rule for one
+  case, while every other literal is read by its value.
+
+- **L87. `vector` takes scalars.** An entry of `vector` that is not a
+  scalar is `type_mismatch`. Stacking matrices as rows was set aside:
+  `append_rows` already does it.
+
+- **L88. Only a variable can be assigned.** `assign` on a name that
+  does not exist is `unknown_word`; on any existing name that is not a
+  variable, vocabulary and reserved words included, it is
+  `not_assignable`. Calling a vocabulary word unknown was set aside:
+  the name exists.
+
+- **L89. Bindings are checked in the order of the declarations, as
+  exact texts.** Each declaration in order (missing, invalid, digits),
+  then the values with no declaration. A value is exactly a value
+  text, without trimming: it is what an engine writes (E13), and a
+  host that reads text from a person trims it itself. Trimming was set
+  aside: it makes a second valid form of every value.
+
+- **L90. A session is one program for its limits; a part is whole
+  for its counts.** `maxSourceLength` bounds the sum of the parts, as
+  steps count the whole session; measuring each part alone was set
+  aside, since splitting a program would escape the limit. A count is
+  written in the same part as its word: a value an earlier part
+  already left on the stack is never read again as a count.
+
+- **L91. `exact` drops the boolean mark.** `true exact` is 1: only
+  the words that move or store a value keep the mark, and that list
+  stays closed. Keeping the mark because `exact` changes nothing on an
+  exact value was set aside: it adds an exception for a use no program
+  needs.
+
+- **L92. `Program.rpn` has one rule for whitespace in both
+  notations.** For an RPN program, as for the translation of an infix
+  one, each run of whitespace inside a literal becomes one space:
+  `[[1   2]` and `[3 4]]` on two lines give `[[1 2] [3 4]]`, so the text
+  always fits on one line. Copying literals as written was set aside,
+  since the same value would print in two ways; rewriting each literal
+  as the text of its value was set aside too, since it drops the form
+  the author chose.
+
+- **L93. A `syntax_error` points to one token.** The span is the first
+  token that cannot stand where it is, whole: `2x`, the first `{` of a
+  misplaced program, a misplaced `:x`, the `√` of `√9`; a statement or
+  a text that ends too soon gives length 0 where it ends. Spanning the
+  whole construct that fails was set aside, since it would need a rule
+  for where each construct starts and ends; leaving the span free was
+  set aside, since engines would differ.
+
+- **L94. The lexical edges are closed by the rule they already
+  follow.** What is written wrong is `syntax_error`; what has the form
+  of a name and does not exist is `unknown_word`. So `{1}`, `[[1 2]]x`,
+  `[1,,2]`, `[1,2,]`, `[[1 2] 3]` and `:π` are `syntax_error`; `-pi` is
+  `unknown_word`, since a token starts as a number only with a digit,
+  `.` or `[`, alone or after a sign or `~`. `#` starts a comment even
+  right after a token. Carriage return is whitespace and a line ends at
+  a line feed, so a text with CR LF reads the same.
+
+- **L95. Only a visible name can clash.** A function, like a variable,
+  lives until the end of its scope, and defining a name is
+  `name_exists` only when a function or variable of that name is
+  visible there: defined earlier in the text, in the same scope or an
+  enclosing one. `true { { 1 } :g fn } if { 2 } :g fn g` gives `[2]`.
+  Making function names unique in the whole program was set aside: it
+  is an exception to the lexical scope that already holds for
+  variables.
+
+- **L96. No negative zero.** Every −0.0 in an approximate value, from a
+  word or a literal, is +0.0. So the text of every approximate value
+  reads back as the same doubles, and a word that depends on the sign
+  of a zero, such as the angle of `natural_logarithm`, gives the same
+  result in every engine. Writing −0.0 without its sign only in the
+  text was set aside, since the value would still differ inside a run;
+  reading `~-0.0` as −0.0 was set aside, since it makes an exception to
+  `~` approximating the exact value.
+
 ### Scope of computation
 
 - **L26. Numeric and symbolic, matrices first.** The language computes

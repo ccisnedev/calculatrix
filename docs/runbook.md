@@ -81,6 +81,27 @@ match the roadmap. Then the language design continues.
 - [x] **2.3 Update the engine contract** (`engine-api-contract.md`) as
   listed in "Impact on the engine contract".
 
+## Phase 3. Close roadmap stage 1
+
+- [x] **3.1 Worked programs.** The spec has the programs the roadmap
+  asks for: quadratic formula, factorial, Newton with a convergence
+  test, error trapping.
+- [x] **3.2 Conformance suite format.** How a case is written (source,
+  notation, bindings, limits, expected stack or error with id, phase
+  and span), how approximate values are compared, and where the suite
+  lives, independent of any engine. The first cases come from the
+  examples of the spec.
+- [x] **3.3 Roadmap and issues.** "Where we are" in `roadmap.md`
+  reflects the spec; #86 says how `percent` was settled.
+- [x] **3.4 Clean-room prototype.** A throwaway interpreter in Python,
+  written from the specs and `conformance/` alone, without reading
+  `code/`, runs the conformance suite. It lives in `.dev/`, outside git.
+  Done when: the suite has run and every place where the spec was
+  ambiguous, contradictory or incomplete is listed with its section.
+- [x] **3.5 Settle the findings** of 3.4 one by one: each one corrects
+  the spec, the suite or the prototype. Settled as L64–L96; the suite
+  grew to 86 cases, all passed by the prototype.
+
 ## Working rules
 
 - **Simplicity first.** Clear code and processes come from simple ones.

@@ -1,0 +1,495 @@
+[
+  {
+    "name": "function_square_plus_one",
+    "notation": "infix",
+    "source": [
+      "function f(x)",
+      "  x^2 + 1",
+      "end",
+      "f(3)"
+    ],
+    "rpn": "{ :x variable x 2 power 1 add } :f function 3 f",
+    "expect": {
+      "stack": [
+        "10"
+      ],
+      "steps": 9
+    }
+  },
+  {
+    "name": "function_square_plus_one_rpn",
+    "notation": "rpn",
+    "source": [
+      "{ :x variable x 2 power 1 add } :f function 3 f"
+    ],
+    "expect": {
+      "stack": [
+        "10"
+      ],
+      "steps": 9
+    }
+  },
+  {
+    "name": "recursion_factorial",
+    "notation": "infix",
+    "source": [
+      "function fact(n)",
+      "  if n <= 1",
+      "    1",
+      "  else",
+      "    n * fact(n - 1)",
+      "  end",
+      "end",
+      "fact(5)"
+    ],
+    "rpn": "{ :n variable n 1 less_equal { 1 } { n n 1 subtract fact multiply } ifelse } :fact function 5 fact",
+    "expect": {
+      "stack": [
+        "120"
+      ],
+      "steps": 53
+    }
+  },
+  {
+    "name": "inverse_by_adjugate",
+    "notation": "infix",
+    "source": [
+      "var a = [[1 2] [3 4]]",
+      "var b = (1/det(a))*adj(a)",
+      "a*b"
+    ],
+    "rpn": "[[1 2] [3 4]] :a variable 1 a determinant divide a adjugate multiply :b variable a b multiply",
+    "expect": {
+      "stack": [
+        "[[1 0] [0 1]]"
+      ]
+    }
+  },
+  {
+    "name": "several_results_lu",
+    "notation": "infix",
+    "source": [
+      "var a = [[4 3] [6 3]]",
+      "var p, l, u = lu(a)",
+      "p*a == l*u"
+    ],
+    "rpn": "[[4 3] [6 3]] :a variable a lu :u variable :l variable :p variable p a multiply l u multiply equal",
+    "expect": {
+      "stack": [
+        "true"
+      ]
+    }
+  },
+  {
+    "name": "parameter_and_percent",
+    "notation": "infix",
+    "source": [
+      "parameter price",
+      "price + percent(price, 21)"
+    ],
+    "bindings": {
+      "price": "200"
+    },
+    "rpn": ":price parameter price price 21 percent add",
+    "expect": {
+      "stack": [
+        "242"
+      ]
+    }
+  },
+  {
+    "name": "quadratic_rational_roots",
+    "notation": "infix",
+    "source": [
+      "parameter a",
+      "parameter b",
+      "parameter c",
+      "var d = b^2 - 4*a*c",
+      "var x1 = (-b + sqrt(d)) / (2*a)",
+      "var x2 = (-b - sqrt(d)) / (2*a)",
+      "x1",
+      "x2"
+    ],
+    "bindings": {
+      "a": "1",
+      "b": "-3",
+      "c": "2"
+    },
+    "rpn": ":a parameter :b parameter :c parameter b 2 power 4 a multiply c multiply subtract :d variable b negate d square_root add 2 a multiply divide :x1 variable b negate d square_root subtract 2 a multiply divide :x2 variable x1 x2",
+    "expect": {
+      "stack": [
+        "2",
+        "1"
+      ]
+    }
+  },
+  {
+    "name": "quadratic_complex_roots",
+    "notation": "infix",
+    "source": [
+      "parameter a",
+      "parameter b",
+      "parameter c",
+      "var d = b^2 - 4*a*c",
+      "var x1 = (-b + sqrt(d)) / (2*a)",
+      "var x2 = (-b - sqrt(d)) / (2*a)",
+      "x1",
+      "x2"
+    ],
+    "bindings": {
+      "a": "1",
+      "b": "0",
+      "c": "4"
+    },
+    "rpn": ":a parameter :b parameter :c parameter b 2 power 4 a multiply c multiply subtract :d variable b negate d square_root add 2 a multiply divide :x1 variable b negate d square_root subtract 2 a multiply divide :x2 variable x1 x2",
+    "expect": {
+      "stack": [
+        "[[0 -2] [2 0]]",
+        "[[0 2] [-2 0]]"
+      ]
+    }
+  },
+  {
+    "name": "quadratic_irrational_roots",
+    "notation": "infix",
+    "source": [
+      "parameter a",
+      "parameter b",
+      "parameter c",
+      "var d = b^2 - 4*a*c",
+      "var x1 = (-b + sqrt(d)) / (2*a)",
+      "var x2 = (-b - sqrt(d)) / (2*a)",
+      "x1",
+      "x2"
+    ],
+    "bindings": {
+      "a": "1",
+      "b": "0",
+      "c": "-2"
+    },
+    "rpn": ":a parameter :b parameter :c parameter b 2 power 4 a multiply c multiply subtract :d variable b negate d square_root add 2 a multiply divide :x1 variable b negate d square_root subtract 2 a multiply divide :x2 variable x1 x2",
+    "expect": {
+      "stack": [
+        "~1.4142135623730951",
+        "~-1.4142135623730951"
+      ]
+    }
+  },
+  {
+    "name": "newton_exact",
+    "notation": "infix",
+    "source": [
+      "parameter s",
+      "var x = s",
+      "var step = 1",
+      "while abs(step) > 1e-10",
+      "  step = (x^2 - s) / (2*x)",
+      "  x = x - step",
+      "end",
+      "x"
+    ],
+    "bindings": {
+      "s": "2"
+    },
+    "rpn": ":s parameter s :x variable 1 :step variable { step absolute_value 1e-10 greater } { x 2 power s subtract 2 x multiply divide :step assign x step subtract :x assign } while x",
+    "expect": {
+      "stack": [
+        "886731088897/627013566048"
+      ],
+      "steps": 101
+    }
+  },
+  {
+    "name": "newton_approximate",
+    "notation": "infix",
+    "source": [
+      "parameter s",
+      "var x = approximate(s)",
+      "var step = 1",
+      "while abs(step) > 1e-10",
+      "  step = (x^2 - s) / (2*x)",
+      "  x = x - step",
+      "end",
+      "x"
+    ],
+    "bindings": {
+      "s": "2"
+    },
+    "expect": {
+      "stack": [
+        "~1.4142135623730951"
+      ],
+      "steps": 102
+    }
+  },
+  {
+    "name": "catch_singular_matrix",
+    "notation": "infix",
+    "source": [
+      "var a = [[1 2] [2 4]]",
+      "try",
+      "  inv(a)",
+      "catch singular_matrix",
+      "  var r, c = size(a)",
+      "  zeros(r, c)",
+      "end"
+    ],
+    "rpn": "[[1 2] [2 4]] :a variable { a inverse } :singular_matrix { a size :c variable :r variable r c zeros } try",
+    "expect": {
+      "stack": [
+        "[[0 0] [0 0]]"
+      ]
+    }
+  },
+  {
+    "name": "for_sum_one_to_ten",
+    "notation": "infix",
+    "source": [
+      "var s = 0",
+      "for k in 1:10",
+      "  s = s + k",
+      "end",
+      "s"
+    ],
+    "rpn": "0 :s variable 1 10 { :k variable s k add :s assign } for s",
+    "expect": {
+      "stack": [
+        "55"
+      ],
+      "steps": 56
+    }
+  },
+  {
+    "name": "count_is_part_of_its_word",
+    "notation": "rpn",
+    "source": [
+      "1 2 3 3 vector"
+    ],
+    "expect": {
+      "stack": [
+        "[[1] [2] [3]]"
+      ],
+      "steps": 4
+    }
+  },
+  {
+    "name": "count_added_by_infix_vector",
+    "notation": "infix",
+    "source": [
+      "vector(1, 2, 3)"
+    ],
+    "rpn": "1 2 3 3 vector",
+    "expect": {
+      "stack": [
+        "[[1] [2] [3]]"
+      ],
+      "steps": 4
+    }
+  },
+  {
+    "name": "one_by_one_matrix_is_a_scalar",
+    "notation": "rpn",
+    "source": [
+      "true transpose [[5]]"
+    ],
+    "expect": {
+      "stack": [
+        "1",
+        "5"
+      ],
+      "steps": 3
+    }
+  },
+  {
+    "name": "counts_are_exact_on_approximate_operands",
+    "notation": "rpn",
+    "source": [
+      "~[[1 2] [3 4]] rank ~[[1 2]] size"
+    ],
+    "expect": {
+      "stack": [
+        "2",
+        "1",
+        "2"
+      ],
+      "steps": 4
+    }
+  },
+  {
+    "name": "digit_limit_never_falls_back_to_approximate",
+    "notation": "rpn",
+    "source": [
+      "10001/10000 approximate 3000 power"
+    ],
+    "expect": {
+      "stack": [
+        "~1.3498385611954407"
+      ],
+      "steps": 4
+    }
+  },
+  {
+    "name": "approximate_integer_exponent",
+    "notation": "rpn",
+    "source": [
+      "-2 ~2 power ~[[1 2]] size zeros"
+    ],
+    "expect": {
+      "stack": [
+        "~4",
+        "[[0 0]]"
+      ],
+      "steps": 6
+    }
+  },
+  {
+    "name": "recursion_inside_if",
+    "notation": "rpn",
+    "source": [
+      "0 :s variable",
+      "{ :n variable n 0 greater { s n add :s assign n 1 subtract countdown } if } :countdown function",
+      "3 countdown s"
+    ],
+    "expect": {
+      "stack": [
+        "6"
+      ]
+    }
+  },
+  {
+    "name": "boolean_binding",
+    "notation": "rpn",
+    "source": [
+      ":p parameter p { 1 } { 2 } ifelse"
+    ],
+    "bindings": {
+      "p": "true"
+    },
+    "expect": {
+      "stack": [
+        "1"
+      ]
+    }
+  },
+  {
+    "name": "power_of_diagonal_with_zero",
+    "notation": "rpn",
+    "source": [
+      "[[0 0] [0 4]] 3/2 power"
+    ],
+    "expect": {
+      "stack": [
+        "[[0 0] [0 8]]"
+      ],
+      "steps": 3
+    }
+  },
+  {
+    "name": "infix_approximate_fraction_is_division",
+    "notation": "infix",
+    "source": [
+      "~1/3"
+    ],
+    "rpn": "~1 3 divide",
+    "expect": {
+      "stack": [
+        "~0.3333333333333333"
+      ],
+      "steps": 3
+    }
+  },
+  {
+    "name": "count_in_any_exact_form",
+    "notation": "rpn",
+    "source": [
+      "1 2 4/2 pick [[2]] vector"
+    ],
+    "expect": {
+      "stack": [
+        "1",
+        "[[2] [1]]"
+      ],
+      "steps": 4
+    }
+  },
+  {
+    "name": "exact_drops_the_boolean_mark",
+    "notation": "rpn",
+    "source": [
+      "true exact"
+    ],
+    "expect": {
+      "stack": [
+        "1"
+      ],
+      "steps": 2
+    }
+  },
+  {
+    "name": "rpn_text_joins_whitespace_inside_literals",
+    "source": [
+      "[[1   2]",
+      "\t[3 4]]  # a matrix",
+      "2 multiply"
+    ],
+    "notation": "rpn",
+    "rpn": "[[1 2] [3 4]] 2 multiply",
+    "expect": {
+      "stack": [
+        "[[2 4] [6 8]]"
+      ]
+    }
+  },
+  {
+    "name": "comment_right_after_token",
+    "source": [
+      "2 3#c",
+      "add"
+    ],
+    "notation": "rpn",
+    "rpn": "2 3 add",
+    "expect": {
+      "stack": [
+        "5"
+      ]
+    }
+  },
+  {
+    "name": "carriage_return_is_whitespace",
+    "source": [
+      "1\r",
+      "2 add"
+    ],
+    "notation": "rpn",
+    "expect": {
+      "stack": [
+        "3"
+      ]
+    }
+  },
+  {
+    "name": "function_name_free_after_its_scope_ends",
+    "source": [
+      "true { { 1 } :g fn } if { 2 } :g fn g"
+    ],
+    "notation": "rpn",
+    "expect": {
+      "stack": [
+        "2"
+      ]
+    }
+  },
+  {
+    "name": "function_name_defined_later_does_not_clash",
+    "source": [
+      "{ { 1 } :g fn g } :f fn { 2 } :g fn f g"
+    ],
+    "notation": "rpn",
+    "expect": {
+      "stack": [
+        "1",
+        "2"
+      ]
+    }
+  }
+]

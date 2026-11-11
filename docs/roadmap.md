@@ -12,9 +12,11 @@ version numbers.
 - `cx`: the CLI over the core, with help, discovery and stable error
   ids. 8 of 8 on the benchmark trap set.
 - The calculator app (Android, Windows, web).
-- The language is designed in `spec/language-decisions.md`; nothing of
-  it (variables, functions, control flow, infix as translation) is
-  implemented yet.
+- The language is specified: `spec/language.md` (language 0.1),
+  `spec/calculatrix_mathematics.md`, `spec/engine-api-contract.md` (0.2)
+  and the conformance suite in `conformance/0.1/`, whose format is
+  `spec/conformance.md`. The reasons are in `spec/language-decisions.md`.
+  The engine does not implement it yet (stage 2).
 
 ## Stages
 

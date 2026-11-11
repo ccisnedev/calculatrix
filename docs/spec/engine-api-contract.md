@@ -68,7 +68,9 @@ Session.append(source, notation)      -> Result  | Error
 - **E7.** `prepare` never runs code. Every error of phase `prepare`
   (`language.md`, section 8) is reported here, never later.
 - **E8.** `run` with a missing, an undeclared or an invalid binding
-  fails before running anything, with a `binding_*` error.
+  fails before running anything, with a `binding_*` error; a binding
+  with more digits than `maxDigits` fails there too, with
+  `limit_digits`.
 - **E9.** A `Program` can run any number of times; runs never observe
   each other. The engine keeps no state, so there is no `reset` and no
   `finalize`.
@@ -80,8 +82,9 @@ Session.append(source, notation)      -> Result  | Error
 - **E30. Translation is observable.** `Program.rpn` is the RPN text of
   the program: for an infix program its translation (`language.md`,
   section 9.3), byte for byte the same in every engine; for an RPN
-  program the source with comments dropped and tokens separated by one
-  space.
+  program the source with comments dropped, tokens separated by one
+  space, and each run of whitespace inside a literal replaced by one
+  space, as in the translation.
 - **E31. Definitions.** `Program.definitions` lists every function of
   the program with its name, its stack effect and the span of its
   definition, so a linter, a language server or an agent can work
@@ -100,7 +103,7 @@ Like `sqlite3_limit`: every limit has a default and its own error id.
 | `maxDigits`: digits of a numerator or denominator of any value | 10 000 | `limit_digits` |
 | `maxSteps`: steps of one run (`language.md`, section 6) | 1 000 000 | `limit_steps` |
 | `maxStackDepth`: values on the stack | 10 000 | `limit_stack` |
-| `maxSourceLength`: bytes of the source | 1 048 576 | `limit_source` |
+| `maxSourceLength`: bytes of the source; in a session, of all its parts | 1 048 576 | `limit_source` |
 | `maxCallDepth`: nested function calls | 1 000 | `limit_calls` |
 
 - **E11.** Limits are part of the run's identity (E1). Steps and digits
@@ -146,9 +149,10 @@ possibly carrying a boolean mark (`language.md`, section 3).
   price` in infix. Inside the program a parameter is used as a bare
   word.
 - **E18.** Bindings are by name only, never by position. A host passes
-  each value as the text of a matrix literal, or as a value its engine
-  returned, which stands for its text. The text is read as a literal,
-  never as a program; anything else is `binding_invalid`.
+  each value as the text of a matrix literal, `true` or `false`, or as
+  a value its engine returned, which stands for its text. The text is
+  read as a value, never as a program; anything else is
+  `binding_invalid`.
 - **E19.** `Program.parameters` lists the name and the span of every
   parameter the program declares, in order, so a host can check a call
   before running it.
@@ -189,14 +193,18 @@ possibly carrying a boolean mark (`language.md`, section 3).
 - **E23.** `phase` is one of `prepare`, `binding`, `run` or `limit`
   (`language.md`, section 8), plus `open` for `limit_unsupported`.
 - **E24.** `span` points into the source the host passed, in its own
-  notation: an infix error points into the infix text. For an error
+  notation, by the rules of `language.md`, section 8; it is absent for
+  an error that is about no place in the text. For an error
   inside a function, `span` points to the word that failed in the
   body, and `trace` lists the spans of the calls that led to it,
   innermost first.
-- **E25.** `stack` is the stack at the moment of the failure, in the
-  form of E20; for a `prepare` or `binding` error it is the stack the
-  run would have started with. A failed run never returns partial
-  results.
+- **E25.** `stack` is the stack just before the word or literal that
+  failed, in the form of E20; when a control word fails on a value it
+  tests, such as the condition of `while` on any turn, it is the stack
+  at that test, with the value on top. For a `prepare` or `binding`
+  error it is the stack the run would have started with: empty for a
+  program, and in a session the stack after the last part appended. A
+  failed run never returns partial results.
 - **E26.** The ids of `language.md`, section 8, and of this contract
   keep their meaning. New ids may be added; none is ever reused for
   another meaning.
@@ -212,7 +220,13 @@ A session is one program written in parts (`language.md`, section 4.7).
   the stack after the part, with the steps counted from the start of
   the session.
 - **E35.** A part that fails is not appended: the session stays as it
-  was, and the error comes back. Its span points into that part.
+  was, and the error comes back.
+- **E39. Spans in a session name their part.** In a session, the span
+  of an error and every span of its `trace` carry `part`: the number of
+  the part the span points into, from 0, in the order the parts were
+  appended; the part being appended has the next number. An error in a
+  function written in an earlier part points to the word that failed in
+  that part, by E24.
 - **E36.** Each part has its own notation; an infix part is appended as
   its translation (E30), so a document may mix RPN and infix parts.
 - **E37.** A part that declares a parameter with no value in the
@@ -231,7 +245,8 @@ A session is one program written in parts (`language.md`, section 4.7).
   `Engine.info` reports both, the conformance suite version the engine
   passes, and the maximum of every limit (E32).
 - **E28.** A conforming engine passes 100% of the conformance suite for
-  its declared language version. The suite compares exact values by
+  its declared language version. The suite, in `conformance/`, follows
+  the format of `conformance.md`, and compares exact values by
   text, approximate values within the tolerance of
   `calculatrix_mathematics.md`, section 3, and errors by id, phase,
   span and stack. Partial engines declare which feature sets they
