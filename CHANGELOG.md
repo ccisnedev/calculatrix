@@ -205,6 +205,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	tests, which the CLI release workflow runs before every release: the
 	trap set passes 8 of 8 through `cx` (acceptance 2 of #54).
 
+## [0.7.3] - Unreleased
+
+Windows release that starts on a clean install.
+
+### Windows
+
+- The installer and the portable zip ship `msvcp140.dll`,
+	`vcruntime140.dll` and `vcruntime140_1.dll` next to `Calculatrix.exe`.
+	The 0.7.2 build had none of them, so on a machine without the Visual C++
+	redistributable the app failed at startup with `STATUS_DLL_NOT_FOUND`
+	(`0xC0000135`). The release workflow stages them before packaging, and
+	`build-installer.ps1` refuses a bundle without them.
+
 ## [0.7.2] - 2026-11-05
 
 Android release for the closed test on Google Play, with the improvements the

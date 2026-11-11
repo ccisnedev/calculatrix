@@ -1,0 +1,38 @@
+Calculatrix is a precision calculator built around a persistent RPN (Reverse Polish Notation) shell with native matrix algebra at its core.
+
+Every value in Calculatrix is a matrix. Scalars are 1×1 matrices. Complex numbers are 2×2 real matrices using the standard imaginary-unit embedding. This unified model means all operations — from simple arithmetic to full matrix algebra — share the same engine with no special cases.
+
+**RPN shell**
+The primary interface is a clean RPN stack. Push values, apply operations, and inspect committed stack registers (X0, X1, X2, …) at any time. The stack shows only committed truth — no ambiguous intermediate state.
+
+**Infix editor**
+Need a traditional expression? Tap INFIX to open a full algebraic editor with standard operator precedence (PEMDAS). Press ENTER to evaluate and push the result to the RPN stack, or CANCEL to return without changes.
+
+**Matrix editor**
+Enter matrices of any size directly from the keypad. The editor validates dimensions before pushing to the stack, keeping your workspace clean and your computations correct.
+
+**Matrix operations**
+- Addition, subtraction, multiplication
+- Scalar and matrix division
+- Transpose
+- Inverse (for square non-singular matrices)
+- Determinant
+- Trace
+- Row-reduced echelon form (RREF)
+- Rank
+
+**Complex number support**
+Complex numbers are represented as 2×2 real matrices using the imaginary-unit embedding J = [[0,−1],[1,0]]. Scalar promotion handles mixed expressions naturally, so 3 + 2J gives [[3,−2],[2,3]] without extra steps.
+
+**Precision**
+All calculations use explicit floating-point tolerances (absolute tolerance 1×10⁻¹⁴) and smart rounding to 12 significant digits for clean display output.
+
+**Memory**
+Classic MRC memory toggle — store, recall, and clear with a single key.
+
+**Design**
+Fixed keypad layout. No mode switches cluttering the interface. The module bar surfaces contextual operations (EDIT, MATH, STACK) without hiding the keys you use every day.
+
+Calculatrix is free and contains no ads, no in-app purchases, and no data collection.
+
+Privacy policy: https://ccisne.dev/legal/calculatrix/privacy/

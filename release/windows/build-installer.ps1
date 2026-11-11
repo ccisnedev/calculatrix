@@ -32,6 +32,15 @@ if (-not (Test-Path $BuildDir)) {
     throw "Flutter Windows release bundle not found: $BuildDir"
 }
 
+# The installer must be self-contained: without these the app fails to start on
+# machines that lack the VC++ redistributable. See stage-vc-runtime.ps1.
+$runtimeDlls = @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
+$missingDlls = $runtimeDlls | Where-Object { -not (Test-Path (Join-Path $BuildDir $_)) }
+
+if ($missingDlls.Count -gt 0) {
+    throw "VC runtime DLLs missing from the build bundle: $($missingDlls -join ', '). Run release\windows\stage-vc-runtime.ps1 against $BuildDir first."
+}
+
 if ([string]::IsNullOrWhiteSpace($PublicVersion)) {
     $versionLine = Select-String -Path $pubspecPath -Pattern '^version:\s*(.+)\s*$' | Select-Object -First 1
 
