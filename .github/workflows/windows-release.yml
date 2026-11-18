@@ -76,7 +76,7 @@ jobs:
         run: |
           $repoRoot = $PWD.Path
 
-          .elease\windows\stage-vc-runtime.ps1 `
+          .\release\windows\stage-vc-runtime.ps1 `
             -BuildDir (Join-Path $repoRoot "code/app/build/windows/x64/runner/Release")
 
       - name: Install Inno Setup
