@@ -37,6 +37,8 @@ is released on its own.
 
 - [ ] Run `dart pub publish --dry-run` in `code/core` when preparing a package release.
 - [ ] Run `flutter build apk --debug` or the target packaging command in `code/app` when Android artifacts matter for the release.
+- [ ] For Windows artifacts, stage the VC runtime into the release bundle with `release/windows/stage-vc-runtime.ps1` before building the installer or the portable zip, so both ship self-contained.
+- [ ] After publishing Windows release assets, update the `winget` manifest under `release/winget/manifests/` with the released `InstallerSha256` and `ReleaseDate` before opening the `winget-pkgs` PR.
 
 ## 7. Manual Gate
 

@@ -1,6 +1,6 @@
 # Public distribution
 
-Updated: 2026-10-28. The earlier step-by-step plan was mostly done or
+Updated: 2026-11-11. The earlier step-by-step plan was mostly done or
 obsolete and was cut down to what is true now and what is still to do. The
 releases themselves are described by the workflows in `.github/workflows/`
 and by [release-checklist.md](release-checklist.md); each package versions
@@ -13,7 +13,7 @@ and releases on its own ([ADR 0002](adr/0002-versioning-and-changelog-policy.md)
 | Web, https://calculatrix.ccisne.dev | Live | `pages-release.yml` on every push to `main`; also serves `install.ps1` and `install.sh` for `cx`. |
 | `cx` (Windows, Linux) | Released as `cli-vX.Y.Z` | `cli-release.yml` when `code/cli/pubspec.yaml` changes on `main`. |
 | App for Windows | Built per `vX.Y.Z` release | `windows-release.yml`: Inno Setup installer, portable zip, `SHA256SUMS.txt`. Not Authenticode-signed. |
-| App for Android | Signed `.aab` built per `vX.Y.Z` release | `android-release.yml`; see [android-release-signing.md](android-release-signing.md). Signing secrets are configured in the repository. Not yet on Google Play. |
+| App for Android | Signed `.aab` built per `vX.Y.Z` release | `android-release.yml`; see [android-release-signing.md](android-release-signing.md). Signing secrets are configured in the repository. On Google Play in a closed test (0.7.2+32 since 2026-11-05); production access requested on 2026-11-10, awaiting Google. Listing in [../store/](../store/README.md). |
 | winget | Not published | A manifest (`release/winget/manifests/c/CcisneDev/Calculatrix/0.7.1`, installer type Inno Setup, requires `Microsoft.VCRedist.2015+.x64`) was submitted in microsoft/winget-pkgs#381654, which was closed without merging. |
 | pub.dev | Published 0.0.1 only (publisher `ccisne.dev`) | The core is `calculatrix` (`code/core`, now 0.8.0); `cx` is `publish_to: none`. Releasing it follows the checklist (`dart pub publish --dry-run`). |
 
@@ -26,8 +26,9 @@ and releases on its own ([ADR 0002](adr/0002-versioning-and-changelog-policy.md)
 
 ## Still to do
 
-- Google Play: create the app in Play Console, complete the listing, Data
-  safety and App content declarations, upload a signed `.aab`.
+- Google Play: when production access is granted, promote the closed-test
+  release to production; refresh the screenshots and the description of
+  `store/` for the current app.
 - winget: find out why the submission was closed and resubmit for a current
   app version.
 - Windows: sign the installer (Authenticode) if wanted; Microsoft Store is a
