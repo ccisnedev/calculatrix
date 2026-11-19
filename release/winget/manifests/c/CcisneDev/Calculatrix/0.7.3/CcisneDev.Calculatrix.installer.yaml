@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
+PackageIdentifier: CcisneDev.Calculatrix
+PackageVersion: 0.7.3
+InstallerLocale: en-US
+MinimumOSVersion: 10.0.0.0
+InstallerType: inno
+UpgradeBehavior: install
+ReleaseDate: 2026-11-19
+Installers:
+- Architecture: x64
+  Scope: machine
+  InstallerUrl: https://github.com/ccisnedev/calculatrix/releases/download/v0.7.3/Calculatrix-windows-x64-0.7.3-setup.exe
+  InstallerSha256: 765C6DDBD85E4CADBEE5BD35D63AB2E01FFB766E407A02257949D86924DBC424
+  InstallerSwitches:
+    Silent: /VERYSILENT /SP- /NORESTART
+    SilentWithProgress: /SILENT /SP- /NORESTART
+    Custom: /ALLUSERS
+  ProductCode: CcisneDev.Calculatrix_is1
+  AppsAndFeaturesEntries:
+  - DisplayName: Calculatrix version 0.7.3
+    DisplayVersion: 0.7.3
+    Publisher: ccisne.dev
+    ProductCode: CcisneDev.Calculatrix_is1
+- Architecture: x64
+  Scope: user
+  InstallerUrl: https://github.com/ccisnedev/calculatrix/releases/download/v0.7.3/Calculatrix-windows-x64-0.7.3-setup.exe
+  InstallerSha256: 765C6DDBD85E4CADBEE5BD35D63AB2E01FFB766E407A02257949D86924DBC424
+  InstallerSwitches:
+    Silent: /VERYSILENT /SP- /NORESTART
+    SilentWithProgress: /SILENT /SP- /NORESTART
+    Custom: /CURRENTUSER
+  ProductCode: CcisneDev.Calculatrix_is1
+  AppsAndFeaturesEntries:
+  - DisplayName: Calculatrix version 0.7.3
+    DisplayVersion: 0.7.3
+    Publisher: ccisne.dev
+    ProductCode: CcisneDev.Calculatrix_is1
+ManifestType: installer
+ManifestVersion: 1.12.0
