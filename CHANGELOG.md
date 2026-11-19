@@ -205,7 +205,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 	tests, which the CLI release workflow runs before every release: the
 	trap set passes 8 of 8 through `cx` (acceptance 2 of #54).
 
-## [0.7.3] - Unreleased
+## [0.7.3] - 2026-11-18
 
 Windows release that starts on a clean install.
 

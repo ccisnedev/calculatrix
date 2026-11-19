@@ -24,6 +24,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.41.8
 
       - name: Resolve release version
         shell: pwsh
@@ -76,7 +77,7 @@ jobs:
         run: |
           $repoRoot = $PWD.Path
 
-          .elease\windows\stage-vc-runtime.ps1 `
+          .\release\windows\stage-vc-runtime.ps1 `
             -BuildDir (Join-Path $repoRoot "code/app/build/windows/x64/runner/Release")
 
       - name: Install Inno Setup
